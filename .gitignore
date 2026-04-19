@@ -1,0 +1,34 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Virtual env
+.venv/
+venv/
+
+# Streamlit
+.streamlit/secrets.toml
+
+# Project working data
+data/logs/*
+data/output/*
+data/input/*
+!data/logs/.gitkeep
+!data/output/.gitkeep
+!data/input/.gitkeep
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# Claude Code local settings
+.claude/
+
+# OS
+.DS_Store
+Thumbs.db
