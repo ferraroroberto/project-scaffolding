@@ -21,7 +21,8 @@ Clone this directory, rename it, and start building.
 - `launch_app.{bat,sh}` — one-click local launch.
 - `launch_server.{bat,sh}` — local launch + Cloudflare Tunnel for
   public sharing (no API keys leave your machine).
-- `AGENTS.md` so AI coding agents can extend the project safely.
+- `CLAUDE.md` so AI coding agents (Claude Code, Cursor, Codex, etc.) can extend the project safely. `AGENTS.md` is a one-line pointer to it for non-Claude tools.
+- `docs/agents/` — the master AGENTS/CLAUDE templates, the adapt prompt, the rollout runbook, and the standalone `print()`→`logging` migration prompt. Single source of truth for agent instructions across all my repos.
 
 ## Setup
 
@@ -74,7 +75,67 @@ launch_app.{bat,sh}
 launch_server.{bat,sh}
 ```
 
-See `AGENTS.md` for the full conventions.
+See `CLAUDE.md` for the cross-project agent conventions.
+
+## Conventions
+
+### Import rules
+
+- `app/app.py` prepends the project root to `sys.path`, so `from src.X import Y` works everywhere downstream.
+- UI code in `app/` imports from `src/`, **never the other way around**.
+- Views can import siblings as top-level modules (`from views import welcome`) because Streamlit puts `app/` on `sys.path` when it runs `app/app.py`.
+- The view directory is named `views/` (not `pages/`) on purpose: Streamlit auto-discovers any subdirectory called `pages/` and adds it to the sidebar, which would duplicate the navigation built in `app.py`.
+- Pipelines run standalone with `python -m src.pipelines.<name>` — they must not import from `app/`.
+
+### Views
+
+- One file per view in `app/views/`. Always export `def render() -> None`.
+- Register the view in `app/app.py` by appending an `st.Page` entry to `nav_pages` (Streamlit's native multipage navigation renders the sidebar entries automatically).
+- `app/app.py` itself only configures the page, renders the sidebar (light/dark toggle), and hands off to `st.navigation` — it does not draw view content directly. The landing view is `app/views/welcome.py` (registered with `default=True`).
+- A view should orchestrate; **business logic lives in `src/`** so it can be reused from the CLI or tests.
+
+### Pipelines
+
+- One file per pipeline in `src/pipelines/`. Always export `def run(**kwargs)`.
+- Pipelines must **never** call `print()` or `st.*`. They emit progress through the logger so they work the same way from the UI, the CLI, and tests.
+- Return a small JSON-serialisable summary dict (counts, timings, output paths). The UI / caller decides how to display it.
+
+### Logger
+
+```python
+from src import get_logger
+
+log = get_logger("my_pipeline")
+log.info("Loading %d rows", len(rows))
+log.warning("Skipping malformed row id=%s", row.id)
+log.error("Upload failed", exc_info=True)
+```
+
+One call → three sinks:
+
+1. Color-tinted, timestamped terminal output.
+2. Rotating file at `data/logs/app.log` (1 MB × 3 backups).
+3. In-memory ring buffer that Streamlit views can render live (see `app/views/pipeline_runner.py` for the threaded refresh pattern, and `src.stream_to_streamlit` / `src.render_log_panel` helpers).
+
+Do not configure root logging elsewhere — it is set up once in `src/logger.py` and is idempotent.
+
+### Config
+
+Read settings from `src/config.py`, not from `os.environ` directly. Add new keys there with a sensible default so the app boots without a `.env` file.
+
+## Extending the scaffold
+
+- **New view** → create `app/views/<name>.py` with `render()`, append `st.Page(<module>.render, title=..., icon=...)` to `nav_pages` inside `app/app.py`.
+- **New pipeline** → create `src/pipelines/<name>.py` with `run(...)`, log via `get_logger("<name>")`.
+- **New shared helper** → put it under `src/` and re-export from `src/__init__.py` if it is part of the public surface.
+- **New dependency** → add to `requirements.txt` (follow the existing version-specifier style), then re-run `pip install -r requirements.txt` in `.venv`.
+
+## What NOT to do
+
+- Don't sprinkle `print()` for progress — use the logger.
+- Don't import Streamlit inside `src/pipelines/*` or at the top of `src/logger.py`'s public path (the logger imports it lazily inside the Streamlit-only helpers, which is intentional).
+- Don't hardcode paths. Build them off `src.config.ROOT_DIR`, `INPUT_DIR`, `OUTPUT_DIR`, `LOG_DIR`.
+- Don't add per-project files to this scaffold itself. Clone it, rename, and customise downstream.
 
 ## Theming
 
