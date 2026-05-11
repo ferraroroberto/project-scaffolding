@@ -9,6 +9,8 @@ Single source of truth for AI agent instructions across all my repos.
 - **`ADAPT_PROMPT.md`** — copy-paste prompt to install the canonical instructions in a new repo.
 - **`LOGGING_MIGRATION_PROMPT.md`** — separate, future-use prompt for migrating `print()` → `logging` across a repo.
 - **`ROLLOUT_RUNBOOK.md`** — followable plan to replicate this whole consolidation on another machine across a different set of repos.
+- **`skills/`** — reusable Claude Code skills. Each subfolder mirrors the `~/.claude/skills/<name>/SKILL.md` layout so a folder can be copied verbatim into a user-level skills directory.
+  - **`skills/handoff-commit/`** — `/handoff-commit [<commit-ish>]` generates a copy-paste markdown prompt that hands a specific pushed GitHub commit to another LLM, so it can replicate the same logical change in a sister project (e.g. public repo → private fork) without copy-pasting code.
 
 ## Why CLAUDE.md is canonical (not AGENTS.md)
 
