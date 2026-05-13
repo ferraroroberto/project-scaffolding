@@ -65,6 +65,32 @@ If multiple reasonable approaches exist, present them as options with tradeoffs.
 - UI code only in the UI directory (e.g. `app/`). Data logic stays in the non-UI package (e.g. `src/`). Never import `streamlit` from non-UI code.
 - User feedback via `st.error()` / `st.warning()` / `st.success()`, not `st.write()`.
 
+## End-to-end UI testing
+*Apply only if this project serves a browser UI (Streamlit, Flask, etc.).*
+
+Two loops, kept deliberately separate. Don't conflate them. Full reasoning, setup, and bootstrap recipe in the scaffold's `docs/playwright-ui-testing.md`.
+
+### Iterative verification (headed, agent-driven)
+Use this during active development so I can watch the agent verify a change.
+
+- Drive the running app via the **Playwright MCP server in `--headed` mode** (Claude Code, Codex CLI). For tools without MCP support, fall back to a small `playwright` Python script run via Bash with `headless=False` — same shape, just less ergonomic.
+- Boot the app **once** on a fixed port (Streamlit default: 8501) and leave it running. Do NOT restart between iterations unless `set_page_config` or top-level imports changed.
+- Prefer the a11y `snapshot` tool over `screenshot` — DOM is far cheaper than pixels in tokens. Screenshot only on failure or as final visual confirmation.
+- Cap actions per cycle in the prompt (≤ 5 actions, then report). Stop and ask if the page state is unexpected; do not loop blindly.
+- Target widgets via their stable `key=` (already required by Streamlit conventions above) using `page.get_by_role(..., name=...)` or `page.get_by_test_id(...)`.
+- Do NOT create files under `tests/e2e/` for verification — it's throwaway, lives in the conversation only. Promotion to a permanent test is a separate, deliberate decision (see below).
+
+### Regression suite (headless, pytest-playwright)
+Optional. Lives at `tests/e2e/`. **Don't create the folder until the first regression test is actually justified.**
+
+- Add a test only when all three hold: (1) silent breakage would hurt, (2) it can't be caught by a unit test under `tests/`, (3) the behavior has stabilized (not still in flux).
+- Runs via `& .\.venv\Scripts\python.exe -m pytest tests/e2e/` (Windows) / `./.venv/bin/python -m pytest tests/e2e/` (POSIX). No LLM in the loop, zero per-run cost.
+- One shared `streamlit_app` session fixture boots the app once per pytest run.
+- Keep the suite small — target < 15 tests total. If you're tempted to add #20, delete two first.
+- No Page Object Model. Too much ceremony for this size.
+- Don't gate commits on e2e. Run on push or in CI, not in pre-commit.
+- When you remove a feature, remove its e2e test in the same commit.
+
 ## Phased execution for larger work
 Multi-file refactors don't go in a single response. Break into phases of ≤5 files each. Complete phase 1, run verification, wait for my approval, then phase 2. Same rule for any task you'd estimate at >30 minutes of work.
 

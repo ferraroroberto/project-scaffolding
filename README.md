@@ -23,6 +23,7 @@ Clone this directory, rename it, and start building.
   public sharing (no API keys leave your machine).
 - `CLAUDE.md` so AI coding agents (Claude Code, Cursor, Codex, etc.) can extend the project safely. `AGENTS.md` is a one-line pointer to it for non-Claude tools.
 - `docs/agents/` — the master AGENTS/CLAUDE templates, the adapt prompt, the rollout runbook, and the standalone `print()`→`logging` migration prompt. Single source of truth for agent instructions across all my repos.
+- `docs/playwright-ui-testing.md` — didactic reference for the two-loop browser-testing recipe (headed agent verification + optional headless regression suite). Read this when bootstrapping on a fresh PC.
 
 ## Setup
 
