@@ -41,6 +41,16 @@ If multiple reasonable approaches exist, present them as options with tradeoffs.
 - Re-read any file before modifying it. Don't trust memory across long sessions.
 - For files >500 LOC, read in chunks; don't assume you've seen the whole file.
 - When renaming a symbol, search separately for: direct calls, type references, string literals, dynamic imports, re-exports, and tests.
+- Reproduce before fixing: for any non-trivial bug, write a repro (script, failing test, or documented sequence) before the fix. Forces real understanding; stops "I think this fixes it" → ship → rollback.
+- Re-verify the issue's premise: spend 5 min confirming the symptom still reproduces and the code matches the issue before starting. Stale briefs waste PRs.
+- `git log -- <file>` the area first. Prior attempts at the same fix are the cheapest source of truth.
+
+## While fixing
+- Empirical proof for retry/timeout/backoff logic. Loops that react to return values encode assumptions about API semantics — verify the assumption with a 10-line probe before shipping.
+- Distinct error messages for distinct conditions. If "down" and "in flight past timeout" need different responses, they need different messages. Same-message-different-cause is how users stack orphan state.
+- Don't bundle independently-revertable bugs in one PR. If bug-A's commit can revert without breaking bug-B's fix, ship two PRs.
+- Leave log breadcrumbs after a hard bug. The next occurrence should be diagnosable from logs, not screenshots. Add the info-level log in the same commit as the fix.
+- Test-plan checkboxes are observed, not aspirational. `[x]` means "I ran this and saw it pass." If a box can't be checked now, the PR isn't ready now — check it or drop it.
 
 ## General conventions
 - **Project layout** is documented in this repo's `README.md`. Don't assume `/app/`, `/src/`, `launch_app.bat`, or any specific paths exist — read the README first.
@@ -53,6 +63,8 @@ If multiple reasonable approaches exist, present them as options with tradeoffs.
 - **No hardcoded paths or credentials.**
 - **Type hints** on all public Python functions. Use `Optional[T]`, never bare `None` returns.
 - Implement only what was asked. No nice-to-haves.
+- Three similar lines beats a premature abstraction. Add a helper on the third caller, not the second. Don't wrap framework scaffolds on day one.
+- Conventional commit prefixes, always: `feat:` `fix:` `refactor:` `docs:` `chore:` `test:` `perf:`. Makes `git log --oneline` scannable and PR-body commit tables possible.
 
 ## Streamlit conventions
 *Apply only if this project uses Streamlit.*
@@ -120,15 +132,69 @@ For feature work and refactors (not trivial fixes):
 
 For one-line fixes and typos: skip the changelog.
 
-## Planning future work
-Plans, roadmaps, and proposed features live as **GitHub issues** on this repo, not as files in the tree. One issue per topic (group closely-related items; split when in doubt). Issues should be self-contained enough to hand off to an LLM or a human cold.
+- Rotation / expiration dates go in README, not memory. Certs, tokens, API deprecations, vendor deadlines — anything with a future expiry gets a calendar-anchored line in README. Memory decays; READMEs get read.
 
-When work for an issue is finished, close the issue properly:
-- If merged via PR, reference the issue in the PR body (`Closes #N`) so GitHub auto-closes it on merge.
-- If completed via direct commits, close the issue manually and paste the relevant commit SHA(s) in a closing comment.
+## Planning future work
+Plans, roadmaps, proposed features live as **GitHub issues** on this repo, never as files in the tree. One issue per topic. Issues must be self-contained enough to hand off cold.
+
+**Defaults on `gh issue create`:** always pass `--assignee @me` and at least one type label (`bug`, `enhancement`, `refactor`, `docs`, `chore`, `test`, `perf` — mirroring commit prefixes; `meta` for cumulative/rollback context issues). Create the label first if missing (`gh label create <name>`). No untagged, unassigned issues.
+
+**Issue template (non-trivial work):**
+- **Why** (or **Symptom** + **Root cause** for bugs)
+- **Scope** — what's in
+- **Out of scope** — explicit non-goals (prevents scope creep)
+- **How to verify** — concrete acceptance steps
+- **Constraints worth knowing** — env, gotchas, file refs not obvious from code
+
+**Decompose:** if it can't be one PR, split into "Step N/M" sub-issues, each independently shippable. Don't ship "phase 1 of 4" PRs.
+
+**Closing:**
+- `Closes #N` in PR body for auto-close on merge.
+- For issues closed by direct commit, paste the SHA in a closing comment.
+- Close not-planned with a comment explaining the empirical disproof when the premise turns out wrong. No zombie issues.
+
+**Cross-repo:** if a bug lives in a shared script/pattern, file the same issue in each affected sister repo and cross-link by URL.
+
+**On rollback:** file a `meta`-labeled issue capturing what was attempted, what worked/didn't, why — plus a checkbox list of items "conceptually still open" so re-introduction has a roadmap. Reference rollback SHA + base-of-truth SHA explicitly.
+
+## Branch & PR pipeline
+`main` is always shippable. One issue → one branch → one PR → merge → branch deleted, issue closed.
+
+Branch naming: `<type>/<issue-N>-<short-slug>` — e.g. `fix/28-terminal-reconnect`, `feat/30-osc-title`. Type matches the commit prefix.
+
+**Lifecycle:**
+1. Open the branch off latest `main`.
+2. First push → open PR as **draft** with the issue's acceptance checklist copied into the body. Surfaces direction early; cheap to course-correct.
+3. While in draft: commits land freely, each with a conventional prefix. Keep the PR body's checklist up to date.
+4. When acceptance checks pass, promote to **ready for review/merge**.
+5. Merge: squash by default. Keep multi-commit history only when each commit is independently meaningful (cumulative rounds — see below). Always auto-delete the branch on merge.
+6. After merge: `git checkout main && git pull && git branch -d <branch>` locally; `git fetch --prune` to drop the remote ref. Confirm the issue auto-closed.
+
+**Hard rules:**
+- Never commit to `main` directly.
+- Never force-push a branch someone else (or a CI run) might have pulled.
+- Never stack a second feature branch on an unmerged first — rebase or wait.
+- One feature/fix per branch. If mid-branch you discover an unrelated bug, file an issue and start a new branch; don't smuggle it in.
+
+**PR body discipline:**
+- Single-commit PR: `Summary` + `Test plan` checklist + `Closes #N`.
+- Multi-commit / cumulative PR: per-commit table (`SHA | What | Why`) + `Closed in this PR` + `Still open` sections.
+
+**Cumulative branch (exception, not default):**
+- Allowed only for rapid iterative rounds where each commit is verified end-to-end and the next builds on it.
+- Document the policy in the PR body ("branch stays alive after merge, next round continues on top").
+- Default back to one-issue-one-branch as soon as the round closes.
+
+**Never stack hotfixes on hotfixes.** If a fix exposes a new bug, revert before adding a third change on top. If three same-day PRs interact badly, roll back to last known-good and re-introduce one at a time on separate branches.
+
+## Project hygiene
+- Restart the minimum. If the project runs multiple long-lived processes, document a one-line restart matrix in README (touched X → restart Y). Restarting more than necessary loses warm state and breaks sister processes.
+- Pinned known-good worktree for risky work. For architectural changes, keep a parallel checkout pinned at the last known-good commit for live A/B comparison. Don't touch the pinned tree until the risky work re-stabilizes on main.
 
 ## Git
 Never auto-commit or push, never stage files without being asked. When a task is done, prepare a relevant commit message, ready to copy for the user. Never add `Co-Authored-By: Claude` (or any other LLM/AI attribution trailer) to commit messages.
+
+Use conventional commit prefixes (`feat:` `fix:` `refactor:` `docs:` `chore:` `test:` `perf:`). Multi-line body: first line ≤72 chars, blank line, then bullets explaining *why* not *what*.
 
 ```bash
 git add <files>
