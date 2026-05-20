@@ -112,8 +112,16 @@ Optional. Lives at `tests/e2e/`. **Don't create the folder until the first regre
 - Make the projection **always-on** — a parametrised `browser_name` / device fixture so every test runs the mobile projection too. An opt-in projection gets forgotten.
 - WebKit-on-Windows is *not* real iOS: no iOS shell, no real WKWebView memory limits, no Apple keyboard, no Add-to-Home-Screen container. For the residual shell-only bugs, attach PC DevTools to a real phone via `ios-webkit-debug-proxy` (bridges the iOS Web Inspector to a local port Edge/Chrome DevTools can attach to). Playwright cannot drive real iOS Safari — only its bundled WebKit and the iOS Simulator on macOS.
 
-## Phased execution for larger work
-Multi-file refactors don't go in a single response. Break into phases of ≤5 files each. Complete phase 1, run verification, wait for my approval, then phase 2. Same rule for any task you'd estimate at >30 minutes of work.
+## Execution: scope up front, then carry it through
+- Front-load the questions. Settle scope, ambiguity, and hard-to-undo decisions *before* starting — that is the main control point.
+- Once scope is agreed, execute end-to-end to a verified, shippable state. Don't stop for per-phase approval; "large" is not "stop".
+- Checkpoint on risk, not size. Pause mid-task only for what the agreed scope didn't cover: a real ambiguity, an unforeseen decision, or a finding that contradicts the plan.
+- Verify every unit before calling it done (see Verification).
+
+## Chaining connected work
+- Issues are split for tracking but are often sequential. After finishing and verifying a unit, check the related open issues.
+- If the next step is a natural continuation, state it and proceed — new branch off freshly-merged `main`. Pause for approval only when it's risky, ambiguous, or materially bigger than discussed.
+- One branch per coherent unit. Keep commits and branches separable so any piece reviews and reverts on its own; don't sprawl one branch across unrelated issues.
 
 ## Verification (before declaring a task done)
 Examples — adapt to the project's actual tooling:
