@@ -279,6 +279,14 @@ POSIX:
 - **No Page Object Model.** Too much ceremony at this scale.
 - **One shared fixture.** Don't build a framework until I have three
   tests that need the same helper.
+- **Boot-or-adopt, fail loud.** The session fixture should boot the app
+  — and any service dependencies (a separate API process, a worker, a
+  PTY host) — on a free/fixed port, or adopt one already listening, and
+  **hard-fail (never `pytest.skip`)** if it can't. A suite that skips on
+  a missing server reports green on a build it never tested. The
+  `streamlit_app` skeleton above is the single-process Streamlit
+  instance of this pattern; `uvicorn` / `flask run` are the same shape,
+  and a multi-process app boots each dependency the same way.
 - **Don't gate commits on it.** Run on push or in CI, never in
   pre-commit. Slow pre-commit hooks train me to bypass them.
 - **Delete with the feature.** When I remove a feature, remove its
