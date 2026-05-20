@@ -6,6 +6,9 @@ __pycache__/
 .mypy_cache/
 .ruff_cache/
 
+# e2e test runtime artefact (written by tests/_streamlit_lifecycle.py)
+tests/_streamlit_restart_marker.txt
+
 # Virtual env
 .venv/
 venv/
