@@ -124,6 +124,36 @@ Do not configure root logging elsewhere — it is set up once in `src/logger.py`
 
 Read settings from `src/config.py`, not from `os.environ` directly. Add new keys there with a sensible default so the app boots without a `.env` file.
 
+## Testing
+
+Two layers, both under `tests/`:
+
+- **Unit** (`tests/test_*.py`) — one file per `src/` module, hermetic. Runs in well under a second.
+- **Headless e2e** (`tests/e2e/`) — `pytest-playwright` against a real browser. The `streamlit_app` session fixture (`tests/e2e/conftest.py`) **force-restarts Streamlit against the current code on disk** via `tests/_streamlit_lifecycle.py`, so the suite can never pass against a stale process. One example smoke test ships; expand per the regression-suite rules in `CLAUDE.md` ("End-to-end UI testing").
+
+One-time setup:
+
+```powershell
+& .\.venv\Scripts\python.exe -m pip install -r requirements.txt
+& .\.venv\Scripts\python.exe -m playwright install chromium
+```
+
+Run (POSIX: swap `.\.venv\Scripts\python.exe` for `./.venv/bin/python`):
+
+```powershell
+& .\.venv\Scripts\python.exe -m pytest                      # everything
+& .\.venv\Scripts\python.exe -m pytest --ignore=tests/e2e    # unit only, fast
+& .\.venv\Scripts\python.exe -m pytest tests/e2e             # e2e only
+```
+
+The e2e port is `STREAMLIT_E2E_PORT` in `tests/_streamlit_lifecycle.py` (default `8766`) — change it per project so two scaffolded projects don't collide.
+
+**Force-restart the dev Streamlit yourself** — the same thing the e2e fixture does, handy when an edit isn't showing up in the browser:
+
+```powershell
+& .\.venv\Scripts\python.exe -c "from tests._streamlit_lifecycle import ensure_fresh_streamlit; ensure_fresh_streamlit()"
+```
+
 ## Extending the scaffold
 
 - **New view** → create `app/views/<name>.py` with `render()`, append `st.Page(<module>.render, title=..., icon=...)` to `nav_pages` inside `app/app.py`.
