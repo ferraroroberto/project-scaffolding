@@ -79,7 +79,7 @@ If multiple reasonable approaches exist, present them as options with tradeoffs.
 - **App layout:** main file (e.g. `app.py`) handles only page config, shared state, sidebar, and tab/radio routing. Each tab/mode lives in its own file exposing a `main(...)` (or `render_*`) function. Default to `st.tabs()`; use a sidebar radio only when asked.
 
 ## End-to-end UI testing
-*Apply only if this project serves a browser UI (Streamlit, Flask, etc.).*
+*Apply only if this project serves a browser UI (Streamlit, FastAPI, Flask, etc.).*
 
 Two loops, kept deliberately separate. Don't conflate them. Full reasoning, setup, and bootstrap recipe in [`docs/playwright-ui-testing.md`](docs/playwright-ui-testing.md).
 
@@ -98,7 +98,8 @@ Optional. Lives at `tests/e2e/`. **Don't create the folder until the first regre
 
 - Add a test only when all three hold: (1) silent breakage would hurt, (2) it can't be caught by a unit test under `tests/`, (3) the behavior has stabilized (not still in flux).
 - Runs via `& .\.venv\Scripts\python.exe -m pytest tests/e2e/` (Windows) / `./.venv/bin/python -m pytest tests/e2e/` (POSIX). No LLM in the loop, zero per-run cost.
-- One shared `streamlit_app` session fixture boots the app once per pytest run.
+- **One shared session fixture boots the app — and any service dependencies** (a separate API process, a worker, a PTY host, …) — once per pytest run. Boot on a fixed or free port; **adopt** an instance already listening rather than spawning a second. The fixture is engine-agnostic: `streamlit run`, `uvicorn`, `flask run` are all just the launch command.
+- **Boot failure is a hard failure — never `pytest.skip`.** A regression suite that skips when the app isn't up reports green on a build it never tested; that is the exact rot this suite exists to prevent. Skip is fine for the *ad-hoc* "use whatever tray I have running" path; the *pre-ship* path must fail loud.
 - Keep the suite small — target < 15 tests total. If you're tempted to add #20, delete two first.
 - No Page Object Model. Too much ceremony for this size.
 - Don't gate commits on e2e. Run on push or in CI, not in pre-commit.
@@ -119,6 +120,8 @@ Windows / PowerShell:
 POSIX:
 - Syntax: `./.venv/bin/python -m py_compile <file>`
 - Tests: `./.venv/bin/python -m pytest`
+
+**Pre-ship gate (projects with an e2e suite).** Once a project has a regression suite, wire a single project-specific command — e.g. `scripts/verify-before-ship.ps1` — that runs the whole pipeline as one pass/fail: byte-compile → unit `pytest` → e2e suite (auto-booting the app per the harness rule in "End-to-end UI testing"). Make it mandatory before any UI-touching change is declared done. One command, can't half-skip. Do **not** substitute a bare `pytest` run that silently skips e2e when no server is up — that is how a regression ships looking green.
 
 If no checker exists for a project, say so explicitly. Don't claim "tests pass" when there are no tests.
 
