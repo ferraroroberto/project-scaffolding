@@ -60,6 +60,10 @@ If multiple reasonable approaches exist, present them as options with tradeoffs.
 - **Imports:** stdlib → third-party → local.
 - **Versioning policy:** follow the existing style in `requirements.txt` / `package.json` — keep `==` where the file uses pins, keep `>=` where it uses lower bounds. Don't change the policy unless explicitly asked.
 - **Virtual environment:** use the existing `.venv`. Never create `venv`. Never activate — invoke via `& .\.venv\Scripts\python.exe ...` on Windows, `./.venv/bin/python ...` on POSIX.
+- **Running scripts that import project packages:** Python sets `sys.path[0]` to the *script's* directory, not CWD. A script at `E:\tmp\smoke.py` cannot `from app... import ...` even if you `cd` to the project first. Two acceptable patterns:
+  - Script lives **inside** the repo (gitignored `./scratch/` etc.): run with `& .\.venv\Scripts\python.exe -m scratch.foo` from the project root. `-m` adds CWD to `sys.path`.
+  - Script lives **outside** the repo (e.g. `E:\tmp\`): prepend `$env:PYTHONPATH = (Get-Location).Path;` (POSIX: `PYTHONPATH=$(pwd)`) before invoking the venv Python.
+  Never invoke `& .\.venv\Scripts\python.exe E:\tmp\foo.py` from a project root and expect `app.*` or `src.*` to resolve — they won't.
 - **No hardcoded paths or credentials.**
 - **Type hints** on all public Python functions. Use `Optional[T]`, never bare `None` returns.
 - Implement only what was asked. No nice-to-haves.
