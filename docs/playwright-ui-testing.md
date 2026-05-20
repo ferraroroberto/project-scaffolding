@@ -292,6 +292,21 @@ POSIX:
 - **Delete with the feature.** When I remove a feature, remove its
   e2e test in the same commit.
 
+### Mobile projection (phone-first apps only)
+
+If the app's primary surface is a phone, run the regression suite on
+**WebKit** with a Playwright device descriptor (iPhone / Android —
+viewport, user-agent, touch, scale). WebKit shares the iOS Safari
+rendering + JS engine, so it catches most engine-specific mobile bugs on
+a normal Windows/Linux box. Make the projection always-on via a
+parametrised fixture so it can't be forgotten.
+
+WebKit-on-Windows is not real iOS (no iOS shell, no real WKWebView
+limits, no Apple keyboard). For the residual shell-only bugs, attach PC
+DevTools to a real phone with `ios-webkit-debug-proxy`. Playwright
+cannot drive real iOS Safari — only its bundled WebKit and the macOS
+iOS Simulator.
+
 ---
 
 ## Cost economics
