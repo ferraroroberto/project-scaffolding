@@ -110,12 +110,17 @@ POSIX:
 If no checker exists for a project, say so explicitly. Don't claim "tests pass" when there are no tests.
 
 ## Documentation discipline
-For feature work and refactors (not trivial fixes):
-- Update `README.md` if usage, config, or output changed
-- If the project already has a `docs/` folder, add `docs/YYYY-MM-DD-short-description.md` with: what was done, files modified, validation run
-- Don't create a `docs/` folder just to file a changelog entry on a one-off task
+The `docs/` folder is for **durable reference material** a future reader (you, or a cold LLM) will actually re-open — design records, architecture overviews, integration guides, shared playbooks. Filenames describe the topic, not a date.
 
-For one-line fixes and typos: skip the changelog.
+Never put in `docs/`:
+- Plans, roadmaps, TODOs, "future work" → those are GitHub issues.
+- Dated per-PR changelog files (`docs/YYYY-MM-DD-*.md`) → the issue + the PR that closes it + `git log` already capture what was done, files modified, and validation run. Don't write a third copy.
+
+For feature work and refactors:
+- Update `README.md` if usage, config, or output changed.
+- If the change introduces a durable concept worth re-reading (a new integration, a non-obvious architectural decision, a shared pattern), add a topic-named doc — `docs/<topic>.md`, not `docs/YYYY-MM-DD-<topic>.md`.
+
+For one-line fixes and typos: just commit.
 
 ## Git
 Never auto-commit or push. Never stage files without being asked. When a task is done, ask: "Shall I prepare the commit message?" When asked, provide a ready-to-copy block:
