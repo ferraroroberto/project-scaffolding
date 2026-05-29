@@ -32,6 +32,9 @@ data/input/*
 # Claude Code local settings
 .claude/
 
+# Launcher scratch (ephemeral images/logs written by the tray launcher)
+.launcher-tmp/
+
 # OS
 .DS_Store
 Thumbs.db
