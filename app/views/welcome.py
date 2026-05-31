@@ -28,7 +28,7 @@ def render() -> None:
         All from a single `log.info(...)` call in your pipeline code.
 
         ### Extend
-        - New view → drop `app/views/<name>.py` with a `render()` function and register it in `app.py`'s `VIEWS` list.
+        - New view → drop `app/views/<name>.py` with a `render()` function and append an `st.Page(<module>.render, ...)` entry to `nav_pages` in `app.py`.
         - New pipeline → drop `src/pipelines/<name>.py` with `run(**kwargs)`.
         - New shared helper → put it in `src/`.
 
