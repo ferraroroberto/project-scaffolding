@@ -110,6 +110,19 @@ def _configure_root() -> None:
     if _CONFIGURED:
         return
 
+    # On Windows the default console encoding is cp1252; emoji in log messages
+    # would raise UnicodeEncodeError inside the StreamHandler and flood the
+    # console with "--- Logging error ---" tracebacks instead of log lines.
+    # Reconfigure both streams to UTF-8 with replacement before attaching the
+    # handler, so non-encodable glyphs degrade gracefully.
+    for _stream_name in ("stdout", "stderr"):
+        _s = getattr(sys, _stream_name, None)
+        if _s is not None and hasattr(_s, "reconfigure"):
+            try:
+                _s.reconfigure(encoding="utf-8", errors="replace")
+            except Exception:
+                pass
+
     root = logging.getLogger("app")
     root.setLevel(logging.DEBUG)
     root.propagate = False
