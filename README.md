@@ -117,7 +117,7 @@ One call → three sinks:
 
 1. Color-tinted, timestamped terminal output.
 2. Rotating file at `data/logs/app.log` (1 MB × 3 backups).
-3. In-memory ring buffer that Streamlit views can render live (see `app/views/pipeline_runner.py` for the threaded refresh pattern, and `src.stream_to_streamlit` / `src.render_log_panel` helpers).
+3. In-memory ring buffer that Streamlit views can render live via the `src.stream_to_streamlit` helper (runs the work on a background thread and streams its logs into a live panel; see `app/views/pipeline_runner.py` for the canonical usage) or one-shot via `src.render_log_panel`.
 
 Do not configure root logging elsewhere — it is set up once in `src/logger.py` and is idempotent.
 
