@@ -8,24 +8,12 @@ terminal and is appended to ``data/logs/app.log``.
 
 from __future__ import annotations
 
-import threading
-import time
-
 import streamlit as st
 
-from src import clear_log_buffer, get_log_buffer, get_logger
+from src import clear_log_buffer, get_logger, stream_to_streamlit
 from src.pipelines import example_pipeline
 
 log = get_logger("ui.pipeline_runner")
-
-
-def _run_in_thread(steps: int, fail_chance: float, done: threading.Event) -> None:
-    try:
-        example_pipeline.run(steps=steps, fail_chance=fail_chance)
-    except Exception:
-        log.exception("Pipeline crashed")
-    finally:
-        done.set()
 
 
 def render() -> None:
@@ -45,31 +33,17 @@ def render() -> None:
         clear_log_buffer()
         log.info("UI: triggering pipeline (steps=%d, warn%%=%d)", steps, fail_pct)
 
-        placeholder = st.empty()
-        done = threading.Event()
-        start = len(get_log_buffer())
-
-        thread = threading.Thread(
-            target=_run_in_thread,
-            args=(steps, fail_pct / 100, done),
-            daemon=True,
-        )
-        thread.start()
-
-        # Live refresh loop — repaint the panel until the pipeline ends.
-        while not done.is_set():
-            lines = get_log_buffer()[start:]
-            with placeholder.container():
-                st.markdown("**Live log**")
-                st.code("\n".join(lines) if lines else "(starting...)", language="log")
-            time.sleep(0.25)
-
-        lines = get_log_buffer()[start:]
-        with placeholder.container():
-            st.markdown("**Live log**")
-            st.code("\n".join(lines) if lines else "(no output)", language="log")
-
-        st.success("Pipeline finished")
+        # The helper runs the pipeline on a background thread and streams its
+        # log output into a live panel — one canonical live-panel implementation.
+        try:
+            stream_to_streamlit(
+                lambda: example_pipeline.run(steps=steps, fail_chance=fail_pct / 100)
+            )
+        except Exception:
+            log.exception("Pipeline crashed")
+            st.error("Pipeline crashed — see the log panel above.")
+        else:
+            st.success("Pipeline finished")
 
     with st.expander("How the logger works"):
         st.markdown(
@@ -77,8 +51,8 @@ def render() -> None:
             - `from src import get_logger` returns a stdlib `logging.Logger`
               wired to three handlers: colored terminal, rotating file,
               and an in-memory ring buffer.
-            - The page polls that ring buffer ~4×/s while the pipeline
-              runs in a background thread.
+            - `stream_to_streamlit(...)` runs the pipeline on a background
+              thread and polls that ring buffer ~4×/s to refresh the panel.
             - For console-only scripts, just call `get_logger(...)` and
               log normally — no Streamlit dependency triggered.
             """

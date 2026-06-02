@@ -19,11 +19,10 @@ Usage
 
 In a Streamlit page that runs a pipeline:
 
-    with stream_to_streamlit():
-        run_my_pipeline()
+    stream_to_streamlit(lambda: run_my_pipeline())
 
-The same log lines will appear in the terminal *and* in a live
-panel inside the page.
+The pipeline runs on a background thread while the same log lines
+stream live into a panel inside the page — and into the terminal.
 """
 
 from __future__ import annotations
@@ -31,10 +30,9 @@ from __future__ import annotations
 import logging
 import sys
 import threading
-from contextlib import contextmanager
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
-from typing import Iterator
+from typing import Any, Callable
 
 # ---------------------------------------------------------------------------
 # Paths & constants
@@ -156,31 +154,68 @@ def get_logger(name: str = "app") -> logging.Logger:
 # ---------------------------------------------------------------------------
 # Streamlit live panel
 # ---------------------------------------------------------------------------
-@contextmanager
 def stream_to_streamlit(
+    work: Callable[[], Any],
     title: str = "Live log",
-    poll_seconds: float = 0.2,
-) -> Iterator[None]:
-    """Render a live log panel while the wrapped block runs."""
+    poll_seconds: float = 0.25,
+) -> Any:
+    """Run ``work()`` while streaming its log output into a live panel.
+
+    ``work`` is executed on a background thread so the calling (script-run)
+    thread stays free to repaint the panel ~``1/poll_seconds`` times a second.
+    Streamlit UI calls must happen on the script thread, so it is the *work*
+    that moves off-thread, not the painting — the panel therefore scrolls live
+    while ``work`` runs, then settles on the final buffer. This is the single
+    canonical "stream logs into a live Streamlit panel" implementation; pages
+    should call it rather than hand-rolling their own refresh loop.
+
+    Usage::
+
+        stream_to_streamlit(lambda: example_pipeline.run(steps=12))
+
+    Returns whatever ``work()`` returns. Any exception raised inside ``work``
+    propagates out of this call after the final repaint, exactly as if it had
+    run inline on the calling thread.
+    """
     import time
     import streamlit as st
 
     placeholder = st.empty()
     start_len = len(get_log_buffer())
 
-    def _paint() -> None:
+    def _paint(empty_msg: str) -> None:
         lines = get_log_buffer()[start_len:]
-        body = "\n".join(lines) if lines else "(waiting for logs...)"
+        body = "\n".join(lines) if lines else empty_msg
         with placeholder.container():
             st.markdown(f"**{title}**")
             st.code(body, language="log")
 
-    _paint()
-    try:
-        yield
-    finally:
-        _paint()
+    done = threading.Event()
+    result: list[Any] = []
+    error: list[BaseException] = []
+
+    def _runner() -> None:
+        try:
+            result.append(work())
+        except BaseException as exc:  # noqa: BLE001 — re-raised on the main thread
+            error.append(exc)
+        finally:
+            done.set()
+
+    worker = threading.Thread(target=_runner, daemon=True)
+    _paint("(starting...)")
+    worker.start()
+
+    # Poll-and-paint on the script thread until the work finishes.
+    while not done.is_set():
+        _paint("(starting...)")
         time.sleep(poll_seconds)
+    worker.join()
+
+    _paint("(no output)")
+    if error:
+        raise error[0]
+    return result[0]
 
 
 def render_log_panel(
