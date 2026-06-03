@@ -82,6 +82,32 @@ If multiple reasonable approaches exist, present them as options with tradeoffs.
 - User feedback via `st.error()` / `st.warning()` / `st.success()`, not `st.write()`.
 - **App layout:** main file (e.g. `app.py`) handles only page config, shared state, sidebar, and tab/radio routing. Each tab/mode lives in its own file exposing a `main(...)` (or `render_*`) function. Default to `st.tabs()`; use a sidebar radio only when asked.
 
+## GitHub Actions CI conventions
+*Apply whenever this project adds a `.github/workflows/` file.*
+
+- **Pin a dated Windows runner.** Use `runs-on: windows-2025`, never `windows-latest`. GitHub is redirecting `windows-latest` to `windows-2025` (deadline June 2026); for a Windows-only tray/daemon app that spawns real processes (PTYs, uvicorn, Chromium), the OS image silently changing under you is exactly the environment shift that turns a green gate red without a code change. Pin the label so the runner is an explicit, reviewable choice.
+- **Use Node-24 action majors.** `actions/checkout@v4`, `actions/setup-python@v5`, and `actions/upload-artifact@v4` all run on Node 20, which is deprecated (forced Node 24 starting June 16 2026; Node 20 removed September 16 2026). Use the current majors that run on Node 24: `checkout@v6`, `setup-python@v6`, `upload-artifact@v7`. Inputs are unchanged for standard usage, so the bump is drop-in.
+
+Canonical pattern:
+
+```yaml
+jobs:
+  <job>:
+    runs-on: windows-2025          # not windows-latest — pin the OS image
+    steps:
+      - uses: actions/checkout@v6        # Node 24 (not @v4 / Node 20)
+      - uses: actions/setup-python@v6    # Node 24 (not @v5 / Node 20)
+        with:
+          python-version: '3.12'
+      # ...
+      - uses: actions/upload-artifact@v7 # Node 24 (not @v4 / Node 20)
+        with:
+          name: <name>
+          path: <path>
+```
+
+**Sister-repo tracking:** when a fleet repo still has the old runner/actions, it carries a pointer issue back to `ferraroroberto/project-scaffolding#25` (the canonical decision record). Fix it before the deprecation deadline rather than after.
+
 ## End-to-end UI testing
 *Apply only if this project serves a browser UI (Streamlit, FastAPI, Flask, etc.).*
 
