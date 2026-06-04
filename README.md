@@ -25,6 +25,7 @@ Clone this directory, rename it, and start building.
 - `docs/agents/` — the master AGENTS/CLAUDE templates, the adapt prompt, the rollout runbook, and the standalone `print()`→`logging` migration prompt. Single source of truth for agent instructions across all my repos.
 - `docs/playwright-ui-testing.md` — didactic reference for the two-loop browser-testing recipe (headed agent verification + optional headless regression suite). Read this when bootstrapping on a fresh PC.
 - `docs/shared-chrome-profile.md` — didactic reference for projects that drive real Chrome with a persistent profile: when two jobs share one profile, serialize access by waiting (never killing the holder). Read this before adding a second job on a shared profile.
+- `docs/windows-tray.md` — didactic reference + canonical `tray.bat` shape for projects that ship a Windows tray owning a long-lived service: idempotent single-instance start, and an orphan-proof `--restart` that reclaims owned service ports by PID (scoped to the app's `.venv`, matched on CommandLine). Read this before writing or fixing a tray restart.
 
 ## Setup
 
