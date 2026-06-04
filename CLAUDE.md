@@ -111,7 +111,7 @@ jobs:
 ## End-to-end UI testing
 *Apply only if this project serves a browser UI (Streamlit, FastAPI, Flask, etc.).*
 
-Two loops, kept deliberately separate. Don't conflate them. Full reasoning, setup, and bootstrap recipe in [`docs/playwright-ui-testing.md`](docs/playwright-ui-testing.md).
+Two loops, kept deliberately separate. Don't conflate them. Full reasoning, setup, and bootstrap recipe in the scaffold's `docs/playwright-ui-testing.md`.
 
 ### Iterative verification (headed, agent-driven)
 Use this during active development so I can watch the agent verify a change.
@@ -169,6 +169,17 @@ POSIX:
 **Pre-ship gate (projects with an e2e suite).** Once a project has a regression suite, wire a single project-specific command — e.g. `scripts/verify-before-ship.ps1` — that runs the whole pipeline as one pass/fail: byte-compile → unit `pytest` → e2e suite (auto-booting the app per the harness rule in "End-to-end UI testing"). Make it mandatory before any UI-touching change is declared done. One command, can't half-skip. Do **not** substitute a bare `pytest` run that silently skips e2e when no server is up — that is how a regression ships looking green.
 
 If no checker exists for a project, say so explicitly. Don't claim "tests pass" when there are no tests.
+
+## Restart and verify before hand-off
+*Apply only if this project runs a long-lived process (dev server, webapp, daemon, tray) without hot-reload.*
+
+After the verification step — and unless I said otherwise — restart that process so the change is actually live, and confirm it: check a version/build endpoint or equivalent signal that the running process reflects the new code (not just that it answers a health check — a stale process passes health checks fine). Report the build identifier. Don't hand off "done" with a stale process still serving.
+
+**Restart safely.** Kill only the specific process for *this* app (identify it precisely — by listening port / PID / window title), never a blanket process-name kill (`pythonw`, `node`, `python`) that would also take down sibling apps or shared services on the same machine.
+
+**A 'start' script is usually not a 'restart' script.** Re-running `launch_app.bat` / `tray.bat` / `npm start` while an instance is already up typically just spawns a duplicate (or silently no-ops if the port is bound). The pattern is **kill-then-start**, not "run start again". Document the project-specific recipe in this repo's own `CLAUDE.md` under `## This repository` — *which* process to kill (port / PID lookup), *which* command relaunches it, *what* signal confirms the new build (e.g. `GET /api/version` returning the current `git_sha`).
+
+**A tray restart must reclaim the app's service ports by PID (orphan-proof), not just `taskkill /T` the tray subtree.** A tray's service children (a webapp, a session-host, a tunnel) can orphan — the tray dies or is replaced while a child keeps running, so the child leaves the tray's process subtree but still holds its service port. A restart that kills only the tray PID-subtree misses the orphan; the fresh tray can't bind the port, silently fails, and the old orphan keeps serving stale code while the restart *reports success*. So `--restart` must, for each fixed loopback port the app **definitively owns**, find the current listener and kill its owning PID, **then** start. Scope the sweep to **this app's `.venv`** so sibling apps are never touched — and scope it by the holder's **CommandLine**, *not* its process image path: on Python 3.14 Windows venvs a venv-launched `pythonw.exe` re-execs the base interpreter, so the image path reports the *shared base* interpreter while only the CommandLine still carries the `.venv` path; an image-path guard never matches the real webapp and the reclaim silently no-ops. Exclude any port that is **mutex-shared** with another app (reclaiming it would kill the sibling's live process). This is the third tray-lifecycle gotcha in the fleet, alongside **#12** (single-instance via a named mutex, not a bound TCP port) and **#13** (`CREATE_NO_WINDOW` when shelling out to console tools); it does not conflict with #12 — #12 is how you *detect* a running instance, this is how a *restart cleans up* the previous one. Canonical `tray.bat` shape (idempotent detect + reclaim-then-start) and the full reasoning live in the scaffold's `docs/windows-tray.md`.
 
 ## Documentation discipline
 The `docs/` folder is for **durable reference material** a future reader (you, or a cold LLM) will actually re-open — design records, architecture overviews, integration guides, shared playbooks (e.g. `docs/playwright-ui-testing.md`). Filenames describe the topic, not a date.
