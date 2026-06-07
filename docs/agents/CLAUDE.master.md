@@ -87,10 +87,17 @@ If multiple reasonable approaches exist, present them as options with tradeoffs.
 
 - **Pin a dated Windows runner.** Use `runs-on: windows-2025`, never `windows-latest`. GitHub is redirecting `windows-latest` to `windows-2025` (deadline June 2026); for a Windows-only tray/daemon app that spawns real processes (PTYs, uvicorn, Chromium), the OS image silently changing under you is exactly the environment shift that turns a green gate red without a code change. Pin the label so the runner is an explicit, reviewable choice.
 - **Use Node-24 action majors.** `actions/checkout@v4`, `actions/setup-python@v5`, and `actions/upload-artifact@v4` all run on Node 20, which is deprecated (forced Node 24 starting June 16 2026; Node 20 removed September 16 2026). Use the current majors that run on Node 24: `checkout@v6`, `setup-python@v6`, `upload-artifact@v7`. Inputs are unchanged for standard usage, so the bump is drop-in.
+- **Trigger once per commit: `push:[main]` + `pull_request:[main]`.** Gate `main` with two events that each own exactly one job — `push` to `main` (the post-merge integration gate) and `pull_request` to `main` (validates every feature branch). Do **not** trigger `push` on feature branches (`push:` with no `branches:` filter, or `push: branches-ignore: [main]`): while a PR is open, every branch push fires *both* `push` and `pull_request`, running the same gate **twice on the same commit** — double runtime, double flake exposure, zero added coverage. The `branches-ignore: [main]` shape also silently *omits* the post-merge `main` gate, so the merge commit (which can differ from what the PR validated, if `main` moved underneath it) is never CI-gated. `concurrency` cannot fix this: `github.ref` differs between the two events (`refs/heads/<branch>` for push vs `refs/pull/<N>/merge` for pull_request), so they land in separate concurrency groups and both survive — `concurrency` only collapses successive pushes to the *same* ref. The only thing given up — CI on a branch you pushed but never opened a PR for — is a non-loss: the standard `/issue-finish` flow always pushes and immediately opens the PR.
 
 Canonical pattern:
 
 ```yaml
+on:
+  push:
+    branches: [main]          # post-merge integration gate on main only
+  pull_request:
+    branches: [main]          # validates every feature branch via the PR event
+
 jobs:
   <job>:
     runs-on: windows-2025          # not windows-latest — pin the OS image
@@ -106,7 +113,15 @@ jobs:
           path: <path>
 ```
 
-**Sister-repo tracking:** when a fleet repo still has the old runner/actions, it carries a pointer issue back to `ferraroroberto/project-scaffolding#25` (the canonical decision record). Fix it before the deprecation deadline rather than after.
+Run-count, wrong shape vs this convention:
+
+| Moment | `push: branches-ignore: [main]` + `pull_request` | This convention |
+|---|---|---|
+| Push to a feature branch with an open PR | **2 runs** (push + pull_request) | **1 run** (pull_request `synchronize`) |
+| Push to a feature branch, no PR yet | 1 run | 0 (open the PR before you need CI) |
+| Merge commit on `main` | **0 runs** (main is ignored) | 1 run (post-merge gate) |
+
+**Sister-repo tracking:** when a fleet repo still has the old runner/actions (`#25`) or the duplicate `push`-on-branches trigger (`#38`), it carries a pointer issue back to the canonical decision record in `ferraroroberto/project-scaffolding`. Fix it before the deprecation deadline rather than after.
 
 ## End-to-end UI testing
 *Apply only if this project serves a browser UI (Streamlit, FastAPI, Flask, etc.).*
