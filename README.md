@@ -21,6 +21,7 @@ Clone this directory, rename it, and start building.
 - `launch_app.{bat,sh}` — one-click local launch.
 - `launch_server.{bat,sh}` — local launch + Cloudflare Tunnel for
   public sharing (no API keys leave your machine).
+- `tray.bat.template` — copy-to-adapt canonical Windows tray launcher for apps that run a tray owning a long-lived service. Replace the four `__PLACEHOLDER__` tokens and you get the orphan-proof `tray.bat --restart` by default. See `docs/windows-tray.md`.
 - `CLAUDE.md` so AI coding agents (Claude Code, Cursor, Codex, etc.) can extend the project safely. `AGENTS.md` is a one-line pointer to it for non-Claude tools.
 - `docs/agents/` — the master AGENTS/CLAUDE templates, the adapt prompt, the rollout runbook, and the standalone `print()`→`logging` migration prompt. Single source of truth for agent instructions across all my repos.
 - `docs/playwright-ui-testing.md` — didactic reference for the two-loop browser-testing recipe (headed agent verification + optional headless regression suite). Read this when bootstrapping on a fresh PC.
@@ -76,6 +77,7 @@ src/
 data/                       input / output / logs (gitignored)
 launch_app.{bat,sh}
 launch_server.{bat,sh}
+tray.bat.template           canonical tray launcher (copy + adapt for tray apps)
 ```
 
 See `CLAUDE.md` for the cross-project agent conventions.
