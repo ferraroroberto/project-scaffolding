@@ -22,6 +22,7 @@ Clone this directory, rename it, and start building.
 - `launch_server.{bat,sh}` — local launch + Cloudflare Tunnel for
   public sharing (no API keys leave your machine).
 - `tray.bat.template` — copy-to-adapt canonical Windows tray launcher for apps that run a tray owning a long-lived service. Replace the four `__PLACEHOLDER__` tokens and you get the orphan-proof `tray.bat --restart` by default. See `docs/windows-tray.md`.
+- `app/tray/single_instance.py` — canonical, **vendor-verbatim** named-mutex primitive for tray apps: `SingleInstance` (the tray's in-process single-instance lock) + `cross_process_lock` (serializes the webapp adopt-or-spawn so two trays can't both spawn it). Copy it byte-for-byte into a tray app — the per-app mutex *names* are passed at the call site, so the file stays identical fleet-wide. See `docs/windows-tray.md` (gotcha #4).
 - `CLAUDE.md` so AI coding agents (Claude Code, Cursor, Codex, etc.) can extend the project safely. `AGENTS.md` is a one-line pointer to it for non-Claude tools.
 - `docs/agents/` — the master AGENTS/CLAUDE templates, the adapt prompt, the rollout runbook, and the standalone `print()`→`logging` migration prompt. Single source of truth for agent instructions across all my repos.
 - `docs/playwright-ui-testing.md` — didactic reference for the two-loop browser-testing recipe (headed agent verification + optional headless regression suite). Read this when bootstrapping on a fresh PC.
@@ -70,6 +71,7 @@ app/
   app.py                    Streamlit entry: page config,
                             st.navigation + light/dark toggle
   views/                    one render() per file (welcome, ...)
+  tray/single_instance.py   vendor-verbatim named-mutex primitive for tray apps
 src/
   config.py                 paths + env-driven settings
   logger.py                 the elegant logger

@@ -4,7 +4,7 @@ Personal reference for projects that ship a **Windows tray app owning a long-liv
 
 > **Audience.** Me, plus any AI coding agent I hand a project to.
 > **Status.** Living reference, not a changelog. Update in place when the recipe changes.
-> **Canonical record.** [`project-scaffolding#29`](https://github.com/ferraroroberto/project-scaffolding/issues/29). Sits alongside the two other tray-lifecycle gotchas: **#12** (single-instance via a named mutex, not a bound TCP port) and **#13** (`CREATE_NO_WINDOW` when shelling out to console tools).
+> **Canonical records.** The full tray-lifecycle gotcha series, oldest first: **#12** (single-instance via a named mutex, not a bound TCP port), **#13** (`CREATE_NO_WINDOW` when shelling out to console tools), [**#29**](https://github.com/ferraroroberto/project-scaffolding/issues/29) (orphan-proof port reclaim on restart — this doc's original anchor), [**#39**](https://github.com/ferraroroberto/project-scaffolding/issues/39) (the single-instance mutex must hold *in-process* and adopt-or-spawn must be *race-safe*), [**#35**](https://github.com/ferraroroberto/project-scaffolding/issues/35) (non-blocking agent-side restart + child re-adoption).
 
 ---
 
@@ -14,6 +14,9 @@ Personal reference for projects that ship a **Windows tray app owning a long-liv
 - A restart must **not** assume the old instance's service-bound children are still in the tray's process subtree. They can orphan. `taskkill /T /PID <tray>` alone misses an orphan, the fresh tray can't bind the port, and the old orphan keeps serving stale code while the restart *reports success*.
 - The reliable mechanism is a **port-reclaim sweep**: for each fixed loopback port the app owns, find the current listener and kill its owning PID, scoped to **this app's `.venv`**, *then* start.
 - Scope the sweep by the holder's **CommandLine**, not its process image path. On Python 3.14 Windows venvs a venv-launched `pythonw.exe` re-execs the base interpreter, so the process image path reports the *shared base* interpreter — only the CommandLine still carries the `.venv` path. A path-based guard never matches the real webapp and the reclaim silently no-ops.
+- Single-instance must be enforced **in the tray process** by a named mutex, not by the launcher `.bat`'s pre-check alone — two near-simultaneous starts both pass the `.bat`'s CIM blind-spot and both survive. Adopt-or-spawn must be **race-safe** (serialize the check-then-spawn), or two trays both spawn a duplicate service. One byte-identical primitive does both: `app/tray/single_instance.py`.
+- A restart is **adopt / reclaim / spawn**, not reclaim-only: re-attach to healthy owned children, kill stale port-holders, spawn only what's missing. Classify every child as **owned-and-cycled** (dies + respawns) or **linked-and-preserved** (PTY windows / launched apps that must survive a restart) — the reclaim sweep touches only the former.
+- The **agent** invokes `tray.bat --restart` fire-and-forget and verifies with a **bounded** poll of `GET /api/version` (hard timeout + attempt cap, fail loud) — never a foreground launch, never an unbounded wait, never re-deriving the kill by hand.
 
 ---
 
@@ -98,8 +101,70 @@ Adapt per repo:
 
 Don't re-derive the reclaim logic per project. A copy-to-adapt **`tray.bat.template`** ships at the scaffold root — for a new tray app, copy it to `tray.bat` and replace the four `__PLACEHOLDER__` tokens (`__APP_NAME__`, `__TRAY_LAUNCH__`, `__TRAY_MATCH__`, `__OWNED_PORTS__`); a filled-in copy is byte-identical to every sister tray. For an existing tray, copy the two blocks above verbatim and change only the ports + tray-match regex. The `--restart` recipe (which port to reclaim, which command relaunches, what signal confirms the new build is live — e.g. `GET /api/version` returning the current `git_sha`) also gets a one-line entry in each repo's own `CLAUDE.md` under `## This repository`.
 
+The in-process single-instance + race-safe adopt-or-spawn primitive (gotcha #4) ships the same way: **`app/tray/single_instance.py`** is **vendored verbatim** — copy it byte-for-byte into each tray app, never edit it per-app (the app-specific mutex *names* are passed at the call site, so the file stays identical fleet-wide). A fix made once in the scaffold re-propagates by re-copying.
+
+## Gotcha #4 — single-instance must hold in-process; adopt-or-spawn must be race-safe
+
+`project-scaffolding#39`. The #29 machinery cleans up the *previous* instance on restart; this is the orthogonal guarantee that a *single start* never creates *two*. Two independent layers, both proven on `whatsapp-radar` from a verified-clean baseline (one `tray.bat` spawned two trays + two uvicorns contending for one port):
+
+1. **The single-instance lock must live in the tray process.** `tray.bat`'s pre-launch CIM detection is necessary but not sufficient: two near-simultaneous launches both read the process table before either tray is visible, both pass the check, and both survive. Per #12 the guarantee belongs to a **named mutex held by the tray process itself** — acquire it at the top of `run_tray()`; if another process already holds it, exit immediately. The `.bat` check stays (it makes the common case a fast no-op), but it is the *outer* guard, not the only one.
+2. **Adopt-or-spawn must be race-safe.** A `WebappManager.start()` that does `status()` (is the port in use?) then `Popen(uvicorn)` is check-then-act: two trays that both observe "not running" before either binds will **both** spawn — a TOCTOU race. Serialize the critical section with a named mutex keyed on the owned port so the second caller blocks, then sees the now-listening port and **adopts** instead of spawning.
+
+Both are solved by one byte-identical primitive vendored verbatim from the scaffold — `app/tray/single_instance.py`:
+
+```python
+# tray entry -- in-process single instance (held for the process lifetime)
+from app.tray.single_instance import SingleInstance, cross_process_lock
+
+_instance = SingleInstance(r"Global\whatsapp-radar-tray")
+if not _instance.acquired:
+    logger.info("Another whatsapp-radar tray is already running; exiting.")
+    return 0
+
+# WebappManager.start() -- race-safe adopt-or-spawn
+with cross_process_lock(rf"Global\whatsapp-radar-webapp-start-{self.config.port}"):
+    current = self.status()
+    if current.running:          # someone bound it while we waited -> adopt
+        return current
+    self._proc = subprocess.Popen(self._build_command(), ...)
+```
+
+The mutex *names* are the only per-app difference; the file is identical everywhere. A `Global\` prefix makes the lock span terminal-server sessions; use a bare/`Local\` name only if per-session scope is what you want.
+
+**The cascade caveat.** On a python.org "pythoncore" venv the symptom can *look* like a double-spawn even after the locks are correct: a venv-launched `pythonw.exe` re-execs the base interpreter, so each logical process appears as a parent/child PID pair (the venv stub waiting on the re-exec'd child). That is two PIDs, one logical process — distinct from the genuine double-spawn the locks fix. Pin which one you're seeing (parentage + CommandLine) before concluding the lock failed.
+
+## Re-adoption and child lifecycle on restart
+
+`project-scaffolding#35`. The #29 sweep only ever **reclaims** (kills stale port-holders). A correct restart is the fuller **adopt / reclaim / spawn**:
+
+- **Adopt** the owned children already up *and healthy* (re-attach, don't kill-and-respawn) — and reload cache/assets as part of normal boot.
+- **Reclaim** the stale ones (a port-holder under this `.venv` that is unhealthy or that the fresh tray supersedes).
+- **Spawn** only what is actually missing.
+
+"Don't spawn it 20 times" is exactly this: discover-then-decide, never blind-spawn.
+
+**Child-lifecycle classes — classify every tray child as one of:**
+
+| Class | Examples | On tray restart |
+|---|---|---|
+| **owned-and-cycled** | the uvicorn webapp, a worker | dies with the tray, respawns (or is adopted if already healthy); its port **is** in the reclaim list |
+| **linked-but-independent** | `app-launcher` PTY terminal windows, externally-launched apps that attach to the tray | must **survive** the restart and re-attach; their ports/PIDs are **never** in the reclaim sweep |
+
+`app-launcher` is the motivating case: a restart must cycle the webapp while leaving the user's open PTY windows and launched apps untouched. Non-deterministic collateral (sometimes killed, sometimes not) is the bug this classification removes — the reclaim list holds *only* owned-and-cycled ports, and mutex-shared ports stay excluded as before.
+
+## The agent-side contract: invoke + bounded-verify, never re-derive
+
+`project-scaffolding#35`, gap 1 — where the 10–20-minute hangs actually lived. The intelligence (which ports, which children, what to reclaim) belongs in the app's `--restart`, which already holds it; the agent must **delegate**, not reconstruct:
+
+1. **Invoke `tray.bat --restart` fire-and-forget.** A tray launcher is long-lived and holds the console it starts in; run as a normal foreground tool call it never returns and burns the tool timeout. The `.bat`'s relaunch is already detached (`start "Title" pythonw …` returns immediately), so the *agent* must also call it non-blocking (background/detached) so the tool returns at once.
+2. **Verify with a bounded poll of the build signal.** Poll `GET /api/version` (live `git_sha` + asset hash) with a **hard timeout and attempt cap** (e.g. ≤30 s / fixed attempts), then **fail loud**. A slow or failed boot must become a fast, explicit failure — never an open-ended wait.
+3. **Assert `git_sha == HEAD`** and report the build line. A health check alone is not enough — a stale process answers `/healthz` fine.
+
+No `Get-NetTCPConnection`/PID-hunting in the agent skill: that logic lives in `--restart`. A hand-rolled kill only catches the one listener it finds and misses the orphan the reclaim sweep exists to kill. The same recipe is mandated agent-side in the scaffold `CLAUDE.md` ("Restart and verify before hand-off") and in the `/issue-finish` finisher.
+
 ## Decision log
 
+- **2026-06-07** — Added the **in-process single-instance + race-safe adopt-or-spawn** convention (gotcha #4, `project-scaffolding#39`) and the **agent-safe restart + re-adoption** convention (`#35`). Shipped the byte-identical `app/tray/single_instance.py` primitive (`SingleInstance` for the tray's in-process lock; `cross_process_lock` to serialize the webapp adopt-or-spawn) so neither #39 layer is re-derived per app. Documented the **adopt / reclaim / spawn** restart model and the **owned-and-cycled vs linked-and-preserved** child-lifecycle classification (app-launcher's PTY/linked apps as the worked example), plus the **agent-side contract** (invoke `--restart` fire-and-forget, bounded version-endpoint poll, fail loud — no hand-rolled PID hunting). The #39 root cause was proven on `whatsapp-radar` (one clean `tray.bat` spawned two trays + two uvicorns); the fix re-propagates to each sister tray via pointer issues.
 - **2026-06-07** — Shipped the canonical **`tray.bat.template`** at the scaffold root and mandated the **`tray.bat --restart`** invocation across the toolchain (`project-scaffolding#40`, `claude-config#78`, fleet pointer issues). Closed the enforcement gap where the `/issue-finish` and `/issue-yolo` skills told the agent to hand-roll a `Get-NetTCPConnection`/`taskkill` restart instead of calling the deterministic `tray.bat --restart` — a hand-rolled kill only catches the one listener it finds and misses the orphan the reclaim sweep exists to kill. The skills now name `tray.bat --restart` as the primary path (manual kill = fallback only); the scaffold `CLAUDE.md` mandates the invocation; and `local-llm-hub` — the lone fleet tray still on the old start-only shape — was brought up to the canonical form (reclaims `:8000`, excludes the mutex-shared `:8090`). Each tray app's `CLAUDE.md` `## This repository` section now names `tray.bat --restart`.
 - **2026-06-07** — Extended the CommandLine correction to the **single-instance detection** block (`project-scaffolding#36`). The 2026-06-04 fix below corrected only the `--restart` port-reclaim half; the detection `Where-Object` kept the `ExecutablePath.StartsWith(<repo>\.venv\Scripts)` guard. On a python.org "pythoncore" venv that guard never matched a live tray (the venv `pythonw.exe` re-execs the base interpreter, so `ExecutablePath` reports `…\pythoncore-3.14-64\pythonw.exe`), so plain `tray.bat` stopped no-op'ing and **stacked a second tray** each run; the duplicate trays then deadlocked the webapp port (each idempotent webapp manager no-ops while a sibling holds the port, so none binds). Observed live on `whatsapp-radar` (`:8455` would not bind until the duplicates were cleaned to one). Detection now matches on `CommandLine.IndexOf($v, OrdinalIgnoreCase) -ge 0` against this repo's `.venv` (same pattern as the reclaim block), still AND-ed with the `launcher\.py\s+tray` invocation match so a sister-app tray is never detected or killed. Carry the same one-line change to each sister `tray.bat` (app-launcher, whatsapp-radar, photo-ocr, voice-transcriber).
 - **2026-06-04** — Corrected the canonical scope guard from **process image path** to **CommandLine**. The original `project-scaffolding#29` sketch scoped the reclaim by `$p.Path.StartsWith($venv)` (image path). Proven wrong during the app-launcher rollout (#122): on Python 3.14 Windows venvs a venv-launched `pythonw.exe` re-execs the base interpreter, so the running webapp/session-host reports the shared base interpreter as its image path, not the repo's `.venv`. An image-path guard never matched the real webapp and the reclaim silently no-op'd — the exact failure the convention exists to prevent. The working form (in app-launcher's merged `tray.bat`) matches the holder's `.venv` path against its `CommandLine`. Also recorded the caveat that mutex-shared ports must be excluded from the reclaim list.

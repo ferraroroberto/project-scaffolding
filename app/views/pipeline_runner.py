@@ -25,11 +25,11 @@ def render() -> None:
 
     col1, col2 = st.columns(2)
     with col1:
-        steps = st.slider("Steps", 5, 40, 12)
+        steps = st.slider("Steps", 5, 40, 12, key="pipeline_steps")
     with col2:
-        fail_pct = st.slider("Warning probability (%)", 0, 50, 10)
+        fail_pct = st.slider("Warning probability (%)", 0, 50, 10, key="pipeline_warn_pct")
 
-    if st.button("Run pipeline", type="primary"):
+    if st.button("Run pipeline", type="primary", key="pipeline_run"):
         clear_log_buffer()
         log.info("UI: triggering pipeline (steps=%d, warn%%=%d)", steps, fail_pct)
 
