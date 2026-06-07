@@ -39,9 +39,11 @@ So a correct restart cleans up by **port ownership**, not by process parentage. 
 
 ### Scope by CommandLine, not image path (the correction that matters)
 
-The obvious scope guard — "only kill the holder if its process *image path* is under `<app>\.venv`" — is **wrong on modern Windows venvs** and was corrected out of the canonical form. On Python 3.14, a venv-launched `pythonw.exe` re-execs the *base* interpreter, so a running webapp/session-host reports the **shared base interpreter** as its image path (`Get-Process.Path` / `Win32_Process.ExecutablePath` = `…\pythoncore-3.14-64\pythonw.exe`), not the repo's `.venv`. Only the process **CommandLine** still carries the `.venv` path (it's how the venv launcher invoked it). An image-path guard therefore *never matches the real webapp*, the reclaim silently no-ops, and you get back the exact "reports success, changes nothing" failure the convention exists to prevent.
+The obvious scope guard — "only match the process if its *image path* is under `<app>\.venv`" — is **wrong on modern Windows venvs** and was corrected out of the canonical form. On Python 3.14, a venv-launched `pythonw.exe` re-execs the *base* interpreter, so a running tray/webapp/session-host reports the **shared base interpreter** as its image path (`Get-Process.Path` / `Win32_Process.ExecutablePath` = `…\pythoncore-3.14-64\pythonw.exe`), not the repo's `.venv`. Only the process **CommandLine** still carries the `.venv` path (it's how the venv launcher invoked it). An image-path guard therefore *never matches the real process*, the operation silently no-ops, and you get back the exact "reports success, changes nothing" failure the convention exists to prevent.
 
-Match on `CommandLine` containing the repo's `.venv` path (ordinal, case-insensitive). That uniquely identifies *this* app's children while leaving sibling apps' processes (and unrelated processes that merely happen to hold the port) untouched.
+This applies to **both** uses of the per-app match: the `--restart` **port-reclaim** (which holder to kill) **and** the single-instance **detection** (is a tray already running?). The original 2026-06-04 correction fixed only the reclaim block; the detection block kept an `ExecutablePath.StartsWith(...)` guard and so never recognised a live tray on a pythoncore venv — every `tray.bat` invocation then stacked another tray and the webapp port deadlocked. Both blocks now match on CommandLine.
+
+Match on `CommandLine` containing the repo's `.venv` path (ordinal, case-insensitive). That uniquely identifies *this* app's processes while leaving sibling apps' processes (and unrelated processes that merely happen to hold the port) untouched.
 
 ### Only reclaim ports the tray definitively owns
 
@@ -56,13 +58,13 @@ A port that is **mutex-shared with another app** must **not** go in the reclaim 
 
 `app-launcher`'s merged `tray.bat` is the reference implementation. The two load-bearing blocks:
 
-**Idempotent single-instance detection** (CIM, scoped to this repo's `.venv`, matched on the tray's own command line — never a bound port):
+**Idempotent single-instance detection** (CIM, scoped to this repo's `.venv` via **CommandLine** — never `ExecutablePath`, never a bound port — matched on the tray's own command line):
 
 ```bat
 set "PS=C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe"
-set "TRAY_VENV=%VENV_DIR%"
+set "TRAY_VENV=%SCRIPT_DIR%.venv"
 set "TRAY_PIDS="
-for /f "usebackq delims=" %%P in (`%PS% -NoProfile -NonInteractive -Command "$v=$env:TRAY_VENV; Get-CimInstance Win32_Process -Filter 'Name = ''pythonw.exe'' OR Name = ''python.exe''' | Where-Object { $_.ExecutablePath -and $_.ExecutablePath.StartsWith($v, [System.StringComparison]::OrdinalIgnoreCase) -and $_.CommandLine -match 'launcher\.py\s+tray' } | Select-Object -ExpandProperty ProcessId"`) do (
+for /f "usebackq delims=" %%P in (`%PS% -NoProfile -NonInteractive -Command "$v=$env:TRAY_VENV; Get-CimInstance Win32_Process -Filter 'Name = ''pythonw.exe'' OR Name = ''python.exe''' | Where-Object { $_.CommandLine -and $_.CommandLine.IndexOf($v, [System.StringComparison]::OrdinalIgnoreCase) -ge 0 -and $_.CommandLine -match 'launcher\.py\s+tray' } | Select-Object -ExpandProperty ProcessId"`) do (
     if defined TRAY_PIDS (set "TRAY_PIDS=!TRAY_PIDS! %%P") else (set "TRAY_PIDS=%%P")
 )
 ```
@@ -98,4 +100,5 @@ Don't re-derive the reclaim logic per project. Copy the two blocks above verbati
 
 ## Decision log
 
+- **2026-06-07** — Extended the CommandLine correction to the **single-instance detection** block (`project-scaffolding#36`). The 2026-06-04 fix below corrected only the `--restart` port-reclaim half; the detection `Where-Object` kept the `ExecutablePath.StartsWith(<repo>\.venv\Scripts)` guard. On a python.org "pythoncore" venv that guard never matched a live tray (the venv `pythonw.exe` re-execs the base interpreter, so `ExecutablePath` reports `…\pythoncore-3.14-64\pythonw.exe`), so plain `tray.bat` stopped no-op'ing and **stacked a second tray** each run; the duplicate trays then deadlocked the webapp port (each idempotent webapp manager no-ops while a sibling holds the port, so none binds). Observed live on `whatsapp-radar` (`:8455` would not bind until the duplicates were cleaned to one). Detection now matches on `CommandLine.IndexOf($v, OrdinalIgnoreCase) -ge 0` against this repo's `.venv` (same pattern as the reclaim block), still AND-ed with the `launcher\.py\s+tray` invocation match so a sister-app tray is never detected or killed. Carry the same one-line change to each sister `tray.bat` (app-launcher, whatsapp-radar, photo-ocr, voice-transcriber).
 - **2026-06-04** — Corrected the canonical scope guard from **process image path** to **CommandLine**. The original `project-scaffolding#29` sketch scoped the reclaim by `$p.Path.StartsWith($venv)` (image path). Proven wrong during the app-launcher rollout (#122): on Python 3.14 Windows venvs a venv-launched `pythonw.exe` re-execs the base interpreter, so the running webapp/session-host reports the shared base interpreter as its image path, not the repo's `.venv`. An image-path guard never matched the real webapp and the reclaim silently no-op'd — the exact failure the convention exists to prevent. The working form (in app-launcher's merged `tray.bat`) matches the holder's `.venv` path against its `CommandLine`. Also recorded the caveat that mutex-shared ports must be excluded from the reclaim list.
