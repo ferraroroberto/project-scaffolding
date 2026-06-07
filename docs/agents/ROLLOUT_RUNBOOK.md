@@ -58,4 +58,5 @@ Phase 4 — Final verification sweep
 Out of scope (call out to the user):
 - `print()` → `logging` migration — see `LOGGING_MIGRATION_PROMPT.md`.
 - Renaming `venv/` to `.venv/` — report only; manual recreation required (renaming an active venv breaks paths inside it on Windows).
+- Tray apps: per repo, if it ships a `tray.bat` that owns a long-lived service, grep for `WANT_RESTART`; if absent, the tray lacks the orphan-proof `--restart` — flag it for the `tray.bat.template` adoption per `ADAPT_PROMPT.md` step 9 (report only; do not rewrite a working tray without approval). See `docs/windows-tray.md`.
 ```

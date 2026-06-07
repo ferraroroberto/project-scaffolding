@@ -16,6 +16,7 @@ You are setting up CLAUDE.md / AGENTS.md for this repository.
 6. Grep README.md (and any docs) for links to those deleted files; replace with a link to `CLAUDE.md`.
 7. If the repo uses Streamlit, grep for `use_container_width` and report any occurrences (do not fix without approval).
 8. If the repo has a `venv/` folder instead of `.venv/`, report it (do not auto-rename).
+9. If this repo runs a Windows tray that owns a long-lived service (a webapp, session-host, hub, … on a fixed loopback port), copy `<scaffolding>/tray.bat.template` to `./tray.bat` and replace the four `__PLACEHOLDER__` tokens: `__APP_NAME__` (used in messages + the window title), `__TRAY_LAUNCH__` (the args python starts the tray with, e.g. `launcher.py tray` or `-m tray`), `__TRAY_MATCH__` (a regex matching that invocation in a CommandLine, e.g. `launcher\.py\s+tray`), and `__OWNED_PORTS__` (comma list of ports this tray *exclusively* owns — exclude any mutex-shared port). This gives the app the orphan-proof `tray.bat --restart` by default; see `<scaffolding>/docs/windows-tray.md`. If the repo is not a tray app, skip this. If it already has a `tray.bat`, report it rather than overwriting.
 
 Replace `<scaffolding>` with the absolute path to your local copy of project-scaffolding.
 ```
