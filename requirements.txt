@@ -4,3 +4,8 @@ streamlit>=1.30.0
 # After install: .venv\Scripts\python.exe -m playwright install chromium
 pytest>=8.0.0
 pytest-playwright>=0.5.0
+
+# Lint + type gate (scripts/verify-before-ship.ps1) — the same strictness every
+# consumer enforces on vendor-verbatim primitives. Config lives in pyproject.toml.
+ruff>=0.10.0
+mypy>=1.10.0

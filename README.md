@@ -160,6 +160,18 @@ The e2e port is `STREAMLIT_E2E_PORT` in `tests/_streamlit_lifecycle.py` (default
 & .\.venv\Scripts\python.exe -c "from tests._streamlit_lifecycle import ensure_fresh_streamlit; ensure_fresh_streamlit()"
 ```
 
+### Verification gate
+
+`scripts/verify-before-ship.ps1` is the one pass/fail pre-ship gate — run it before declaring any change done:
+
+```powershell
+& .\scripts\verify-before-ship.ps1
+```
+
+It sequences, fail-fast: **byte-compile** → **ruff** (whole repo) → **mypy `--strict`** (vendor-verbatim primitives only) → **pytest** (unit + e2e). Strictness lives in `pyproject.toml` (`[tool.ruff.lint]` adds `UP` to ruff's defaults; `[tool.mypy]` sets `strict = true`); the script only sequences the tools.
+
+The mypy stage gates **vendor-verbatim primitives** — modules like `app/tray/single_instance.py` that consumers copy byte-identical and run through *their* `ruff` + `mypy --strict` gates. Gating them here means a canonical primitive can never ship lint- or type-dirty and redden every consumer's CI. When you add a new vendored primitive, append it to `$VendoredModules` in the script.
+
 ## Extending the scaffold
 
 - **New view** → create `app/views/<name>.py` with `render()`, append `st.Page(<module>.render, title=..., icon=...)` to `nav_pages` inside `app/app.py`.

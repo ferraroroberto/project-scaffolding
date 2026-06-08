@@ -6,6 +6,8 @@ import io
 import logging
 import sys
 
+import pytest
+
 from src import clear_log_buffer, get_log_buffer, get_logger
 from src.logger import _configure_root
 
@@ -33,7 +35,7 @@ def test_debug_lines_stay_below_the_buffer_threshold() -> None:
 
 
 def test_console_handler_tolerates_emoji_on_cp1252_stdout(
-    monkeypatch: "pytest.MonkeyPatch",
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """StreamHandler must not raise UnicodeEncodeError on a cp1252 console."""
     # Simulate a cp1252 Windows console by wrapping a BytesIO with cp1252.

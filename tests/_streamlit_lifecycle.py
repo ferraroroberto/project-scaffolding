@@ -19,9 +19,9 @@ import sys
 import time
 import urllib.error
 import urllib.request
-from datetime import datetime, timezone
+from datetime import datetime, UTC
 from pathlib import Path
-from typing import Callable, List
+from collections.abc import Callable
 
 _ROOT = Path(__file__).resolve().parent.parent
 _APP = _ROOT / "app" / "app.py"
@@ -41,7 +41,7 @@ def port_is_in_use(port: int) -> bool:
         return sock.connect_ex(("127.0.0.1", port)) == 0
 
 
-def _listening_pids(port: int) -> List[str]:
+def _listening_pids(port: int) -> list[str]:
     """PIDs LISTENing on ``port`` (Windows netstat / POSIX lsof)."""
     if sys.platform == "win32":
         out = subprocess.run(
@@ -99,7 +99,7 @@ def _health_ok(base_url: str) -> bool:
 
 def _write_marker(port: int, pid: int) -> None:
     """Record the restart so a human can confirm which process is serving."""
-    stamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+    stamp = datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S UTC")
     line = f"streamlit e2e: pid={pid} port={port} restarted={stamp}"
     try:
         _MARKER.write_text(line + "\n", encoding="utf-8")

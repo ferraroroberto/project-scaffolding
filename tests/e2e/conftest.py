@@ -11,7 +11,7 @@ needed — unlike a self-signed-cert project, which would add
 
 from __future__ import annotations
 
-from typing import Iterator
+from collections.abc import Iterator
 
 import pytest
 

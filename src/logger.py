@@ -32,7 +32,8 @@ import sys
 import threading
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
+from collections.abc import Callable
 
 # ---------------------------------------------------------------------------
 # Paths & constants
