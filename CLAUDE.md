@@ -123,6 +123,34 @@ Run-count, wrong shape vs this convention:
 
 **Sister-repo tracking:** when a fleet repo still has the old runner/actions (`#25`) or the duplicate `push`-on-branches trigger (`#38`), it carries a pointer issue back to the canonical decision record in `ferraroroberto/project-scaffolding`. Fix it before the deprecation deadline rather than after.
 
+## CI is advisory — `## CI expectations` block + e2e-surface skip rule
+*Apply whenever this project has a `.github/workflows/` file **and** a local verification gate.*
+
+**CI is advisory, not a required gate.** The fleet's e2e workflows run on repos with **no branch protection**, so their checks are not required to merge. The **local gate** (`scripts/verify-before-ship.ps1`, or `pytest + ruff + mypy`) is the contract; CI is supplementary. The agent must not treat `gh pr checks --watch` as a mandatory blocking wall.
+
+**CI's only signal beyond the local gate is the e2e suite.** The local gate runs `pytest + ruff + mypy` but **skips the Playwright e2e leg** (it needs browsers + a live webapp). So the *only* thing CI runs that the local gate didn't is the e2e suite — which is also the known-flaky part (browser/PTY input wedging on the slower hosted Windows runner). **Consequence:** a diff that touches **none** of the project's e2e surface gains nothing from waiting on CI, yet a wedged WebKit browser can still block the merge up to the `timeout-minutes` cap. Waiting there is pure cost, no signal.
+
+**Each project declares a `## CI expectations` block in its own `CLAUDE.md`** (the per-project *instance* — durations, flaky leg, e2e-surface paths). `/issue-finish` reads it. Don't inline these values into the skill; they differ per repo. Block template (fill the bracketed values):
+
+```markdown
+## CI expectations
+- Workflow `[.github/workflows/e2e.yml]`, job `[verify-before-ship]`, on every PR. **Advisory, not required** (no branch protection) — the local gate is the contract.
+- Typical green: **~[N] min**. Investigate at **>[2N] min**; treat as wedged at **>[~4N] min**.
+- Flaky leg: `[the Playwright WebKit/iPhone projection / PTY-input tests]` can wedge on the hosted runner. `timeout-minutes: [30]` caps a wedge. A wedge is a flake, not the diff.
+- CI's only signal beyond the local gate is the **e2e suite** (skipped locally). Its e2e surface = `[app/webapp/, app/tray/, tests/e2e/, static assets, …]`. A diff touching **none** of these gains nothing from CI.
+```
+
+**What `/issue-finish` does with it (the shared skill mechanism, two behaviors):**
+- **Skip-the-wait keyed on the e2e surface, not "docs vs code."** If the diff touches none of the project's declared e2e surface and the local gate is green → merge on local-green and **state it** in the finish summary (e.g. `CI not awaited — store-only diff, no e2e surface touched`). This generalizes the old narrow `*.md`-only skip rule into the principled one: e2e is the only thing CI adds over the local gate.
+- **Proactive flake handling.** Read the expected duration from the block. While watching, the moment elapsed crosses the *investigate* threshold, stop waiting passively — inspect the run (`gh run view --job`), classify flake vs real failure, and for the *documented* flaky leg cancel + rerun **once** automatically, saying so. A second flake → stop and surface it to the user. **Never** rerun a real (non-flake) failure.
+
+**Keep-the-human-in-control guardrails:**
+- The agent always **states** its CI decision (skip vs wait, plus any rerun) in the finish summary, so the user can veto.
+- Auto-rerun is capped at **once** and only for the *documented* flaky leg; a second flake stops and asks.
+- Nothing force-merges. Because CI is advisory (no branch protection) no `--admin` override is ever needed. **If a repo later adds the `e2e` check as a *required* status check, the skip-rule must fall back to watching** — a required check cannot be skipped without `--admin`, and force-merging is out of scope here.
+
+**Where each piece lives** (per the fleet "don't diverge" rule): this scaffold documents the convention + the block template; the **skill mechanism** lives in `claude-config` `skills/issue-finish/SKILL.md` step 5 (synced to `~/.claude`); the **per-project instances** live in each project's own `CLAUDE.md` block; **sister-repo pointer issues** (start: `whatsapp-radar`, `app-launcher`) track adoption back to the canonical decision record. Making the e2e leg actually stop flaking (env-aware wait budgets / retry) is a separate per-project fix — this convention makes a flake *cheap*, it does not cure it.
+
 ## End-to-end UI testing
 *Apply only if this project serves a browser UI (Streamlit, FastAPI, Flask, etc.).*
 
