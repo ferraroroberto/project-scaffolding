@@ -20,6 +20,16 @@ REM  Detection matches the tray process by command line + this project's .venv
 REM  path via CIM, then kills BY PID with /T. We never blanket-kill pythonw, so
 REM  sister-app trays and any other python processes are untouched.
 REM
+REM  The CIM detection + port reclaim live in app\tray\tray_lifecycle.ps1 (a
+REM  committed helper shelled to with -File), NOT inline `powershell -Command
+REM  "..."`. Inline, the CIM -Filter's nested quotes inside this batch's quotes
+REM  inside a `for /f usebackq` backtick block get mangled when tray.bat is
+REM  launched non-interactively (Git Bash -> `cmd /c "tray.bat --restart"`, or a
+REM  finisher skill's Bash tool): the inline command returns empty, nothing is
+REM  killed, and --restart silently degrades to a plain start that adopts the
+REM  stale webapp and reports success. -File removes the nested quoting, so
+REM  detection/reclaim behave identically from any caller (project-scaffolding#54).
+REM
 REM  --restart is orphan-proof: besides killing the tray subtree, it reclaims
 REM  this app's owned service ports by their owning PID, regardless of process
 REM  parentage. A service child that got detached from its tray (a stale process
@@ -53,12 +63,17 @@ set "WANT_RESTART="
 if /i "%~1"=="--restart" set "WANT_RESTART=1"
 if /i "%~1"=="-r"        set "WANT_RESTART=1"
 
-REM === ADAPT (3/4): in the -match below, replace __TRAY_MATCH__ with a regex
+REM === ADAPT (3/4): in the -TrayMatch below, replace __TRAY_MATCH__ with a regex
 REM     matching THIS app's tray invocation, e.g. launcher\.py\s+tray  or  -m\s+tray
 set "PS=C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe"
 set "TRAY_VENV=%SCRIPT_DIR%.venv"
+set "TRAY_PS=%SCRIPT_DIR%app\tray\tray_lifecycle.ps1"
+if not exist "%TRAY_PS%" (
+    echo ERROR: missing tray helper "%TRAY_PS%" -- vendor app\tray\tray_lifecycle.ps1 from the scaffold.
+    exit /b 1
+)
 set "TRAY_PIDS="
-for /f "usebackq delims=" %%P in (`%PS% -NoProfile -NonInteractive -Command "$v=$env:TRAY_VENV; Get-CimInstance Win32_Process -Filter 'Name = ''pythonw.exe'' OR Name = ''python.exe''' | Where-Object { $_.CommandLine -and $_.CommandLine.IndexOf($v, [System.StringComparison]::OrdinalIgnoreCase) -ge 0 -and $_.CommandLine -match '__TRAY_MATCH__' } | Select-Object -ExpandProperty ProcessId"`) do (
+for /f "usebackq delims=" %%P in (`%PS% -NoProfile -NonInteractive -File "%TRAY_PS%" detect -VenvDir "%TRAY_VENV%" -TrayMatch "__TRAY_MATCH__"`) do (
     if defined TRAY_PIDS (set "TRAY_PIDS=!TRAY_PIDS! %%P") else (set "TRAY_PIDS=%%P")
 )
 
@@ -82,7 +97,7 @@ if defined WANT_RESTART (
     REM === ADAPT (4/4): replace __OWNED_PORTS__ with this tray's exclusively-owned
     REM     ports as a comma list, e.g. 8445,8446 . Exclude any mutex-shared port. ===
     set "RECLAIM_VENV=%SCRIPT_DIR%.venv"
-    %PS% -NoProfile -NonInteractive -Command "$v=$env:RECLAIM_VENV; foreach ($port in __OWNED_PORTS__) { Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue | ForEach-Object { $opid = $_.OwningProcess; $cim = Get-CimInstance Win32_Process -Filter ('ProcessId = {0}' -f $opid) -ErrorAction SilentlyContinue; if ($cim -and $cim.CommandLine -and $cim.CommandLine.IndexOf($v, [System.StringComparison]::OrdinalIgnoreCase) -ge 0) { Write-Host ('Reclaiming :{0} from PID {1}' -f $port, $opid); Stop-Process -Id $opid -Force -ErrorAction SilentlyContinue } } }"
+    %PS% -NoProfile -NonInteractive -File "%TRAY_PS%" reclaim -VenvDir "%RECLAIM_VENV%" -Ports "__OWNED_PORTS__"
     REM Give Windows a moment to release the ports before rebinding.
     ping 127.0.0.1 -n 3 >nul
 )
