@@ -2,6 +2,8 @@
 
 Canonical instructions for AI coding agents working in this repository. Claude Code reads this file directly as project memory. Other agents (Cursor, Codex, etc.) reach it via the one-line `AGENTS.md` pointer.
 
+> **Scope — project-local only.** This template owns *what goes **inside** a project*. Machine-wide rules that apply *above all projects* — global hooks, the issue-workflow skills, cross-fleet conventions — live in the machine config (`claude-config/global-CLAUDE.md`, installed once as `~/.claude/CLAUDE.md` and `~/.codex/AGENTS.md`) and must **not** be re-stated here. If a rule is true for every repo on the machine, it belongs there; this file carries only project-local guidance. (Boundary rule recorded in `ferraroroberto/claude-config`.)
+
 ## Plan mode is the default
 Every non-trivial request starts in plan mode. Non-trivial = anything beyond a one-line fix, a typo, or a question I can answer without touching code.
 
