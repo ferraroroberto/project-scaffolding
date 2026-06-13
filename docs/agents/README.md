@@ -18,7 +18,9 @@ Claude Code auto-loads `CLAUDE.md` as project memory — putting the full instru
 
 ## Updating the master
 
+This repo's own `./CLAUDE.md` is the master copied verbatim — only the `## This repository` footer differs. **When you edit one, mirror the change to the other in the same commit;** otherwise the canonical template silently drifts from the repo that defines it (the drift `project-scaffolding#59` had to reconcile). Fleet-specific reality belongs in the *footer* or a sister repo's own `## This repository` block, never hardcoded into the shared body — keep the body generic so it copies cleanly into every repo.
+
 When the master changes:
-1. Edit `CLAUDE.master.md` here.
+1. Edit `CLAUDE.master.md` here **and** mirror the same edit into this repo's `./CLAUDE.md`.
 2. Re-run the rollout (see `ROLLOUT_RUNBOOK.md`) to propagate to every sibling repo.
 3. Each repo's `## This repository` footer stays untouched.
