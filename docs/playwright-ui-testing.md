@@ -260,6 +260,40 @@ def test_classify_local_returns_rows(page):
     assert page.get_by_role("table").locator("tbody tr").count() > 0
 ```
 
+### Default timeout — make hangs self-name
+
+Playwright's implicit action + navigation timeout is **30 s**. An auto-waiting call — `.click()`, `page.goto()`, `wait_for_selector()` with no explicit `timeout=` — that never settles blocks silently for the full 30 s, and a few stacking inside one test push the run into a multi-minute hang. Under `pytest-timeout`, the test finally aborts as a **black box that never names which wait hung** — forcing replay or log archaeology on a flake that may not recur.
+
+Set an **explicit, bounded, env-tunable default** in conftest instead of inheriting Playwright's implicit 30 s. **15 s is the recommended base** — well under any `pytest-timeout`, generous for a real localhost action, short enough that a stuck wait fails immediately with `TimeoutError: ... waiting for <locator>` and names the hung call. Set it once in an `autouse` fixture so every test inherits it without per-call boilerplate.
+
+Where to set it depends on the fixture shape in conftest:
+
+**Tests using the pytest-playwright `page` fixture directly** — apply it on the page:
+
+```python
+import os
+
+_DEFAULT_TIMEOUT_MS = int(os.environ.get("E2E_DEFAULT_TIMEOUT_MS", "15000"))
+
+@pytest.fixture(autouse=True)
+def _bound_default_timeouts(page) -> None:
+    page.set_default_timeout(_DEFAULT_TIMEOUT_MS)
+    page.set_default_navigation_timeout(_DEFAULT_TIMEOUT_MS)
+```
+
+**A custom fixture that does `context.new_page()`** (e.g. an `authed_page`) — apply it on the context instead; the default is consulted at action time, so a context-level cap covers every page created from it:
+
+```python
+@pytest.fixture(autouse=True)
+def _bound_default_timeouts(context) -> None:
+    context.set_default_timeout(_DEFAULT_TIMEOUT_MS)
+    context.set_default_navigation_timeout(_DEFAULT_TIMEOUT_MS)
+```
+
+`expect()` web-first assertions carry their own 5 s default — leave them alone. An explicit `timeout=` on any single call still overrides. Widen for a slow hosted CI runner without a code change: set `E2E_DEFAULT_TIMEOUT_MS=20000` in the workflow env.
+
+**Origin:** app-launcher#186 (a ~120 s CI e2e hang, opaque, never named) surfaced the cost of the implicit 30 s default; the convention landed in app-launcher PR #189. whatsapp-radar already sets an explicit `page.set_default_timeout` with a 30 s × scale-factor variant (`_scaled_page_timeouts`) — satisfies the spirit. The **15 s bounded base is the fleet standard** across all sister repos.
+
 ### Running it
 
 ```powershell

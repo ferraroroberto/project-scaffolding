@@ -11,6 +11,7 @@ needed — unlike a self-signed-cert project, which would add
 
 from __future__ import annotations
 
+import os
 from collections.abc import Iterator
 
 import pytest
@@ -21,6 +22,12 @@ from tests._streamlit_lifecycle import (
     kill_streamlit_on_port,
 )
 
+# Explicit bounded default for Playwright action + navigation waits (#61).
+# Playwright's implicit 30 s stacks into opaque multi-minute hangs under
+# pytest-timeout; 15 s fails fast with a TimeoutError that names the locator.
+# Widen for slow CI runners via E2E_DEFAULT_TIMEOUT_MS without a code change.
+_DEFAULT_TIMEOUT_MS = int(os.environ.get("E2E_DEFAULT_TIMEOUT_MS", "15000"))
+
 
 @pytest.fixture(scope="session")
 def streamlit_app() -> Iterator[str]:
@@ -30,3 +37,14 @@ def streamlit_app() -> Iterator[str]:
         yield base_url
     finally:
         kill_streamlit_on_port(STREAMLIT_E2E_PORT)
+
+
+@pytest.fixture(autouse=True)
+def _bound_default_timeouts(page) -> None:
+    """Cap every Playwright action + navigation wait to _DEFAULT_TIMEOUT_MS (#61).
+
+    Applied on the page (not context) because this scaffold's tests take the
+    pytest-playwright page fixture directly — no custom context.new_page() path.
+    """
+    page.set_default_timeout(_DEFAULT_TIMEOUT_MS)
+    page.set_default_navigation_timeout(_DEFAULT_TIMEOUT_MS)
