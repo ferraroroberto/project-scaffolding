@@ -97,7 +97,7 @@ if defined WANT_RESTART (
     REM === ADAPT (4/4): replace __OWNED_PORTS__ with this tray's exclusively-owned
     REM     ports as a comma list, e.g. 8445,8446 . Exclude any mutex-shared port. ===
     set "RECLAIM_VENV=%SCRIPT_DIR%.venv"
-    %PS% -NoProfile -NonInteractive -File "%TRAY_PS%" reclaim -VenvDir "%RECLAIM_VENV%" -Ports "__OWNED_PORTS__"
+    %PS% -NoProfile -NonInteractive -File "%TRAY_PS%" reclaim -VenvDir "!RECLAIM_VENV!" -Ports "__OWNED_PORTS__"
     REM Give Windows a moment to release the ports before rebinding.
     ping 127.0.0.1 -n 3 >nul
 )
