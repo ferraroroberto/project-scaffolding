@@ -2,7 +2,7 @@
 
 Canonical instructions for AI coding agents working in this repository. Claude Code reads this file directly as project memory. Other agents (Cursor, Codex, etc.) reach it via the one-line `AGENTS.md` pointer.
 
-> **Scope — project-local only.** This template owns *what goes **inside** a project*. Machine-wide rules that apply *above all projects* — global hooks, the issue-workflow skills, cross-fleet conventions — live in the machine config (`claude-config/global-CLAUDE.md`, installed once as `~/.claude/CLAUDE.md` and `~/.codex/AGENTS.md`) and must **not** be re-stated here. If a rule is true for every repo on the machine, it belongs there; this file carries only project-local guidance. (Boundary rule recorded in `ferraroroberto/claude-config`.)
+> **Scope — project-local only.** This template owns *what goes **inside** a project*. Machine-wide rules that apply *above all projects* — global hooks, the issue-workflow skills, cross-fleet conventions — live in the machine config (`fleet-config/global-CLAUDE.md`, installed once as `~/.claude/CLAUDE.md` and `~/.codex/AGENTS.md`) and must **not** be re-stated here. If a rule is true for every repo on the machine, it belongs there; this file carries only project-local guidance. (Boundary rule recorded in `ferraroroberto/fleet-config`.)
 
 ## Plan mode is the default
 Every non-trivial request starts in plan mode. Non-trivial = anything beyond a one-line fix, a typo, or a question I can answer without touching code.
@@ -151,7 +151,7 @@ Run-count, wrong shape vs this convention:
 - Auto-rerun is capped at **once** and only for the *documented* flaky leg; a second flake stops and asks.
 - Nothing force-merges. Because CI is advisory (no branch protection) no `--admin` override is ever needed. **If a repo later adds the `e2e` check as a *required* status check, the skip-rule must fall back to watching** — a required check cannot be skipped without `--admin`, and force-merging is out of scope here.
 
-**Where each piece lives** (per the fleet "don't diverge" rule): this scaffold documents the convention + the block template; the **skill mechanism** lives in `claude-config` `skills/issue-finish/SKILL.md` step 5 (synced to `~/.claude`); the **per-project instances** live in each project's own `CLAUDE.md` block; **sister-repo pointer issues** (start: `whatsapp-radar`, `app-launcher`) track adoption back to the canonical decision record. Making the e2e leg actually stop flaking (env-aware wait budgets / retry) is a separate per-project fix — this convention makes a flake *cheap*, it does not cure it.
+**Where each piece lives** (per the fleet "don't diverge" rule): this scaffold documents the convention + the block template; the **skill mechanism** lives in `fleet-config` `skills/issue-finish/SKILL.md` step 5 (synced to `~/.claude`); the **per-project instances** live in each project's own `CLAUDE.md` block; **sister-repo pointer issues** (start: `whatsapp-radar`, `app-launcher`) track adoption back to the canonical decision record. Making the e2e leg actually stop flaking (env-aware wait budgets / retry) is a separate per-project fix — this convention makes a flake *cheap*, it does not cure it.
 
 ## End-to-end UI testing
 *Apply only if this project serves a browser UI (Streamlit, FastAPI, Flask, etc.).*

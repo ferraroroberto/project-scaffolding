@@ -9,8 +9,8 @@ Single source of truth for AI agent instructions across all my repos.
 - **`ADAPT_PROMPT.md`** — copy-paste prompt to install the canonical instructions in a new repo.
 - **`LOGGING_MIGRATION_PROMPT.md`** — separate, future-use prompt for migrating `print()` → `logging` across a repo.
 - **`ROLLOUT_RUNBOOK.md`** — followable plan to replicate this whole consolidation on another machine across a different set of repos.
-- **`skills/`** — pointers to machine-wide Claude Code skills. User-level skills sit *above* all projects, so their canonical home is the machine config (`ferraroroberto/claude-config` → `skills/`), which installs them once into `~/.claude/skills/`. This folder keeps only a pointer per skill, never a verbatim fork.
-  - **`skills/handoff-commit/`** — pointer to the canonical `/handoff-commit` skill in `claude-config`. (`/handoff-commit [<commit-ish>]` generates a copy-paste markdown prompt that hands a specific pushed GitHub commit to another LLM, so it can replicate the same logical change in a sister project — e.g. public repo → private fork — without copy-pasting code.)
+- **`skills/`** — pointers to machine-wide Claude Code skills. User-level skills sit *above* all projects, so their canonical home is the machine config (`ferraroroberto/fleet-config` → `skills/`), which installs them once into `~/.claude/skills/`. This folder keeps only a pointer per skill, never a verbatim fork.
+  - **`skills/handoff-commit/`** — pointer to the canonical `/handoff-commit` skill in `fleet-config`. (`/handoff-commit [<commit-ish>]` generates a copy-paste markdown prompt that hands a specific pushed GitHub commit to another LLM, so it can replicate the same logical change in a sister project — e.g. public repo → private fork — without copy-pasting code.)
 
 ## Why CLAUDE.md is canonical (not AGENTS.md)
 
