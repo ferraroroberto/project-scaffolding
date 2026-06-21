@@ -24,6 +24,7 @@ Clone this directory, rename it, and start building.
 - `tray.bat.template` — copy-to-adapt canonical Windows tray launcher for apps that run a tray owning a long-lived service. Replace the four `__PLACEHOLDER__` tokens and you get the orphan-proof `tray.bat --restart` by default. See `docs/windows-tray.md`.
 - `app/tray/tray_lifecycle.ps1` — canonical, **vendor-verbatim** tray detect + port-reclaim helper that `tray.bat` shells to with `-File` (app-specific venv path / tray-match regex / owned ports passed as arguments). Keeps the CIM/`Get-NetTCPConnection` logic out of an inline `powershell -Command "…"` whose nested quoting breaks under a non-interactive `--restart` and would silently adopt the stale build. See `docs/windows-tray.md` (#54).
 - `app/tray/single_instance.py` — canonical, **vendor-verbatim** named-mutex primitive for tray apps: `SingleInstance` (the tray's in-process single-instance lock) + `cross_process_lock` (serializes the webapp adopt-or-spawn so two trays can't both spawn it). Copy it byte-for-byte into a tray app — the per-app mutex *names* are passed at the call site, so the file stays identical fleet-wide. See `docs/windows-tray.md` (gotcha #4).
+- `app/webapp/static/_vendored/` — **vendor-verbatim web-app UI components** for the FastAPI + static PWA shape: the fleet design system's *implementation* layer (the *spec* lives in `fleet-config`'s `design.md`/`design.dark.md`). First component is `nav/` — the canonical floating bottom-tab navigation (`nav-tabs.js` + `nav-tabs.css` + `nav-tabs.html`). Copy a component folder byte-for-byte; adapt only your markup + token values. See `app/webapp/static/_vendored/README.md` and `CLAUDE.md` ("Web-app visual identity").
 - `CLAUDE.md` so AI coding agents (Claude Code, Cursor, Codex, etc.) can extend the project safely. `AGENTS.md` is a one-line pointer to it for non-Claude tools.
 - `.fleet.toml` — this repo's card on the fleet architecture map. `fleet-config`'s `/system-map` aggregates every repo's `.fleet.toml`, so a cloned repo appears on the map automatically once you edit it. **After cloning, replace its values** with your repo's own. Schema: `fleet-config/architecture/README.md`.
 - `docs/agents/` — the master AGENTS/CLAUDE templates, the adapt prompt, the rollout runbook, and the standalone `print()`→`logging` migration prompt. Single source of truth for the **project-shaped** agent instructions across all my repos (the universal dev-workflow directives live once in the machine config, `fleet-config/global-CLAUDE.md`).
@@ -75,6 +76,7 @@ app/
   views/                    one render() per file (welcome, ...)
   tray/tray_lifecycle.ps1   vendor-verbatim tray detect + port-reclaim helper
   tray/single_instance.py   vendor-verbatim named-mutex primitive for tray apps
+  webapp/static/_vendored/  vendor-verbatim web-app UI components (nav/ = bottom-tab nav)
 src/
   config.py                 paths + env-driven settings
   logger.py                 the elegant logger
