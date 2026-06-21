@@ -1,0 +1,159 @@
+/* Floating bottom-tab navigation — visual contract for the fleet's canonical
+ * primary nav. VENDORED VERBATIM from project-scaffolding; do NOT edit per-app.
+ *
+ * Every colour, radius, and spacing value is a design-system CSS custom property
+ * (see ~/.claude/design.md + design.dark.md). The consuming app MUST define
+ * these tokens (in its own :root / [data-theme] blocks); this file only
+ * *references* them so one spec drives every app's look. The required tokens are
+ * listed in this folder's README.md.
+ *
+ * Pairs with nav-tabs.js (behaviour) and nav-tabs.html (markup skeleton).
+ *
+ * Desktop (pointer: fine) renders a top segmented control; touch / installed-PWA
+ * (pointer: coarse, narrow) renders the floating bottom-tab pill — that pill is
+ * the fleet navigation contract every app must feel identical on. */
+
+/* ----------------------------------------------------------- tabs (desktop) */
+.tabs {
+  display: flex;
+  gap: var(--space-xs);
+  margin: var(--space-xs) 0 14px;
+  background: var(--card);
+  padding: var(--space-xs);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  position: sticky;
+  top: 0;
+  z-index: 4;
+}
+.tab {
+  flex: 1;
+  background: transparent;
+  border: 0;
+  padding: 9px 10px;
+  border-radius: var(--radius-pill);
+  color: var(--muted);
+  font-size: var(--font-label);
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.tab.active { background: var(--card-off); color: var(--accent); }
+.tab:active { transform: scale(0.97); }
+/* Desktop shows the emoji + label; the stroke SVG icon is mobile-only (revealed
+   in the coarse-pointer media query below). */
+.tab-icon { display: none; }
+.tab-emoji { margin-right: 0.35em; }
+@media (max-width: 430px) {
+  .tab {
+    min-width: 0;
+    font-size: var(--font-caption);
+    padding: 8px 2px;
+  }
+}
+
+/* ------------------------------------------- floating bottom tab bar (mobile) */
+/* Gated on touch + narrow width so desktop keeps the top segmented control
+   byte-for-byte unchanged. Colours adapt to the theme tokens so the glass bar
+   works in both light and dark. This block is the fleet navigation contract —
+   position, radius, blur, and the safe-area handling must stay identical across
+   apps (don't re-author it per-app). */
+@media (pointer: coarse) and (max-width: 520px) {
+  .app {
+    /* Always fill the viewport so the fixed bottom bar anchors to the *viewport*
+       bottom, not the content bottom. Without this, iOS standalone PWAs pin a
+       position:fixed bar to a short page's content bottom on non-scrolling
+       pages, so it rides up. 100vh fallback for iOS < 15.4. */
+    min-height: 100vh;
+    min-height: 100dvh;
+    padding-bottom: calc(
+      env(safe-area-inset-bottom, 0px) + var(--bottom-tabs-margin) +
+      var(--bottom-tabs-height) + var(--bottom-tabs-margin) + var(--gap)
+    );
+    scroll-padding-bottom: calc(
+      env(safe-area-inset-bottom, 0px) + var(--bottom-tabs-margin) +
+      var(--bottom-tabs-height) + var(--bottom-tabs-margin) + var(--gap)
+    );
+  }
+
+  .tabs {
+    position: fixed;
+    top: auto;
+    left: max(var(--bottom-tabs-margin), env(safe-area-inset-left, 0));
+    right: max(var(--bottom-tabs-margin), env(safe-area-inset-right, 0));
+    bottom: var(--bottom-tabs-margin);
+    z-index: 120;
+    display: grid;
+    /* One column per tab. --nav-tab-count is set by the app (default 5) so the
+       grid matches however many tabs the markup declares. */
+    grid-template-columns: repeat(var(--nav-tab-count, 5), minmax(0, 1fr));
+    grid-auto-rows: var(--bottom-tabs-pill-height);
+    align-content: center;
+    align-items: center;
+    gap: 4px;
+    height: var(--bottom-tabs-height);
+    max-width: 480px;
+    margin: 0 auto;
+    padding: 4px;
+    background: var(--tabbar-bg);
+    border: 1px solid var(--tabbar-border);
+    border-radius: var(--radius-nav);
+    box-shadow: 0 10px 34px rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(20px) saturate(1.25);
+    -webkit-backdrop-filter: blur(20px) saturate(1.25);
+  }
+
+  .tab {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    min-width: 0;
+    height: var(--bottom-tabs-pill-height);
+    padding: 6px 2px 5px;
+    border-radius: var(--radius-pill);
+    border: 1px solid transparent;
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 1.1;
+    color: var(--muted);
+    transition: background 0.16s ease, border-color 0.16s ease, color 0.16s ease;
+  }
+  .tab.active {
+    background: var(--card-off);
+    border-color: var(--line);
+    color: var(--accent);
+    box-shadow: none;
+  }
+  .tab:active { transform: scale(0.97); }
+
+  .tab-icon {
+    display: block;
+    width: 21px;
+    height: 21px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+  .tab-emoji { display: none; }
+  .tab-label {
+    display: block;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* Never let the floating bar hover over a modal / overlay. The <dialog> rule
+     covers any native dialog; add the `nav-hidden` class to <body> for non-
+     <dialog> overlays (e.g. a custom login screen) to hide the bar too. */
+  body:has(dialog[open]) .tabs,
+  body.nav-hidden .tabs {
+    display: none;
+  }
+}

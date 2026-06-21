@@ -17,6 +17,16 @@ Canonical instructions for AI coding agents working in this repository. Claude C
 - **App layout:** the main file (e.g. `app.py`) handles only page config, shared state, the sidebar, and routing. Default to native multipage navigation — `st.navigation` + `st.Page`, one view per file exposing a `render()` function (the pattern this scaffold ships). Use `st.tabs()` for sub-sections *within* a view, and a sidebar radio only when asked.
 - **Ask before assuming (Streamlit specifics):** `st.session_state` key names & scope; caching strategy (`@st.cache_data` TTL vs. `@st.cache_resource`); widget `key=` names & input sources; page placement (new page vs. a section in an existing page). (The universal "ask before assuming" directive is in global.)
 
+## Web-app visual identity (fleet design system)
+*Apply only if this project serves a FastAPI + static PWA web app. Streamlit POC spikes are exempt.*
+
+A fleet web app inherits its look **and** its navigation from one place — it re-authors neither. The split follows single-home-by-altitude: **`fleet-config`** owns the *spec* (`design.md` + `design.dark.md`, junctioned into `~/.claude`, plus the `/design-sync` skill); **this scaffold** owns the *vendored implementation* (`app/webapp/static/_vendored/`).
+
+- **Tokens come from the spec, not from you.** Wire your CSS custom properties to `~/.claude/design.md` (light) + `~/.claude/design.dark.md` (dark) — colors, typography, spacing, radii. Define the tokens in your app's `:root` / `[data-theme]` blocks pointing at those values; **don't** copy the spec into your repo and **don't** invent a second accent or per-app palette. `/design-sync` reports drift.
+- **Nav is vendored, not re-implemented.** The primary navigation — the floating bottom-tab pill (desktop segmented control → mobile pill, the fleet *navigation contract*) — is vendored from `app/webapp/static/_vendored/nav/` (`nav-tabs.js` + `nav-tabs.css` + `nav-tabs.html`). Copy the folder **verbatim**, adapt only your markup (which tabs) and the `storageKey`. This is the same "copy byte-for-byte, never fork per-app" rule as the tray's `single_instance.py` / `tray_lifecycle.ps1`.
+- **`_vendored/` is the UI component channel.** New shared HTML/CSS/JS components live under `app/webapp/static/_vendored/<component>/`, normalized from the best existing fleet implementation. Don't hand-copy a sibling app's snippet into a new app — vendor it from here so there's one source of truth. See `app/webapp/static/_vendored/README.md` for the convention and how to add a component.
+- **Don't diverge / don't re-author.** A change to a vendored component or the token contract is made *here* and re-vendored downstream, never forked in a consuming app. (Standard: `ferraroroberto/project-scaffolding#79`; aligns to `ferraroroberto/fleet-config#178`.)
+
 ## GitHub Actions CI conventions
 *Apply whenever this project adds a `.github/workflows/` file.*
 
