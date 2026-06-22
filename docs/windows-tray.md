@@ -4,7 +4,7 @@ Personal reference for projects that ship a **Windows tray app owning a long-liv
 
 > **Audience.** Me, plus any AI coding agent I hand a project to.
 > **Status.** Living reference, not a changelog. Update in place when the recipe changes.
-> **Canonical records.** The full tray-lifecycle gotcha series, oldest first: **#12** (single-instance via a named mutex, not a bound TCP port), **#13** (`CREATE_NO_WINDOW` when shelling out to console tools), [**#29**](https://github.com/ferraroroberto/project-scaffolding/issues/29) (orphan-proof port reclaim on restart — this doc's original anchor), [**#39**](https://github.com/ferraroroberto/project-scaffolding/issues/39) (the single-instance mutex must hold *in-process* and adopt-or-spawn must be *race-safe*), [**#35**](https://github.com/ferraroroberto/project-scaffolding/issues/35) (non-blocking agent-side restart + child re-adoption), [**#54**](https://github.com/ferraroroberto/project-scaffolding/issues/54) (detect/reclaim must live in a committed `.ps1`, not inline `-Command`, so a non-interactive `--restart` can't silently degrade to adopt-the-stale-build).
+> **Canonical records.** The full tray-lifecycle gotcha series, oldest first: **#12** (single-instance via a named mutex, not a bound TCP port), **#13** (`CREATE_NO_WINDOW` when shelling out to console tools), [**#29**](https://github.com/ferraroroberto/project-scaffolding/issues/29) (orphan-proof port reclaim on restart — this doc's original anchor), [**#39**](https://github.com/ferraroroberto/project-scaffolding/issues/39) (the single-instance mutex must hold *in-process* and adopt-or-spawn must be *race-safe*), [**#35**](https://github.com/ferraroroberto/project-scaffolding/issues/35) (non-blocking agent-side restart + child re-adoption), [**#54**](https://github.com/ferraroroberto/project-scaffolding/issues/54) (the full detect → kill → reclaim → start → verify lifecycle must live in one committed `.ps1` call, not inline `-Command` or cmd `for /f` capture, so a non-interactive `--restart` can't silently degrade to adopt-the-stale-build).
 
 ---
 
@@ -38,7 +38,8 @@ So a correct restart cleans up by **port ownership**, not by process parentage. 
 1. **Detect the running tray** by CIM on command line + this repo's `.venv` path (idempotency guard for the no-arg start). Match the tray's own invocation (`launcher.py tray` or equivalent), never a bound port — that is gotcha #12's job.
 2. **On `--restart`, kill the tray subtree by PID** (`taskkill /T /F /PID <tray>`), so cloudflared and any non-port children go down with it.
 3. **Then reclaim each owned service port.** For each fixed port the app owns, find the listener's `OwningProcess`, and kill it **only if its CommandLine is under this repo's `.venv`**. This catches an orphan that the subtree kill missed.
-4. **Wait briefly** for Windows to release the ports (a short `ping 127.0.0.1 -n 3` loopback delay), then start.
+4. **Wait briefly** for Windows to release the ports, then start.
+5. **Verify the served build** by polling `GET /api/version` and comparing its `git_sha` to repo `HEAD`. A stale mismatch is a hard non-zero failure.
 
 ### Scope by CommandLine, not image path (the correction that matters)
 
@@ -54,51 +55,35 @@ A port that is **mutex-shared with another app** must **not** go in the reclaim 
 
 ## Platform gotcha (Windows / PowerShell 5.1)
 
-- `tray.bat` shells out to **Windows PowerShell 5.1** (`C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe`), running the detect/reclaim logic via `-File app\tray\tray_lifecycle.ps1`. Keep that `.ps1` **ASCII-only** — a stray em-dash or other non-ASCII char breaks PS 5.1 parsing. (Write the prose with em-dashes; keep the *code* plain.)
+- `tray.bat` shells out to **Windows PowerShell 5.1** (`C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe`), running the whole lifecycle via one `-File app\tray\tray_lifecycle.ps1 launch ...` call. Keep that `.ps1` **ASCII-only** — a stray em-dash or other non-ASCII char breaks PS 5.1 parsing. (Write the prose with em-dashes; keep the *code* plain.)
 - Match the listener via `Get-NetTCPConnection -LocalPort <p> -State Listen`, take `OwningProcess`, then resolve its CommandLine via `Get-CimInstance Win32_Process -Filter 'ProcessId = <pid>'`. `Get-Process` alone won't give you the command line.
 
 ## The canonical shape
 
-`app-launcher`'s merged `tray.bat` is the reference implementation. The two load-bearing blocks:
-
-**Idempotent single-instance detection** (CIM, scoped to this repo's `.venv` via **CommandLine** — never `ExecutablePath`, never a bound port — matched on the tray's own command line):
+`tray.bat.template` is the reference implementation. The load-bearing shape is a single helper invocation:
 
 ```bat
 set "PS=C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe"
 set "TRAY_VENV=%SCRIPT_DIR%.venv"
 set "TRAY_PS=%SCRIPT_DIR%app\tray\tray_lifecycle.ps1"
-set "TRAY_PIDS="
-for /f "usebackq delims=" %%P in (`%PS% -NoProfile -NonInteractive -File "%TRAY_PS%" detect -VenvDir "%TRAY_VENV%" -TrayMatch "launcher\.py\s+tray"`) do (
-    if defined TRAY_PIDS (set "TRAY_PIDS=!TRAY_PIDS! %%P") else (set "TRAY_PIDS=%%P")
-)
+set "OWNED_PORTS=8445,8446"
+set "VERSION_URL="
+set "RESTART_ARG="
+if defined WANT_RESTART set "RESTART_ARG=-Restart"
+
+%PS% -NoProfile -NonInteractive -File "%TRAY_PS%" launch -AppName "%APP_NAME%" -ScriptDir "%SCRIPT_DIR%" -VenvDir "%TRAY_VENV%" -TrayMatch "launcher\.py\s+tray" -Ports "%OWNED_PORTS%" -TrayLaunch "%TRAY_LAUNCH%" -VersionUrl "%VERSION_URL%" !RESTART_ARG!
+exit /b %ERRORLEVEL%
 ```
 
-**Reclaim-then-start `--restart`** (subtree kill, then the orphan-proof port-reclaim scoped by **CommandLine**, then a short release delay):
+Inside the helper, `launch` performs idempotent start when `-Restart` is absent; when `-Restart` is present it detects matching tray PIDs, kills the tray subtree, reclaims owned ports by CommandLine-scoped PID, starts the tray, and polls the version endpoint until served `git_sha` matches repo `HEAD`.
 
-```bat
-if defined WANT_RESTART (
-    if defined TRAY_PIDS (
-        for %%P in (!TRAY_PIDS!) do taskkill /T /F /PID %%P >nul 2>&1
-    )
-    REM Orphan-proof: reclaim this app's service ports from ANY holder whose
-    REM CommandLine is under this repo's .venv, even one detached from the tray
-    REM subtree above. Match CommandLine (not the image path): a venv-launched
-    REM pythonw re-execs the base interpreter, so .Path reports the shared base
-    REM python while CommandLine still carries the .venv path.
-    set "RECLAIM_VENV=%SCRIPT_DIR%.venv"
-    %PS% -NoProfile -NonInteractive -File "%TRAY_PS%" reclaim -VenvDir "%RECLAIM_VENV%" -Ports "8445,8446"
-    REM Give Windows a moment to release the ports before rebinding.
-    ping 127.0.0.1 -n 3 >nul
-)
-```
+### The lifecycle lives in a committed `.ps1`, not cmd capture (the non-interactive fix)
 
-### The detect/reclaim logic lives in a committed `.ps1`, not inline `-Command` (the non-interactive fix)
-
-Both blocks shell to `%PS% … -File "%SCRIPT_DIR%app\tray\tray_lifecycle.ps1"` rather than embedding the CIM/`Get-NetTCPConnection` logic in an inline `powershell.exe -Command "…"`. This is load-bearing, not cosmetic. The inline form needs a CIM `-Filter` with **doubled single quotes nested inside the batch's double quotes**, all inside a `for /f usebackq` **backtick** block. When `tray.bat` is launched **non-interactively through a nested shell** — Git Bash → `cmd /c "tray.bat --restart"`, or a finisher skill's Bash tool — that nested quoting is mangled and the inline command returns **empty**. Neither the running tray nor the port holder is found, so `--restart` silently degrades to a plain start.
+The batch shells to `%PS% … -File "%SCRIPT_DIR%app\tray\tray_lifecycle.ps1" launch ...` once rather than embedding the CIM/`Get-NetTCPConnection` logic in inline `powershell.exe -Command "…"` or parsing helper output through `for /f`. This is load-bearing, not cosmetic. The first broken shape needed a CIM `-Filter` with **doubled single quotes nested inside the batch's double quotes**, all inside a `for /f usebackq` **backtick** block. The second broken shape moved the CIM logic to `-File` but still wrapped `detect` in `for /f`; launched **non-interactively through a nested shell** — Git Bash → `cmd /c "tray.bat --restart"`, or a finisher skill's Bash tool — that capture can still return **empty**. Neither the running tray nor the port holder is found, so `--restart` silently degrades to a plain start.
 
 That degradation is dangerous precisely because **a plain start adopts whatever is already serving the port**: a tray's `WebappManager.start()` runs `status()` first and, finding a live listener, *adopts* it (`OWNERSHIP_EXTERNAL`) and returns healthy — it never swaps in new code. The **only** thing that forces a new build to load is `--restart`'s reclaim killing the old holder *before* the fresh tray starts. So a mangled detection doesn't just "miss a kill" — it turns `--restart` into "adopt the stale build" while reporting success. Observed live (project-scaffolding#54, `whatsapp-radar`): the run emitted only the `cmd` banner, none of the batch's own `Stopping previous…` echoes, the old trays survived, and `GET /api/version` kept reporting the previous `git_sha`.
 
-Shelling to `-File` removes every nested quote from the batch line (app-specific values — venv path, tray-match regex, owned ports — are passed as plain `-VenvDir` / `-TrayMatch` / `-Ports` arguments), so detection and reclaim behave **identically** whether `tray.bat` is run from an interactive console, the Startup folder, or a non-interactive agent shell. `tray_lifecycle.ps1` is **vendored verbatim** alongside `single_instance.py` (only its arguments differ per app), and `tray.bat` hard-errors if the helper is missing rather than silently no-op'ing back into the stale-adopt failure.
+Shelling once to the helper removes cmd output parsing from the lifecycle entirely (app-specific values — venv path, tray-match regex, owned ports, tray launch, optional version URL — are passed as plain arguments), so detection, reclaim, start, and verification behave **identically** whether `tray.bat` is run from an interactive console, the Startup folder, or a non-interactive agent shell. `tray_lifecycle.ps1` is **vendored verbatim** alongside `single_instance.py` (only its arguments differ per app), and `tray.bat` hard-errors if the helper is missing rather than silently no-op'ing back into the stale-adopt failure.
 
 **Verification is by served `git_sha` vs repo `HEAD`, never a `healthz` 200** — a stale adopted process passes a health check fine. The agent owns the bounded version-endpoint poll (see "The agent-side contract" below); `fleet-config`'s `/issue-finish` invokes `tray.bat --restart` through a real Windows shell and **stops + surfaces** a `git_sha ≠ HEAD` mismatch rather than improvising process kills (`fleet-config#89`).
 
@@ -110,9 +95,9 @@ Adapt per repo:
 
 ## Single source of truth
 
-Don't re-derive the reclaim logic per project. A copy-to-adapt **`tray.bat.template`** ships at the scaffold root — for a new tray app, copy it to `tray.bat` and replace the four `__PLACEHOLDER__` tokens (`__APP_NAME__`, `__TRAY_LAUNCH__`, `__TRAY_MATCH__`, `__OWNED_PORTS__`); a filled-in copy is byte-identical to every sister tray. For an existing tray, copy the two blocks above verbatim and change only the ports + tray-match regex. The `--restart` recipe (which port to reclaim, which command relaunches, what signal confirms the new build is live — e.g. `GET /api/version` returning the current `git_sha`) also gets a one-line entry in each repo's own `CLAUDE.md` under `## This repository`.
+Don't re-derive the lifecycle logic per project. A copy-to-adapt **`tray.bat.template`** ships at the scaffold root — for a new tray app, copy it to `tray.bat` and replace the four `__PLACEHOLDER__` tokens (`__APP_NAME__`, `__TRAY_LAUNCH__`, `__TRAY_MATCH__`, `__OWNED_PORTS__`); a filled-in copy is byte-identical to every sister tray. For an existing tray, replace the cmd-side detect/reclaim/start blocks with the single `launch` helper call and change only the ports + tray-match regex. The `--restart` recipe (which port to reclaim, which command relaunches, what signal confirms the new build is live — e.g. `GET /api/version` returning the current `git_sha`) also gets a one-line entry in each repo's own `CLAUDE.md` under `## This repository`.
 
-The detect/reclaim helper **`app/tray/tray_lifecycle.ps1`** is **vendored verbatim** the same way as the mutex primitive — copy it byte-for-byte alongside `tray.bat`, never edit it per-app (the venv path, tray-match regex, and owned ports are passed as `-VenvDir` / `-TrayMatch` / `-Ports` arguments by `tray.bat`, so the file stays identical fleet-wide). It exists so the CIM/port logic is never embedded as an inline `powershell -Command "…"` whose nested quoting breaks under a non-interactive call (see the non-interactive-fix section above). A new tray app therefore vendors **two** scaffold files — `tray_lifecycle.ps1` and `single_instance.py` — plus the filled-in `tray.bat`.
+The lifecycle helper **`app/tray/tray_lifecycle.ps1`** is **vendored verbatim** the same way as the mutex primitive — copy it byte-for-byte alongside `tray.bat`, never edit it per-app (the venv path, tray-match regex, owned ports, tray launch, and optional version URL are passed as arguments by `tray.bat`, so the file stays identical fleet-wide). It exists so detect → kill → reclaim → start → verify is never embedded in cmd parsing whose quoting/capture breaks under a non-interactive call (see the non-interactive-fix section above). A new tray app therefore vendors **two** scaffold files — `tray_lifecycle.ps1` and `single_instance.py` — plus the filled-in `tray.bat`.
 
 The in-process single-instance + race-safe adopt-or-spawn primitive (gotcha #4) ships the same way: **`app/tray/single_instance.py`** is **vendored verbatim** — copy it byte-for-byte into each tray app, never edit it per-app (the app-specific mutex *names* are passed at the call site, so the file stays identical fleet-wide). A fix made once in the scaffold re-propagates by re-copying.
 
@@ -179,7 +164,8 @@ No `Get-NetTCPConnection`/PID-hunting in the agent skill: that logic lives in `-
 
 ## Decision log
 
-- **2026-06-09** — Moved the tray's CIM **detection** and port **reclaim** out of inline `powershell.exe -Command "…"` blocks in `tray.bat` and into a committed, vendored-verbatim **`app/tray/tray_lifecycle.ps1`** shelled to with `-File` (`project-scaffolding#54`). Root cause: the inline CIM `-Filter`'s doubled single quotes, nested inside the batch's double quotes inside a `for /f usebackq` backtick block, are mangled when `tray.bat` is launched **non-interactively** through a nested shell (Git Bash → `cmd /c "tray.bat --restart"`, or a finisher skill's Bash tool) — the command returns empty, nothing is killed, and `--restart` degrades to a plain start that **adopts the still-running old build** and reports success (served `git_sha` ≠ `HEAD`). Hit live on `whatsapp-radar`; recovery needed manual, error-prone process surgery. The `-File` form removes every nested quote (app-specific values pass as `-VenvDir`/`-TrayMatch`/`-Ports`), so detect/reclaim behave identically from any caller; `tray.bat` now hard-errors if the helper is missing rather than no-op'ing back into the stale-adopt failure. Validated end-to-end against the live fleet trays (correct PIDs, venv-scoped isolation). The agent-invocation half — invoke `--restart` through a real Windows shell, stop + surface a `git_sha ≠ HEAD` mismatch instead of hand-killing — landed in `fleet-config#89` (`/issue-finish` step 6). Sister trays re-vendor `tray_lifecycle.ps1` + the updated two `tray.bat` blocks via pointer issues. *Not done here (out of scaffold scope): the `WebappManager.restart()` "restart an external owner" / adopt-external precedence change lives in sister projects' `app/webapp/manager.py`, which the scaffold does not carry.*
+- **2026-06-22** — Completed the `project-scaffolding#54` fix after the first `-File` move proved incomplete. The reopened repro (`home-automation#77`) showed the helper worked standalone, but `tray.bat` still wrapped `detect` in cmd `for /f usebackq`; from Git Bash → `cmd /c "tray.bat --restart"`, that capture returned empty, so the tray kill and port reclaim no-op'd, the stale webapp was adopted, and the batch exited 0. The canonical template now delegates the full **detect → kill → reclaim → start → verify** sequence to one `tray_lifecycle.ps1 launch ...` call, with no cmd-side helper-output parsing. On `--restart`, the helper polls `/api/version`, compares served `git_sha` to repo `HEAD`, and exits non-zero on a stale serve. Sister trays re-vendor `tray_lifecycle.ps1` + the updated `tray.bat` helper call. *Still out of scaffold scope: the `WebappManager.restart()` "restart an external owner" / adopt-external precedence change lives in sister projects' `app/webapp/manager.py`, which the scaffold does not carry.*
+- **2026-06-09** — Moved the tray's CIM **detection** and port **reclaim** out of inline `powershell.exe -Command "…"` blocks in `tray.bat` and into a committed, vendored-verbatim **`app/tray/tray_lifecycle.ps1`** shelled to with `-File` (`project-scaffolding#54`). This fixed the inline `-Command` nested-quote failure, but not the later cmd `for /f` capture around the helper; the completed 2026-06-22 entry above supersedes this partial fix.
 - **2026-06-07** — Reconciled the **agent-safe restart** model (`project-scaffolding#35`) after finding the canonical `tray.bat --restart` mandate (#41/#43) collided with the user's recorded feedback that it destroys live PTY sessions. Resolution keeps `tray.bat --restart` as the *single* canonical command (no revert of #41/#43) and fixes the root cause structurally: **linked-but-independent children are spawned re-parented out of the tray subtree (via `cmd /c start`; `DETACHED_PROCESS` does *not* escape `/T`, verified by probe) and re-adopted on start**, so a `/T` restart cleans only the owned-and-cycled subtree and can never reach the session-host / PTY — safe to run even from inside a hosted session. Builds on #29 (reclaim) + #39/#44 (adopt-or-spawn as the adoption engine); retires the fragile "kill only :8445 + bare `tray.bat`" workaround. The one code change lands in `app-launcher` (detach + adopt its `:8446` session-host); every other tray has only owned-and-cycled children and is already `/T`-safe.
 - **2026-06-07** — Added the **in-process single-instance + race-safe adopt-or-spawn** convention (gotcha #4, `project-scaffolding#39`) and the **agent-safe restart + re-adoption** convention (`#35`). Shipped the byte-identical `app/tray/single_instance.py` primitive (`SingleInstance` for the tray's in-process lock; `cross_process_lock` to serialize the webapp adopt-or-spawn) so neither #39 layer is re-derived per app. Documented the **adopt / reclaim / spawn** restart model and the **owned-and-cycled vs linked-and-preserved** child-lifecycle classification (app-launcher's PTY/linked apps as the worked example), plus the **agent-side contract** (invoke `--restart` fire-and-forget, bounded version-endpoint poll, fail loud — no hand-rolled PID hunting). The #39 root cause was proven on `whatsapp-radar` (one clean `tray.bat` spawned two trays + two uvicorns); the fix re-propagates to each sister tray via pointer issues.
 - **2026-06-07** — Shipped the canonical **`tray.bat.template`** at the scaffold root and mandated the **`tray.bat --restart`** invocation across the toolchain (`project-scaffolding#40`, `fleet-config#78`, fleet pointer issues). Closed the enforcement gap where the `/issue-finish` and `/issue-yolo` skills told the agent to hand-roll a `Get-NetTCPConnection`/`taskkill` restart instead of calling the deterministic `tray.bat --restart` — a hand-rolled kill only catches the one listener it finds and misses the orphan the reclaim sweep exists to kill. The skills now name `tray.bat --restart` as the primary path (manual kill = fallback only); the scaffold `CLAUDE.md` mandates the invocation; and `local-llm-hub` — the lone fleet tray still on the old start-only shape — was brought up to the canonical form (reclaims `:8000`, excludes the mutex-shared `:8090`). Each tray app's `CLAUDE.md` `## This repository` section now names `tray.bat --restart`.
