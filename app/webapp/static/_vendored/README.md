@@ -14,6 +14,7 @@ A cloned web app inherits both: design **tokens** (wire your CSS custom properti
 | Folder | What | Status |
 | --- | --- | --- |
 | [`nav/`](nav/) | Floating bottom-tab navigation (desktop segmented control → mobile pill). The fleet navigation contract. | ✅ |
+| [`icons/`](icons/) | Inline Lucide icon sprite + `icon()` helper. The fleet's one icon set (24×24, 2px stroke, currentColor). | ✅ |
 
 _More components land here as they're normalized from the fleet (cards, modal/dialog shell, toast, settings collapse, …). Each gets its own folder + `README.md` with files, a vendoring recipe, and its required design tokens — same shape as `nav/`._
 
