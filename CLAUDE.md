@@ -27,6 +27,39 @@ A fleet web app inherits its look **and** its navigation from one place — it r
 - **`_vendored/` is the UI component channel.** New shared HTML/CSS/JS components live under `app/webapp/static/_vendored/<component>/`, normalized from the best existing fleet implementation. Don't hand-copy a sibling app's snippet into a new app — vendor it from here so there's one source of truth. See `app/webapp/static/_vendored/README.md` for the convention and how to add a component.
 - **Don't diverge / don't re-author.** A change to a vendored component or the token contract is made *here* and re-vendored downstream, never forked in a consuming app. (Standard: `ferraroroberto/project-scaffolding#79`; aligns to `ferraroroberto/fleet-config#178`.)
 
+## UX surface — diff-keyed design-conformance gate
+*Apply only if this project serves a FastAPI + static PWA web app. Streamlit POC spikes are exempt.*
+
+The visual identity above is only as good as what stops drift from reaching `main`. When an issue touches a web app's UX, the finish flow runs a **gate** that checks the change still conforms to the spec — and crucially, *that the rendered view isn't visually broken*. This is the enforcement arm of the section above; it is the don't-introduce-new-drift counterpart to the periodic fleet-wide audit (`ferraroroberto/fleet-config#180`), not a duplicate of it.
+
+**Two distinct checks — keep them separate.** A *token check* (`/design-sync`-style) diffs the CSS custom properties (light + dark) and the nav contract against the spec — it is static, runs no browser, and **never renders the page**, so it catches "accent drifted from spec" but is blind to "nav pushed off-screen / cards overlap." A *visual verification* (`verify`-style) launches the live app, drives the touched view in a headed browser, and screenshots it — the only check that actually *sees* the result, and the token-expensive leg. They are not substitutes: the token check is cheap and blind; the screenshot sees but costs. A real gate uses both, scoped to the diff.
+
+**Each project declares a `## UX surface` block in its own `CLAUDE.md`** — the per-project *instance* the skills read, exactly as `## CI expectations` does for the e2e-surface skip. Don't inline these paths into the skill; they differ per repo. Copy-paste default (adapt the paths/views to your layout; a repo with no web UI sets `design spec applies: no` and the gate becomes a permanent no-op):
+
+```markdown
+## UX surface
+- design spec applies: yes      # `no` for Streamlit POC spikes / non-web repos → gate no-ops
+- paths:
+  - app/webapp/static/**/*.css
+  - app/webapp/templates/**
+  - app/webapp/static/**/*.{js,html}
+- key views:                    # used only by the `ux-full` whole-app sweep
+  - /          (home + bottom nav)
+  - /settings
+```
+
+**The gate contract (the shared skill behavior):**
+- **Deterministic, diff-keyed — not a per-run LLM judgment.** The trigger is purely: does `git diff <main>...HEAD` intersect the declared `paths`? Yes → the gate runs. No → skip silently and **state it** in the finish summary (`no UX surface touched`). Zero added cost on the ~90% of issues that touch no UX. This is the same path-keyed mechanism as the `## CI expectations` e2e-surface skip — the "judgment" is just a glob intersection, which is why it stays consistent run to run.
+- **Cheap design-aware load at `/issue-start`.** When the picked issue is *likely* to touch the UX surface, read `~/.claude/design.md` + `design.dark.md` into context **before** building — two file reads, no browser, ~free. The build starts design-aware, which is what prevents end-of-flow rework. No `/design-sync` and no screenshot at start.
+- **Gate at `/issue-finish` (and `/issue-yolo`), only when the diff touched the surface** — two legs:
+  - **Token check, fix-now semantics.** Compare the touched UX files (CSS custom properties light + dark + the nav contract) to the spec and **fix material drift in this branch before merge.** Note the semantics differ from vanilla `/design-sync`, whose default *files-and-defers* a `design-drift` issue: the finish gate's job is to **not introduce** drift, not to log it for later. (Vanilla `/design-sync` stays as-is for the periodic sweep — different job.)
+  - **One screenshot of the touched view.** The finish flow already restarts the tray and version-verifies, so the app is live at that point — screenshot the affected view once (eyeball nav pill, layout, palette against the spec) via the `verify` skill and attach it to the PR body. Diff-scoped, never a whole-app sweep by default.
+- **Manual overrides** (mirroring `/issue-start`'s `now`/`plan`): `ux` / `design` forces the gate even if the diff looks code-only; `no-ux` skips it when the detector over-fires; `ux-full` audits the whole app's `key views`, not just the diff — the one expensive path, opt-in only.
+- **Materiality bar** (carried over from `/design-sync`): a 1-unit radius/spacing nitpick is not a blocker; a wrong canvas color, a missing dark theme, a hand-rolled nav, or a visibly broken layout is.
+- **Keep-the-human-in-control.** The agent always **states** the gate decision (ran / skipped / `ux-full`, plus any drift it fixed) in the finish summary, so the user can veto.
+
+**Where each piece lives** (per the fleet "don't diverge" rule): this scaffold documents the convention + the block default; the **skill mechanism** lives in `fleet-config` `skills/issue-{start,finish,yolo}/SKILL.md` (synced to `~/.claude`), tracked in `ferraroroberto/fleet-config#195`; the **per-project instances** live in each project's own `## UX surface` block; the periodic fleet-wide drift sweep is a separate job (`ferraroroberto/fleet-config#180`). Browser screenshots must go through the `verify` skill's stealth-Chrome launch (real Chrome, no automation infobar, per the global `CLAUDE.md`) — never re-inline launch args. (Decision record: `ferraroroberto/project-scaffolding#83`.)
+
 ## GitHub Actions CI conventions
 *Apply whenever this project adds a `.github/workflows/` file.*
 
