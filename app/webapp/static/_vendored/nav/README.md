@@ -19,7 +19,7 @@ The fleet's canonical **primary navigation**: a top segmented control on desktop
    <link rel="stylesheet" href="/static/_vendored/nav/nav-tabs.css">
    ```
    ```css
-   .tabs { --nav-tab-count: 3; }   /* match however many tabs your markup has */
+   /* No tab-count variable is required: the mobile grid auto-fits 4–6 tabs. */
    ```
 4. Wire up the switcher once the DOM is ready:
    ```js
@@ -44,7 +44,7 @@ Each `.tab` carries `data-tab` (its name) and `aria-controls` (the id of the pan
 
 ## Required design tokens
 
-`nav-tabs.css` references these CSS custom properties — define them in your app's `:root` / `[data-theme="dark"]` blocks, **wired to `~/.claude/design.md` (+ `design.dark.md`)**. Don't copy the spec; point your tokens at it. Reference values (light) from the canonical implementation:
+`nav-tabs.css` references these CSS custom properties — define them in your app's `:root` / `[data-theme="dark"]` blocks, **wired to `~/.claude/design.md` (+ `design.dark.md`)**. Don't copy the spec; point your tokens at it. Reference values (light) from the canonical implementation. The mobile geometry below is the phone-validated standard promoted from `home-automation` issue #118: measured from 1290px-wide iPhone screenshots of the GitHub/VLC apps (~3x CSS pixels), then validated live on Roberto's iPhone.
 
 | Token | Light value | Used for |
 | --- | --- | --- |
@@ -60,9 +60,13 @@ Each `.tab` carries `data-tab` (its name) and `aria-controls` (the id of the pan
 | `--radius-md` | `12px` | bar corners (desktop) |
 | `--radius-pill` | `9999px` | tab corners |
 | `--radius-nav` | `30px` | floating bar corners (mobile) |
-| `--bottom-tabs-height` | `56px` | floating bar height |
-| `--bottom-tabs-margin` | `12px` | floating bar inset from edges |
-| `--bottom-tabs-pill-height` | `48px` | per-tab pill height (mobile) |
+| `--bottom-tabs-height` | `61px` | floating bar height |
+| `--bottom-tabs-margin` | `21px` | floating bar inset from left/right/physical bottom |
+| `--bottom-tabs-pill-height` | `53px` | per-tab pill height (mobile) |
+| `--bottom-tabs-padding` | `4px` | mobile bar inner padding |
+| `--bottom-tabs-gap` | `4px` | mobile tab gap |
+| `--bottom-tabs-icon` | `20px` | mobile SVG icon size |
+| `--bottom-tabs-label` | `11px` | mobile label font size |
 | `--tabbar-bg` | `rgba(255,255,255,0.85)` | floating bar glass fill |
 | `--tabbar-border` | `rgba(31,35,40,0.12)` | floating bar border |
 
