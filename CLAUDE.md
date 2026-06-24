@@ -200,3 +200,5 @@ After the verification step — and unless I said otherwise — restart that pro
 ## This repository
 Starter scaffold for a Streamlit app + Python pipelines project — clone, rename, and build.
 See `README.md` for setup, layout, and usage.
+
+Standing up a new self-hosted **PWA** app (FastAPI + static PWA + Windows tray)? `docs/app-onboarding.md` is the canonical end-to-end playbook — bootstrap the app, issue + trust the self-signed-CA HTTPS cert (the exact `certutil -user -addstore Root ca.pem` command + the full-Chrome-restart gotcha + the leaf-cert expiry note), and install the PWA on an iPhone (the `/install-ca` mobileconfig detour) / Android. It cross-links `docs/windows-tray.md` for the tray lifecycle rather than duplicating it.
