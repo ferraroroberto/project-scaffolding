@@ -1,5 +1,9 @@
 streamlit>=1.30.0
 
+# HTTPS provisioning — cert inspection for scripts/gen_tailscale_cert.py --check
+# (the auto-renew leg reads SAN + expiry to decide whether to renew the LE leaf).
+cryptography>=42.0.0
+
 # Testing — unit (pytest) + headless e2e (pytest-playwright).
 # After install: .venv\Scripts\python.exe -m playwright install chromium
 pytest>=8.0.0

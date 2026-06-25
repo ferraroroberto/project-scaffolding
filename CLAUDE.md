@@ -60,6 +60,16 @@ The visual identity above is only as good as what stops drift from reaching `mai
 
 **Where each piece lives** (per the fleet "don't diverge" rule): this scaffold documents the convention + the block default; the **skill mechanism** lives in `fleet-config` `skills/issue-{start,finish,yolo}/SKILL.md` (synced to `~/.claude`), tracked in `ferraroroberto/fleet-config#195`; the **per-project instances** live in each project's own `## UX surface` block; the periodic fleet-wide drift sweep is a separate job (`ferraroroberto/fleet-config#180`). Browser screenshots must go through the `verify` skill's stealth-Chrome launch (real Chrome, no automation infobar, per the global `CLAUDE.md`) — never re-inline launch args. (Decision record: `ferraroroberto/project-scaffolding#83`.)
 
+## HTTPS provisioning
+*Apply only if this project serves a FastAPI + static PWA web app. Streamlit POC spikes are exempt.*
+
+An installed PWA needs HTTPS (Service Workers + Web Push are HTTPS-only). How you provision the cert is decided by **how the app is reached remotely** — and the preferred path eliminates the per-device trust chore the fleet has otherwise re-paid on every app.
+
+- **Reached over Tailscale → `tailscale cert` (preferred).** Provision a **real Let's Encrypt leaf** for the tailnet MagicDNS name with `scripts/gen_tailscale_cert.py`. Tailscale owns the `ts.net` domain and answers the ACME DNS-01 challenge, so there is **no public DNS name, no HTTP-01/DNS-01 setup, and no inbound exposure** to arrange — and because every tailnet device already trusts Let's Encrypt, there are **zero per-device trust steps**: no CA install, no `.mobileconfig`, no iOS Certificate-Trust toggle, no Chrome-restart gotcha. This is *simpler* than the self-signed dance, not overkill. One-time prereq: enable HTTPS in the tailnet admin console (**DNS → HTTPS Certificates**), once per tailnet.
+- **Auto-renew on startup is mandatory.** The LE leaf is **~90 days** (vs a self-signed root's 10 years), so a manual re-issue *will* be forgotten. `gen_tailscale_cert.py --check` renews **only** a `.ts.net` cert expiring within ~30 days, **no-ops a self-signed cert**, and never blocks startup on error. Wire `--check` into the **app's own webapp launcher** (e.g. `webapp.bat`), before uvicorn binds — **not** the generic `tray.bat.template` (vendored tray lifecycle; cert provisioning is app-specific). Reference wire-up: `grocery-shopping-automation`'s `webapp.bat`.
+- **LAN-only / no Tailscale → self-signed CA (fallback).** A genuinely loopback/LAN-only app keeps the self-signed CA + leaf (`gen_ssl_cert.py`) and the per-device trust dance (`certutil -user -addstore Root ca.pem` + the full-Chrome-restart gotcha; iOS `/install-ca` `.mobileconfig` + Certificate-Trust toggle). This remains correct **only** when there is no tailnet. The in-app `/install-ca` Settings affordance (`#74`) is scoped to this fallback path — a `tailscale cert` app does not ship it.
+- **Don't diverge.** The convention lives here; the full didactic procedure (commands, the admin-console step, the iPhone install) is `docs/app-onboarding.md` §2–§3. A cloned PWA inherits this decision by default. (Decision record: `ferraroroberto/project-scaffolding#89`.)
+
 ## GitHub Actions CI conventions
 *Apply whenever this project adds a `.github/workflows/` file.*
 
