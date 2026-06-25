@@ -102,6 +102,47 @@ export function initNavTabs(opts = {}) {
   });
 
   setTab(initialTab());
+  pinNavToVisualViewport(nav);
 
   return { setTab: setTab, getTab: function () { return current; } };
+}
+
+/**
+ * Keep the floating bottom-tab pill pinned to the *visual* viewport on mobile.
+ *
+ * nav-tabs.css positions the mobile bar `fixed; bottom: …` against the *layout*
+ * viewport. iOS Safari's dynamic bottom toolbar collapses on scroll-down and
+ * re-expands on scroll-up, resizing the layout viewport, which drags a fixed
+ * bottom-anchored element up then down — the bar appears to ride loose instead
+ * of staying locked. The VisualViewport API reports the actually-visible rect;
+ * we translate the bar up by the slice of layout viewport hidden below it so it
+ * rides the visible bottom edge.
+ *
+ * Gated to the coarse-pointer / narrow floating-bar mode (desktop renders .tabs
+ * as a sticky top control, where a transform would be wrong) and feature-gated
+ * on window.visualViewport (older browsers keep today's CSS-only behaviour — no
+ * error, no change). Idempotent and self-correcting: the transform is cleared
+ * whenever the media query stops matching or nothing is hidden.
+ *
+ * @param {HTMLElement} nav  the <nav class="tabs"> element.
+ */
+function pinNavToVisualViewport(nav) {
+  const vv = window.visualViewport;
+  if (!vv) return;
+  const mq = window.matchMedia('(pointer: coarse) and (max-width: 520px)');
+
+  function update() {
+    if (!mq.matches) { nav.style.transform = ''; return; }
+    // Height of the layout viewport currently hidden below the visual viewport
+    // (Safari's collapsing toolbar / any off-screen slice). Pull the bar up by
+    // exactly that so its CSS `bottom` inset is measured from the *visible* edge.
+    const hidden = window.innerHeight - vv.height - vv.offsetTop;
+    nav.style.transform = hidden > 1 ? 'translateY(' + -hidden + 'px)' : '';
+  }
+
+  vv.addEventListener('resize', update);
+  vv.addEventListener('scroll', update);
+  // matchMedia change covers rotation / desktop↔mobile resize crossing 520px.
+  if (mq.addEventListener) mq.addEventListener('change', update);
+  update();
 }
