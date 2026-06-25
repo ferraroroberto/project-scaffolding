@@ -77,6 +77,14 @@ The floating bar hides whenever a modal is open so it never floats over a dialog
 - Any native `<dialog open>` → handled automatically (`body:has(dialog[open]) .tabs`).
 - A non-`<dialog>` overlay (e.g. a custom login screen) → add the class `nav-hidden` to `<body>` while it's open.
 
+## Scroll-pinning (mobile Safari)
+
+The mobile stylesheet positions the floating bar `fixed; bottom: …` against the **layout** viewport. iOS Safari's dynamic bottom toolbar collapses on scroll-down and re-expands on scroll-up, resizing the layout viewport and dragging a bottom-anchored fixed element up then down — the bar rides loose instead of staying locked.
+
+`initNavTabs` fixes this automatically: it installs a `VisualViewport` listener that translates the bar up by the slice of layout viewport hidden below the visible rect, so the bar's CSS `bottom` inset is measured from the *visible* bottom edge. It's gated to the coarse-pointer / narrow floating-bar mode (desktop's sticky top control is untouched) and feature-detected on `window.visualViewport` (older browsers fall back to the CSS-only behaviour — no error). No call-site change is needed.
+
+**Recommended app-level hardening:** set `overscroll-behavior: none` on `html, body` in your app's stylesheet to kill rubber-band overscroll drag at the document edges. This lives in the consuming app, not the component, because the document scroller (`body`) is the app's, not the nav's.
+
 ## Don't diverge
 
 `nav-tabs.js` and `nav-tabs.css` are **vendored verbatim** — the same "copy byte-for-byte, never edit per-app" rule as the tray's `single_instance.py` / `tray_lifecycle.ps1`. If the contract needs to change, change it **here in `project-scaffolding`** and re-vendor downstream; don't fork it in a consuming app. Streamlit POC spikes are exempt — they don't serve this PWA shell.
