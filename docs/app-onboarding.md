@@ -209,6 +209,11 @@ async def list_messages(db: sqlite3.Connection = Depends(get_db)) -> list[dict]:
 
 Acceptance: a derived app has **zero** per-handler `sqlite3.connect(...)` calls in its routers. SQLite + stdlib `sqlite3` stays the fleet default — this is only the lifecycle dependency, not an ORM / async driver / connection pool. The documented exception (none currently in the fleet) is an app that legitimately needs a long-lived single connection.
 
+Two gotchas when first adopting this (both surfaced shipping it into `whatsapp-radar`):
+
+- **ruff B008.** `Depends(get_db)` as a default argument is FastAPI's documented idiom, but `flake8-bugbear`'s B008 ("do not perform function calls in argument defaults") flags every injection. Add `fastapi.Depends` to ruff's `flake8-bugbear.extend-immutable-calls` allowlist in `pyproject.toml` so the convention doesn't fight the linter.
+- **async handlers → `async def` dependency.** If your handlers are `async def`, make `get_db` an **`async def` generator**. A plain `def` generator runs in Starlette's threadpool while the handler runs on the event-loop thread, so the connection is created in one thread and used in another — `sqlite3`'s same-thread guard trips unless you pass `check_same_thread=False` (the snippet above does). The `async def` form keeps creation and use on the same thread and is the cleaner fix.
+
 ---
 
 ## See also
