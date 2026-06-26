@@ -4,7 +4,7 @@ Single source of truth for the **project-shaped** AI agent instructions across a
 
 ## Files
 
-- **`CLAUDE.master.md`** — canonical **project-shaped** instruction set (the shape-specific sections — Streamlit, GitHub-Actions CI, e2e UI testing, tray / long-lived process; universal dev-workflow directives live in `fleet-config/global-CLAUDE.md`, not here). Copy verbatim into any repo's `./CLAUDE.md`, then replace the `## This repository` placeholder at the bottom with two sentences.
+- **`CLAUDE.master.md`** — canonical **project-shaped** instruction set (the shape-specific sections — Streamlit, the FastAPI + static PWA web-app shape (web-app visual identity, UX-conformance gate, HTTPS provisioning, PWA required surfaces, PWA static-asset cache-busting), FastAPI + SQLite connection lifecycle, GitHub-Actions CI, e2e UI testing, tray / long-lived process; universal dev-workflow directives live in `fleet-config/global-CLAUDE.md`, not here). Copy verbatim into any repo's `./CLAUDE.md`, then replace the `## This repository` placeholder at the bottom with two sentences.
 - **`AGENTS.master.md`** — one-line pointer template. Copy verbatim into any repo's `./AGENTS.md`. Other agents (Cursor, Codex) discover it and hop to CLAUDE.md.
 - **`ADAPT_PROMPT.md`** — copy-paste prompt to install the canonical instructions in a new repo.
 - **`LOGGING_MIGRATION_PROMPT.md`** — separate, future-use prompt for migrating `print()` → `logging` across a repo.

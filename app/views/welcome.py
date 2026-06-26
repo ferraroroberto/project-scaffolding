@@ -32,6 +32,6 @@ def render() -> None:
         - New pipeline → drop `src/pipelines/<name>.py` with `run(**kwargs)`.
         - New shared helper → put it in `src/`.
 
-        See `AGENTS.md` for the full conventions.
+        See `README.md` for the full conventions.
         """
     )
