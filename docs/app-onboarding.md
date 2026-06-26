@@ -1,6 +1,6 @@
 # New self-hosted PWA app: onboarding playbook (didactic)
 
-Personal reference for standing up a **new tray-resident FastAPI + static PWA app** from this scaffold, end to end, until it is reachable as a trusted-HTTPS installed PWA on an iPhone. It collects three procedures that every fleet app (`home-automation`, `photo-ocr`, `app-launcher`, …) has otherwise rediscovered independently: bootstrap the app, provision HTTPS (a real Let's Encrypt cert via `tailscale cert` for a tailnet app — preferred, zero per-device trust; the self-signed-CA dance only as the LAN-only fallback), and install the PWA on a phone. The per-app README instances stay; this is the canonical *procedure* so the knowledge stops drifting and a new app doesn't re-pay the discovery cost.
+Personal reference for standing up a **new tray-resident FastAPI + static PWA app** from this scaffold, end to end, until it is reachable as a trusted-HTTPS installed PWA on an iPhone. It collects three procedures that every fleet app (`home-automation`, `photo-ocr`, `app-launcher`, …) has otherwise rediscovered independently: bootstrap the app, provision HTTPS (a real Let's Encrypt cert via `tailscale cert` for a tailnet app — preferred, zero per-device trust; the self-signed-CA dance only as the LAN-only fallback), and install the PWA on a phone. The per-app README instances stay; this is the canonical *procedure* so the knowledge stops drifting and a new app doesn't re-pay the discovery cost. §4 then carries the two webapp-shape internals worth getting right once the app is reachable — static-asset cache-busting and the SQLite connection lifecycle.
 
 > **Audience.** Me, plus any AI coding agent I hand a fresh app to.
 > **Status.** Living reference, not a changelog. Update in place when the recipe changes.
@@ -118,9 +118,104 @@ The webapp installs to the phone home screen as a full-screen app. **If you prov
 
 ---
 
+## 4. App internals worth getting right — cache-busting + the DB connection
+
+Once the app boots over HTTPS (§1–§3), two webapp-shape conventions decide whether it behaves under load. Both have been re-derived (or forgotten) per app and are now canonical — the scaffold `CLAUDE.md` records the rule; this section carries the reference snippets so a new app copies one thing.
+
+### 4a. Cache-bust the static module graph (`CachingStaticFiles` + fleet hash)
+
+A bare `StaticFiles` mount sends only `ETag`/`Last-Modified`, so an installed iOS PWA heuristic-caches the JS/CSS and keeps running the **old build** after a deploy + tray restart — while `/api/version` reports the new SHA. The fix is a single content/build hash used as the asset cache key, plus an explicit per-suffix `Cache-Control` and a shell that always revalidates. The nominated canonical implementation is `home-automation/src/static_versioning.py` (the `BuildInfo` + fleet-hash + rewriters) and the `CachingStaticFiles` subclass in `home-automation/app/webapp/server.py`. Copy those; adapt only the static dir.
+
+**Why a *fleet* hash, not a per-file hash.** The webapp is an ES-module graph — `index.html` loads `main.js`, which imports the other modules. A naive per-file hash goes stale on a transitive edit: if `state.js` changes but `main.js`'s own bytes don't, `main.js`'s hash is unchanged, yet the graph it pulls in is now different — so the device re-fetches `main.js` (unchanged) and keeps the stale `state.js`. A single **fleet hash** — one SHA-256 over the concatenation of every hashable file's per-file hash — rotates *every* `?v=` stamp on any edit to any module, so the whole (tiny) graph is re-fetched together:
+
+```python
+# static_versioning.py — the fleet hash (one value stamped onto every asset)
+def compute_asset_hashes(static_dir: Path) -> Dict[str, str]:
+    """Return {filename: fleet_hash} for every hashable static file.
+
+    Every value is the SAME fleet hash, so any edit to any module rotates
+    every ?v= stamp. Keyed by filename only so a rewriter can confirm a
+    referenced file exists before stamping. Empty dict on a partial deploy
+    → unstamped URLs rather than a crashed page.
+    """
+    if not static_dir.exists():
+        return {}
+    per_file = {p.name: _short_hash(p.read_bytes()) for p in _iter_hashable_files(static_dir)}
+    if not per_file:
+        return {}
+    fleet_input = "\n".join(f"{n}:{per_file[n]}" for n in sorted(per_file)).encode("utf-8")
+    fleet_hash = _short_hash(fleet_input)
+    return {name: fleet_hash for name in per_file}
+```
+
+The rewriters stamp `?v=<fleet_hash>` onto each `href`/`src` in `index.html` (`rewrite_index_html`, wrapped by `BuildInfo.stamp_html`) and onto each relative `import` in a served `.js` (`rewrite_js_imports`, wrapped by `BuildInfo.stamp_js`). **Canonical names are `stamp_html` / `stamp_js`** — this is the resolution of the old photo-ocr `stamp_js` vs voice-transcriber `rewrite_js_imports` split: apps copy one API. The matching regexes also capture an existing `?v=…` so re-stamping an already-served body is idempotent.
+
+**Per-suffix `Cache-Control`, and a shell that always revalidates.** The mount subclass keys the policy on the file suffix; the root route serves the shell `no-cache` so the entry document re-validates every load (a cached shell pointing at the old entry module would defeat the hashing):
+
+```python
+# server.py — CachingStaticFiles: hash-stamped assets cache hard, shell revalidates
+_LONG_CACHE = "public, max-age=31536000, immutable"   # .js / .css — fleet hash is the cache key
+_DAY_CACHE = "public, max-age=86400"                  # manifest / icons — rarely change
+
+class CachingStaticFiles(StaticFiles):
+    def file_response(self, full_path, stat_result, scope, status_code=200) -> Response:
+        path = Path(full_path); suffix = path.suffix.lower()
+        if suffix == ".js":
+            try:
+                body = path.read_text(encoding="utf-8")
+            except OSError:
+                return super().file_response(full_path, stat_result, scope, status_code)
+            return Response(BUILD_INFO.stamp_js(body), status_code=status_code,
+                            media_type="text/javascript", headers={"Cache-Control": _LONG_CACHE})
+        response = super().file_response(full_path, stat_result, scope, status_code)
+        if suffix in {".js", ".css"}:
+            response.headers["Cache-Control"] = _LONG_CACHE
+        elif suffix in {".webmanifest", ".png", ".ico"}:
+            response.headers["Cache-Control"] = _DAY_CACHE
+        return response
+
+# The shell (index.html root route) — stamp asset URLs, force revalidation:
+@router.get("/")
+async def index() -> HTMLResponse:
+    html = BUILD_INFO.stamp_html((STATIC_DIR / "index.html").read_text(encoding="utf-8"))
+    return HTMLResponse(html, headers={"Cache-Control": "no-cache, must-revalidate"})
+```
+
+`BuildInfo` (computed once at startup) also surfaces `{git_sha, built_at, asset_hash}` at `/api/version` and the glanceable `Build:` footer (§the required-surfaces convention in `CLAUDE.md`); its git-SHA capture is console-less-tray-safe (`CREATE_NO_WINDOW` + `stdin=DEVNULL`). Verify with `curl -I` — `.js`/`.css` carry the long-immutable header, `/` carries `no-cache` — and confirm a real mobile PWA picks up new JS on a **normal reload** after a deploy, no delete/re-add. Service workers / offline caching are deliberately not used in the fleet.
+
+### 4b. One SQLite connection per request via a `Depends` dependency
+
+A FastAPI app backed by SQLite exposes the connection through **one** dependency that opens it, `yield`s it, and closes it in a `finally`. One place owns open/close and the connection setup (pragmas, row factory, timeout); every handler that needs the DB just declares `Depends(get_db)`, and the handle is guaranteed closed even when the handler raises. This replaces the per-handler `connect → use → close` boilerplate that `whatsapp-radar` had copy-pasted across 11 handlers (`ferraroroberto/whatsapp-radar#100`) — every copy a potential leak on an early return, all of them needing edits together to change setup.
+
+```python
+import sqlite3
+from typing import Iterator
+from fastapi import Depends
+
+def get_db() -> Iterator[sqlite3.Connection]:
+    conn = sqlite3.connect(DB_PATH, timeout=30, check_same_thread=False)
+    conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA journal_mode=WAL")
+    try:
+        yield conn
+    finally:
+        conn.close()
+
+# Every handler takes the connection by dependency — never opens its own:
+@router.get("/messages")
+async def list_messages(db: sqlite3.Connection = Depends(get_db)) -> list[dict]:
+    return [dict(r) for r in db.execute("SELECT * FROM messages ORDER BY ts DESC LIMIT 100")]
+```
+
+Acceptance: a derived app has **zero** per-handler `sqlite3.connect(...)` calls in its routers. SQLite + stdlib `sqlite3` stays the fleet default — this is only the lifecycle dependency, not an ORM / async driver / connection pool. The documented exception (none currently in the fleet) is an app that legitimately needs a long-lived single connection.
+
+---
+
 ## See also
 
 - [`windows-tray.md`](windows-tray.md) — the tray lifecycle this playbook deliberately does **not** duplicate: idempotent single-instance start, the orphan-proof `tray.bat --restart`, and the agent-side restart contract.
 - `home-automation` `README.md` (the cert + "Phone install (PWA)" sections) and `photo-ocr` `README.md` — the two worked examples this playbook is lifted from.
 - `scripts/gen_tailscale_cert.py` (this scaffold) — the preferred-path generator: provision a real Let's Encrypt leaf via `tailscale cert` plus the `--check` auto-renew leg. Reference wire-up into a webapp launcher: `grocery-shopping-automation`'s `webapp.bat`.
 - `scripts/gen_ssl_cert.py` in either worked-example repo — the **fallback** self-signed CA + leaf generator (auto-trust on Windows, `/install-ca` mobileconfig output) for LAN-only apps.
+- `home-automation/src/static_versioning.py` + the `CachingStaticFiles` subclass in `home-automation/app/webapp/server.py` — the nominated **canonical** cache-busting reference (§4a): the fleet-hash `BuildInfo` with `stamp_html`/`stamp_js`, copied verbatim into a new PWA app.
+- `ferraroroberto/whatsapp-radar#100` — the 11-handler `sqlite3.connect` boilerplate that motivated the one-`get_db`-`Depends` convention (§4b).
