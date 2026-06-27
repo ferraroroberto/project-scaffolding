@@ -108,21 +108,29 @@ export function initNavTabs(opts = {}) {
 }
 
 /**
- * Keep the floating bottom-tab pill pinned to the *visual* viewport on mobile.
+ * Keep the floating bottom-tab pill pinned to the bottom on mobile — CSS-first,
+ * with a minimal browser-only transform fallback.
  *
- * nav-tabs.css positions the mobile bar `fixed; bottom: …` against the *layout*
- * viewport. iOS Safari's dynamic bottom toolbar collapses on scroll-down and
- * re-expands on scroll-up, resizing the layout viewport, which drags a fixed
- * bottom-anchored element up then down — the bar appears to ride loose instead
- * of staying locked. The VisualViewport API reports the actually-visible rect;
- * we translate the bar up by the slice of layout viewport hidden below it so it
- * rides the visible bottom edge.
+ * Hard-won lesson (home-automation #205/#214/#229, validated on a real iPhone):
+ * the JS transform is the enemy in a standalone PWA. nav-tabs.css positions the
+ * bar `fixed; bottom: …`, which is correct on its own in an installed PWA (no
+ * browser chrome). The VisualViewport transform only ever existed to chase
+ * Safari's collapsing *browser* toolbar — and in standalone every flavour of that
+ * math (compute-the-offset AND measure-the-rect) eventually strands the bar UP and
+ * won't bring it back, because iOS's layout and rendered geometry disagree there.
+ * So the rule is blunt: in a standalone PWA NEVER translate. CSS owns the position;
+ * the cold-start short-page float is handled in CSS (nav-tabs.css forces the page
+ * just past viewport height so `position:fixed` anchors to the screen, not the
+ * content) and the consumer should cold-start on a content-tall tab (see README).
+ *
+ * The transform survives ONLY for a real browser tab, where the toolbar genuinely
+ * collapses: translate the bar up by the hidden slice, clamped to a toolbar's
+ * height and suppressed while the soft keyboard is up (a focused field, or the
+ * visible viewport shrank past a toolbar's worth). None of this runs in the PWA.
  *
  * Gated to the coarse-pointer / narrow floating-bar mode (desktop renders .tabs
  * as a sticky top control, where a transform would be wrong) and feature-gated
- * on window.visualViewport (older browsers keep today's CSS-only behaviour — no
- * error, no change). Idempotent and self-correcting: the transform is cleared
- * whenever the media query stops matching or nothing is hidden.
+ * on window.visualViewport (older browsers keep the CSS-only behaviour — no error).
  *
  * @param {HTMLElement} nav  the <nav class="tabs"> element.
  */
@@ -131,13 +139,37 @@ function pinNavToVisualViewport(nav) {
   if (!vv) return;
   const mq = window.matchMedia('(pointer: coarse) and (max-width: 520px)');
 
+  // Largest slice we'll pin against in a browser tab — Safari's toolbar (~44–90px).
+  // A bigger gap is the soft keyboard / a picker, which we must not chase.
+  const MAX_PIN_PX = 160;
+
+  // Installed PWA: no toolbar, so the transform is pure harm here — disable it
+  // entirely and let CSS pin the bar.
+  function isStandalone() {
+    return window.matchMedia('(display-mode: standalone)').matches ||
+      window.navigator.standalone === true;
+  }
+
+  function isEditableFocused() {
+    const a = document.activeElement;
+    if (!a) return false;
+    const tag = a.tagName;
+    // Anything that raises the iOS keyboard. SELECT opens a picker that also
+    // shrinks the viewport, so treat it the same.
+    return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || a.isContentEditable;
+  }
+
   function update() {
     if (!mq.matches) { nav.style.transform = ''; return; }
-    // Height of the layout viewport currently hidden below the visual viewport
-    // (Safari's collapsing toolbar / any off-screen slice). Pull the bar up by
-    // exactly that so its CSS `bottom` inset is measured from the *visible* edge.
-    const hidden = window.innerHeight - vv.height - vv.offsetTop;
-    nav.style.transform = hidden > 1 ? 'translateY(' + -hidden + 'px)' : '';
+    // Standalone PWA → never translate (CSS owns it). Browser tab → compensate for
+    // the collapsing toolbar, but not while a field is focused (keyboard up) and
+    // never by more than a toolbar's worth.
+    let desired = '';
+    if (!isStandalone() && !isEditableFocused()) {
+      const hidden = window.innerHeight - vv.height - vv.offsetTop;
+      if (hidden > 1 && hidden <= MAX_PIN_PX) desired = 'translateY(' + -hidden + 'px)';
+    }
+    if (nav.style.transform !== desired) nav.style.transform = desired;
   }
 
   vv.addEventListener('resize', update);
