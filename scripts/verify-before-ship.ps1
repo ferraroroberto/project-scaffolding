@@ -36,7 +36,8 @@ if (-not (Test-Path $py)) {
 # is gated with mypy --strict here so it passes what consumers enforce BEFORE it
 # ships. Append the next module to this list when a new vendored primitive lands.
 $VendoredModules = @(
-    "app/tray/single_instance.py"
+    "app/tray/single_instance.py",
+    "src/notify/"
 )
 
 function Invoke-Stage {

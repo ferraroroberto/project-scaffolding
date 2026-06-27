@@ -81,6 +81,7 @@ app/
 src/
   config.py                 paths + env-driven settings
   logger.py                 the elegant logger
+  notify/                   vendor-verbatim Telegram notifier (send_text + factory/config)
   pipelines/                one run() per file
 data/                       input / output / logs (gitignored)
 launch_app.{bat,sh}
