@@ -17,7 +17,11 @@
 .tabs {
   display: flex;
   gap: var(--space-xs);
-  margin: var(--space-xs) 0 14px;
+  /* Body-level nav: match .app's content column (772px minus 2×--gap)
+     because the nav is intentionally outside .app on iOS PWA. */
+  width: calc(100% - var(--gap) - var(--gap));
+  max-width: calc(772px - var(--gap) - var(--gap));
+  margin: calc(env(safe-area-inset-top, 0px) + var(--gap) + var(--space-xs)) auto 14px;
   background: var(--card);
   padding: var(--space-xs);
   border: 1px solid var(--line);
@@ -60,15 +64,14 @@
    apps (don't re-author it per-app). */
 @media (pointer: coarse) and (max-width: 520px) {
   .app {
-    /* Force the page just PAST the viewport height so it's always scrollable.
-       iOS standalone PWAs anchor a position:fixed bar to the *content* bottom on
-       a non-scrolling (content ≤ viewport) page, so on a short tab the bar rides
-       up. Exactly 100dvh leaves the page non-scrollable; the extra 1px tips it
-       into "scrollable", which flips iOS back to anchoring the fixed bar to the
-       screen bottom. 100vh fallback for iOS < 15.4. */
+    /* Keep the bar outside this content wrapper. home-automation#232 proved on a
+       real iPhone PWA that putting a fixed nav inside a momentum/content scroller
+       lets iOS anchor it to short-tab content rather than the viewport. Normal
+       document scroll keeps the physical screen filled; the +1px keeps short
+       tabs technically scrollable so iOS anchors fixed to the screen bottom. */
     min-height: calc(100vh + 1px);
     min-height: calc(100dvh + 1px);
-    padding-bottom: calc(
+    padding: calc(env(safe-area-inset-top, 0px) + var(--gap)) var(--gap) calc(
       env(safe-area-inset-bottom, 0px) + var(--bottom-tabs-margin, 21px) +
       var(--bottom-tabs-height, 61px) + var(--bottom-tabs-margin, 21px) + var(--gap)
     );
@@ -94,6 +97,7 @@
     align-items: center;
     gap: var(--bottom-tabs-gap, 4px);
     height: var(--bottom-tabs-height, 61px);
+    width: auto;
     max-width: 480px;
     margin: 0 auto;
     padding: var(--bottom-tabs-padding, 4px);
@@ -101,6 +105,12 @@
     border: 1px solid var(--tabbar-border);
     border-radius: var(--radius-nav);
     box-shadow: 0 10px 34px rgba(0, 0, 0, 0.5);
+    /* Keep the fixed bar on its own composited layer so iOS document scrolling is
+       less likely to repaint it a frame late after modal hide/show. Identity
+       transform only; nav-tabs.js still owns real toolbar translations in normal
+       Safari tabs and standalone PWAs receive no measured JS offset. */
+    transform: translateZ(0);
+    will-change: transform;
     backdrop-filter: blur(20px) saturate(1.25);
     -webkit-backdrop-filter: blur(20px) saturate(1.25);
   }
@@ -151,11 +161,14 @@
     white-space: nowrap;
   }
 
-  /* Never let the floating bar hover over a modal / overlay. The <dialog> rule
-     covers any native dialog; add the `nav-hidden` class to <body> for non-
-     <dialog> overlays (e.g. a custom login screen) to hide the bar too. */
+  /* Never let the floating bar hover over a modal / overlay. Hide with
+     visibility (not display) so the fixed bar stays in the render tree across
+     modal open/close, which is gentler on iOS fixed-layer repainting. The
+     <dialog> rule covers native dialogs; add `nav-hidden` to <body> for non-
+     <dialog> overlays (e.g. a custom login screen). */
   body:has(dialog[open]) .tabs,
   body.nav-hidden .tabs {
-    display: none;
+    visibility: hidden;
+    pointer-events: none;
   }
 }

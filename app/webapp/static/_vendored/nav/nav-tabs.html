@@ -19,12 +19,13 @@
      text label (shown on desktop). Replace the <path> data with your own glyphs;
      the icons below are placeholders.
 
-     IMPORTANT: wrap your page content in <main class="app"> … </main>. The mobile
-     stylesheet reserves bottom padding on `.app` equal to the floating bar's
-     height + safe-area inset; without that wrapper the fixed bar occludes the
-     bottom of your content. -->
+     IMPORTANT: keep <nav class="tabs"> as a direct <body> child, sibling to
+     <main class="app"> — never nested inside the content wrapper/scroller. iOS
+     installed PWAs can capture fixed-position descendants of scroll containers
+     and anchor them to scrolled content instead of the physical viewport. The
+     mobile stylesheet reserves bottom padding on `.app` so the fixed bar never
+     occludes content. -->
 
-<main class="app">
 <nav class="tabs" role="tablist" aria-label="Sections" data-active-tab="home">
   <button id="tabHome" type="button" class="tab active" data-tab="home"
           role="tab" aria-selected="true" aria-controls="paneHome">
@@ -56,6 +57,7 @@
   </button>
 </nav>
 
+<main class="app">
 <!-- One <section class="pane"> per tab; the active pane is visible, the rest
      carry [hidden]. nav-tabs.js toggles `hidden` — start every non-default pane
      hidden so there's no flash before JS runs. -->

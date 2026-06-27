@@ -17,12 +17,17 @@
  *     <button class="tab" data-tab="NAME" role="tab"
  *             aria-controls="PANE_ID" aria-selected="…"> … </button> …
  *   </nav>
- *   <section id="PANE_ID" class="pane" role="tabpanel" aria-labelledby="…"> … </section>
+ *   <main class="app">
+ *     <section id="PANE_ID" class="pane" role="tabpanel" aria-labelledby="…"> … </section>
+ *   </main>
  *
  * Each .tab carries data-tab (its name) and aria-controls (the id of the pane it
- * shows). The chosen tab is remembered in localStorage so an installed PWA
- * reopens where you left it. The modal-hide rule (hide the bar while a <dialog>
- * is open) lives entirely in nav-tabs.css — no JS needed.
+ * shows). The nav element must be a direct <body> child, sibling to the .app
+ * content wrapper; iOS installed PWAs can capture fixed descendants of scrollers
+ * and anchor them to short-tab content. The chosen tab is remembered in
+ * localStorage so an installed PWA reopens where you left it. The modal-hide rule
+ * (hide the bar while a <dialog> is open) lives entirely in nav-tabs.css — no JS
+ * needed.
  */
 
 'use strict';
@@ -111,17 +116,18 @@ export function initNavTabs(opts = {}) {
  * Keep the floating bottom-tab pill pinned to the bottom on mobile — CSS-first,
  * with a minimal browser-only transform fallback.
  *
- * Hard-won lesson (home-automation #205/#214/#229, validated on a real iPhone):
- * the JS transform is the enemy in a standalone PWA. nav-tabs.css positions the
- * bar `fixed; bottom: …`, which is correct on its own in an installed PWA (no
- * browser chrome). The VisualViewport transform only ever existed to chase
- * Safari's collapsing *browser* toolbar — and in standalone every flavour of that
- * math (compute-the-offset AND measure-the-rect) eventually strands the bar UP and
- * won't bring it back, because iOS's layout and rendered geometry disagree there.
- * So the rule is blunt: in a standalone PWA NEVER translate. CSS owns the position;
- * the cold-start short-page float is handled in CSS (nav-tabs.css forces the page
- * just past viewport height so `position:fixed` anchors to the screen, not the
- * content) and the consumer should cold-start on a content-tall tab (see README).
+ * Hard-won lesson (home-automation #205/#214/#229/#232, validated on a real
+ * iPhone): the JS transform is the enemy in a standalone PWA, and nav placement
+ * is load-bearing. nav-tabs.css positions the bar `fixed; bottom: …`, which is
+ * correct on its own in an installed PWA (no browser chrome) only when the nav is
+ * a body-level sibling of the content wrapper, not nested inside a scroller. The
+ * VisualViewport transform only ever existed to chase Safari's collapsing
+ * *browser* toolbar — and in standalone every measured offset risks stranding the
+ * bar UP because iOS's layout and rendered geometry disagree there. So the rule
+ * is blunt: in a standalone PWA NEVER apply a measured translate. CSS owns the
+ * position; the short-page float mitigation lives in CSS (nav-tabs.css forces the
+ * page just past viewport height so `position:fixed` anchors to the screen, not
+ * the content).
  *
  * The transform survives ONLY for a real browser tab, where the toolbar genuinely
  * collapses: translate the bar up by the hidden slice, clamped to a toolbar's
