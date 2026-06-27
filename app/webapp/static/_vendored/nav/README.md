@@ -77,13 +77,18 @@ The floating bar hides whenever a modal is open so it never floats over a dialog
 - Any native `<dialog open>` → handled automatically (`body:has(dialog[open]) .tabs`).
 - A non-`<dialog>` overlay (e.g. a custom login screen) → add the class `nav-hidden` to `<body>` while it's open.
 
-## Scroll-pinning (mobile Safari)
+## Pinning the bar (iOS) — CSS-first, transform retired in the PWA
 
-The mobile stylesheet positions the floating bar `fixed; bottom: …` against the **layout** viewport. iOS Safari's dynamic bottom toolbar collapses on scroll-down and re-expands on scroll-up, resizing the layout viewport and dragging a bottom-anchored fixed element up then down — the bar rides loose instead of staying locked.
+Hard-won contract, validated extensively on a real iPhone (`home-automation` #205/#214/#229). The short version: **in an installed PWA the floating bar is pinned by CSS alone — no JS transform.**
 
-`initNavTabs` fixes this automatically: it installs a `VisualViewport` listener that translates the bar up by the slice of layout viewport hidden below the visible rect, so the bar's CSS `bottom` inset is measured from the *visible* bottom edge. It's gated to the coarse-pointer / narrow floating-bar mode (desktop's sticky top control is untouched) and feature-detected on `window.visualViewport` (older browsers fall back to the CSS-only behaviour — no error). No call-site change is needed.
+- **Standalone PWA → no transform.** `nav-tabs.css` positions the bar `fixed; bottom: …`, which is correct on its own in a fullscreen installed PWA (no browser chrome). The VisualViewport transform only ever existed to chase Safari's collapsing *browser* toolbar; in standalone every flavour of that math eventually strands the bar **up** and won't bring it back (iOS's layout and rendered geometry disagree there). So `initNavTabs` detects `display-mode: standalone` / `navigator.standalone` and never translates.
+- **Browser tab → minimal transform.** Only in a real browser tab (where the toolbar genuinely collapses) does it translate the bar up by the hidden slice — clamped to a toolbar's height (~160px) and suppressed while the soft keyboard is up (a focused field, or a viewport shrink past a toolbar's worth). Desktop's sticky top control is untouched; feature-detected on `window.visualViewport`.
+- **Force the page scrollable.** `nav-tabs.css` sets `.app { min-height: calc(100dvh + 1px) }`. iOS standalone anchors a `position: fixed` bar to the *content* bottom on a non-scrolling page, so a short tab would float the bar up; the extra 1px makes the page always scrollable, which flips iOS back to anchoring at the screen bottom. (Cost: a barely-perceptible scroll on short tabs.)
 
-**Recommended app-level hardening:** set `overscroll-behavior: none` on `html, body` in your app's stylesheet to kill rubber-band overscroll drag at the document edges. This lives in the consuming app, not the component, because the document scroller (`body`) is the app's, not the nav's.
+**Recommended app-level hardening:**
+
+- Set `overscroll-behavior: none` on `html, body` to kill rubber-band drag at the document edges. This lives in the consuming app, not the component, because the document scroller (`body`) is the app's.
+- **Cold-start on a content-tall tab.** The force-scrollable rule fixes most cases, but a *short* tab navigated to directly can still sit slightly high until the next reflow eases it down (an iOS-internal fixed-reanchor settle). To avoid it on launch, have your call site select a content-tall default on cold-start rather than restoring a short last-tab — e.g. always `setTab('home')` on open while still letting `storageKey` remember the tab within a session. `home-automation` does exactly this.
 
 ## Don't diverge
 
