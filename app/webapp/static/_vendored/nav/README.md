@@ -13,7 +13,7 @@ The fleet's canonical **primary navigation**: a top segmented control on desktop
 ## How to vendor
 
 1. Copy this `nav/` folder **verbatim** into your app's static dir (e.g. `app/webapp/static/_vendored/nav/`). Do **not** edit `nav-tabs.js` / `nav-tabs.css` per-app — that is the drift this component removes. Per-app changes go in *your* markup and *your* token values only.
-2. Paste the `nav-tabs.html` skeleton into your `index.html` and adapt the tabs (rename `data-tab` / `aria-controls` / ids, swap the SVG icon + emoji + label, add/remove `<button class="tab">` + matching `<section class="pane">` pairs). **Wrap your page content in `<main class="app">`** — the mobile stylesheet reserves bottom padding on `.app` so the floating bar never occludes content.
+2. Paste the `nav-tabs.html` skeleton into your `index.html` and adapt the tabs (rename `data-tab` / `aria-controls` / ids, swap the SVG icon + emoji + label, add/remove `<button class="tab">` + matching `<section class="pane">` pairs). **Keep `<nav class="tabs">` as a direct `<body>` child, sibling to `<main class="app">`, never nested inside the content wrapper/scroller.** iOS installed PWAs can capture fixed-position descendants of scroll containers and anchor them to scrolled content instead of the physical viewport. `<main class="app">` still wraps your page content because the mobile stylesheet reserves bottom padding there so the floating bar never occludes content.
 3. Link the CSS and set the tab count:
    ```html
    <link rel="stylesheet" href="/static/_vendored/nav/nav-tabs.css">
@@ -37,7 +37,9 @@ The fleet's canonical **primary navigation**: a top segmented control on desktop
   <button class="tab" data-tab="NAME" role="tab"
           aria-controls="PANE_ID" aria-selected="…"> … </button>
 </nav>
-<section id="PANE_ID" class="pane" role="tabpanel" aria-labelledby="…"> … </section>
+<main class="app">
+  <section id="PANE_ID" class="pane" role="tabpanel" aria-labelledby="…"> … </section>
+</main>
 ```
 
 Each `.tab` carries `data-tab` (its name) and `aria-controls` (the id of the pane it shows). Start every non-default `.pane` with `hidden` so there's no flash before JS runs. A tab may omit its pane (e.g. an external link) — only its button state toggles.
@@ -72,23 +74,24 @@ Each `.tab` carries `data-tab` (its name) and `aria-controls` (the id of the pan
 
 ## The modal-hide rule
 
-The floating bar hides whenever a modal is open so it never floats over a dialog:
+The floating bar hides whenever a modal is open so it never floats over a dialog. It uses `visibility: hidden` rather than `display: none` so the fixed layer stays in the render tree across modal open/close, which is gentler on iOS PWA repainting:
 
 - Any native `<dialog open>` → handled automatically (`body:has(dialog[open]) .tabs`).
 - A non-`<dialog>` overlay (e.g. a custom login screen) → add the class `nav-hidden` to `<body>` while it's open.
 
-## Pinning the bar (iOS) — CSS-first, transform retired in the PWA
+## Pinning the bar (iOS) — CSS-first, body-level nav
 
-Hard-won contract, validated extensively on a real iPhone (`home-automation` #205/#214/#229). The short version: **in an installed PWA the floating bar is pinned by CSS alone — no JS transform.**
+Hard-won contract, validated extensively on a real iPhone (`home-automation` #205/#214/#229/#232). The short version: **in an installed PWA the floating bar is pinned by CSS alone, and the nav must be outside the content wrapper/scroller.**
 
-- **Standalone PWA → no transform.** `nav-tabs.css` positions the bar `fixed; bottom: …`, which is correct on its own in a fullscreen installed PWA (no browser chrome). The VisualViewport transform only ever existed to chase Safari's collapsing *browser* toolbar; in standalone every flavour of that math eventually strands the bar **up** and won't bring it back (iOS's layout and rendered geometry disagree there). So `initNavTabs` detects `display-mode: standalone` / `navigator.standalone` and never translates.
+- **Body-level nav is load-bearing.** `nav-tabs.html` places `<nav class="tabs">` as a direct `<body>` child before `<main class="app">`. Do not move it inside `.app`. iOS can capture a fixed-position element nested inside a momentum/content scroller and position it against the scrolled content bottom; on a short tab that makes the bar float mid-screen. A body-level sibling pins against the viewport instead.
+- **Standalone PWA → no measured JS transform.** `nav-tabs.css` positions the bar `fixed; bottom: …`, which is correct on its own in a fullscreen installed PWA (no browser chrome). The VisualViewport transform only ever existed to chase Safari's collapsing *browser* toolbar; in standalone every measured offset eventually risks stranding the bar **up** because iOS's layout and rendered geometry disagree there. So `initNavTabs` detects `display-mode: standalone` / `navigator.standalone` and never applies a measured translate.
 - **Browser tab → minimal transform.** Only in a real browser tab (where the toolbar genuinely collapses) does it translate the bar up by the hidden slice — clamped to a toolbar's height (~160px) and suppressed while the soft keyboard is up (a focused field, or a viewport shrink past a toolbar's worth). Desktop's sticky top control is untouched; feature-detected on `window.visualViewport`.
-- **Force the page scrollable.** `nav-tabs.css` sets `.app { min-height: calc(100dvh + 1px) }`. iOS standalone anchors a `position: fixed` bar to the *content* bottom on a non-scrolling page, so a short tab would float the bar up; the extra 1px makes the page always scrollable, which flips iOS back to anchoring at the screen bottom. (Cost: a barely-perceptible scroll on short tabs.)
+- **Keep normal document scroll.** An inner `.app` scroller can reduce bar repaint jank, but on iOS standalone it also proved prone to leaving an unusable bottom safe-area dead band. The accepted fleet fallback is normal document scroll with the nav outside `.app`.
+- **Force the page scrollable.** `nav-tabs.css` sets `.app { min-height: calc(100dvh + 1px) }`. iOS standalone can anchor a `position: fixed` bar to the *content* bottom on a non-scrolling page, so a short tab may float the bar up; the extra 1px keeps the page technically scrollable, which helps iOS anchor fixed elements at the screen bottom. (Cost: a barely-perceptible scroll on short tabs.)
 
 **Recommended app-level hardening:**
 
 - Set `overscroll-behavior: none` on `html, body` to kill rubber-band drag at the document edges. This lives in the consuming app, not the component, because the document scroller (`body`) is the app's.
-- **Cold-start on a content-tall tab.** The force-scrollable rule fixes most cases, but a *short* tab navigated to directly can still sit slightly high until the next reflow eases it down (an iOS-internal fixed-reanchor settle). To avoid it on launch, have your call site select a content-tall default on cold-start rather than restoring a short last-tab — e.g. always `setTab('home')` on open while still letting `storageKey` remember the tab within a session. `home-automation` does exactly this.
 
 ## Don't diverge
 
