@@ -34,19 +34,18 @@ The visual identity above is only as good as what stops drift from reaching `mai
 
 **Two distinct checks — keep them separate.** A *token check* (`/design-sync`-style) diffs the CSS custom properties (light + dark) and the nav contract against the spec — it is static, runs no browser, and **never renders the page**, so it catches "accent drifted from spec" but is blind to "nav pushed off-screen / cards overlap." A *visual verification* (`verify`-style) launches the live app, drives the touched view in a headed browser, and screenshots it — the only check that actually *sees* the result, and the token-expensive leg. They are not substitutes: the token check is cheap and blind; the screenshot sees but costs. A real gate uses both, scoped to the diff.
 
-**Each project declares a `## UX surface` block in its own `CLAUDE.md`** — the per-project *instance* the skills read, exactly as `## CI expectations` does for the e2e-surface skip. Don't inline these paths into the skill; they differ per repo. Copy-paste default (adapt the paths/views to your layout; a repo with no web UI sets `design spec applies: no` and the gate becomes a permanent no-op):
+**Each project declares a `## UX surface` block in its own `CLAUDE.md`** — the per-project *instance* the skills read, exactly as `## CI expectations` does for the e2e-surface skip. Don't inline these paths into the skill; they differ per repo. **This scaffold ships the block below as a _live_ declaration, not a fenced sample** — so a cloned repo inherits a parseable block, and turning the gate on is a one-word edit: flip `design spec applies` to `yes` and adapt the paths/views once the repo serves a FastAPI + static PWA. A repo with no web UI leaves it `no` and the gate stays a permanent no-op. Keep the block under this section's heading — `ux_surface.py` tolerates the descriptive `— …` suffix, so do **not** add a second `## UX surface` heading (the parser would match this one first and read nothing).
 
-```markdown
-## UX surface
-- design spec applies: yes      # `no` for Streamlit POC spikes / non-web repos → gate no-ops
+**The live block for this repo** — edit these lines in place; the skills read exactly them:
+
+- design spec applies: no        # flip to `yes` once this repo serves a FastAPI + static PWA; `no` = gate no-ops
 - paths:
   - app/webapp/static/**/*.css
   - app/webapp/templates/**
   - app/webapp/static/**/*.{js,html}
-- key views:                    # used only by the `ux-full` whole-app sweep
+- key views:                     # used only by the `ux-full` whole-app sweep
   - /          (home + bottom nav)
   - /settings
-```
 
 **The gate contract (the shared skill behavior):**
 - **Deterministic, diff-keyed — not a per-run LLM judgment.** The trigger is purely: does `git diff <main>...HEAD` intersect the declared `paths`? Yes → the gate runs. No → skip silently and **state it** in the finish summary (`no UX surface touched`). Zero added cost on the ~90% of issues that touch no UX. This is the same path-keyed mechanism as the `## CI expectations` e2e-surface skip — the "judgment" is just a glob intersection, which is why it stays consistent run to run.
