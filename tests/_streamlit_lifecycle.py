@@ -117,7 +117,11 @@ def ensure_fresh_streamlit(port: int = STREAMLIT_E2E_PORT) -> str:
     """
     if port_is_in_use(port):
         kill_streamlit_on_port(port)
-        _wait_until(lambda: not port_is_in_use(port), timeout=5.0)
+        if not _wait_until(lambda: not port_is_in_use(port), timeout=5.0):
+            raise RuntimeError(
+                f"streamlit port :{port} is still in use after kill attempt — "
+                "refusing to return a possibly stale Streamlit URL"
+            )
 
     proc = subprocess.Popen(
         [
