@@ -1,0 +1,89 @@
+%% docs/architecture.mmd — project-scaffolding's own internal structure.
+%% Hand-authored, not generated — this is the per-repo counterpart to the
+%% fleet-wide map `fleet-config`'s `/system-map` aggregates from every repo's
+%% `.fleet.toml`. That map is mechanically crawled; this repo's own internal
+%% shape is semantic and can't be, so it is authored once and kept correct by
+%% discipline. Update this diagram in the same PR as any material structural
+%% change (a new view, a new vendored component, a script relocated) — same
+%% anti-staleness contract as this repo's own `.fleet.toml` `description` field.
+%% See `ferraroroberto/fleet-config#256` for the general convention.
+
+flowchart TB
+  subgraph launchers["Launchers"]
+    LAUNCHAPP["launch_app.{bat,sh}\nlocal Streamlit run"]
+    LAUNCHSRV["launch_server.{bat,sh}\nlocal run + Cloudflare Tunnel"]
+    TRAYTMPL["tray.bat.template\ncopy-to-adapt tray launcher\n(--restart: detect/kill/reclaim/start)"]
+  end
+
+  subgraph appdir["app/ — Streamlit UI"]
+    APPPY["app.py\npage config, sidebar,\nlight/dark toggle, st.navigation"]
+    VIEWS["views/\nwelcome.py, pipeline_runner.py\none render() per file"]
+    TRAYLIB["tray/\ntray_lifecycle.ps1 (vendor-verbatim)\nsingle_instance.py (named-mutex primitive)"]
+    WEBVEND["webapp/static/_vendored/\nnav/ (bottom-tab nav)\nicons/ (Lucide sprite)"]
+    STYLES["styles/light.css\nruntime CSS overlay"]
+    STCFG[".streamlit/config.toml\nnative dark theme"]
+  end
+  APPPY --> VIEWS
+  APPPY --> STCFG
+  APPPY --> STYLES
+  LAUNCHAPP --> APPPY
+  LAUNCHSRV --> APPPY
+  TRAYTMPL -.->|vendors| TRAYLIB
+
+  subgraph srcdir["src/ — non-UI Python (reusable from CLI + tests)"]
+    CONFIG["config.py\npaths + env-driven settings"]
+    LOGGER["logger.py\nterminal + rotating file +\nStreamlit live panel, one log.info() call"]
+    PIPELINES["pipelines/\nexample_pipeline.py\none run() per file, returns summary dict"]
+    NOTIFY["notify/\nbase.py, factory.py, config.py, telegram.py\nvendor-verbatim Telegram notifier"]
+  end
+  VIEWS -->|orchestrates, business logic stays here| PIPELINES
+  VIEWS --> LOGGER
+  PIPELINES --> LOGGER
+  PIPELINES --> CONFIG
+  LOGGER -->|writes| DATALOGS
+  PIPELINES -.->|optional| NOTIFY
+
+  DATALOGS["data/\nlogs/app.log, input/, output/\n(gitignored)"]
+
+  subgraph scriptsdir["scripts/"]
+    VERIFY["verify-before-ship.ps1\nbyte-compile -> ruff -> mypy --strict\n(vendored primitives) -> pytest"]
+    TSCERT["gen_tailscale_cert.py\nprovision/renew Tailscale HTTPS leaf"]
+  end
+  VERIFY --> srcdir
+  VERIFY --> appdir
+  VERIFY --> testsdir
+
+  subgraph testsdir["tests/"]
+    UNIT["test_*.py\none file per src/ module, hermetic"]
+    E2E["e2e/conftest.py + test_smoke.py\npytest-playwright, force-restarts\nStreamlit via _streamlit_lifecycle.py"]
+  end
+  E2E --> appdir
+
+  subgraph docsdir["docs/ — didactic references"]
+    AGENTSDIR["agents/\nCLAUDE.master.md, AGENTS.master.md,\nADAPT_PROMPT.md, ROLLOUT_RUNBOOK.md"]
+    TRAYDOC["windows-tray.md"]
+    ONBOARD["app-onboarding.md"]
+    PLAYWRIGHTDOC["playwright-ui-testing.md"]
+    CHROMEDOC["shared-chrome-profile.md"]
+  end
+  AGENTSDIR -.->|source of truth for| CLAUDEMD
+  TRAYDOC -.->|documents| TRAYLIB
+  ONBOARD -.->|links| TRAYDOC
+
+  CLAUDEMD["CLAUDE.md\n(+ one-line AGENTS.md pointer)\nagent conventions for derived repos"]
+  FLEETTOML[".fleet.toml\nfleet-map card"]
+
+  subgraph external["External dependencies"]
+    STREAMLIT["Streamlit"]
+    CLOUDFLARE["Cloudflare Tunnel"]
+    TELEGRAM["Telegram Bot API"]
+    TAILSCALE["Tailscale (tailscale cert)"]
+    PLAYWRIGHT["Playwright"]
+    RUFFMYPY["ruff / mypy / pytest"]
+  end
+  APPPY --> STREAMLIT
+  LAUNCHSRV --> CLOUDFLARE
+  NOTIFY --> TELEGRAM
+  TSCERT --> TAILSCALE
+  E2E --> PLAYWRIGHT
+  VERIFY --> RUFFMYPY

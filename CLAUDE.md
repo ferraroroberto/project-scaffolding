@@ -240,4 +240,8 @@ After the verification step — and unless I said otherwise — restart that pro
 Starter scaffold for a Streamlit app + Python pipelines project — clone, rename, and build.
 See `README.md` for setup, layout, and usage.
 
+### Internal architecture
+
+[`docs/architecture.mmd`](docs/architecture.mmd) is a hand-authored Mermaid diagram of this repo's own internal structure (`app/`, `src/`, `scripts/`, `tests/`, `docs/`, external dependencies). Update it in the same PR as any material structural change (a new view, a new vendored component, a script relocated) — same anti-staleness contract as this repo's own `.fleet.toml` `description` field. It is hand-authored, not auto-generated, and not covered by `scripts/verify-before-ship.ps1`.
+
 Standing up a new self-hosted **PWA** app (FastAPI + static PWA + Windows tray)? `docs/app-onboarding.md` is the canonical end-to-end playbook — bootstrap the app, issue + trust the self-signed-CA HTTPS cert (the exact `certutil -user -addstore Root ca.pem` command + the full-Chrome-restart gotcha + the leaf-cert expiry note), and install the PWA on an iPhone (the `/install-ca` mobileconfig detour) / Android. It cross-links `docs/windows-tray.md` for the tray lifecycle rather than duplicating it.
