@@ -44,6 +44,11 @@ and writes:
 | `<tray_out_dir>/<project_slug>.ico` | 16/32/48/64/256 | Windows tray icon |
 | `<stream_deck_out_dir>/<project_slug>-144.png` | 144×144 | Elgato Stream Deck button |
 
+Pass `emit_tray=False` (and `tray_out_dir=None`) for a project whose tray
+renders its own live, state-tinted icon at runtime instead of loading a
+static file (e.g. a health-status color) — `local-llm-hub`'s hub tray glyph
+is the first example. The tray `.ico` row above is then skipped entirely.
+
 A downstream project's own `scripts/gen_icons.py` becomes a thin caller:
 
 ```python

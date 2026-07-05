@@ -74,21 +74,26 @@ def _render_tile(glyph_paths: str, size: int, pad_ratio: float) -> Image.Image:
 def render_set(
     master: Path,
     out_dir: Path,
-    tray_out_dir: Path,
+    tray_out_dir: Path | None,
     stream_deck_out_dir: Path,
     project_slug: str,
+    emit_tray: bool = True,
 ) -> None:
     """Emit the full icon set for one project from its master Lucide SVG.
 
     Writes into ``out_dir``: favicon.ico, icon-180.png, icon-192.png,
-    icon-512.png, icon-512-maskable.png. Into ``tray_out_dir``:
-    ``<project_slug>.ico``. Into ``stream_deck_out_dir``:
-    ``<project_slug>-144.png``.
+    icon-512.png, icon-512-maskable.png. Into ``stream_deck_out_dir``:
+    ``<project_slug>-144.png``. Into ``tray_out_dir``: ``<project_slug>.ico``
+    — unless ``emit_tray=False`` (a project whose tray renders its own live,
+    state-tinted icon at runtime instead of loading a static file), in which
+    case ``tray_out_dir`` is ignored and may be ``None``.
     """
     glyph_paths = _glyph_paths(master.read_text(encoding="utf-8"))
     out_dir.mkdir(parents=True, exist_ok=True)
-    tray_out_dir.mkdir(parents=True, exist_ok=True)
     stream_deck_out_dir.mkdir(parents=True, exist_ok=True)
+    if emit_tray:
+        assert tray_out_dir is not None, "tray_out_dir is required when emit_tray=True"
+        tray_out_dir.mkdir(parents=True, exist_ok=True)
 
     icon_512 = _render_tile(glyph_paths, 512, FULL_BLEED_PAD)
     icon_512.save(out_dir / "icon-512.png")
@@ -108,8 +113,10 @@ def render_set(
     stream_deck_tile = _render_tile(glyph_paths, 144, FULL_BLEED_PAD)
     stream_deck_tile.save(stream_deck_out_dir / f"{project_slug}-144.png")
 
-    tray_base = _render_tile(glyph_paths, 256, FULL_BLEED_PAD)
-    tray_base.save(
-        tray_out_dir / f"{project_slug}.ico",
-        sizes=[(16, 16), (32, 32), (48, 48), (64, 64), (256, 256)],
-    )
+    if emit_tray:
+        assert tray_out_dir is not None
+        tray_base = _render_tile(glyph_paths, 256, FULL_BLEED_PAD)
+        tray_base.save(
+            tray_out_dir / f"{project_slug}.ico",
+            sizes=[(16, 16), (32, 32), (48, 48), (64, 64), (256, 256)],
+        )
