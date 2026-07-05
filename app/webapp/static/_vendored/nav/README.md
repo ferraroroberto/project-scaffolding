@@ -27,8 +27,12 @@ The fleet's canonical **primary navigation**: a top segmented control on desktop
    const nav = initNavTabs({
      storageKey: 'my-app.tab',   // omit to disable PWA persistence
      onChange: (tab) => { /* lazy-load that pane, change poll rate, … */ },
+     navEvent: (msg) => { /* optional: wire to a nav-debug recorder for on-device forensics */ },
+     scrollResetSelector: '.app', // element scroller reset to top on tab switch (default; null to skip)
    });
    ```
+
+   `initNavTabs` also self-heals the pinned bar (home-automation #300/#303 lessons): it clears the browser-tab transform when a `<dialog>` scroll-lock engages (`scroll-lock:engaged`/`released` events — apps without scroll-lock.js simply never fire them), re-pins after `[hidden]` overlay toggles, on `visibilitychange`/`load`, and via a 400 ms watchdog. Standalone PWAs still never get a measured translate.
 
 ## Markup contract
 
