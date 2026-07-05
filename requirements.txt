@@ -1,5 +1,13 @@
 streamlit>=1.30.0
 
+# Fleet icon-brand generator (scripts/brand_gen.py) — dev-only: the generated
+# PNGs/ICOs are committed per downstream project, so no project's runtime
+# webapp ever imports these. resvg-py renders the vendored Lucide SVG masters
+# to PNG (prebuilt Windows wheel, no Cairo/GTK system deps); Pillow assembles
+# the multi-size .ico containers and does the PNG resizes.
+resvg-py>=0.3.0
+Pillow>=10.0.0
+
 # HTTPS provisioning — cert inspection for scripts/gen_tailscale_cert.py --check
 # (the auto-renew leg reads SAN + expiry to decide whether to renew the LE leaf).
 cryptography>=42.0.0

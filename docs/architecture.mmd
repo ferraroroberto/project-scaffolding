@@ -48,10 +48,17 @@ flowchart TB
   subgraph scriptsdir["scripts/"]
     VERIFY["verify-before-ship.ps1\nbyte-compile -> ruff -> mypy --strict\n(vendored primitives) -> pytest"]
     TSCERT["gen_tailscale_cert.py\nprovision/renew Tailscale HTTPS leaf"]
+    BRANDGEN["brand_gen.py\nrender_set(): Lucide master SVG -> dark-tile\nPWA/tray/Stream Deck icon set (resvg-py)"]
   end
   VERIFY --> srcdir
   VERIFY --> appdir
   VERIFY --> testsdir
+
+  subgraph branddir["brand/ — fleet icon masters"]
+    BRANDSVGS["rocket/camera/mic/hub/radar/house.svg\nvendored verbatim from lucide-static"]
+  end
+  BRANDGEN -->|reads| BRANDSVGS
+  BRANDGEN -.->|imported via known local path by| DOWNSTREAM["downstream projects'\nscripts/gen_icons.py\n(app-launcher, photo-ocr, voice-transcriber,\nlocal-llm-hub, whatsapp-radar, home-automation)"]
 
   subgraph testsdir["tests/"]
     UNIT["test_*.py\none file per src/ module, hermetic"]
@@ -65,10 +72,12 @@ flowchart TB
     ONBOARD["app-onboarding.md"]
     PLAYWRIGHTDOC["playwright-ui-testing.md"]
     CHROMEDOC["shared-chrome-profile.md"]
+    BRANDDOC["brand-icons.md"]
   end
   AGENTSDIR -.->|source of truth for| CLAUDEMD
   TRAYDOC -.->|documents| TRAYLIB
   ONBOARD -.->|links| TRAYDOC
+  BRANDDOC -.->|documents| BRANDGEN
 
   CLAUDEMD["CLAUDE.md\n(+ one-line AGENTS.md pointer)\nagent conventions for derived repos"]
   FLEETTOML[".fleet.toml\nfleet-map card"]
@@ -80,6 +89,7 @@ flowchart TB
     TAILSCALE["Tailscale (tailscale cert)"]
     PLAYWRIGHT["Playwright"]
     RUFFMYPY["ruff / mypy / pytest"]
+    RESVG["resvg-py\n(SVG -> PNG rasterizer, prebuilt wheel)"]
   end
   APPPY --> STREAMLIT
   LAUNCHSRV --> CLOUDFLARE
@@ -87,3 +97,4 @@ flowchart TB
   TSCERT --> TAILSCALE
   E2E --> PLAYWRIGHT
   VERIFY --> RUFFMYPY
+  BRANDGEN --> RESVG
