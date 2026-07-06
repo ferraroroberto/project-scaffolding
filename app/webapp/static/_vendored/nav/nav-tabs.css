@@ -176,6 +176,17 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    /* Own compositing layer so the label glyphs are NOT rasterized into the
+       pill's backdrop-filter texture (the .tabs rule above: translateZ(0) +
+       will-change + backdrop-filter). On iOS WebKit, flipping the bar
+       visibility:hidden→visible when a <dialog> closes re-composites that
+       backdrop layer without re-rasterizing text baked into it — labels come
+       back blank until a class/theme change forces a repaint. An own layer
+       keeps the glyphs out of the stale texture so they repaint on show.
+       iOS-only; desktop WebKit composites differently and never reproduces it.
+       Validated on a real iPhone PWA (home-automation#381). */
+    transform: translateZ(0);
+    backface-visibility: hidden;
   }
 
   /* Never let the floating bar hover over a modal / overlay. Hide with
