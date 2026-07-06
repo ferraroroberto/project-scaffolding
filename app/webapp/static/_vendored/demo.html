@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>_vendored — fleet component gallery</title>
+<!--
+  Component gallery + render harness.
+
+  Human use: open this page (over HTTP — the ESM imports don't run from
+  file://) to eyeball every vendored component in light + dark.
+  Machine use: tests/e2e/test_vendored_components.py drives this page and
+  asserts each component's key computed styles in both themes.
+
+  The token blocks below are SAMPLE values transcribed from
+  ~/.claude/design.md (light) + design.dark.md (dark) — the one place a
+  consuming app would normally define them. They live inline here (not in a
+  component file) because defining tokens is the app's job; this page plays
+  the app. The P3 wide-gamut twins are intentionally omitted: the harness
+  asserts sRGB values.
+-->
+<style>
+  :root {
+    --bg: #ffffff;
+    --card: #ffffff;
+    --card-off: #f6f8fa;
+    --ink: #1f2328;
+    --muted: #656d76;
+    --line: #d1d9e0;
+    --line-muted: #d8dee4;
+    --accent: #0969da;
+    --accent-fg: #ffffff;
+    --on: #1a7f37;
+    --deficit: #cf222e;
+    --attention: #9a6700;
+    --tile-green: #1f883d;
+    --tile-blue: #0969da;
+    --tile-purple: #8250df;
+    --tile-orange: #bc4c00;
+    --tile-yellow: #bf8700;
+    --input-bg: var(--card-off);
+    --toggle-track: var(--line);
+    --toggle-knob: #ffffff;
+    --close-bg: var(--card-off);
+    --accent-border-strong: color-mix(in srgb, var(--accent) 28%, transparent);
+    --radius-md: 12px;
+    --radius: 16px;
+    --radius-pill: 9999px;
+    --space-xs: 4px;
+    --space-sm: 8px;
+    --space-md: 16px;
+    --space-lg: 24px;
+    --space-xl: 32px;
+    --gap: 12px;
+    --control-h: 36px;
+    --font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --font-heading-xl: 2rem;
+    --font-heading-lg: 1.5rem;
+    --font-body: 1rem;
+    --font-label: 0.92rem;
+    --font-caption: 0.78rem;
+    --icon-inline: 16px;
+    --icon-title: 18px;
+    --icon-feature: 24px;
+    --tile-size: 48px;
+    color-scheme: light dark;
+  }
+  [data-theme="dark"] {
+    --bg: #0d1117;
+    --card: #161b22;
+    --card-off: #010409;
+    --ink: #e6edf3;
+    --muted: #7d8590;
+    --line: #30363d;
+    --line-muted: #21262d;
+    --accent: #2f81f7;
+    --accent-fg: #ffffff;
+    --on: #3fb950;
+    --deficit: #f85149;
+    --attention: #d29922;
+    --tile-green: #2ea043;
+    --tile-blue: #2f81f7;
+    --tile-purple: #a371f7;
+    --tile-orange: #db6d28;
+    --tile-yellow: #d29922;
+    --input-bg: var(--bg);
+    --toggle-track: var(--line);
+    --toggle-knob: var(--ink);
+    --close-bg: var(--line);
+  }
+
+  /* Gallery chrome only — not part of any component. */
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--font);
+    font-size: var(--font-body);
+    line-height: 1.5;
+  }
+  .gallery {
+    max-width: 480px;
+    margin: 0 auto;
+    padding: var(--gap);
+    display: flex;
+    flex-direction: column;
+    gap: var(--gap);
+  }
+  .gallery > h2 {
+    margin: var(--space-md) 0 0;
+    font-size: var(--font-label);
+    font-weight: 600;
+    color: var(--muted);
+    text-transform: none;
+  }
+  .icon { display: inline-block; width: 1em; height: 1em; flex: none;
+          stroke: currentColor; stroke-width: 2; stroke-linecap: round;
+          stroke-linejoin: round; vertical-align: -0.15em; }
+  .tile-row { display: flex; gap: var(--gap); }
+  #themeToggle { align-self: flex-end; }
+</style>
+<link rel="stylesheet" href="card/card.css">
+<link rel="stylesheet" href="disclosure/disclosure.css">
+<link rel="stylesheet" href="modal/modal.css">
+<link rel="stylesheet" href="empty-state/empty-state.css">
+<link rel="stylesheet" href="switch/switch.css">
+<link rel="stylesheet" href="icon-tile/icon-tile.css">
+</head>
+<body>
+<div class="gallery">
+  <button type="button" id="themeToggle" class="empty-state-action">Toggle theme</button>
+
+  <h2>card</h2>
+  <div class="card" id="demoCard">
+    <div class="card-head">
+      <h3 class="card-title">
+        <svg class="icon" aria-hidden="true"><use href="#i-house"></use></svg>
+        Card title
+      </h3>
+      <span class="card-head-meta">3 items</span>
+    </div>
+    <p class="card-meta">Optional muted meta line.</p>
+  </div>
+
+  <h2>disclosure</h2>
+  <details class="card card--collapsible" id="demoDisclosureClosed">
+    <summary class="collapse-summary">
+      <span class="collapse-main">
+        <svg class="icon" aria-hidden="true"><use href="#i-shield-check"></use></svg>
+        <h3 class="collapse-title">Closed section</h3>
+      </span>
+      <span class="collapse-chevron" aria-hidden="true">›</span>
+    </summary>
+    <div class="collapse-body">Hidden until opened.</div>
+  </details>
+  <details class="card card--collapsible" id="demoDisclosureOpen" open>
+    <summary class="collapse-summary">
+      <span class="collapse-main">
+        <svg class="icon" aria-hidden="true"><use href="#i-shield-check"></use></svg>
+        <h3 class="collapse-title">Open section</h3>
+        <span class="collapse-count">2 hidden</span>
+      </span>
+      <span class="collapse-chevron" aria-hidden="true">›</span>
+    </summary>
+    <div class="collapse-body">Open-state body content.</div>
+  </details>
+
+  <h2>modal</h2>
+  <div class="card">
+    <button type="button" id="openModalBtn" class="empty-state-action">Open editor modal</button>
+  </div>
+  <dialog class="detail-dialog" id="demoDialog">
+    <div class="detail-card">
+      <div class="detail-header">
+        <h2>Edit thing</h2>
+        <button type="button" class="detail-close" id="demoDialogClose" aria-label="Close">
+          <svg class="icon" aria-hidden="true"><use href="#i-x"></use></svg>
+        </button>
+      </div>
+      <div class="row">
+        <span>Name</span>
+        <input class="input-native" type="text" value="Living room">
+      </div>
+      <div class="row">
+        <span>Mode</span>
+        <select class="select-native"><option>Auto</option><option>Manual</option></select>
+      </div>
+      <div class="detail-actions">
+        <button type="button" class="detail-save-btn" id="demoSaveBtn" disabled>Save</button>
+      </div>
+    </div>
+  </dialog>
+
+  <h2>empty-state (built via empty-state.js)</h2>
+  <div class="card" id="demoEmptyHost"></div>
+
+  <h2>switch (static + built via switch.js)</h2>
+  <div class="card" id="demoSwitchHost">
+    <button type="button" class="toggle on" id="demoSwitchOn" role="switch"
+            aria-checked="true" aria-label="Static on switch">
+      <span class="knob"></span><span class="toggle-label">ON</span>
+    </button>
+    <button type="button" class="toggle" id="demoSwitchOff" role="switch"
+            aria-checked="false" aria-label="Static off switch">
+      <span class="knob"></span><span class="toggle-label">OFF</span>
+    </button>
+    <button type="button" class="toggle" id="demoSwitchDisabled" role="switch"
+            aria-checked="false" aria-label="Disabled switch" disabled>
+      <span class="knob"></span><span class="toggle-label">OFF</span>
+    </button>
+  </div>
+
+  <h2>icon-tile</h2>
+  <div class="card">
+    <div class="tile-row">
+      <span class="icon-tile icon-tile--green"><svg class="icon" aria-hidden="true"><use href="#i-house"></use></svg></span>
+      <span class="icon-tile icon-tile--blue" id="demoTileBlue"><svg class="icon" aria-hidden="true"><use href="#i-zap"></use></svg></span>
+      <span class="icon-tile icon-tile--purple"><svg class="icon" aria-hidden="true"><use href="#i-settings"></use></svg></span>
+      <span class="icon-tile icon-tile--orange"><svg class="icon" aria-hidden="true"><use href="#i-flame"></use></svg></span>
+      <span class="icon-tile icon-tile--yellow"><svg class="icon" aria-hidden="true"><use href="#i-sun"></use></svg></span>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+  import { emptyStateEl } from './empty-state/empty-state.js';
+  import { switchEl, setSwitch } from './switch/switch.js';
+
+  // Inject the real vendored sprite so <use href="#i-NAME"> resolves.
+  const sprite = await fetch('./icons/icons-sprite.html').then((r) => r.text());
+  document.body.insertAdjacentHTML('afterbegin', sprite);
+
+  // Empty state, built by the vendored builder.
+  document.getElementById('demoEmptyHost').appendChild(
+    emptyStateEl('satellite-dish', 'Nothing reachable', {
+      actionLabel: 'Retry',
+      onAction: () => console.log('retry'),
+    })
+  );
+
+  // A live switch, built by the vendored builder.
+  const live = switchEl(false, {
+    label: 'Built switch',
+    onToggle: (next, btn) => setSwitch(btn, next),
+  });
+  live.id = 'demoSwitchBuilt';
+  document.getElementById('demoSwitchHost').appendChild(live);
+
+  // Modal wiring.
+  const dlg = document.getElementById('demoDialog');
+  document.getElementById('openModalBtn').addEventListener('click', () => dlg.showModal());
+  document.getElementById('demoDialogClose').addEventListener('click', () => dlg.close());
+
+  // Theme toggle.
+  document.getElementById('themeToggle').addEventListener('click', () => {
+    const root = document.documentElement;
+    root.dataset.theme = root.dataset.theme === 'dark' ? '' : 'dark';
+  });
+
+  // Signal readiness to the e2e harness.
+  document.body.dataset.demoReady = '1';
+</script>
+</body>
+</html>
