@@ -98,6 +98,71 @@
     );
   }
 
+  /* Standalone-PWA shell (home-automation#303): in the installed app the
+     *document* was the scroller, and the home-screen WKWebView's native
+     scroll bounce moves the visual viewport itself, dragging every
+     `position: fixed` element (the floating nav) with it — `overscroll-
+     behavior: none` above does not govern that native bounce the way it does
+     in a Safari tab. So in standalone the document must never scroll at all:
+     `.app` becomes the element scroller instead, whose bounce doesn't move
+     the visual viewport (and whose overscroll-behavior IS honored), so the
+     fixed nav stays put by construction rather than by after-the-fact
+     correction.
+
+     The load-bearing subtlety (home-automation#303 rounds 1-2, proven by
+     on-device nav-debug forensics): iOS standalone expands the layout
+     viewport to the full physical screen ONLY WHILE THE DOCUMENT IS
+     SCROLLABLE. With every body child out of flow the document has zero
+     scrollable overflow, and the fixed-positioning viewport contracts —
+     every fixed element (nav, .app) anchors above the physical bottom: the
+     home-automation#232 dead band again. The baseline's
+     `min-height: calc(100dvh + 1px)` forcer above exists to keep exactly this
+     expansion alive ("so position:fixed anchors to the screen rather than the
+     content"). So the shell re-creates that 1px overflow with an inert
+     body-level spacer: the document stays technically scrollable (viewport
+     expanded), but no touch can ever reach it — content gestures land on the
+     fixed .app scroller (its overscroll-behavior: none stops chaining), and
+     the nav declines pan gestures outright — so the WKWebView bounce that
+     moves `visualViewport.offsetTop` (home-automation#300) still has no entry
+     point. */
+  @media (display-mode: standalone) {
+    .app {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      /* Sized with the LARGE viewport unit, not bottom-anchored (`inset: 0`):
+         at cold launch iOS *animates* the layout-viewport expansion (1px per
+         vv:resize frame over ~2s — home-automation#303 round-3 on-device
+         log), so a bottom edge tied to the live viewport slides down with it.
+         lvh reports the final expanded height from the very first frame, and
+         the top edge is stable, so this box has its final geometry
+         immediately. Plain vh first: on iOS it equals the large viewport too
+         (that was the historic 100vh complaint) — fallback for engines
+         without lvh. */
+      height: 100vh;
+      height: 100lvh;
+      overflow-y: auto;
+      overscroll-behavior: none;
+      /* The in-flow document-scroll forcer above (100dvh + 1px) would push a
+         fixed box 1px past the bottom edge; the spacer below carries the
+         forcer role instead. */
+      min-height: 0;
+    }
+    /* Invisible 1px-past-viewport spacer behind the fixed .app: keeps the
+       document scrollable so the layout viewport stays expanded (see the
+       shell comment above). dvh on purpose (not lvh): it tracks the live
+       viewport, so the document's scrollable range is exactly 1px in every
+       state — contracted at boot, mid-animation, expanded — never more. vh
+       first as the no-dvh fallback. */
+    body::after {
+      content: '';
+      display: block;
+      height: calc(100vh + 1px);
+      height: calc(100dvh + 1px);
+    }
+  }
+
   .tabs {
     position: fixed;
     top: auto;
@@ -130,6 +195,46 @@
     will-change: transform;
     backdrop-filter: blur(20px) saturate(1.25);
     -webkit-backdrop-filter: blur(20px) saturate(1.25);
+  }
+
+  /* Standalone-PWA nav anchoring (home-automation#303, pairs with the shell
+     above; placed after the base rule so the cascade picks it). Two changes:
+     1. Anchor from the stable TOP edge via the large-viewport unit instead of
+        `bottom`: during the cold-launch viewport-expansion animation (see the
+        .app shell comment above) a bottom-anchored bar visibly "floats" down
+        for ~2s before locking. `100lvh` is the final height from frame one,
+        so this puts the bar at its physical-bottom resting spot immediately.
+        Same resting position as the base rule's
+        `bottom: var(--bottom-tabs-margin, 21px)` once the viewport settles —
+        geometry is unchanged, only the anchor.
+     2. Refuse pan gestures: the nav is the one fixed surface a drag could
+        still reach the 1px-scrollable document through (it sits outside
+        .app), and home-automation#300 proved the standalone bounce ignores
+        overscroll-behavior. Taps are unaffected. */
+  @media (display-mode: standalone) {
+    .tabs {
+      bottom: auto;
+      top: calc(100vh - var(--bottom-tabs-height, 61px) - var(--bottom-tabs-margin, 21px));
+      top: calc(100lvh - var(--bottom-tabs-height, 61px) - var(--bottom-tabs-margin, 21px));
+      touch-action: none;
+      /* Cold-launch cosmetics: iOS paints the region below the animating
+         layout-viewport edge only as the ~2s expansion sweeps past it, so the
+         bar (at its final spot from frame one) would look like it's being
+         un-curtained bottom-up. Stay transparent through the sweep, then
+         slide up into place. The bar's own strip is painted ~1.7s in, so a
+         1.8s delay clears it without waiting out the whole sweep. Pure CSS,
+         runs once per page load; `backwards` fill guarantees it always ends
+         fully visible. The translate lives only inside the animation
+         (computed, never inline style), so nav-tabs.js's home-automation#300
+         never-translate rule — which reads/writes nav.style.transform — is
+         untouched, and with no `forwards` fill the resting geometry after the
+         entrance is byte-identical to before. */
+      animation: nav-boot-reveal 0.35s ease-out 1.8s backwards;
+    }
+    @keyframes nav-boot-reveal {
+      from { opacity: 0; transform: translateY(14px); }
+      to { opacity: 1; transform: none; }
+    }
   }
 
   .tab {
