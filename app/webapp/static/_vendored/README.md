@@ -15,8 +15,14 @@ A cloned web app inherits both: design **tokens** (wire your CSS custom properti
 | --- | --- | --- |
 | [`nav/`](nav/) | Floating bottom-tab navigation (desktop segmented control → mobile pill). The fleet navigation contract. | ✅ |
 | [`icons/`](icons/) | Inline Lucide icon sprite + `icon()` helper. The fleet's one icon set (24×24, 2px stroke, currentColor). | ✅ |
+| [`card/`](card/) | The base elevated content group: `rounded.lg` surface + hairline border + the one-row header (glyph + bold title + muted meta + right-pinned meta). | ✅ |
+| [`disclosure/`](disclosure/) | Collapsible `<details>`/summary card: 52px closed header, chevron pinned right, the shared `.card--collapsible` padding-zeroing modifier. | ✅ |
+| [`modal/`](modal/) | The editor `<dialog>` shell: title + 34px × close, label/value rows, full-width primary with the AA disabled recipe, on-device-validated iOS anchoring/scroll-lock rules. | ✅ |
+| [`empty-state/`](empty-state/) | Canonical zero-items block: feature-size glyph + one-line reason + optional quiet action; `emptyStateEl()` builder. | ✅ |
+| [`switch/`](switch/) | The one boolean control (shadcn Switch shape, **green** on-track per design.md v2); `switchEl()`/`setSwitch()` builders. | ✅ |
+| [`icon-tile/`](icon-tile/) | The Home-screen rounded-square: one `tile-*` fill + centered feature-size glyph. | ✅ |
 
-_More components land here as they're normalized from the fleet (cards, modal/dialog shell, toast, settings collapse, …). Each gets its own folder + `README.md` with files, a vendoring recipe, and its required design tokens — same shape as `nav/`._
+_Each folder carries a `README.md` with files, a vendoring recipe, the markup contract, and its required design tokens — same shape as `nav/`. [`demo.html`](demo.html) is the component gallery: open it over HTTP to eyeball every component in light + dark; `tests/e2e/test_vendored_components.py` drives the same page and asserts each component's key computed styles in both themes._
 
 ## Adding a new vendored component
 

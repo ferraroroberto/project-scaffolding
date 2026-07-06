@@ -19,7 +19,7 @@ flowchart TB
     APPPY["app.py\npage config, sidebar,\nlight/dark toggle, st.navigation"]
     VIEWS["views/\nwelcome.py, pipeline_runner.py\none render() per file"]
     TRAYLIB["tray/\ntray_lifecycle.ps1 (vendor-verbatim)\nsingle_instance.py (named-mutex primitive)"]
-    WEBVEND["webapp/static/_vendored/\nnav/ (bottom-tab nav)\nicons/ (Lucide sprite)"]
+    WEBVEND["webapp/static/_vendored/\nnav/ (bottom-tab nav) · icons/ (Lucide sprite)\ncard/ · disclosure/ · modal/\nempty-state/ · switch/ · icon-tile/\n+ demo.html (gallery / render harness)"]
     STYLES["styles/light.css\nruntime CSS overlay"]
     STCFG[".streamlit/config.toml\nnative dark theme"]
   end
@@ -62,7 +62,7 @@ flowchart TB
 
   subgraph testsdir["tests/"]
     UNIT["test_*.py\none file per src/ module, hermetic"]
-    E2E["e2e/conftest.py + test_smoke.py\npytest-playwright, force-restarts\nStreamlit via _streamlit_lifecycle.py"]
+    E2E["e2e/conftest.py + test_smoke.py\npytest-playwright, force-restarts\nStreamlit via _streamlit_lifecycle.py\n+ test_vendored_components.py\n(drives _vendored/demo.html, light+dark)"]
   end
   E2E --> appdir
 
