@@ -90,6 +90,11 @@ iOS Safari — installed home-screen PWAs especially — heuristic-caches static
 - **Per-suffix `Cache-Control`; the shell always revalidates.** `.js`/`.css` get `public, max-age=31536000, immutable` (safe because the fleet hash is the cache key); manifest/icons get a daily `public, max-age=86400`. The **shell** (`index.html` root route) is served `Cache-Control: no-cache, must-revalidate` so the entry point always revalidates — otherwise a cached shell still points at the old entry module and the hashing buys nothing.
 - **Don't diverge.** The convention lives here; the trimmed `CachingStaticFiles` + fleet-hash reference snippet is in `docs/app-onboarding.md` §4. Service workers / offline caching are deliberately **not** used in the fleet. (Decision record: `ferraroroberto/project-scaffolding#78`.)
 
+## Windows event-loop pinning (uvicorn)
+*Apply only if this project serves a FastAPI + static PWA web app. Streamlit POC spikes are exempt.*
+
+- Every uvicorn spawn point (tray subprocess spawn via `manager.py`, a programmatic `uvicorn.run()`, `.bat` launcher scripts, e2e autoboot spawns) must pass a pinned selector-loop factory (`--loop`/`loop=`) — asyncio's default Windows proactor loop wedges the listening socket on any aborted client connection (`app-launcher#388`). Worked shim + rationale: `docs/app-onboarding.md` §1; reference implementation: `app-launcher`'s `app/webapp/event_loop.py` (`selector_loop_factory`).
+
 ## FastAPI + SQLite connection lifecycle (one `get_db` `Depends` dependency)
 *Apply only if this project is a FastAPI app backed by SQLite.*
 
