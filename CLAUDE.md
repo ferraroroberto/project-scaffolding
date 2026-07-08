@@ -95,6 +95,14 @@ iOS Safari — installed home-screen PWAs especially — heuristic-caches static
 
 - Every uvicorn spawn point (tray subprocess spawn via `manager.py`, a programmatic `uvicorn.run()`, `.bat` launcher scripts, e2e autoboot spawns) must pass a pinned selector-loop factory (`--loop`/`loop=`) — asyncio's default Windows proactor loop wedges the listening socket on any aborted client connection (`app-launcher#388`). Worked shim + rationale: `docs/app-onboarding.md` §1; reference implementation: `app-launcher`'s `app/webapp/event_loop.py` (`selector_loop_factory`).
 
+## Windows console-subprocess suppression (`CREATE_NO_WINDOW`)
+*Apply only if this project runs a long-lived Windows process (tray, daemon, GUI) without its own console — e.g. launched via `pythonw` — that shells out to a console-based CLI tool (`docker`, `nvidia-smi`, `git`, `taskkill`, …).*
+
+- Every console-tool subprocess call (`subprocess.run`/`subprocess.Popen`, `asyncio.create_subprocess_exec`) must pass `creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0` — a console-less parent (no window of its own) makes Windows allocate a fresh console for each child, flashing a visible window; repeated on a poll loop this reads as malware or a stuck app (`local-llm-hub`'s Hub-tab health poll, `project-scaffolding#13`). Centralize behind one small helper (e.g. `_no_window_flag()`) imported everywhere rather than re-inlining the literal at each call site — `asyncio.create_subprocess_exec` accepts the same flag and is easy to miss vs. the sync API.
+- A detached long-running child additionally wants `DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP` as appropriate.
+- Related trap: a `pythonw` child launched without a redirected `stdout`/`stderr` crashes on its first log write (no console to write to) — always give it a real target (pipe or file).
+- Worked helper: `docs/app-onboarding.md` §1.
+
 ## FastAPI + SQLite connection lifecycle (one `get_db` `Depends` dependency)
 *Apply only if this project is a FastAPI app backed by SQLite.*
 

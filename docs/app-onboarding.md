@@ -69,6 +69,26 @@ uvicorn.run(..., loop="app.webapp.event_loop:selector_loop_factory")
 
 Do this at scaffold time, not after the first phone-roaming wedge — see the `CLAUDE.md` rule under the webapp/PWA conventions.
 
+**Suppress console flashes from child processes.** A tray/daemon (`pythonw`, no console of its own) that shells out to a console CLI (`docker`, `nvidia-smi`, `git`, `taskkill`) must pass `CREATE_NO_WINDOW`, or Windows flashes a fresh console window per child — visible, repeated flicker on any poll loop (`project-scaffolding#13`). One helper, imported everywhere:
+
+```python
+import subprocess
+import sys
+
+def _no_window_flag() -> int:
+    return subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
+
+subprocess.run(["docker", "info"], capture_output=True, creationflags=_no_window_flag())
+
+await asyncio.create_subprocess_exec(
+    "docker", "info",
+    stdout=asyncio.subprocess.PIPE,
+    creationflags=_no_window_flag(),
+)
+```
+
+A `pythonw`-launched child also needs a real `stdout`/`stderr` target (pipe or file) — without one, its first log write crashes it.
+
 ---
 
 ## 2. Provision HTTPS — `tailscale cert` (preferred) or self-signed CA (LAN-only fallback)
