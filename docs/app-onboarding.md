@@ -42,6 +42,33 @@ Set this app's identity before anything else: update `.fleet.toml` (its architec
 
 The signal that the new code is actually live is a product-specific render (e.g. the card grid populating), **not** a `/healthz` 200 — a stale process answers health checks fine. Pick that signal per app and write it into the app's own `CLAUDE.md` `## This repository`.
 
+**Pin the selector event loop — every uvicorn spawn, from the first boot.** On Windows, asyncio's default **proactor** event loop closes its listening socket the moment `accept()` raises any `OSError` (CPython's `proactor_events.py:_start_serving` accept loop) — a client aborting a connection mid-handshake (a browser dropping the socket, a phone roaming off Wi-Fi) surfaces as exactly such an error (`WinError 64`), and one aborted client wedges the listener: the process stays alive but every subsequent connection fails until a manual restart. The **selector** event loop has no such failure mode. Fixed in `app-launcher#388` after the bug wedged its phone-facing webapp; verified empirically there that a bare `SelectorEventLoop` server survived 800 concurrent aborted connections while a `ProactorEventLoop` server died after ~20.
+
+Copy `app-launcher`'s `app/webapp/event_loop.py` (`selector_loop_factory`) verbatim into a new app's `app/webapp/` and wire it into **every** uvicorn spawn point via `--loop`/`loop=`:
+
+```python
+# app/webapp/event_loop.py — must return an instantiated loop, not a loop class:
+# uvicorn imports a custom --loop/loop= dotted-path target and calls it directly
+# as the final zero-arg factory (no use_subprocess= indirection like its
+# built-in names get).
+def selector_loop_factory() -> asyncio.AbstractEventLoop:
+    if sys.platform == "win32":
+        return asyncio.SelectorEventLoop()
+    return asyncio.new_event_loop()
+```
+
+```powershell
+# CLI invocation (webapp.bat, WebappManager._build_command, e2e autoboot spawn):
+--loop app.webapp.event_loop:selector_loop_factory
+```
+
+```python
+# programmatic uvicorn.run() (e.g. app/cli/commands/webapp_cmd.py):
+uvicorn.run(..., loop="app.webapp.event_loop:selector_loop_factory")
+```
+
+Do this at scaffold time, not after the first phone-roaming wedge — see the `CLAUDE.md` rule under the webapp/PWA conventions.
+
 ---
 
 ## 2. Provision HTTPS — `tailscale cert` (preferred) or self-signed CA (LAN-only fallback)
