@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>_vendored — fleet component gallery</title>
 <!--
   Component gallery + render harness.
@@ -42,7 +42,11 @@
     --toggle-track: var(--line);
     --toggle-knob: #ffffff;
     --close-bg: var(--card-off);
+    --accent-soft: color-mix(in srgb, var(--accent) 16%, transparent);
+    --accent-border-soft: color-mix(in srgb, var(--accent) 24%, transparent);
     --accent-border-strong: color-mix(in srgb, var(--accent) 28%, transparent);
+    --deficit-soft: color-mix(in srgb, var(--deficit) 12%, transparent);
+    --deficit-border-soft: color-mix(in srgb, var(--deficit) 30%, transparent);
     --radius-md: 12px;
     --radius: 16px;
     --radius-pill: 9999px;
@@ -126,6 +130,7 @@
 <link rel="stylesheet" href="empty-state/empty-state.css">
 <link rel="stylesheet" href="switch/switch.css">
 <link rel="stylesheet" href="icon-tile/icon-tile.css">
+<link rel="stylesheet" href="button/button.css">
 </head>
 <body>
 <div class="gallery">
@@ -209,6 +214,16 @@
             aria-checked="false" aria-label="Disabled switch" disabled>
       <span class="knob"></span><span class="toggle-label">OFF</span>
     </button>
+  </div>
+
+  <h2>button</h2>
+  <div class="card" style="display: flex; flex-direction: column; gap: var(--space-sm);">
+    <button type="button" class="button-primary" id="demoButtonPrimary">Save</button>
+    <button type="button" class="button-tint" id="demoButtonTint">Run now</button>
+    <button type="button" class="button-ghost" id="demoButtonGhost">Cancel</button>
+    <button type="button" class="button-surface" id="demoButtonSurface">Options</button>
+    <button type="button" class="button-primary" id="demoButtonDisabled" disabled>Save</button>
+    <button type="button" class="button-tint danger" id="demoButtonDanger">Delete</button>
   </div>
 
   <h2>icon-tile</h2>

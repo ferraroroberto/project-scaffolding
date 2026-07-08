@@ -16,6 +16,7 @@ values (the demo page omits the P3 twins on purpose).
 
 from __future__ import annotations
 
+import re
 import threading
 from collections.abc import Iterator
 from functools import partial
@@ -65,6 +66,25 @@ def _set_theme(page: Page, theme: str) -> None:
     page.evaluate(
         "(t) => { document.documentElement.dataset.theme = t; }", theme
     )
+
+
+_RGBA_RE = re.compile(r"rgba?\((\d+), (\d+), (\d+)(?:, ([\d.]+))?\)")
+# Chromium serializes a computed color-mix() as `color(srgb R G B / A)` with
+# 0-1 float channels (legacy rgba() only when no color-mix is involved).
+_COLOR_SRGB_RE = re.compile(r"color\(srgb ([\d.]+) ([\d.]+) ([\d.]+)(?: / ([\d.]+))?\)")
+
+
+def _rgba(color: str) -> tuple[int, int, int, float]:
+    """Parse a getComputedStyle color string into (r, g, b, alpha 0-1)."""
+    m = _RGBA_RE.match(color)
+    if m:
+        a = float(m.group(4)) if m.group(4) is not None else 1.0
+        return int(m.group(1)), int(m.group(2)), int(m.group(3)), a
+    m = _COLOR_SRGB_RE.match(color)
+    assert m, f"unexpected color format: {color}"
+    a = float(m.group(4)) if m.group(4) is not None else 1.0
+    return (round(float(m.group(1)) * 255), round(float(m.group(2)) * 255),
+            round(float(m.group(3)) * 255), a)
 
 
 def _wait_bg(page: Page, selector: str, expected: str) -> None:
@@ -151,6 +171,38 @@ def test_icon_tile_contract(gallery: Page) -> None:
     assert _style(gallery, "#demoTileBlue .icon", "width") == "24px"
 
 
+def test_button_contract(gallery: Page) -> None:
+    """button: four tiers + shared disabled recipe + danger tint (fleet-config#296)."""
+    # primary: solid accent fill, accent-fg text, spec's 48px min-height.
+    assert _style(gallery, "#demoButtonPrimary", "backgroundColor") == "rgb(9, 105, 218)"
+    assert _style(gallery, "#demoButtonPrimary", "color") == "rgb(255, 255, 255)"
+    assert _style(gallery, "#demoButtonPrimary", "minHeight") == "48px"
+    # tint: accent-soft fill — accent-tinted and non-opaque (color-mix with
+    # transparent), never a second solid. Accent text.
+    r, g, b, a = _rgba(_style(gallery, "#demoButtonTint", "backgroundColor"))
+    assert (r, g, b) == (9, 105, 218)
+    assert 0 < a < 1
+    assert _style(gallery, "#demoButtonTint", "color") == "rgb(9, 105, 218)"
+    # ghost: TRANSPARENT fill (not a tint), muted text, hairline line border.
+    assert _style(gallery, "#demoButtonGhost", "backgroundColor") == "rgba(0, 0, 0, 0)"
+    assert _style(gallery, "#demoButtonGhost", "color") == "rgb(101, 109, 118)"
+    assert _style(gallery, "#demoButtonGhost", "borderColor") == "rgb(209, 217, 224)"
+    # surface: card-off fill at the control height, muted text.
+    assert _style(gallery, "#demoButtonSurface", "backgroundColor") == "rgb(246, 248, 250)"
+    assert _style(gallery, "#demoButtonSurface", "height") == "36px"
+    assert _style(gallery, "#demoButtonSurface", "color") == "rgb(101, 109, 118)"
+    # disabled: the one shared card-off/line/muted recipe, not opacity.
+    assert _style(gallery, "#demoButtonDisabled", "backgroundColor") == "rgb(246, 248, 250)"
+    assert _style(gallery, "#demoButtonDisabled", "borderColor") == "rgb(209, 217, 224)"
+    assert _style(gallery, "#demoButtonDisabled", "color") == "rgb(101, 109, 118)"
+    assert _style(gallery, "#demoButtonDisabled", "opacity") == "1"
+    # danger: the tint recipe restated on --deficit — still non-opaque.
+    dr, dg, db, da = _rgba(_style(gallery, "#demoButtonDanger", "backgroundColor"))
+    assert (dr, dg, db) == (207, 34, 46)
+    assert 0 < da < 1
+    assert _style(gallery, "#demoButtonDanger", "color") == "rgb(207, 34, 46)"
+
+
 # ---------------------------------------------------------------------- dark
 
 
@@ -171,3 +223,8 @@ def test_dark_theme_values(gallery: Page) -> None:
     gallery.click("#openModalBtn")
     assert _style(gallery, "#demoSaveBtn", "backgroundColor") == "rgb(1, 4, 9)"
     assert _style(gallery, "#demoSaveBtn", "color") == "rgb(125, 133, 144)"
+    # button-primary re-skins to the dark accent; the shared disabled recipe
+    # holds AA on the dark card-off/muted surface too.
+    assert _style(gallery, "#demoButtonPrimary", "backgroundColor") == "rgb(47, 129, 247)"
+    assert _style(gallery, "#demoButtonDisabled", "backgroundColor") == "rgb(1, 4, 9)"
+    assert _style(gallery, "#demoButtonDisabled", "color") == "rgb(125, 133, 144)"
