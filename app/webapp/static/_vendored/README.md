@@ -21,6 +21,7 @@ A cloned web app inherits both: design **tokens** (wire your CSS custom properti
 | [`empty-state/`](empty-state/) | Canonical zero-items block: feature-size glyph + one-line reason + optional quiet action; `emptyStateEl()` builder. | ✅ |
 | [`switch/`](switch/) | The one boolean control (shadcn Switch shape, **green** on-track per design.md v2); `switchEl()`/`setSwitch()` builders. | ✅ |
 | [`icon-tile/`](icon-tile/) | The Home-screen rounded-square: one `tile-*` fill + centered feature-size glyph. | ✅ |
+| [`button/`](button/) | The four-tier action vocabulary — `button-primary`/`button-tint`/`button-ghost`/`button-surface`, one shared disabled recipe, the `.danger` tint variant. | ✅ |
 
 _Each folder carries a `README.md` with files, a vendoring recipe, the markup contract, and its required design tokens — same shape as `nav/`. [`demo.html`](demo.html) is the component gallery: open it over HTTP to eyeball every component in light + dark; `tests/e2e/test_vendored_components.py` drives the same page and asserts each component's key computed styles in both themes._
 
