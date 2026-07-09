@@ -341,6 +341,72 @@ DevTools to a real phone with `ios-webkit-debug-proxy`. Playwright
 cannot drive real iOS Safari — only its bundled WebKit and the macOS
 iOS Simulator.
 
+### Page-width (horizontal-overflow) assert (phone-first apps only)
+
+A real-device bug (grocery-shopping-automation#63, PR #64) shipped a
+page-wide horizontal scroll that **every other check missed**: token
+lint was clean, component contracts passed, the phone-viewport
+screenshot sweep "looked fine", and the full pytest+Playwright e2e
+suite was green. Root cause was a `display: grid` stack container
+(pane/pane-body/list wrapper) with an implicit or bare `1fr` track — a
+no-wrap or scrollable child's min-content propagated up through the
+chain of grids, so the page grew past the viewport (fix: pin the
+track to `grid-template-columns: minmax(0, 1fr)`, the design.md
+convention landed via fleet-config#294).
+
+**Why the screenshot sweep missed it:** `full_page=True` captures the
+entire scrollable area — an overflowing page just renders as a
+*wider image*, not a visible defect. The only reliable check is a
+measured assert, not a look.
+
+The reusable check — run it per key view, at ≥2 phone widths, on both
+engines (both reproduced the real bug in PR #64):
+
+```python
+import pytest
+
+PHONE_WIDTHS = [390, 430]  # iPhone mini / Pro Max class widths
+KEY_VIEWS = ["/", "/settings"]  # this app's own key views
+
+
+@pytest.mark.parametrize("width", PHONE_WIDTHS)
+def test_no_horizontal_overflow(page, streamlit_app, width, browser_name):
+    """No key view may grow past its own viewport at phone widths.
+
+    full_page=True screenshots can't catch this (see module docstring in
+    playwright-ui-testing.md #126) — only a measured scrollWidth assert
+    does. Run with `--browser chromium --browser webkit` so both engines
+    are covered; a real device bug reproduced on both (PR #64).
+    """
+    page.set_viewport_size({"width": width, "height": 844})
+    for view in KEY_VIEWS:
+        page.goto(streamlit_app + view)
+        viewport_width = page.evaluate("window.innerWidth")
+        doc_width = page.evaluate("document.documentElement.scrollWidth")
+        body_width = page.evaluate("document.body.scrollWidth")
+        assert doc_width <= viewport_width, (
+            f"{view} @ {width}px/{browser_name}: "
+            f"documentElement.scrollWidth={doc_width} > innerWidth={viewport_width}"
+        )
+        assert body_width <= viewport_width, (
+            f"{view} @ {width}px/{browser_name}: "
+            f"body.scrollWidth={body_width} > innerWidth={viewport_width}"
+        )
+```
+
+Run both engines explicitly (pytest-playwright defaults to Chromium
+only):
+
+```powershell
+& .\.venv\Scripts\python.exe -m pytest tests/e2e/test_page_width.py --browser chromium --browser webkit
+```
+
+Adapt `KEY_VIEWS` to the app's own key-views list (the same list a
+`## UX surface` block's `ux-full` sweep uses). This is a reference
+snippet, not something this scaffold wires into its own suite (it has
+no phone-first app) — a per-app adoption is a separate, deliberate
+decision, same as any other Loop 2 promotion.
+
 ---
 
 ## Cost economics
