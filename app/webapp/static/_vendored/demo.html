@@ -131,6 +131,8 @@
 <link rel="stylesheet" href="switch/switch.css">
 <link rel="stylesheet" href="icon-tile/icon-tile.css">
 <link rel="stylesheet" href="button/button.css">
+<link rel="stylesheet" href="range-tab/range-tab.css">
+<link rel="stylesheet" href="page-foot/page-foot.css">
 </head>
 <body>
 <div class="gallery">
@@ -236,11 +238,25 @@
       <span class="icon-tile icon-tile--yellow"><svg class="icon" aria-hidden="true"><use href="#i-sun"></use></svg></span>
     </div>
   </div>
+
+  <h2>range-tab</h2>
+  <nav class="range-tabs" id="demoRangeTabs" aria-label="Demo range">
+    <button type="button" class="range-tab active" id="demoRangeDay" data-range="day">Day</button>
+    <button type="button" class="range-tab" id="demoRangeWeek" data-range="week">Week</button>
+    <button type="button" class="range-tab" id="demoRangeMonth" data-range="month">Month</button>
+    <button type="button" class="range-tab" id="demoRangeDisabled" disabled>Off</button>
+  </nav>
+
+  <h2>page-foot</h2>
+  <footer class="page-foot" id="demoPageFoot">
+    <p id="demoBuildReadout"></p>
+  </footer>
 </div>
 
 <script type="module">
   import { emptyStateEl } from './empty-state/empty-state.js';
   import { switchEl, setSwitch } from './switch/switch.js';
+  import { buildReadoutText } from './page-foot/page-foot.js';
 
   // Inject the real vendored sprite so <use href="#i-NAME"> resolves.
   const sprite = await fetch('./icons/icons-sprite.html').then((r) => r.text());
@@ -261,6 +277,21 @@
   });
   live.id = 'demoSwitchBuilt';
   document.getElementById('demoSwitchHost').appendChild(live);
+
+  // range-tab: click swaps which pill carries .active (caller's job — no
+  // shared builder, per the component's README).
+  document.getElementById('demoRangeTabs').addEventListener('click', (e) => {
+    const btn = e.target.closest('.range-tab');
+    if (!btn || btn.disabled) return;
+    document.querySelectorAll('#demoRangeTabs .range-tab').forEach((b) => {
+      b.classList.toggle('active', b === btn);
+    });
+  });
+
+  // page-foot: the one shared formatter, fed a fixed sample build so the
+  // e2e assertion is deterministic.
+  document.getElementById('demoBuildReadout').textContent =
+    buildReadoutText('abc1234', '2026-07-09T14:05:00Z');
 
   // Modal wiring.
   const dlg = document.getElementById('demoDialog');

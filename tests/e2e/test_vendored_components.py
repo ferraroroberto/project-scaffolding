@@ -203,6 +203,31 @@ def test_button_contract(gallery: Page) -> None:
     assert _style(gallery, "#demoButtonDanger", "color") == "rgb(207, 34, 46)"
 
 
+def test_range_tab_contract(gallery: Page) -> None:
+    """range-tab: control-h height, card-off resting, accent-soft active pill."""
+    assert _style(gallery, "#demoRangeDay", "height") == "36px"
+    assert _style(gallery, "#demoRangeWeek", "backgroundColor") == "rgb(246, 248, 250)"
+    assert _style(gallery, "#demoRangeWeek", "color") == "rgb(101, 109, 118)"
+    r, g, b, a = _rgba(_style(gallery, "#demoRangeDay", "backgroundColor"))
+    assert (r, g, b) == (9, 105, 218)
+    assert 0 < a < 1
+    assert _style(gallery, "#demoRangeDay", "color") == "rgb(9, 105, 218)"
+    assert _style(gallery, "#demoRangeDisabled", "opacity") == "0.45"
+    # clicking a resting pill flips .active onto it (caller-owned toggle).
+    gallery.click("#demoRangeWeek")
+    expect(gallery.locator("#demoRangeWeek")).to_have_class(re.compile(r"\bactive\b"))
+    expect(gallery.locator("#demoRangeDay")).not_to_have_class(re.compile(r"\bactive\b"))
+
+
+def test_page_foot_contract(gallery: Page) -> None:
+    """page-foot: centered footer, muted/caption readout text, shared build-text format."""
+    assert _style(gallery, "#demoPageFoot", "textAlign") == "center"
+    assert _style(gallery, "#demoBuildReadout", "color") == "rgb(101, 109, 118)"
+    assert _style(gallery, "#demoBuildReadout", "fontSize") == "12.48px"  # 0.78rem @ 16px root
+    text = gallery.locator("#demoBuildReadout").inner_text()
+    assert re.match(r"^Build: abc1234 · \d{4}-\d{2}-\d{2} \d{2}:\d{2}$", text), text
+
+
 # ---------------------------------------------------------------------- dark
 
 
@@ -228,3 +253,7 @@ def test_dark_theme_values(gallery: Page) -> None:
     assert _style(gallery, "#demoButtonPrimary", "backgroundColor") == "rgb(47, 129, 247)"
     assert _style(gallery, "#demoButtonDisabled", "backgroundColor") == "rgb(1, 4, 9)"
     assert _style(gallery, "#demoButtonDisabled", "color") == "rgb(125, 133, 144)"
+    # range-tab active pill re-skins to the dark accent.
+    assert _style(gallery, "#demoRangeDay", "color") == "rgb(47, 129, 247)"
+    # page-foot readout re-skins to the dark muted value.
+    assert _style(gallery, "#demoBuildReadout", "color") == "rgb(125, 133, 144)"
