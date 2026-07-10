@@ -63,8 +63,11 @@ flowchart TB
   subgraph testsdir["tests/"]
     UNIT["test_*.py\none file per src/ module, hermetic"]
     E2E["e2e/conftest.py + test_smoke.py\npytest-playwright, force-restarts\nStreamlit via _streamlit_lifecycle.py\n+ test_vendored_components.py\n(drives _vendored/demo.html, light+dark)\n+ test_vendored_nav.py\n(mounts _vendored/nav skeleton, desktop+pill)"]
+    TRAYBEHAVIOR["e2e/test_tray_lifecycle_behavior.py\nWindows-only, pytest.mark.slow, no browser\ndrives real tray.bat + tray_lifecycle.ps1\nvia _tray_harness.py + _dummy_tray_app.py"]
   end
   E2E --> appdir
+  TRAYBEHAVIOR -->|materializes + drives| TRAYTMPL
+  TRAYBEHAVIOR -->|vendors verbatim, drives real lifecycle| TRAYLIB
 
   subgraph docsdir["docs/ — didactic references"]
     AGENTSDIR["agents/\nCLAUDE.master.md, AGENTS.master.md,\nADAPT_PROMPT.md, ROLLOUT_RUNBOOK.md"]
