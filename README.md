@@ -142,7 +142,7 @@ Read settings from `src/config.py`, not from `os.environ` directly. Add new keys
 Two layers, both under `tests/`:
 
 - **Unit** (`tests/test_*.py`) — one file per `src/` module, hermetic. Runs in well under a second.
-- **Headless e2e** (`tests/e2e/`) — `pytest-playwright` against a real browser. The `streamlit_app` session fixture (`tests/e2e/conftest.py`) **force-restarts Streamlit against the current code on disk** via `tests/_streamlit_lifecycle.py`, so the suite can never pass against a stale process. One example smoke test ships; expand per the regression-suite rules in `CLAUDE.md` ("End-to-end UI testing").
+- **Headless e2e** (`tests/e2e/`) — `pytest-playwright` against a real browser. The `streamlit_app` session fixture (`tests/e2e/conftest.py`) **force-restarts Streamlit against the current code on disk** via `tests/_streamlit_lifecycle.py`, so the suite can never pass against a stale process. One example smoke test ships; expand per the regression-suite rules in `CLAUDE.md` ("End-to-end UI testing"). `tests/e2e/test_tray_lifecycle_behavior.py` is the odd one out — no browser, Windows-only, `pytest.mark.slow` — it drives the real `tray.bat.template` + `app/tray/tray_lifecycle.ps1` against a dummy stdlib HTTP(S) app through a real cold-start/restart/verify cycle (`project-scaffolding#152`); see `tests/e2e/_tray_harness.py` for the shared plumbing.
 
 One-time setup:
 
