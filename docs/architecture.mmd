@@ -62,7 +62,7 @@ flowchart TB
 
   subgraph testsdir["tests/"]
     UNIT["test_*.py\none file per src/ module, hermetic"]
-    E2E["e2e/conftest.py + test_smoke.py\npytest-playwright, force-restarts\nStreamlit via _streamlit_lifecycle.py\n+ test_vendored_components.py\n(drives _vendored/demo.html, light+dark)"]
+    E2E["e2e/conftest.py + test_smoke.py\npytest-playwright, force-restarts\nStreamlit via _streamlit_lifecycle.py\n+ test_vendored_components.py\n(drives _vendored/demo.html, light+dark)\n+ test_vendored_nav.py\n(mounts _vendored/nav skeleton, desktop+pill)"]
   end
   E2E --> appdir
 
