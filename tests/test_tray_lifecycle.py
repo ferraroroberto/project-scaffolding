@@ -141,6 +141,11 @@ def test_tray_lifecycle_verify_probes_https_over_loopback() -> None:
     assert 'h == "127.0.0.1"' in helper
     # the previous callback is restored, so the bypass doesn't leak process-wide.
     assert "Restore" in helper
+    # Non-loopback must fall through to normal validation, not a bare reject
+    # (#151): the callback REPLACES .NET's own chain validation, so returning a
+    # hardcoded `false` off-loopback rejects perfectly valid remote certs too.
+    assert "e == SslPolicyErrors.None" in helper
+    assert "return r != null && IsLoopback(r.RequestUri.Host);" not in helper
 
 
 def test_resolve_versionurls_returns_flat_string_list(tmp_path: Path) -> None:
