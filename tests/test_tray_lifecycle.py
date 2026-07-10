@@ -108,6 +108,31 @@ def test_tray_lifecycle_helper_contains_restart_verification() -> None:
     assert "Invoke-RestMethod" in helper
 
 
+def test_tray_lifecycle_verify_probes_https_over_loopback() -> None:
+    """The verify leg must reach an HTTPS PWA over loopback (#147).
+
+    A fleet PWA serves HTTPS under a leaf for its public name (Tailscale /
+    self-signed CA), never for 127.0.0.1, and `/api/version` is auth-gated off
+    loopback. So the probe must (a) try https on 127.0.0.1 by default, not just
+    http, and (b) skip cert validation — but ONLY for loopback, via a compiled
+    delegate (a PowerShell scriptblock callback throws "no Runspace" on .NET's
+    TLS thread). Guard both, and guard that the bypass is not a blanket disable.
+    """
+    helper = (ROOT / "app" / "tray" / "tray_lifecycle.ps1").read_text(encoding="utf-8")
+
+    # https attempted on loopback by default (not only when -VersionUrl is set).
+    assert "https://127.0.0.1:" in helper
+    # cert bypass is a COMPILED type, not a scriptblock callback.
+    assert "Add-Type" in helper
+    assert "class LoopbackCertBypass" in helper
+    # …and it is SCOPED to loopback — a blanket `{ $true }` / unconditional
+    # `return true` would trust every host and is the regression to prevent.
+    assert "IsLoopback" in helper
+    assert 'h == "127.0.0.1"' in helper
+    # the previous callback is restored, so the bypass doesn't leak process-wide.
+    assert "Restore" in helper
+
+
 def test_tray_lifecycle_helper_parses_on_windows(tmp_path: Path) -> None:
     if sys.platform != "win32":
         return
