@@ -133,6 +133,49 @@ def test_tray_lifecycle_verify_probes_https_over_loopback() -> None:
     assert "Restore" in helper
 
 
+def test_resolve_versionurls_returns_flat_string_list(tmp_path: Path) -> None:
+    """An explicit -VersionUrl must yield a flat list of strings, not a nested
+    array (#149).
+
+    `return , @($VersionUrl)` applies the unary comma to something already an
+    array, double-wrapping it; the probe then hands Invoke-RestMethod a
+    string[] and throws "Cannot convert System.Object[] to System.Uri" — so
+    `--restart` exits 1 on a fully successful restart, for every app that sets
+    an explicit VERSION_URL. Only the explicit path is affected (the default
+    multi-URL path is a genuine 2-element array), so this drives the real
+    function with an explicit URL and asserts each element is a plain string.
+    """
+    if sys.platform != "win32":
+        return
+    powershell = shutil.which("powershell.exe")
+    if powershell is None:
+        return
+
+    # Source only the helper's functions (strip its param() header and trailing
+    # switch dispatcher), bind the script-scope inputs, then print the type of
+    # each Resolve-VersionUrls element for an explicit -VersionUrl.
+    harness = tmp_path / "probe.ps1"
+    harness.write_text(
+        "$raw = Get-Content -Raw '{}'\n".format(
+            (ROOT / "app" / "tray" / "tray_lifecycle.ps1").as_posix()
+        )
+        + "$body = $raw.Substring($raw.IndexOf('function Test-UnderVenv'))\n"
+        "$body = $body.Substring(0, $body.IndexOf('switch ($Action)'))\n"
+        "$VersionUrl = 'http://127.0.0.1:8000/admin/api/version'\n"
+        ". ([ScriptBlock]::Create($body))\n"
+        "$urls = @(Resolve-VersionUrls)\n"
+        "$urls | ForEach-Object { Write-Output ($_.GetType().Name) }\n",
+        encoding="utf-8",
+    )
+    result = subprocess.run(
+        [powershell, "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
+         "-File", str(harness)],
+        check=False, capture_output=True, text=True,
+    )
+    types = [ln.strip() for ln in result.stdout.splitlines() if ln.strip()]
+    assert types == ["String"], f"expected one String element, got {types}: {result.stdout}{result.stderr}"
+
+
 def test_tray_lifecycle_helper_parses_on_windows(tmp_path: Path) -> None:
     if sys.platform != "win32":
         return
