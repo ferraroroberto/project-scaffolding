@@ -37,6 +37,68 @@ def test_tray_template_does_not_parse_detect_output_with_for_f() -> None:
     assert not any("usebackq" in line for line in active_lines)
 
 
+def test_tray_template_launch_args_survive_argv_parsing(tmp_path: Path) -> None:
+    """The template's launch line must deliver every switch intact (#145).
+
+    `%~dp0` ends in a backslash, and Windows argv parsing treats an odd run of
+    backslashes before a closing quote as escaping it. Passing `-ScriptDir
+    "%SCRIPT_DIR%"` therefore swallows the rest of the command line, so
+    `-TrayMatch` and `-Ports` reach the helper EMPTY: detect matches nothing,
+    reclaim reclaims nothing, and `--restart` degrades to the adopt-the-stale-
+    build start the whole template exists to prevent. Grepping the batch text
+    cannot catch that, so drive the real template through a real `cmd` + real
+    `powershell -File` and read the parsed values back.
+    """
+    if sys.platform != "win32":
+        return
+    powershell = shutil.which("powershell.exe")
+    if powershell is None:
+        return
+
+    probe = tmp_path / "app" / "tray" / "tray_lifecycle.ps1"
+    probe.parent.mkdir(parents=True)
+    probe.write_text(
+        "param([Parameter(Position=0)][string]$Action, [string]$AppName,\n"
+        " [string]$ScriptDir, [string]$VenvDir, [string]$TrayMatch,\n"
+        " [string]$Ports, [string]$TrayLaunch, [string]$VersionUrl, [switch]$Restart)\n"
+        "Write-Output \"ACTION=$Action\"\n"
+        "Write-Output \"SCRIPTDIR=$ScriptDir\"\n"
+        "Write-Output \"TRAYMATCH=$TrayMatch\"\n"
+        "Write-Output \"PORTS=$Ports\"\n",
+        encoding="utf-8",
+    )
+
+    batch = (ROOT / "tray.bat.template").read_text(encoding="utf-8")
+    batch = (
+        batch.replace("__APP_NAME__", "ProbeApp")
+        .replace("__TRAY_LAUNCH__", "launcher.py tray")
+        .replace("__TRAY_MATCH__", r"launcher\.py\s+tray")
+        .replace("__OWNED_PORTS__", "8445")
+    )
+    (tmp_path / "tray.bat").write_text(batch, encoding="utf-8")
+
+    result = subprocess.run(
+        ["cmd", "/c", str(tmp_path / "tray.bat")],
+        check=False,
+        capture_output=True,
+        text=True,
+        cwd=str(tmp_path),
+    )
+    out = dict(
+        line.split("=", 1)
+        for line in result.stdout.splitlines()
+        if "=" in line and line.split("=", 1)[0].isupper()
+    )
+
+    # The two switches that follow -ScriptDir are the ones a swallowed quote eats.
+    assert out.get("TRAYMATCH") == r"launcher\.py\s+tray", result.stdout
+    assert out.get("PORTS") == "8445", result.stdout
+    assert out.get("ACTION") == "launch", result.stdout
+    # ScriptDir still arrives, just without the trailing separator.
+    assert out.get("SCRIPTDIR", "").rstrip("\\") == str(tmp_path).rstrip("\\")
+    assert not out.get("SCRIPTDIR", "x").endswith("\\")
+
+
 def test_tray_lifecycle_helper_contains_restart_verification() -> None:
     helper = (ROOT / "app" / "tray" / "tray_lifecycle.ps1").read_text(encoding="utf-8")
 
