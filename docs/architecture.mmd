@@ -18,7 +18,7 @@ flowchart TB
   subgraph appdir["app/ — Streamlit UI"]
     APPPY["app.py\npage config, sidebar,\nlight/dark toggle, st.navigation"]
     VIEWS["views/\nwelcome.py, pipeline_runner.py\none render() per file"]
-    TRAYLIB["tray/\ntray_lifecycle.ps1 (vendor-verbatim)\nsingle_instance.py (named-mutex primitive)"]
+    TRAYLIB["tray/\nsingle_instance.py (named-mutex primitive, vendor-verbatim)"]
     WEBVEND["webapp/static/_vendored/\nnav/ (bottom-tab nav) · icons/ (Lucide sprite)\ncard/ · disclosure/ · modal/\nempty-state/ · switch/ · icon-tile/ · button/\nrange-tab/ · page-foot/\n+ demo.html (gallery / render harness)"]
     STYLES["styles/light.css\nruntime CSS overlay"]
     STCFG[".streamlit/config.toml\nnative dark theme"]
@@ -28,7 +28,7 @@ flowchart TB
   APPPY --> STYLES
   LAUNCHAPP --> APPPY
   LAUNCHSRV --> APPPY
-  TRAYTMPL -.->|vendors| TRAYLIB
+  TRAYTMPL -.->|calls by path, not vendored (#153)| FLEETCFGTRAY["fleet-config: tray/tray_lifecycle.ps1\nONE shared machine-local copy\n(external repo, ~/.claude/tray junction)"]
 
   subgraph srcdir["src/ — non-UI Python (reusable from CLI + tests)"]
     CONFIG["config.py\npaths + env-driven settings"]
@@ -63,11 +63,11 @@ flowchart TB
   subgraph testsdir["tests/"]
     UNIT["test_*.py\none file per src/ module, hermetic"]
     E2E["e2e/conftest.py + test_smoke.py\npytest-playwright, force-restarts\nStreamlit via _streamlit_lifecycle.py\n+ test_vendored_components.py\n(drives _vendored/demo.html, light+dark)\n+ test_vendored_nav.py\n(mounts _vendored/nav skeleton, desktop+pill)"]
-    TRAYBEHAVIOR["e2e/test_tray_lifecycle_behavior.py\nWindows-only, pytest.mark.slow, no browser\ndrives real tray.bat + tray_lifecycle.ps1\nvia _tray_harness.py + _dummy_tray_app.py"]
+    TRAYBEHAVIOR["e2e/test_tray_lifecycle_behavior.py\nWindows-only, pytest.mark.slow, no browser\ndrives real tray.bat + the canonical tray_lifecycle.ps1\nvia _tray_harness.py's resolve_tray_lifecycle_path()\n+ _dummy_tray_app.py"]
   end
   E2E --> appdir
   TRAYBEHAVIOR -->|materializes + drives| TRAYTMPL
-  TRAYBEHAVIOR -->|vendors verbatim, drives real lifecycle| TRAYLIB
+  TRAYBEHAVIOR -->|resolves (shared path, falls back to\nfleet-config primary checkout), drives real lifecycle| FLEETCFGTRAY
 
   subgraph docsdir["docs/ — didactic references"]
     AGENTSDIR["agents/\nCLAUDE.master.md, AGENTS.master.md,\nADAPT_PROMPT.md, ROLLOUT_RUNBOOK.md"]
@@ -79,6 +79,7 @@ flowchart TB
   end
   AGENTSDIR -.->|source of truth for| CLAUDEMD
   TRAYDOC -.->|documents| TRAYLIB
+  TRAYDOC -.->|documents ownership of| FLEETCFGTRAY
   ONBOARD -.->|links| TRAYDOC
   BRANDDOC -.->|documents| BRANDGEN
 

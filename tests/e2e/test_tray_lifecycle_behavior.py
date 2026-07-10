@@ -1,12 +1,17 @@
-"""Behavioral e2e harness for the vendored tray lifecycle (project-scaffolding#152).
+"""Behavioral e2e harness for the tray lifecycle (project-scaffolding#152).
 
-Drives the REAL `app/tray/tray_lifecycle.ps1` through a real `tray.bat`,
+Drives the REAL, canonical `tray_lifecycle.ps1` through a real `tray.bat`,
 materialized from the real `tray.bat.template`, against a dummy stdlib
 HTTP(S) app (`_dummy_tray_app.py`) -- cold start, idempotent relaunch,
 `--restart` after a new commit (asserting the NEW git_sha is actually
 served, not a stale adopt), the non-interactive nested-shell invocation
 path that historically failed silently (#54/#144), and an HTTPS loopback
 variant with a self-signed cert (#147/#148).
+
+project-scaffolding#153 moved `tray_lifecycle.ps1` out of this repo to ONE
+shared, machine-local copy owned by fleet-config -- see
+`tests/e2e/_tray_harness.py`'s `resolve_tray_lifecycle_path()` for where this
+harness finds it (both pre- and post-activation of that move).
 
 This complements -- does not replace -- `tests/test_tray_lifecycle.py`,
 which stays the fast, string/grep-level regression suite for the same four

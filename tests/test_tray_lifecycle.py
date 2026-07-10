@@ -1,8 +1,10 @@
+import os
 import shutil
 import subprocess
 import sys
 from pathlib import Path
 
+from tests.e2e._tray_harness import resolve_tray_lifecycle_path
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -55,7 +57,12 @@ def test_tray_template_launch_args_survive_argv_parsing(tmp_path: Path) -> None:
     if powershell is None:
         return
 
-    probe = tmp_path / "app" / "tray" / "tray_lifecycle.ps1"
+    # project-scaffolding#153: the template resolves the helper at
+    # %USERPROFILE%/.claude/tray/tray_lifecycle.ps1, not <ScriptDir>\app\tray\,
+    # so the probe stub lives under a throwaway fake home and the subprocess
+    # gets USERPROFILE pointed there -- same shape as tests/e2e/_tray_harness.py.
+    fake_home = tmp_path / "_home"
+    probe = fake_home / ".claude" / "tray" / "tray_lifecycle.ps1"
     probe.parent.mkdir(parents=True)
     probe.write_text(
         "param([Parameter(Position=0)][string]$Action, [string]$AppName,\n"
@@ -77,12 +84,15 @@ def test_tray_template_launch_args_survive_argv_parsing(tmp_path: Path) -> None:
     )
     (tmp_path / "tray.bat").write_text(batch, encoding="utf-8")
 
+    env = dict(os.environ)
+    env["USERPROFILE"] = str(fake_home)
     result = subprocess.run(
         ["cmd", "/c", str(tmp_path / "tray.bat")],
         check=False,
         capture_output=True,
         text=True,
         cwd=str(tmp_path),
+        env=env,
     )
     out = dict(
         line.split("=", 1)
@@ -100,7 +110,7 @@ def test_tray_template_launch_args_survive_argv_parsing(tmp_path: Path) -> None:
 
 
 def test_tray_lifecycle_helper_contains_restart_verification() -> None:
-    helper = (ROOT / "app" / "tray" / "tray_lifecycle.ps1").read_text(encoding="utf-8")
+    helper = resolve_tray_lifecycle_path().read_text(encoding="utf-8")
 
     assert "[ValidateSet('detect', 'reclaim', 'launch')]" in helper
     assert "Wait-VersionMatchesHead" in helper
@@ -118,7 +128,7 @@ def test_tray_lifecycle_verify_probes_https_over_loopback() -> None:
     delegate (a PowerShell scriptblock callback throws "no Runspace" on .NET's
     TLS thread). Guard both, and guard that the bypass is not a blanket disable.
     """
-    helper = (ROOT / "app" / "tray" / "tray_lifecycle.ps1").read_text(encoding="utf-8")
+    helper = resolve_tray_lifecycle_path().read_text(encoding="utf-8")
 
     # https attempted on loopback by default (not only when -VersionUrl is set).
     assert "https://127.0.0.1:" in helper
@@ -156,10 +166,8 @@ def test_resolve_versionurls_returns_flat_string_list(tmp_path: Path) -> None:
     # each Resolve-VersionUrls element for an explicit -VersionUrl.
     harness = tmp_path / "probe.ps1"
     harness.write_text(
-        "$raw = Get-Content -Raw '{}'\n".format(
-            (ROOT / "app" / "tray" / "tray_lifecycle.ps1").as_posix()
-        )
-        + "$body = $raw.Substring($raw.IndexOf('function Test-UnderVenv'))\n"
+        f"$raw = Get-Content -Raw '{resolve_tray_lifecycle_path().as_posix()}'\n"
+        "$body = $raw.Substring($raw.IndexOf('function Test-UnderVenv'))\n"
         "$body = $body.Substring(0, $body.IndexOf('switch ($Action)'))\n"
         "$VersionUrl = 'http://127.0.0.1:8000/admin/api/version'\n"
         ". ([ScriptBlock]::Create($body))\n"
@@ -184,7 +192,7 @@ def test_tray_lifecycle_helper_parses_on_windows(tmp_path: Path) -> None:
     if powershell is None:
         return
 
-    helper = ROOT / "app" / "tray" / "tray_lifecycle.ps1"
+    helper = resolve_tray_lifecycle_path()
     result = subprocess.run(
         [
             powershell,

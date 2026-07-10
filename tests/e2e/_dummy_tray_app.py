@@ -4,9 +4,11 @@ Not a test itself -- a tiny stdlib HTTP(S) server shaped like every fleet PWA's
 build-identity surface (CLAUDE.md "Webapp PWA required surfaces"): a
 ``/api/version`` endpoint reporting a ``git_sha`` captured once at process
 startup, plus a ``/health`` endpoint. It exists so the e2e harness can drive
-the REAL ``app/tray/tray_lifecycle.ps1`` through a real detect -> kill ->
-reclaim -> start -> verify process lifecycle, exactly like a real app's
-``launcher.py`` would be driven by a real ``tray.bat``.
+the REAL, canonical ``tray_lifecycle.ps1`` (project-scaffolding#153: the ONE
+shared, machine-local copy owned by fleet-config -- resolved via
+``tests/e2e/_tray_harness.py``'s ``resolve_tray_lifecycle_path()``) through a
+real detect -> kill -> reclaim -> start -> verify process lifecycle, exactly
+like a real app's ``launcher.py`` would be driven by a real ``tray.bat``.
 
 Always launched as a subprocess (via ``Start-Process`` inside the helper),
 never imported. The git_sha is read fresh from the working directory's git
