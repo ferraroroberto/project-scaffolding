@@ -4,9 +4,15 @@ Builds a throwaway "app repo" per test: a stub venv (just the redirect
 launcher stubs + pyvenv.cfg, copied from this repo's own real .venv -- see
 `make_stub_venv`), a one-commit git repo (the version-verify leg needs a real
 `git rev-parse HEAD`), a `tray.bat` materialized from the real
-`tray.bat.template`, and the REAL `app/tray/tray_lifecycle.ps1` vendored in
-byte-for-byte (never a stub or a mock). Everything here drives real
-subprocesses; nothing simulates tray_lifecycle.ps1's own logic.
+`tray.bat.template`, and the REAL, canonical `tray_lifecycle.ps1` vendored in
+byte-for-byte (never a stub or a mock) via `resolve_tray_lifecycle_path()`.
+Everything here drives real subprocesses; nothing simulates
+tray_lifecycle.ps1's own logic.
+
+project-scaffolding#153 moved the canonical `tray_lifecycle.ps1` out of this
+repo (it used to live at `app/tray/tray_lifecycle.ps1`, vendored verbatim into
+six sister repos) to ONE shared, machine-local copy owned by `fleet-config` --
+see `resolve_tray_lifecycle_path()` below for where this suite now finds it.
 """
 
 from __future__ import annotations
@@ -14,6 +20,7 @@ from __future__ import annotations
 import datetime
 import ipaddress
 import json
+import os
 import shutil
 import socket
 import ssl
@@ -28,9 +35,60 @@ _HERE = Path(__file__).resolve()
 ROOT = _HERE.parents[2]
 DUMMY_APP = _HERE.parent / "_dummy_tray_app.py"
 REAL_VENV = ROOT / ".venv"
-TRAY_LIFECYCLE_SRC = ROOT / "app" / "tray" / "tray_lifecycle.ps1"
 TRAY_BAT_TEMPLATE = ROOT / "tray.bat.template"
 POWERSHELL = r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe"
+
+# fleet-config's PRIMARY checkout -- not this box's only possible location,
+# but the one the committed fallback must reference (project-scaffolding#153):
+# a fresh machine that merged fleet-config#340 but hasn't run install.ps1 yet
+# still has the file here, just not junctioned to %USERPROFILE%\.claude\tray
+# yet. This is deliberately NOT a worktree path -- a worktree only carries the
+# file while a PR is in flight, so pinning to one would break the moment that
+# branch is deleted.
+_FLEET_CONFIG_PRIMARY_CHECKOUT = Path(r"E:/automation/fleet-config/tray/tray_lifecycle.ps1")
+
+
+def resolve_tray_lifecycle_path() -> Path:
+    """Resolve the canonical, machine-local `tray_lifecycle.ps1`.
+
+    Preference order:
+    1. `TRAY_LIFECYCLE_PS1_OVERRIDE` env var -- an escape valve for local dev
+       against a fleet-config *worktree* that isn't the primary checkout
+       (e.g. this PR's own verification, run before fleet-config#340 has
+       merged). Never required in CI or by the committed expectations below.
+    2. The shared, junctioned path every real `tray.bat` calls
+       (`%USERPROFILE%/.claude/tray/tray_lifecycle.ps1`) -- present once
+       fleet-config#340 has merged AND its `install.ps1` has been run.
+    3. fleet-config's primary checkout, pre-`install.ps1` -- so this suite
+       stays green in the activation window between "fleet-config#340
+       merged" and "install.ps1 run on this box" (project-scaffolding#153).
+
+    Raises FileNotFoundError with a message naming fleet-config's
+    install.ps1 as the fix if none of the three resolve.
+    """
+    override = os.environ.get("TRAY_LIFECYCLE_PS1_OVERRIDE")
+    if override:
+        overridden = Path(override)
+        if overridden.exists():
+            return overridden
+
+    shared = Path(os.path.expandvars(r"%USERPROFILE%")) / ".claude" / "tray" / "tray_lifecycle.ps1"
+    if shared.exists():
+        return shared
+
+    if _FLEET_CONFIG_PRIMARY_CHECKOUT.exists():
+        return _FLEET_CONFIG_PRIMARY_CHECKOUT
+
+    raise FileNotFoundError(
+        "tray_lifecycle.ps1 not found at the shared junctioned path "
+        f"({shared}) or fleet-config's primary checkout "
+        f"({_FLEET_CONFIG_PRIMARY_CHECKOUT}). Install/update fleet-config "
+        "and run its install.ps1 -- see ferraroroberto/fleet-config's README "
+        "(project-scaffolding#153)."
+    )
+
+
+TRAY_LIFECYCLE_SRC = resolve_tray_lifecycle_path()
 
 _NO_WINDOW = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
 
@@ -157,6 +215,20 @@ def generate_self_signed_loopback_cert(cert_path: Path, key_path: Path) -> None:
 def materialize_tray_bat(
     script_dir: Path, *, app_name: str, tray_launch: str, tray_match: str, owned_port: int,
 ) -> Path:
+    """Materialize `tray.bat` from the real template, plus a throwaway fake
+    `%USERPROFILE%` for this test only.
+
+    project-scaffolding#153: the template no longer resolves the helper under
+    `<script_dir>\\app\\tray\\`, it resolves `%USERPROFILE%/.claude/tray/
+    tray_lifecycle.ps1` -- the ONE shared, machine-local copy owned by
+    fleet-config. Rather than depend on (or mutate) this box's real
+    `~/.claude/tray/`, build a throwaway fake home under `script_dir/_home/
+    .claude/tray/` and hand `run_tray_bat` an env override pointing
+    `USERPROFILE` there, populated with the REAL helper (via
+    `resolve_tray_lifecycle_path()`, never a stub or a mock). This drives the
+    exact same `%USERPROFILE%`-relative resolution the real template performs,
+    fully isolated from the real machine's activation state.
+    """
     text = TRAY_BAT_TEMPLATE.read_text(encoding="utf-8")
     text = (
         text.replace("__APP_NAME__", app_name)
@@ -167,12 +239,17 @@ def materialize_tray_bat(
     tray_bat = script_dir / "tray.bat"
     tray_bat.write_text(text, encoding="utf-8")
 
-    helper_dir = script_dir / "app" / "tray"
-    helper_dir.mkdir(parents=True, exist_ok=True)
-    # The REAL helper, vendored verbatim -- never a stub or a mock. This is
-    # the whole point of the harness: drive the actual shipped lifecycle.
-    shutil.copy2(TRAY_LIFECYCLE_SRC, helper_dir / "tray_lifecycle.ps1")
+    fake_tray_home = fake_home_dir(script_dir) / ".claude" / "tray"
+    fake_tray_home.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(resolve_tray_lifecycle_path(), fake_tray_home / "tray_lifecycle.ps1")
     return tray_bat
+
+
+def fake_home_dir(script_dir: Path) -> Path:
+    """The throwaway `%USERPROFILE%` `run_tray_bat` points a materialized
+    `tray.bat` at -- co-located with the test's `script_dir` by convention so
+    callers never need to thread it through explicitly."""
+    return script_dir / "_home"
 
 
 def run_tray_bat(
@@ -185,10 +262,18 @@ def run_tray_bat(
     console/tty attached -- Git Bash -> `cmd /c "tray.bat --restart"`, or an
     agent's Bash tool -- via a closed stdin and CREATE_NO_WINDOW, not merely
     "invoked through cmd".
+
+    Runs with `USERPROFILE` overridden to this test's fake home
+    (`fake_home_dir`), so the template's `%USERPROFILE%/.claude/tray/
+    tray_lifecycle.ps1` resolution finds the harness's throwaway copy
+    regardless of whether fleet-config's install.ps1 has run on this box
+    (project-scaffolding#153).
     """
     cmd = ["cmd", "/c", str(tray_bat), *args]
+    env = dict(os.environ)
+    env["USERPROFILE"] = str(fake_home_dir(tray_bat.parent))
     kwargs: dict[str, object] = dict(
-        cwd=str(tray_bat.parent), capture_output=True, text=True, timeout=timeout,
+        cwd=str(tray_bat.parent), capture_output=True, text=True, timeout=timeout, env=env,
     )
     if nested:
         kwargs["stdin"] = subprocess.DEVNULL
