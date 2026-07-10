@@ -58,4 +58,4 @@ The fleet's canonical **page-foot**: a centered, quiet footer line — `Build: <
 
 ## Don't diverge
 
-`page-foot.css` / `page-foot.js` are vendored verbatim — to change the contract (text format, styling), change it **here in `project-scaffolding`** and re-vendor downstream. In particular, don't re-implement `fmtBuildTime` per-app — that private-reimplementation drift is exactly what whatsapp-radar#122 caught and this component removes. Streamlit POC spikes are exempt.
+`page-foot.css` / `page-foot.js` are vendored verbatim — to change the contract (text format, styling), change it **here in `project-scaffolding`** and re-vendor downstream. In particular, don't re-implement `fmtBuildTime` per-app — that private-reimplementation drift is exactly what whatsapp-radar#122 caught and this component removes. If your own CSS declares the same selector this file touches (e.g. `.app`, `.card`), use longhand properties or a disjoint media condition — a shorthand property at equal specificity is decided by source order, and can silently override a rule you didn't intend to touch. Streamlit POC spikes are exempt.

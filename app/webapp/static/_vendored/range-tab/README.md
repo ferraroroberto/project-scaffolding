@@ -52,4 +52,4 @@ The fleet's canonical **range-tab**: a row of equal-width pills (Day/Week/Month,
 
 ## Don't diverge
 
-`range-tab.css` is vendored verbatim — to change the contract, change it **here in `project-scaffolding`** and re-vendor downstream. In particular, never re-introduce a per-view height override (the census in home-automation#361 is exactly how the old drift happened) — a smaller font-size in a compact context is fine, the box height is not. Streamlit POC spikes are exempt.
+`range-tab.css` is vendored verbatim — to change the contract, change it **here in `project-scaffolding`** and re-vendor downstream. In particular, never re-introduce a per-view height override (the census in home-automation#361 is exactly how the old drift happened) — a smaller font-size in a compact context is fine, the box height is not. If your own CSS declares the same selector this file touches (e.g. `.app`, `.card`), use longhand properties or a disjoint media condition — a shorthand property at equal specificity is decided by source order, and can silently override a rule you didn't intend to touch. Streamlit POC spikes are exempt.
