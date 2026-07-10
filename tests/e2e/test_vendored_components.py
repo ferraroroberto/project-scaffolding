@@ -5,47 +5,24 @@ real browser and asserts each component's *key computed styles* in both the
 light and dark themes, so a regression in any `_vendored/<name>/<name>.css`
 fails loudly here rather than silently downstream in a consuming app.
 
-The gallery is served over HTTP by an in-process `http.server` (session
-fixture below) because the components' ESM imports (`switch.js`,
+The gallery is served over HTTP by the `static_server` session fixture (see
+`conftest.py`) because the components' ESM imports (`switch.js`,
 `empty-state.js`) don't run from `file://`.
 
 Assertions are the contracts from `~/.claude/design.md` v2 ("Component
 contracts" + the component token blocks); expected colors are the sRGB spec
 values (the demo page omits the P3 twins on purpose).
+
+The `nav/` component has its own harness — `test_vendored_nav.py` — because a
+fixed, body-level nav can't share the gallery's scrolling page.
 """
 
 from __future__ import annotations
 
 import re
-import threading
-from collections.abc import Iterator
-from functools import partial
-from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
-from pathlib import Path
 
 import pytest
 from playwright.sync_api import Page, expect
-
-STATIC_DIR = Path(__file__).resolve().parents[2] / "app" / "webapp" / "static"
-
-
-class _QuietHandler(SimpleHTTPRequestHandler):
-    def log_message(self, *args: object) -> None:  # noqa: D102 — silence per-request stderr noise
-        pass
-
-
-@pytest.fixture(scope="session")
-def static_server() -> Iterator[str]:
-    """Serve app/webapp/static over HTTP on an ephemeral port for the session."""
-    handler = partial(_QuietHandler, directory=str(STATIC_DIR))
-    server = ThreadingHTTPServer(("127.0.0.1", 0), handler)
-    thread = threading.Thread(target=server.serve_forever, daemon=True)
-    thread.start()
-    try:
-        yield f"http://127.0.0.1:{server.server_address[1]}"
-    finally:
-        server.shutdown()
-        thread.join(timeout=5)
 
 
 @pytest.fixture()
