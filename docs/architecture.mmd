@@ -63,6 +63,7 @@ flowchart TB
   subgraph testsdir["tests/"]
     UNIT["test_*.py\none file per src/ module, hermetic"]
     E2E["e2e/conftest.py + test_smoke.py\npytest-playwright, force-restarts\nStreamlit via _streamlit_lifecycle.py\n+ test_vendored_components.py\n(drives _vendored/demo.html, light+dark)\n+ test_vendored_nav.py\n(mounts _vendored/nav skeleton, desktop+pill)"]
+    GEOM["e2e/_geometry.py (vendor-verbatim, #157)\neffective 44px targets · overlap · overflow\nChart.js config reads · viewport x theme matrix\n+ test_geometry_helper.py\n+ _fixtures/geometry/ (hermetic twins + Chart.js)"]
     TRAYBEHAVIOR["e2e/test_tray_lifecycle_behavior.py\nWindows-only, pytest.mark.slow, no browser\ndrives real tray.bat + the canonical tray_lifecycle.ps1\nvia _tray_harness.py's resolve_tray_lifecycle_path()\n+ _dummy_tray_app.py"]
   end
   E2E --> appdir
@@ -100,5 +101,6 @@ flowchart TB
   NOTIFY --> TELEGRAM
   TSCERT --> TAILSCALE
   E2E --> PLAYWRIGHT
+  GEOM --> PLAYWRIGHT
   VERIFY --> RUFFMYPY
   BRANDGEN --> RESVG

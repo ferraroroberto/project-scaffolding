@@ -37,7 +37,8 @@ if (-not (Test-Path $py)) {
 # ships. Append the next module to this list when a new vendored primitive lands.
 $VendoredModules = @(
     "app/tray/single_instance.py",
-    "src/notify/"
+    "src/notify/",
+    "tests/e2e/_geometry.py"
 )
 
 function Invoke-Stage {

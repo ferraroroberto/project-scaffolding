@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>geometry fixture — compliant twin</title>
+<!--
+  Hermetic fixture for tests/e2e/_geometry.py (issue #157): the COMPLIANT twin.
+  Every check in the helper must PASS on this page at every 320-772px x
+  light/dark matrix leg. Its sibling `violating.html` is the page every check
+  must FAIL on. Token blocks are transcribed from _vendored/demo.html (which
+  transcribes ~/.claude/design.md) — this page plays the consuming app.
+  Served over HTTP by the test module's own directory server.
+-->
+<script src="chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #ffffff;
+    --card: #ffffff;
+    --card-off: #f6f8fa;
+    --ink: #1f2328;
+    --muted: #656d76;
+    --line: #d1d9e0;
+    --accent: #0969da;
+    --on: #1a7f37;
+    --deficit: #cf222e;
+    --radius-md: 12px;
+    --radius-pill: 9999px;
+    --gap: 12px;
+    --font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    color-scheme: light dark;
+  }
+  [data-theme="dark"] {
+    --bg: #0d1117;
+    --card: #161b22;
+    --card-off: #010409;
+    --ink: #e6edf3;
+    --muted: #7d8590;
+    --line: #30363d;
+    --accent: #2f81f7;
+    --on: #3fb950;
+    --deficit: #f85149;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: var(--gap);
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--font);
+  }
+  .stack { display: flex; flex-direction: column; gap: var(--gap); max-width: 100%; }
+  section { border: 1px solid var(--line); border-radius: var(--radius-md); padding: var(--gap); background: var(--card); }
+  h2 { margin: 0 0 8px; font-size: 0.92rem; color: var(--muted); }
+
+  /* Isolated compact control: 34px visual + ::before -5px ring = 44px effective
+     (the canonical `.hit-target` invisible-expansion utility). */
+  .icon-btn {
+    position: relative;
+    width: 34px;
+    height: 34px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: var(--card-off);
+    color: var(--ink);
+  }
+  .icon-btn.hit-target::before { content: ""; position: absolute; inset: -5px; }
+
+  /* Switch-style control: 44x26 visual track, ::before expands vertical to 44. */
+  .toggle {
+    position: relative;
+    width: 44px;
+    height: 26px;
+    border: 0;
+    border-radius: var(--radius-pill);
+    background: var(--line);
+  }
+  .toggle::before { content: ""; position: absolute; inset: -9px 0; }
+
+  /* Adjacent cluster: real 44px geometry with gaps, no invisible expansion —
+     expanded rectangles from neighbours must never overlap, so a cluster
+     earns the floor with actual tracks. 5 x 44 + 4 x 8 = 252px: fluid at 320. */
+  .cluster { display: flex; gap: 8px; }
+  .cluster .day {
+    width: 44px;
+    height: 44px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-md);
+    background: var(--card-off);
+    color: var(--ink);
+  }
+
+  /* The design contract: the canvas must never drive page overflow. Chart.js
+     resizes async (ResizeObserver), so the app caps it in CSS too. */
+  .chart-box { position: relative; height: 160px; max-width: 100%; }
+  .chart-box canvas { display: block; max-width: 100%; }
+</style>
+</head>
+<body>
+<div class="stack">
+  <section>
+    <h2>Isolated compact controls (invisible expansion)</h2>
+    <button id="lonePlus" class="icon-btn hit-target" aria-label="Add">+</button>
+    <br><br>
+    <button id="loneToggle" class="toggle" role="switch" aria-checked="false" aria-label="Power"></button>
+  </section>
+
+  <section>
+    <h2>Adjacent cluster (real 44px tracks)</h2>
+    <div class="cluster">
+      <button class="day">M</button>
+      <button class="day">T</button>
+      <button class="day">W</button>
+      <button class="day">T</button>
+      <button class="day">F</button>
+    </div>
+  </section>
+
+  <section>
+    <h2>Responsive chart (authored tick budget + non-colour cues)</h2>
+    <div class="chart-box"><canvas id="chart"></canvas></div>
+  </section>
+</div>
+
+<script>
+  const labels = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0') + ':00');
+  const series = (base) => labels.map((_, i) => base + (i % 7) * 3);
+  new Chart(document.getElementById('chart'), {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        { label: 'Generation', data: series(20), borderColor: '#1a7f37',
+          borderDash: [], pointStyle: 'circle', fill: false },
+        { label: 'Grid-supplied', data: series(10), borderColor: '#0969da',
+          borderDash: [8, 4], pointStyle: 'rectRot', fill: false },
+        { label: 'Consumption', data: series(15), borderColor: '#cf222e',
+          borderDash: [2, 4], pointStyle: 'triangle', fill: false },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: false,
+      scales: { x: { ticks: { maxTicksLimit: 4, autoSkip: true, maxRotation: 0 } } },
+    },
+  });
+  document.body.dataset.fixtureReady = '1';
+</script>
+</body>
+</html>

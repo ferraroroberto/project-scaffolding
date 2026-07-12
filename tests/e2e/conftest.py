@@ -16,6 +16,7 @@ from __future__ import annotations
 import os
 import threading
 from collections.abc import Iterator
+from contextlib import contextmanager
 from functools import partial
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -52,10 +53,14 @@ def streamlit_app() -> Iterator[str]:
         kill_streamlit_on_port(STREAMLIT_E2E_PORT)
 
 
-@pytest.fixture(scope="session")
-def static_server() -> Iterator[str]:
-    """Serve app/webapp/static over HTTP on an ephemeral port for the session."""
-    handler = partial(_QuietHandler, directory=str(STATIC_DIR))
+@contextmanager
+def serve_directory(directory: Path) -> Iterator[str]:
+    """Serve *directory* over loopback HTTP on an ephemeral port.
+
+    Shared by `static_server` and any test module that needs its own tree
+    served (e.g. the geometry-helper fixtures under `tests/e2e/_fixtures/`).
+    """
+    handler = partial(_QuietHandler, directory=str(directory))
     server = ThreadingHTTPServer(("127.0.0.1", 0), handler)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
@@ -64,6 +69,13 @@ def static_server() -> Iterator[str]:
     finally:
         server.shutdown()
         thread.join(timeout=5)
+
+
+@pytest.fixture(scope="session")
+def static_server() -> Iterator[str]:
+    """Serve app/webapp/static over HTTP on an ephemeral port for the session."""
+    with serve_directory(STATIC_DIR) as base_url:
+        yield base_url
 
 
 @pytest.fixture(autouse=True)
