@@ -405,7 +405,79 @@ Adapt `KEY_VIEWS` to the app's own key-views list (the same list a
 `## UX surface` block's `ux-full` sweep uses). This is a reference
 snippet, not something this scaffold wires into its own suite (it has
 no phone-first app) — a per-app adoption is a separate, deliberate
-decision, same as any other Loop 2 promotion.
+decision, same as any other Loop 2 promotion. The canonical measured
+form of this check is now `assert_no_horizontal_overflow` in the
+rendered-geometry helper below — vendor that instead of re-inlining the
+snippet; the war story above stays as the *why*.
+
+### Rendered-geometry design-conformance helper
+
+`tests/e2e/_geometry.py` (issue #157) is the canonical implementation
+of the fleet design contracts that are **rendered-DOM facts no static
+scan can prove** — the rendered leg of the `design.md` canon that
+fleet-config#342 codified statically in `design_lint.py`. A clean
+static lint proves authored tokens and markup; these five checks prove
+what the browser actually laid out:
+
+- `effective_rect(locator)` / `effective_rects(locator)` — visual
+  bounding box plus the `::before`/`::after` negative-inset hit-area
+  expansion (the `.hit-target` pattern the vendored `switch`,
+  `range-tab`, and `modal` components use). Zero matches raise —
+  a selector typo must fail loud, never read as conformance.
+- `assert_min_target(locator, min_px=44)` — every match's *effective*
+  width AND height meet the spec's `components.hit-target.min`.
+- `assert_no_overlap(locators)` — O(n²) pairwise sweep over effective
+  rectangles; adjacent compact controls may each reach 44px by
+  invisible expansion, but the expanded rectangles must never
+  intersect.
+- `assert_no_horizontal_overflow(page)` — the measured
+  `scrollWidth <= clientWidth` guard (generalizes the snippet above).
+- `chart_tick_budget` / `assert_chart_ticks` / `chart_dataset_cues` —
+  live Chart.js v4 config reads via `Chart.getChart(canvas)`
+  (`maxTicksLimit` / `autoSkip` / `maxRotation`, per-dataset
+  `borderDash` / `pointStyle` / `fill`). **Deliberately config-read
+  altitude**: the authored config is the design contract; rendered
+  label-collision pixel measurement flakes and is out of scope.
+
+Plus the **viewport × theme matrix**: `MATRIX` (320 / 390 / 430 /
+772 px × light / dark), `matrix_id`, and
+`apply_matrix_leg(page, width, theme, set_theme=...)`. The default
+theme application stamps `document.documentElement.dataset.theme`
+*and* emulates `prefers-color-scheme`; an app whose theme boot reads
+its own persisted state (e.g. home-automation's localStorage key)
+passes its own `set_theme` callable. Call it **after** navigation, and
+pair it with a boot-check that the theme actually took (assert a
+token-driven computed style flipped) — the same fail-loud idiom as the
+nav harness's coarse-pointer assert.
+
+**Consumption is vendor-verbatim**, like `app/tray/single_instance.py`:
+copy the file byte-identical into the app's `tests/e2e/`; every
+selector, budget, and theme mechanism is a call-site argument, so the
+copy never forks (it imports only the stdlib and
+`playwright.sync_api`). It is mypy-strict-gated here via
+`$VendoredModules` so it ships clean.
+
+The helper is proven by its own suite
+(`tests/e2e/test_geometry_helper.py`) against hermetic twin fixture
+pages (`tests/e2e/_fixtures/geometry/`): every check passes on
+`compliant.html` and fails on `violating.html` at all eight matrix
+legs, on both engines. The fixtures bundle a test-only copy of
+Chart.js v4 (never served to any app; `_vendored/` remains the only
+shipping channel). Two-engine run:
+
+```powershell
+& .\.venv\Scripts\python.exe -m pytest tests/e2e/test_geometry_helper.py --browser chromium --browser webkit
+```
+
+(One-time prereq beyond the README's Chromium install:
+`playwright install webkit`.)
+
+Altitude split (fleet-config#342): `~/.claude/design.md` owns the
+normative contract, `design_lint.py` proves the static half,
+`/design-sync` reports the rendered leg as **unmeasured** for a repo
+that lacks this harness — this helper is what turns that leg
+measurable. Migrating home-automation's original inline assertions to
+the helper is the reference adoption (follow-up per #157).
 
 ---
 

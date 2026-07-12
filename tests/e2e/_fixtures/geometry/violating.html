@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>geometry fixture — violating twin</title>
+<!--
+  Hermetic fixture for tests/e2e/_geometry.py (issue #157): the VIOLATING twin.
+  Authors one deliberate violation per contract so the helper's own suite can
+  prove each check FAILS here (and passes on `compliant.html`) at every matrix
+  leg. Violations are kept in separate, independently-targetable elements:
+    1. #tinyClose         — 34px visual, no hit-area pseudo (sub-44 effective)
+    2. .crowded .icon-btn — 44px effective each, but the expanded rings overlap
+    3. #badChart          — no maxTicksLimit, autoSkip off, rotated labels
+    4. #wideBar           — fixed 900px element (overflows every 320-772 leg)
+-->
+<script src="chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #ffffff;
+    --card: #ffffff;
+    --card-off: #f6f8fa;
+    --ink: #1f2328;
+    --muted: #656d76;
+    --line: #d1d9e0;
+    --deficit: #cf222e;
+    --radius-md: 12px;
+    --gap: 12px;
+    --font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    color-scheme: light dark;
+  }
+  [data-theme="dark"] {
+    --bg: #0d1117;
+    --card: #161b22;
+    --card-off: #010409;
+    --ink: #e6edf3;
+    --muted: #7d8590;
+    --line: #30363d;
+    --deficit: #f85149;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: var(--gap);
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--font);
+  }
+  .stack { display: flex; flex-direction: column; gap: var(--gap); }
+  section { border: 1px solid var(--line); border-radius: var(--radius-md); padding: var(--gap); background: var(--card); }
+  h2 { margin: 0 0 8px; font-size: 0.92rem; color: var(--muted); }
+
+  .icon-btn {
+    position: relative;
+    width: 34px;
+    height: 34px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: var(--card-off);
+    color: var(--ink);
+  }
+  /* Violation 1: no ::before ring on #tinyClose — 34px stays 34px. */
+
+  /* Violation 2: each ring reaches 44px effective, but a 4px gap between
+     34px controls means the -5px rings intersect by 6px. */
+  .crowded { display: flex; gap: 4px; }
+  .crowded .icon-btn::before { content: ""; position: absolute; inset: -5px; }
+
+  /* Violation 4: fixed element wider than every matrix viewport. */
+  #wideBar { width: 900px; height: 8px; background: var(--deficit); }
+
+  .chart-box { position: relative; height: 160px; }
+</style>
+</head>
+<body>
+<div class="stack">
+  <section>
+    <h2>Sub-44 effective target</h2>
+    <button id="tinyClose" class="icon-btn" aria-label="Close">×</button>
+  </section>
+
+  <section>
+    <h2>Overlapping expanded targets</h2>
+    <div class="crowded">
+      <button class="icon-btn" aria-label="Up">▲</button>
+      <button class="icon-btn" aria-label="Down">▼</button>
+    </div>
+  </section>
+
+  <section>
+    <h2>Unbudgeted chart (dense rotated labels)</h2>
+    <div class="chart-box"><canvas id="badChart"></canvas></div>
+  </section>
+
+  <section>
+    <h2>Horizontal overflow</h2>
+    <div id="wideBar"></div>
+  </section>
+</div>
+
+<script>
+  const labels = Array.from({ length: 30 }, (_, i) => '2026-06-' + String(i + 1).padStart(2, '0'));
+  new Chart(document.getElementById('badChart'), {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        { label: 'Only series', data: labels.map((_, i) => i), borderColor: '#cf222e' },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: false,
+      // Violation 3: no maxTicksLimit, autoSkip disabled, labels rotated.
+      scales: { x: { ticks: { autoSkip: false, maxRotation: 45, minRotation: 45 } } },
+    },
+  });
+  document.body.dataset.fixtureReady = '1';
+</script>
+</body>
+</html>
