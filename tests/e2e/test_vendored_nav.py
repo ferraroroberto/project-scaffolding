@@ -13,6 +13,7 @@ label-only tabs with no icon at all, silently, in five apps.
 
 from __future__ import annotations
 
+import re
 from collections.abc import Iterator
 
 import pytest
@@ -27,7 +28,63 @@ NAV_DIR = STATIC_DIR / "_vendored" / "nav"
 # = 14.72px; the icon is sized 1.05em of that.
 _DESKTOP_ICON_PX = 14.72 * 1.05
 _ACCENT = "rgb(9, 105, 218)"
+_ACCENT_DARK = "rgb(47, 129, 247)"
 _MUTED = "rgb(101, 109, 118)"
+
+_RGBA_RE = re.compile(r"rgba?\((\d+), (\d+), (\d+)(?:, ([\d.]+))?\)")
+# Chromium serializes a computed color-mix() as `color(srgb R G B / A)` with
+# 0-1 float channels (legacy rgba() only when no color-mix is involved).
+_COLOR_SRGB_RE = re.compile(r"color\(srgb ([\d.]+) ([\d.]+) ([\d.]+)(?: / ([\d.]+))?\)")
+
+
+def _rgba(color: str) -> tuple[int, int, int, float]:
+    """Parse a getComputedStyle color string into (r, g, b, alpha 0-1)."""
+    m = _RGBA_RE.match(color)
+    if m:
+        a = float(m.group(4)) if m.group(4) is not None else 1.0
+        return int(m.group(1)), int(m.group(2)), int(m.group(3)), a
+    m = _COLOR_SRGB_RE.match(color)
+    assert m, f"unexpected color format: {color}"
+    a = float(m.group(4)) if m.group(4) is not None else 1.0
+    return (round(float(m.group(1)) * 255), round(float(m.group(2)) * 255),
+            round(float(m.group(3)) * 255), a)
+
+
+def _set_theme(page: Page, theme: str) -> None:
+    page.evaluate(
+        "(t) => { document.documentElement.dataset.theme = t; }", theme
+    )
+
+
+def _alpha(color: str) -> float:
+    """Extract the alpha channel from a computed color string.
+
+    A `color-mix(in srgb, ...)` result serializes as `rgba(r, g, b, a)` for
+    the light-theme accent, but Chromium serializes the *dark*-theme accent's
+    mix as `oklab(l a b / a)` instead (same `in srgb` mix, different output
+    notation depending on the input channel values) — so this parses the
+    alpha generically off the tail rather than assuming one color function.
+    A solid, non-mixed `rgb(r, g, b)` (3 channels, no alpha) is opaque.
+    """
+    if "/" in color:
+        return float(color.rsplit("/", 1)[1].rstrip(") ").strip())
+    if color.startswith("rgba("):
+        return float(color[len("rgba(") : -1].split(",")[3])
+    return 1.0
+
+
+def _wait_style(page: Page, selector: str, prop: str, expected: str) -> None:
+    """Wait for a computed style property to settle on *expected*.
+
+    `.tab` transitions `background`/`border-color`/`color` over 0.16s
+    (nav-tabs.css), so an instant post-toggle read lands mid-interpolation —
+    same reasoning as `test_vendored_components.py`'s `_wait_bg`.
+    """
+    page.wait_for_function(
+        "([sel, prop, want]) => getComputedStyle(document.querySelector(sel))"
+        "[prop] === want",
+        arg=[selector, prop, expected],
+    )
 
 
 def _mount_nav(page: Page, base_url: str) -> Page:
@@ -144,3 +201,27 @@ def test_mobile_pill_stacks_icon_over_label(nav_mobile: Page) -> None:
     label = nav_mobile.locator("#tabHome .tab-label").bounding_box()
     assert box is not None and label is not None
     assert box["y"] + box["height"] <= label["y"]
+
+
+def test_mobile_pill_active_tab_is_accent_tint_not_inset_surface(
+    nav_mobile: Page,
+) -> None:
+    """Active pill: accent-soft tint + accent-border-soft hairline, both themes (#159).
+
+    Regression for the dark-mode "black hole": the active tab used to fill
+    with `--card-off` (dark canvas-subtle, true black), which read as a hole
+    punched through the translucent tabbar. It must render as a translucent
+    accent tint instead — matching `button-tint` / `.icon-header-btn.active`
+    emphasis elsewhere in the fleet.
+    """
+    r, g, b, a = _rgba(_style(nav_mobile, "#tabHome", "backgroundColor"))
+    assert (r, g, b) == (9, 105, 218)
+    assert 0 < a < 1
+    assert _style(nav_mobile, "#tabHome", "color") == _ACCENT
+
+    _set_theme(nav_mobile, "dark")
+    _wait_style(nav_mobile, "#tabHome", "color", _ACCENT_DARK)
+    dark_bg = _style(nav_mobile, "#tabHome", "backgroundColor")
+    # The pre-fix `--card-off` fill resolved to this exact opaque literal.
+    assert dark_bg != "rgb(1, 9, 9)"
+    assert 0 < _alpha(dark_bg) < 1
