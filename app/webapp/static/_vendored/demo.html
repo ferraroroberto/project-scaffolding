@@ -56,6 +56,9 @@
     --space-lg: 24px;
     --space-xl: 32px;
     --gap: 12px;
+    --row-sm: 44px;
+    --row-md: 52px;
+    --row-lg: 60px;
     --control-h: 36px;
     --font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
     --font-heading-xl: 2rem;
@@ -133,6 +136,10 @@
 <link rel="stylesheet" href="button/button.css">
 <link rel="stylesheet" href="range-tab/range-tab.css">
 <link rel="stylesheet" href="page-foot/page-foot.css">
+<!-- home-head.css must load AFTER card.css (it overrides the card's padding at
+     equal specificity — same source-order convention as disclosure). -->
+<link rel="stylesheet" href="home-head/home-head.css">
+<link rel="stylesheet" href="select-native/select-native.css">
 </head>
 <body>
 <div class="gallery">
@@ -247,6 +254,28 @@
     <button type="button" class="range-tab" id="demoRangeDisabled" disabled>Off</button>
   </nav>
 
+  <h2>home-head</h2>
+  <div class="card home-head" id="demoHomeHead">
+    <span class="home-title">
+      <svg class="icon" aria-hidden="true"><use href="#i-house"></use></svg>
+      Demo app
+    </span>
+    <span class="status" id="demoHomeStatus">All systems normal · 4 devices online</span>
+    <button type="button" class="home-toggle" id="demoHomeToggle"
+            aria-label="Toggle theme" title="Toggle theme">
+      <svg class="icon" aria-hidden="true"><use href="#i-moon"></use></svg>
+    </button>
+  </div>
+
+  <h2>select-native</h2>
+  <div class="card">
+    <select class="select-native" id="demoSelectNative" aria-label="Demo select">
+      <option value="a">Option A</option>
+      <option value="b">Option B</option>
+      <option value="c">Option C</option>
+    </select>
+  </div>
+
   <h2>page-foot</h2>
   <footer class="page-foot" id="demoPageFoot">
     <p id="demoBuildReadout"></p>
@@ -298,11 +327,15 @@
   document.getElementById('openModalBtn').addEventListener('click', () => dlg.showModal());
   document.getElementById('demoDialogClose').addEventListener('click', () => dlg.close());
 
-  // Theme toggle.
-  document.getElementById('themeToggle').addEventListener('click', () => {
+  // Theme toggle — both the gallery-chrome button and the home-head's own
+  // icon toggle flip the theme (home-head owns the button's look, not the
+  // theme logic — the caller wires it, per the component's README).
+  const flipTheme = () => {
     const root = document.documentElement;
     root.dataset.theme = root.dataset.theme === 'dark' ? '' : 'dark';
-  });
+  };
+  document.getElementById('themeToggle').addEventListener('click', flipTheme);
+  document.getElementById('demoHomeToggle').addEventListener('click', flipTheme);
 
   // Signal readiness to the e2e harness.
   document.body.dataset.demoReady = '1';
