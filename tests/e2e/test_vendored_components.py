@@ -205,6 +205,50 @@ def test_page_foot_contract(gallery: Page) -> None:
     assert re.match(r"^Build: abc1234 · \d{4}-\d{2}-\d{2} \d{2}:\d{2}$", text), text
 
 
+def test_home_head_contract(gallery: Page) -> None:
+    """home-head: 52px row at 0-14px inset, title glyph 18px, status ellipsizes, right-pinned 34px toggle."""
+    # One row at the disclosure closed-summary geometry (rows.md 52px, 0 14px).
+    assert _style(gallery, "#demoHomeHead", "minHeight") == "52px"
+    assert _style(gallery, "#demoHomeHead", "paddingLeft") == "14px"
+    assert _style(gallery, "#demoHomeHead", "paddingTop") == "0px"  # overrides the card's own padding
+    assert _style(gallery, "#demoHomeHead", "display") == "flex"
+    # Title glyph is title-size and muted.
+    assert _style(gallery, "#demoHomeHead .home-title .icon", "width") == "18px"
+    # Status fills the middle and ellipsizes so it can't wrap the row.
+    assert _style(gallery, "#demoHomeStatus", "textOverflow") == "ellipsis"
+    assert _style(gallery, "#demoHomeStatus", "whiteSpace") == "nowrap"
+    # Icon-only theme toggle: 34px square, subtle-contrast fill, no border, pinned right.
+    assert _style(gallery, "#demoHomeToggle", "width") == "34px"
+    assert _style(gallery, "#demoHomeToggle", "height") == "34px"
+    assert _style(gallery, "#demoHomeToggle", "backgroundColor") == "rgb(246, 248, 250)"
+    assert _style(gallery, "#demoHomeToggle", "borderTopWidth") == "0px"
+    # The toggle is pinned to the right: its right edge sits within ~1px of the
+    # row's content edge (row right minus the 14px inset), past the status.
+    pinned = gallery.evaluate(
+        "() => {"
+        " const row = document.getElementById('demoHomeHead').getBoundingClientRect();"
+        " const tog = document.getElementById('demoHomeToggle').getBoundingClientRect();"
+        " const status = document.getElementById('demoHomeStatus').getBoundingClientRect();"
+        " return { gap: (row.right - 14) - tog.right, afterStatus: tog.left >= status.right - 1 };"
+        "}"
+    )
+    assert abs(pinned["gap"]) <= 1.5, pinned
+    assert pinned["afterStatus"], pinned
+
+
+def test_select_native_contract(gallery: Page) -> None:
+    """select-native: control-height (36px via explicit height, not min-height), hairline border, input-bg fill."""
+    # THE iOS decision: height is an explicit `height` (respected), never
+    # `min-height` (ignored on a bare <select>, rendering it stubby).
+    assert _style(gallery, "#demoSelectNative", "height") == "36px"
+    assert _style(gallery, "#demoSelectNative", "borderRadius") == "12px"
+    assert _style(gallery, "#demoSelectNative", "borderTopWidth") == "1px"
+    assert _style(gallery, "#demoSelectNative", "borderTopColor") == "rgb(209, 217, 224)"
+    # input-bg is card-off in light (var(--card-off) = #f6f8fa).
+    assert _style(gallery, "#demoSelectNative", "backgroundColor") == "rgb(246, 248, 250)"
+    assert _style(gallery, "#demoSelectNative", "color") == "rgb(31, 35, 40)"
+
+
 # ---------------------------------------------------------------------- dark
 
 
@@ -234,3 +278,11 @@ def test_dark_theme_values(gallery: Page) -> None:
     assert _style(gallery, "#demoRangeDay", "color") == "rgb(47, 129, 247)"
     # page-foot readout re-skins to the dark muted value.
     assert _style(gallery, "#demoBuildReadout", "color") == "rgb(125, 133, 144)"
+    # home-head toggle fill re-skins to the dark --close-bg (var(--line) = #30363d);
+    # the 52px row geometry is theme-independent.
+    assert _style(gallery, "#demoHomeHead", "minHeight") == "52px"
+    assert _style(gallery, "#demoHomeToggle", "backgroundColor") == "rgb(48, 54, 61)"
+    # select-native fill re-skins to the dark --input-bg (var(--bg) = #0d1117);
+    # the 36px control height is theme-independent.
+    assert _style(gallery, "#demoSelectNative", "height") == "36px"
+    assert _style(gallery, "#demoSelectNative", "backgroundColor") == "rgb(13, 17, 23)"
