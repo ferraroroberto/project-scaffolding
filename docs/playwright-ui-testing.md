@@ -326,6 +326,50 @@ POSIX:
 - **Delete with the feature.** When I remove a feature, remove its
   e2e test in the same commit.
 
+### Isolating stateful hosts (never adopt-and-mutate)
+
+The "boot-or-adopt, fail loud" rule above is safe *only* because a
+Streamlit/Flask/uvicorn dev server is stateless and cheap to restart —
+adopting a live one costs nothing if the suite happens to touch it.
+That assumption breaks the moment a project grows a long-lived,
+**stateful** child process that owns the user's real work: a worker
+with in-flight jobs, a PTY host, a session-host holding live shells.
+
+This bit app-launcher for real (`app-launcher#260`): its pre-ship e2e
+gate adopted the live tray's session-host on its fixed port — the same
+one holding the user's actual Coding sessions — instead of spawning its
+own throwaway instance. Its destructive kill-tests then targeted "the
+first session in the list" rather than the session the test itself had
+created. Because the gate had adopted the user's live host, "first in
+the list" was the user's own session — including, on one run, the very
+session that had launched the gate. The user had to restart three
+times before the pattern was understood.
+
+Two rules, going forward:
+
+1. **Isolate, don't adopt, anything stateful.** Adopt-or-autoboot stays
+   correct for a stateless webapp. For any host that owns user
+   state or child processes, the harness spawns its **own disposable
+   instance on a free port** and injects that port into the dependent
+   process (an env override) — it never reuses the live fixed port.
+   Litmus test: *is the thing I'm adopting holding work the user would
+   be upset to lose?* If yes, isolate.
+2. **Destructive tests target only what they created.** A test that
+   stops/kills/tears down must snapshot the pre-existing ids *before*
+   acting and scope its kills to the delta it spawned — never `.first`
+   or "whatever's in the list." On a shared or adopted host, the first
+   item in that list is the user's, not the test's.
+
+This mirrors the tray-restart safety story in `docs/windows-tray.md`
+(detach + re-adopt so `taskkill /T` can't walk into the user's
+children): the *restart* path was made session-preserving, and the
+*validation* path has to meet the same bar. This scaffold's own
+`tests/e2e/conftest.py` never hits this trap today — its `streamlit_app`
+fixture always force-kills-then-boots on a dedicated e2e port (8766,
+distinct from the dev port), and Streamlit itself holds no user state
+worth preserving — but the two rules above are what to reach for the
+day a scaffold-derived project grows its first stateful child process.
+
 ### Mobile projection (phone-first apps only)
 
 If the app's primary surface is a phone, run the regression suite on
