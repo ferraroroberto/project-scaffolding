@@ -294,6 +294,112 @@ def _bound_default_timeouts(context) -> None:
 
 **Origin:** app-launcher#186 (a ~120 s CI e2e hang, opaque, never named) surfaced the cost of the implicit 30 s default; the convention landed in app-launcher PR #189. whatsapp-radar already sets an explicit `page.set_default_timeout` with a 30 s × scale-factor variant (`_scaled_page_timeouts`) — satisfies the spirit. The **15 s bounded base is the fleet standard** across all sister repos.
 
+### Bounded WebKit driver teardown
+
+A stale `WebKitNetworkProcess.exe` zombie left behind by a previously-killed
+run can wedge the Node driver's *own* exit-time cleanup. The suite's verbose
+log shows every test PASSED, but `browser.close()` / `playwright.stop()`
+never return — pytest just hangs at 0% CPU after the last test, never
+reaching its summary line. `taskkill /F` reports "no running instance" for
+these zombies (already-dead, handle-held) and they persist until reboot or
+whatever else holds the handle exits.
+
+The fix is a hard wall-clock bound on the session-scoped `playwright` /
+`browser` fixture teardown: a watchdog thread force-kills the driver's OS
+process if close/stop doesn't return within `E2E_TEARDOWN_TIMEOUT_S` (default
+15s — same convention as `E2E_DEFAULT_TIMEOUT_MS` above).
+
+**Key constraint:** Playwright's sync API is greenlet-based and
+thread-affine, so the teardown call itself (`browser.close`,
+`playwright.stop`) must stay on the *main* thread — calling it from a
+background thread raises `greenlet.error: Cannot switch to a different
+thread`. The watchdog therefore can't call `close()`/`stop()` for you; the
+only thing it can safely do off-thread is force-kill the driver's OS
+process, which breaks the pipe the blocked main-thread call is reading from
+and turns the hang into an exception Playwright's own `Connection.cleanup()`
+already knows how to handle — letting pytest proceed to its summary.
+
+```python
+import os
+import signal
+import subprocess
+import sys
+import threading
+from typing import Callable, Iterator, Optional
+
+import pytest
+from playwright.sync_api import Browser, Playwright, sync_playwright
+
+_TEARDOWN_TIMEOUT_S = float(os.environ.get("E2E_TEARDOWN_TIMEOUT_S", "15"))
+
+
+def _driver_pid(pw: Optional[Playwright]) -> Optional[int]:
+    """Best-effort reach into Playwright's private driver-process handle.
+
+    Reaches into `_impl` privates on purpose — there is no public accessor —
+    so this degrades to `None` (no forced kill, just a log warning) rather
+    than raising if a future Playwright version changes this shape.
+    """
+    if pw is None:
+        return None
+    try:
+        ctx_mgr = pw.stop.__self__  # type: ignore[attr-defined]
+        return ctx_mgr._connection._transport._proc.pid  # type: ignore[attr-defined]
+    except Exception:
+        return None
+
+
+def _bounded_teardown(fn: Callable[[], None], label: str, driver_pid: Optional[int]) -> None:
+    done = threading.Event()
+    timed_out = threading.Event()
+
+    def _watchdog() -> None:
+        if done.wait(timeout=_TEARDOWN_TIMEOUT_S):
+            return
+        timed_out.set()
+        if driver_pid is None:
+            return
+        try:
+            if sys.platform == "win32":
+                subprocess.run(
+                    ["taskkill", "/F", "/T", "/PID", str(driver_pid)],
+                    capture_output=True, timeout=10,
+                )
+            else:
+                os.kill(driver_pid, signal.SIGKILL)
+        except Exception:
+            pass
+
+    threading.Thread(target=_watchdog, name="e2e-teardown-watchdog", daemon=True).start()
+    try:
+        fn()
+    except Exception:
+        if not timed_out.is_set():
+            raise
+    finally:
+        done.set()
+
+
+@pytest.fixture(scope="session")
+def playwright() -> Iterator[Playwright]:
+    pw = sync_playwright().start()
+    yield pw
+    _bounded_teardown(pw.stop, "playwright.stop()", _driver_pid(pw))
+
+
+@pytest.fixture(scope="session")
+def browser(playwright: Playwright) -> Iterator[Browser]:
+    browser_instance = playwright.chromium.launch(headless=True)
+    yield browser_instance
+    _bounded_teardown(browser_instance.close, "browser.close()", _driver_pid(playwright))
+```
+
+This overrides pytest-playwright's own session-scoped `playwright`/`browser`
+fixtures — same fixture names, so the override is picked up automatically
+without changing any test. Worst case on a wedge is a leaked driver process,
+not a hung suite. Reference implementation: `home-automation` PR #443
+(`tests/e2e/conftest.py`).
+
 ### Running it
 
 ```powershell
@@ -626,6 +732,7 @@ loop is *zero-config infrastructure that lives outside the repo*.
 | Same test passes locally, fails in CI               | CI is headless, local is headed. Some Streamlit components render slightly differently. Use `wait_for_selector` aggressively. |
 | Agent loops forever                                  | No action cap in the prompt. Always include "≤ N actions, then report."                           |
 | Screenshot is huge in tokens                         | Vision tokens are expensive. Snapshot instead. Screenshot only on failure.                         |
+| WebKit full-suite run: verbose log shows every test PASSED, then no summary line ever prints (0% CPU, hung indefinitely) | Stale `WebKitNetworkProcess.exe` zombies from a previously-killed run wedge the Node driver's exit-time cleanup, blocking `browser.close()`/`playwright.stop()` forever. Check with `Get-CimInstance Win32_Process -Filter "Name='WebKitNetworkProcess.exe'"` — `taskkill /F` reports "no running instance" for these because they're already-dead, handle-held zombies (only a reboot, or the exit of whatever holds the handle, clears them). Mitigation: a bounded-teardown `conftest.py` fixture override (see "Bounded WebKit driver teardown" below) force-kills the driver process on timeout so pytest always reaches its summary. |
 
 ---
 
