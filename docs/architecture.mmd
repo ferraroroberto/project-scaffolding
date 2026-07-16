@@ -55,7 +55,7 @@ flowchart TB
   VERIFY --> testsdir
 
   subgraph branddir["brand/ — fleet icon masters"]
-    BRANDSVGS["rocket/camera/mic/hub/radar/house.svg\nvendored verbatim from lucide-static"]
+    BRANDSVGS["catalog.json + 20 curated identity SVGs\nvendored verbatim from lucide-static"]
   end
   BRANDGEN -->|reads| BRANDSVGS
   BRANDGEN -.->|imported via known local path by| DOWNSTREAM["downstream projects'\nscripts/gen_icons.py\n(app-launcher, photo-ocr, voice-transcriber,\nlocal-llm-hub, whatsapp-radar, home-automation)"]
