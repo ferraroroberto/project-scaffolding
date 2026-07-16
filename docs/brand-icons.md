@@ -1,8 +1,7 @@
 # Fleet icon brand — shared masters + generator
 
-The fleet's six tray + PWA projects (`app-launcher`, `photo-ocr`, `voice-transcriber`,
-`local-llm-hub`, `whatsapp-radar`, `home-automation`) share one icon family so they read as one
-coherent set on the iPhone home screen, the Stream Deck, and the Windows tray. Canonical issue:
+Fleet apps share one icon family so they read as one coherent set on the iPhone home screen, the
+Stream Deck, and the Windows tray. Canonical issue:
 [`app-launcher#65`](https://github.com/ferraroroberto/app-launcher/issues/65).
 
 ## The rule
@@ -17,16 +16,29 @@ each redefining its own palette and inset math).
 - **Stroke weight:** 2.6px (thickened from Lucide's default 2px for legibility at favicon scale).
 - **Padding:** 12% full-bleed (favicon / iOS / Stream Deck), 26% for the Android maskable safe zone.
 
-## `brand/` — the masters
+## `brand/` — the curated master library
 
-Six SVGs, vendored **verbatim** from [`lucide-static`](https://www.npmjs.com/package/lucide-static)
-(keep the `@license` comment): `rocket.svg` (app-launcher), `camera.svg` (photo-ocr), `mic.svg`
-(voice-transcriber), `hub.svg` (local-llm-hub — vendored from Lucide's `share-2`, renamed for
-readability), `radar.svg` (whatsapp-radar), `house.svg` (home-automation).
+`brand/catalog.json` is the discoverable inventory: 20 SVG masters mapped to their upstream
+Lucide glyph and the fleet repos that use, or are the intended consumers of, that identity.
+Every SVG is vendored **verbatim** from
+[`lucide-static` v1.23.0](https://www.npmjs.com/package/lucide-static) and keeps its `@license`
+comment. The initial six shipped identities remain (`rocket`, `camera`, `mic`, `share-2` renamed
+locally to `hub`, `radar`, `house`); the library also carries the stable identity metaphors already
+represented across the fleet (`shopping-basket`, `sprout`, `shuffle`, `calculator`, `globe-2`,
+`graduation-cap`, `chart-column`, `lightbulb`, `file-text`, `mail`, `folder`, `sun`,
+`credit-card`, and `book-open`).
+
+This is intentionally a curated **app-identity** library, not a mirror of Lucide and not the
+in-page UI sprite. Add a master when a real fleet repo has chosen that glyph as its product
+identity; generic action glyphs still belong in the vendored `icons` component.
 
 **Never hand-edit these.** To change a project's shape, replace the file with a different
 `lucide-static` glyph — same rule as the vendored `nav`/`icons` components ("copy byte-for-byte,
 never edit per-app").
+
+`tests/test_brand_gen.py` keeps the catalog and directory in lockstep, checks the pinned license and
+24×24 Lucide SVG contract, and rasterizes every master through `brand_gen`. An uncatalogued,
+malformed, unlicensed, or non-renderable master fails the project gate.
 
 ## `scripts/brand_gen.py` — the generator
 
@@ -82,10 +94,11 @@ Rust `resvg` crate and ships a prebuilt wheel for Windows — `pip install resvg
 Verified empirically before adopting it (a throwaway venv installed cleanly and rasterized a test
 SVG correctly with no system dependencies).
 
-## Adding a 7th project
+## Adding another project identity
 
 1. Pick the Lucide glyph that matches the project's existing icon identity (or, if there's a real
    choice to make, render a few candidates as tiles and compare visually before locking one in).
 2. Download it verbatim from `lucide-static` into `brand/<name>.svg`.
-3. Add a thin `scripts/gen_icons.py` caller in the downstream project per the example above.
-4. Regenerate and commit the outputs; wire the manifest / tray / Stream Deck loading as needed.
+3. Add it to `brand/catalog.json` with the upstream glyph name and concrete consumer repo(s).
+4. Add a thin `scripts/gen_icons.py` caller in the downstream project per the example above.
+5. Regenerate and commit the outputs; wire the manifest / tray / Stream Deck loading as needed.

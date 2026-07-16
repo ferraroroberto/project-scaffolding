@@ -1,0 +1,29 @@
+{
+  "source": {
+    "package": "lucide-static",
+    "version": "1.23.0",
+    "license": "ISC"
+  },
+  "icons": [
+    {"file": "book-open.svg", "glyph": "book-open", "consumers": ["closed-company-accounting"]},
+    {"file": "calculator.svg", "glyph": "calculator", "consumers": ["mathgamesforkids"]},
+    {"file": "camera.svg", "glyph": "camera", "consumers": ["photo-ocr"]},
+    {"file": "chart-column.svg", "glyph": "chart-column", "consumers": ["social-media-analytics"]},
+    {"file": "credit-card.svg", "glyph": "credit-card", "consumers": ["accounting-quarterly", "family-accounting"]},
+    {"file": "file-text.svg", "glyph": "file-text", "consumers": ["content-management", "mass-html-to-markdown", "pdf-to-markdown"]},
+    {"file": "folder.svg", "glyph": "folder", "consumers": ["mcp-personal-onedrive"]},
+    {"file": "globe-2.svg", "glyph": "globe-2", "consumers": ["website"]},
+    {"file": "graduation-cap.svg", "glyph": "graduation-cap", "consumers": ["vibe-coding-workshop"]},
+    {"file": "house.svg", "glyph": "house", "consumers": ["home-automation"]},
+    {"file": "hub.svg", "glyph": "share-2", "consumers": ["local-llm-hub"]},
+    {"file": "lightbulb.svg", "glyph": "lightbulb", "consumers": ["inspiration-system"]},
+    {"file": "mail.svg", "glyph": "mail", "consumers": ["email-archiver"]},
+    {"file": "mic.svg", "glyph": "mic", "consumers": ["voice-transcriber"]},
+    {"file": "radar.svg", "glyph": "radar", "consumers": ["whatsapp-radar"]},
+    {"file": "rocket.svg", "glyph": "rocket", "consumers": ["app-launcher"]},
+    {"file": "shopping-basket.svg", "glyph": "shopping-basket", "consumers": ["grocery-shopping-automation"]},
+    {"file": "shuffle.svg", "glyph": "shuffle", "consumers": ["facilitation-shuffle"]},
+    {"file": "sprout.svg", "glyph": "sprout", "consumers": ["life-os"]},
+    {"file": "sun.svg", "glyph": "sun", "consumers": ["pvgis"]}
+  ]
+}
