@@ -1,6 +1,6 @@
 # `_vendored/` — fleet web-app component library
 
-Byte-copyable UI components shared across every fleet web app (FastAPI + static PWA). This is the **UI-layer** counterpart to the tray's vendored Python primitives (`app/tray/single_instance.py`, `tray_lifecycle.ps1`): the same "copy verbatim, never fork per-app" channel, for HTML/CSS/JS.
+Byte-copyable UI components shared across every fleet web app (FastAPI + static PWA). This is the **UI-layer** counterpart to the tray's vendored primitive (`app/tray/single_instance.py`) and the shared `tray_lifecycle.ps1` helper: the same "copy verbatim, never fork per-app" channel, for HTML/CSS/JS.
 
 ## The split (single-home-by-altitude)
 
