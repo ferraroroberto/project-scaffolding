@@ -32,6 +32,12 @@ data/input/*
 # Claude Code local settings
 .claude/
 
+# Codex / other-agent local artifacts — auto-generated per-repo mirror noise.
+# Cross-agent instructions are maintained in CLAUDE.md (AGENTS.md is a committed
+# one-line pointer to it, deliberately NOT ignored). Real Codex config: ~/.codex/.
+.agents/
+.codex/
+
 # Launcher scratch (ephemeral images/logs written by the tray launcher)
 .launcher-tmp/
 
