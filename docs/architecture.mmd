@@ -35,6 +35,7 @@ flowchart TB
     LOGGER["logger.py\nterminal + rotating file +\nStreamlit live panel, one log.info() call"]
     PIPELINES["pipelines/\nexample_pipeline.py\none run() per file, returns summary dict"]
     NOTIFY["notify/\nbase.py, factory.py, config.py, telegram.py\nvendor-verbatim Telegram notifier"]
+    DOCCAP["doc_capture/\nengine.py + adapters.py (streamlit | url)\n+ launch.py + __main__.py (CLI)\nvendor-verbatim doc-capture screenshot engine\n(manifest-driven, fail-safe-masked,\ninput-hash-idempotent + README tour regen)"]
   end
   VIEWS -->|orchestrates, business logic stays here| PIPELINES
   VIEWS --> LOGGER
@@ -61,7 +62,7 @@ flowchart TB
   BRANDGEN -.->|imported via known local path by| DOWNSTREAM["downstream projects'\nscripts/gen_icons.py\n(app-launcher, photo-ocr, voice-transcriber,\nlocal-llm-hub, whatsapp-radar, home-automation)"]
 
   subgraph testsdir["tests/"]
-    UNIT["test_*.py\none file per src/ module, hermetic"]
+    UNIT["test_*.py\none file per src/ module, hermetic\n(incl. test_doc_capture.py — browserless\nplan/hash/readme/adapter contract)"]
     E2E["e2e/conftest.py + test_smoke.py\npytest-playwright, force-restarts\nStreamlit via _streamlit_lifecycle.py\n+ test_vendored_components.py\n(drives _vendored/demo.html, light+dark)\n+ test_vendored_nav.py\n(mounts _vendored/nav skeleton, desktop+pill)"]
     GEOM["e2e/_geometry.py (vendor-verbatim, #157)\neffective 44px targets · overlap · overflow\nChart.js config reads · viewport x theme matrix\n+ test_geometry_helper.py\n+ _fixtures/geometry/ (hermetic twins + Chart.js)"]
     TRAYBEHAVIOR["e2e/test_tray_lifecycle_behavior.py\nWindows-only, pytest.mark.slow, no browser\ndrives real tray.bat + the canonical tray_lifecycle.ps1\nvia _tray_harness.py's resolve_tray_lifecycle_path()\n+ _dummy_tray_app.py"]
@@ -102,5 +103,6 @@ flowchart TB
   TSCERT --> TAILSCALE
   E2E --> PLAYWRIGHT
   GEOM --> PLAYWRIGHT
+  DOCCAP -.->|capture time only| PLAYWRIGHT
   VERIFY --> RUFFMYPY
   BRANDGEN --> RESVG

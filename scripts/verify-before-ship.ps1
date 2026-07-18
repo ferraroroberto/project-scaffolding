@@ -38,6 +38,7 @@ if (-not (Test-Path $py)) {
 $VendoredModules = @(
     "app/tray/single_instance.py",
     "src/notify/",
+    "src/doc_capture/",
     "tests/e2e/_geometry.py"
 )
 
