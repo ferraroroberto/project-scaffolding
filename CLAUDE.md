@@ -4,6 +4,15 @@ Canonical instructions for AI coding agents working in this repository. Claude C
 
 > **Scope — project-shaped guidance only.** This master owns only what is *specific to a project's shape* — Streamlit, GitHub-Actions CI, end-to-end UI testing, a tray / long-lived process — each section gated *"apply only if…"* and inherited by a project of that shape. **Universal** dev-workflow directives (plan mode, asking, before/while editing, execution, conventions, git, branch & PR pipeline, planning, documentation discipline, senior-dev check) live once in the machine config (`fleet-config/global-CLAUDE.md`, installed as `~/.claude/CLAUDE.md` / `~/.codex/AGENTS.md`) and are **not** restated here. The test for any rule: *"would it apply to a bare repo with no app?"* Yes → global; no → here. Nothing belongs in both — the `/context-audit` skill enforces this single-home split weekly. (Standard: `ferraroroberto/project-scaffolding#68`.)
 
+## Agent config artifacts (`AGENTS.md` pointer; `.agents/` / `.codex/` gitignored)
+*Applies to every repo — app or not.*
+
+Codex is an intentionally-supported second agent on this machine, so the fleet keeps **one** deliberate standard for cross-agent config artifacts instead of the ad-hoc auto-generated noise a Codex/AGENTS.md generator once dropped fleet-wide (a verbatim `Claude`→`Codex` find-replace of each `CLAUDE.md`, plus mirror `.agents/skills/` and `.codex/hooks.json`, with broken `~/.Codex/...` paths).
+
+- **`AGENTS.md` is a committed one-line pointer to `CLAUDE.md` — never a find-replaced copy.** The machine-scope instructions are the single global file symlinked into each agent home (`~/.claude/CLAUDE.md`, `~/.codex/AGENTS.md`, …) by `fleet-config/install.ps1`; the per-repo `AGENTS.md` just points non-Claude tools at this repo's `CLAUDE.md`. Being static, it is drift-free by construction — no generator, no sync step, nothing to regenerate when `CLAUDE.md` changes.
+- **`.agents/` and `.codex/` are gitignored, never committed.** They are per-repo auto-generated mirror/tooling noise; the real, maintained Codex config lives machine-scope in `~/.codex/`. This scaffold's `.gitignore` excludes them (consistent with `fleet-config`, which already ignores `.codex/`), while deliberately **not** ignoring the committed `AGENTS.md`.
+- **Don't diverge.** A cloned repo inherits both the committed `AGENTS.md` pointer and the two `.gitignore` lines by default. The decision *record* lives here (not in global `CLAUDE.md`) because it produces per-repo **files** the scaffold templates — global `CLAUDE.md` is a single machine file never copied into repos. Rolling the `.gitignore` delta + `AGENTS.md` pointer out to sister repos is a follow-up fleet sweep. (Decision record: `ferraroroberto/project-scaffolding#28`.)
+
 ## Streamlit conventions
 *Apply only if this project uses Streamlit.*
 
