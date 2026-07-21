@@ -27,3 +27,29 @@ def test_ensure_fresh_streamlit_fails_when_port_stays_bound(
         lifecycle.ensure_fresh_streamlit(port=9999)
 
     assert killed_ports == [9999]
+
+
+def test_streamlit_popen_suppresses_console_window(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A tray/scheduled-task parent has no console of its own -- spawning
+    Streamlit without CREATE_NO_WINDOW flashes a visible console window on
+    every e2e run (fleet-config#399)."""
+    captured: dict[str, object] = {}
+
+    def fake_popen(*args: object, **kwargs: object) -> object:
+        captured.update(kwargs)
+
+        class _Proc:
+            pid = 1234
+
+        return _Proc()
+
+    monkeypatch.setattr(lifecycle, "port_is_in_use", lambda port: False)
+    monkeypatch.setattr(lifecycle, "_wait_until", lambda predicate, timeout: True)
+    monkeypatch.setattr(lifecycle, "_write_marker", lambda port, pid: None)
+    monkeypatch.setattr(lifecycle.subprocess, "Popen", fake_popen)
+
+    lifecycle.ensure_fresh_streamlit(port=9999)
+
+    assert captured.get("creationflags") == lifecycle._NO_WINDOW
