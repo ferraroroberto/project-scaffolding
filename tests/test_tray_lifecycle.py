@@ -109,6 +109,28 @@ def test_tray_template_launch_args_survive_argv_parsing(tmp_path: Path) -> None:
     assert not out.get("SCRIPTDIR", "x").endswith("\\")
 
 
+def test_tray_template_is_ascii_only() -> None:
+    """A non-ASCII byte anywhere in the template corrupts non-interactive
+    --restart (#183).
+
+    The template opens with `chcp 65001`, switching the console codepage
+    mid-file. cmd.exe read-ahead-buffers a chunk of the batch file for parsing
+    at the codepage active when the buffer was filled, so a multi-byte UTF-8
+    character anywhere in that pre-fetch window (REM comments included) gets
+    misparsed once the switch lands, throwing spurious `'X' is not recognized
+    as an internal or external command` errors on unrelated later lines.
+    Removing every non-ASCII byte is the fix; this guard stops one creeping
+    back in. (The whole file, not just active lines: cmd's read-ahead buffers
+    REM comments too.)
+    """
+    raw = (ROOT / "tray.bat.template").read_bytes()
+    offenders = [offset for offset, byte in enumerate(raw) if byte > 0x7F]
+    assert not offenders, (
+        "tray.bat.template must be ASCII-only (#183); "
+        f"non-ASCII bytes at offsets {offenders}"
+    )
+
+
 def test_tray_lifecycle_helper_contains_restart_verification() -> None:
     helper = resolve_tray_lifecycle_path().read_text(encoding="utf-8")
 
