@@ -47,13 +47,16 @@ flowchart TB
   DATALOGS["data/\nlogs/app.log, input/, output/\n(gitignored)"]
 
   subgraph scriptsdir["scripts/"]
-    VERIFY["verify-before-ship.ps1\nbyte-compile -> ruff -> mypy --strict\n(vendored primitives) -> pytest"]
+    VERIFY["verify-before-ship.ps1\nbyte-compile -> ruff -> mypy --strict\n(vendored primitives) -> pytest (non-e2e)\n-> routed e2e (skip/static/full)"]
+    CLASSIFY["classify_e2e.py (vendor-verbatim, #180)\ndiff-proportionate e2e routing\nreads .fleet.toml [e2e] rules, fail-safe to full"]
     TSCERT["gen_tailscale_cert.py\nprovision/renew Tailscale HTTPS leaf"]
     BRANDGEN["brand_gen.py\nrender_set(): Lucide master SVG -> dark-tile\nPWA/tray/Stream Deck icon set (resvg-py)"]
   end
   VERIFY --> srcdir
   VERIFY --> appdir
   VERIFY --> testsdir
+  VERIFY -->|routes e2e phase via| CLASSIFY
+  CLASSIFY -.->|reads [e2e] rules from| FLEETTOML
 
   subgraph branddir["brand/ — fleet icon masters"]
     BRANDSVGS["catalog.json + 20 curated identity SVGs\nvendored verbatim from lucide-static"]
@@ -86,7 +89,7 @@ flowchart TB
   BRANDDOC -.->|documents| BRANDGEN
 
   CLAUDEMD["CLAUDE.md\n(+ one-line AGENTS.md pointer)\nagent conventions for derived repos"]
-  FLEETTOML[".fleet.toml\nfleet-map card"]
+  FLEETTOML[".fleet.toml\nfleet-map card + [e2e] routing rules (#180)"]
 
   subgraph external["External dependencies"]
     STREAMLIT["Streamlit"]

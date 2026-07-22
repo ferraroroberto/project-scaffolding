@@ -10,3 +10,97 @@
 layer       = "governance"
 icon        = "📐"
 description = "Canonical master — the scaffold &amp; CLAUDE.md every project derives from."
+
+# Diff-proportionate e2e routing (project-scaffolding#180). scripts/verify-
+# before-ship.ps1's browser phase classifies the branch's changed files
+# against the rules below (first match wins, in this order) instead of
+# always running the whole tests/e2e suite. Schema + rationale:
+# docs/e2e-routing.md. Mechanism: scripts/classify_e2e.py. A path matching no
+# rule below -- or a repo with no [e2e] table at all -- fails safe to the
+# full suite; this table only ever narrows what an *already-covered* diff
+# runs, never what an unmatched one runs.
+[e2e]
+static_pytest_target = "tests/e2e/test_smoke.py"
+static_browsers       = ["chromium"]
+full_pytest_target    = "tests/e2e"
+
+# Inert image/font assets under the vendored static tree -> smoke is enough.
+[[e2e.rule]]
+tier       = "static"
+prefix     = "app/webapp/static/"
+extensions = ["svg", "png", "jpg", "jpeg", "gif", "ico", "webp", "avif", "woff", "woff2", "ttf", "eot", "otf", "webmanifest"]
+
+# A vendored HTML fragment is pure markup with no behaviour of its own; its
+# .css/.js siblings are NOT covered by this rule and fall through to "full"
+# below (the component-contract harnesses in tests/e2e/ assert those).
+[[e2e.rule]]
+tier       = "static"
+prefix     = "app/webapp/static/_vendored/"
+extensions = ["html"]
+
+# Real browser surface -> full dual coverage.
+[[e2e.rule]]
+tier   = "full"
+prefix = "app/webapp/"
+[[e2e.rule]]
+tier   = "full"
+prefix = "app/tray/"
+[[e2e.rule]]
+tier   = "full"
+prefix = "app/views/"
+[[e2e.rule]]
+tier   = "full"
+prefix = "app/styles/"
+[[e2e.rule]]
+tier = "full"
+path = "app/app.py"
+# The e2e suite itself, and the Streamlit boot helper its conftest relies on.
+[[e2e.rule]]
+tier   = "full"
+prefix = "tests/e2e/"
+[[e2e.rule]]
+tier = "full"
+path = "tests/_streamlit_lifecycle.py"
+
+# Backend/tooling with no browser impact -> no browser suite needed.
+[[e2e.rule]]
+tier       = "none"
+prefix     = "src/"
+extensions = ["py"]
+[[e2e.rule]]
+tier       = "none"
+prefix     = "tests/"
+extensions = ["py"]
+[[e2e.rule]]
+tier   = "none"
+prefix = "scripts/"
+[[e2e.rule]]
+tier   = "none"
+prefix = "config/"
+[[e2e.rule]]
+tier   = "none"
+prefix = "docs/"
+[[e2e.rule]]
+tier   = "none"
+prefix = ".github/"
+[[e2e.rule]]
+tier       = "none"
+extensions = ["md"]
+[[e2e.rule]]
+tier = "none"
+path = ".fleet.toml"
+[[e2e.rule]]
+tier = "none"
+path = ".gitignore"
+[[e2e.rule]]
+tier = "none"
+path = "LICENSE"
+[[e2e.rule]]
+tier = "none"
+path = "AGENTS.md"
+[[e2e.rule]]
+tier = "none"
+path = "CLAUDE.md"
+[[e2e.rule]]
+tier       = "none"
+extensions = ["bat"]
