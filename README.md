@@ -177,9 +177,11 @@ The e2e port is `STREAMLIT_E2E_PORT` in `tests/_streamlit_lifecycle.py` (default
 & .\scripts\verify-before-ship.ps1
 ```
 
-It sequences, fail-fast: **byte-compile** → **ruff** (whole repo) → **mypy `--strict`** (vendor-verbatim primitives only) → **pytest** (unit + e2e). Strictness lives in `pyproject.toml` (`[tool.ruff.lint]` adds `UP` to ruff's defaults; `[tool.mypy]` sets `strict = true`); the script only sequences the tools.
+It sequences, fail-fast: **byte-compile** → **ruff** (whole repo) → **mypy `--strict`** (vendor-verbatim primitives only) → **pytest (unit, non-e2e)** → **routed e2e**. Strictness lives in `pyproject.toml` (`[tool.ruff.lint]` adds `UP` to ruff's defaults; `[tool.mypy]` sets `strict = true`); the script only sequences the tools.
 
-The mypy stage gates **vendor-verbatim primitives** — modules like `app/tray/single_instance.py` that consumers copy byte-identical and run through *their* `ruff` + `mypy --strict` gates. Gating them here means a canonical primitive can never ship lint- or type-dirty and redden every consumer's CI. When you add a new vendored primitive, append it to `$VendoredModules` in the script.
+The mypy stage gates **vendor-verbatim primitives** — modules like `app/tray/single_instance.py` and `scripts/classify_e2e.py` that consumers copy byte-identical and run through *their* `ruff` + `mypy --strict` gates. Gating them here means a canonical primitive can never ship lint- or type-dirty and redden every consumer's CI. When you add a new vendored primitive, append it to `$VendoredModules` in the script.
+
+The final **routed e2e** stage is diff-proportionate ([`docs/e2e-routing.md`](docs/e2e-routing.md)): instead of always running the whole `tests/e2e` browser suite, `scripts/classify_e2e.py` maps the branch's changed files to a tier declared in `.fleet.toml`'s `[e2e]` table — `skip` (backend/docs-only diff → no browser suite), `static` (inert assets → the narrow smoke target), or `full` (real UI/behaviour, or **any** unrecognized/mixed/empty diff → the whole suite). Routing is fail-safe: uncertainty always runs `full`. It only ever narrows an already-narrow diff, never an unmatched one.
 
 ## Extending the scaffold
 
