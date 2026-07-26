@@ -1,8 +1,16 @@
 """Session fixtures for the headless e2e regression suite.
 
-`streamlit_app` force-restarts Streamlit against the current code on disk
-(see `tests/_streamlit_lifecycle.py`) so the suite can never pass against a
-stale process. `static_server` serves `app/webapp/static` over HTTP for the
+`streamlit_app` defaults to a **disposable** instance: if the e2e port is
+free it boots a fresh Streamlit against the current code on disk (see
+`tests/_streamlit_lifecycle.py`); if the port is already occupied it
+*refuses* rather than silently killing or adopting whatever's there — a bare
+`pytest tests/e2e` must never touch a process it didn't start. Set
+`STREAMLIT_E2E_LIVE=1` to explicitly permit reclaiming (kill + fresh
+restart) an occupied port. See `CLAUDE.md` ("End-to-end UI testing" —
+live-app isolation) and `project-scaffolding#191`; reference implementation:
+`app-launcher`'s `LAUNCHER_E2E_LIVE` / `tests/e2e/conftest.py`.
+
+`static_server` serves `app/webapp/static` over HTTP for the
 vendored-component harnesses (their ESM imports don't run from `file://`).
 `pytest-playwright` supplies the `page` fixture.
 
@@ -27,6 +35,7 @@ from tests._streamlit_lifecycle import (
     STREAMLIT_E2E_PORT,
     ensure_fresh_streamlit,
     kill_streamlit_on_port,
+    port_is_in_use,
 )
 
 STATIC_DIR = Path(__file__).resolve().parents[2] / "app" / "webapp" / "static"
@@ -37,6 +46,11 @@ STATIC_DIR = Path(__file__).resolve().parents[2] / "app" / "webapp" / "static"
 # Widen for slow CI runners via E2E_DEFAULT_TIMEOUT_MS without a code change.
 _DEFAULT_TIMEOUT_MS = int(os.environ.get("E2E_DEFAULT_TIMEOUT_MS", "15000"))
 
+# Opt-in to reclaiming an already-occupied e2e port (#191). Loudly named and
+# opt-IN on purpose — the inverted opt-OUT shape (forgetting a flag silently
+# adopts a live app) is exactly the footgun this convention exists to avoid.
+_E2E_LIVE_ENV = "STREAMLIT_E2E_LIVE"
+
 
 class _QuietHandler(SimpleHTTPRequestHandler):
     def log_message(self, *args: object) -> None:  # noqa: D102 — silence per-request stderr noise
@@ -45,7 +59,25 @@ class _QuietHandler(SimpleHTTPRequestHandler):
 
 @pytest.fixture(scope="session")
 def streamlit_app() -> Iterator[str]:
-    """Boot a fresh Streamlit for the whole pytest session; kill it after."""
+    """Boot a disposable Streamlit for the whole pytest session; kill it after.
+
+    Refuses (does not kill or adopt) an occupied e2e port unless
+    `STREAMLIT_E2E_LIVE=1` explicitly opts in to reclaiming it (#191).
+    """
+    live_opt_in = os.environ.get(_E2E_LIVE_ENV) == "1"
+    if port_is_in_use(STREAMLIT_E2E_PORT) and not live_opt_in:
+        pytest.exit(
+            f"Refusing to touch the process already listening on "
+            f":{STREAMLIT_E2E_PORT} - a bare e2e run must not silently kill "
+            f"or adopt it. Set {_E2E_LIVE_ENV}=1 to explicitly allow "
+            "reclaiming this port (kill + fresh restart), or free the port "
+            "yourself first.",
+            returncode=2,
+        )
+    if live_opt_in:
+        print(f"[e2e] {_E2E_LIVE_ENV}=1 - reclaiming :{STREAMLIT_E2E_PORT}")
+    else:
+        print(f"[e2e] booting disposable Streamlit on :{STREAMLIT_E2E_PORT}")
     base_url = ensure_fresh_streamlit(STREAMLIT_E2E_PORT)
     try:
         yield base_url
