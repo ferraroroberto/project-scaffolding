@@ -6,9 +6,11 @@ free it boots a fresh Streamlit against the current code on disk (see
 *refuses* rather than silently killing or adopting whatever's there — a bare
 `pytest tests/e2e` must never touch a process it didn't start. Set
 `STREAMLIT_E2E_LIVE=1` to explicitly permit reclaiming (kill + fresh
-restart) an occupied port. See `CLAUDE.md` ("End-to-end UI testing" —
-live-app isolation) and `project-scaffolding#191`; reference implementation:
-`app-launcher`'s `LAUNCHER_E2E_LIVE` / `tests/e2e/conftest.py`.
+restart) an occupied port. The check-refuse-log policy itself is the
+vendor-verbatim `_e2e_live_guard.py` (issue #191/#194); this fixture owns
+only the Streamlit-specific boot/teardown around it. See `CLAUDE.md` ("End-to-
+end UI testing" — live-app isolation); reference implementation: `app-
+launcher`'s `LAUNCHER_E2E_LIVE` / `tests/e2e/conftest.py`.
 
 `static_server` serves `app/webapp/static` over HTTP for the
 vendored-component harnesses (their ESM imports don't run from `file://`).
@@ -35,8 +37,8 @@ from tests._streamlit_lifecycle import (
     STREAMLIT_E2E_PORT,
     ensure_fresh_streamlit,
     kill_streamlit_on_port,
-    port_is_in_use,
 )
+from tests.e2e._e2e_live_guard import require_disposable_instance
 
 STATIC_DIR = Path(__file__).resolve().parents[2] / "app" / "webapp" / "static"
 
@@ -62,22 +64,9 @@ def streamlit_app() -> Iterator[str]:
     """Boot a disposable Streamlit for the whole pytest session; kill it after.
 
     Refuses (does not kill or adopt) an occupied e2e port unless
-    `STREAMLIT_E2E_LIVE=1` explicitly opts in to reclaiming it (#191).
+    `STREAMLIT_E2E_LIVE=1` explicitly opts in to reclaiming it (#191/#194).
     """
-    live_opt_in = os.environ.get(_E2E_LIVE_ENV) == "1"
-    if port_is_in_use(STREAMLIT_E2E_PORT) and not live_opt_in:
-        pytest.exit(
-            f"Refusing to touch the process already listening on "
-            f":{STREAMLIT_E2E_PORT} - a bare e2e run must not silently kill "
-            f"or adopt it. Set {_E2E_LIVE_ENV}=1 to explicitly allow "
-            "reclaiming this port (kill + fresh restart), or free the port "
-            "yourself first.",
-            returncode=2,
-        )
-    if live_opt_in:
-        print(f"[e2e] {_E2E_LIVE_ENV}=1 - reclaiming :{STREAMLIT_E2E_PORT}")
-    else:
-        print(f"[e2e] booting disposable Streamlit on :{STREAMLIT_E2E_PORT}")
+    require_disposable_instance(STREAMLIT_E2E_PORT, _E2E_LIVE_ENV)
     base_url = ensure_fresh_streamlit(STREAMLIT_E2E_PORT)
     try:
         yield base_url
