@@ -12,6 +12,11 @@ Pillow>=10.0.0
 # (the auto-renew leg reads SAN + expiry to decide whether to renew the LE leaf).
 cryptography>=42.0.0
 
+# Pooled outbound HTTP client (src/pooled_http.py, #192) — real dependency for
+# a project that vendors this file, not pulled in for its own sake; declared
+# here because this repo's own copy is exercised by tests/test_pooled_http.py.
+requests>=2.31.0
+
 # Testing — unit (pytest) + headless e2e (pytest-playwright).
 # After install: .venv\Scripts\python.exe -m playwright install chromium
 pytest>=8.0.0
