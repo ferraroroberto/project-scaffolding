@@ -299,6 +299,34 @@ A correct restart is **adopt / reclaim / spawn** — re-attach to healthy owned 
 
 (Motivating incident: the 2026-07-09/10 tray cascade, `#144` → `#145`/`#146` → `#147`/`#148` → `#149`/`#150` — four defect waves in 48 hours, each reproducible at source with no sister repo involved, each discovered only *after* fanning out to ~6 trays and ~22 mechanical PRs.)
 
+## Restart/deploy coverage — merged is not shipped
+*Apply only if this project has more than one long-lived runtime component, or a runtime that lives outside the checkout, such that the project's restart or deploy recipe does not necessarily reach every live thing it owns.*
+
+A merged PR, a green gate, and a successful restart only prove that the *one component the restart step touched* is live. Two failure shapes share that same root cause — the finish flow reports "shipped" without observing the actual running target:
+
+- **Out-of-tree runtime.** The code lives in this repo, but the thing it changes runs somewhere else — a remote VM, a device, a tailnet peer. Merging changes nothing there until an explicit deploy step runs. (`home-automation#314` — a reminders config change merged and closed with the Home Assistant VM never receiving it, despite the repo already owning a working deploy mechanism for exactly this — `scripts/ha_config_sync.py`'s preflight/deploy/rollback/probe over SSH with `ha core check` validation. The mechanism existed; closing the issue didn't confirm it had actually been invoked and verified against the live VM.)
+- **In-tree, restart-excluded runtime.** The changed process lives in this repo and normally restarts with everything else — except one component is deliberately excluded from the standard restart, for a good reason (protecting live state) invisible from the code alone. (`app-launcher#611`/`#615` — a session-host fix merged, `tray.bat --restart` ran and verified the *webapp's* build sha, and the issue was reported shipped. `:8446` (the session-host) is deliberately excluded from that restart to protect live PTY sessions, so the fix was dead code for three more days — and the resulting half-restarted state, new webapp against old session-host, was worse than either whole version: before the fix, short messages submitted and only bulk ones stranded; after, nothing submitted at all, while the API still returned `{"ok": true}`.)
+
+**The invariant:** a change must never be reportable as shipped while it is merely merged. Either the flow observed the actual target running the new code, or it says plainly that it did not — and where liveness can't be determined (target unreachable, sha unresolvable), it reports **unknown**, never assumes fine.
+
+**Declare every not-fully-covered runtime component** in this repo's own `CLAUDE.md`, in the same "This repository" section as the restart recipe — one entry per component the standard restart/deploy does not reach:
+
+```markdown
+## <component name>
+- what/why: <what this component is; why it's excluded from the standard restart, or where it lives if out-of-tree>
+- update command: `<the one supported command>` (confirmation-gated if destructive)
+- liveness signal: `<field or probe>` — e.g. `GET /api/version`'s `<component>.stale`
+- NOT restarted/deployed by: `<the standard restart/finish flow>`
+```
+
+**Extend the build-identity endpoint per component, not just per process.** Where `/api/version` already exists (per "Webapp PWA required surfaces"), report a sub-block per not-fully-covered component: `{reachable, git_sha, captured_at, stale}` — `stale` compares that component's own captured identity (captured once, at its own process start/import, via a shared `build_info.py`-style helper — not read live) against the repo's current HEAD sha, and must be `None`/unknown rather than `false` when either side is unresolvable. For an out-of-tree target with no HTTP endpoint of its own, the equivalent is a probe against the target itself (e.g. hitting its live API to confirm a pushed config took effect) — the same "observe the target, not the repo" principle, just a different transport.
+
+**Surface the gap at verify time, not just at finish time.** Where a diff-classification mechanism already exists (e.g. `classify_e2e.py`'s path-to-tier routing), reuse its output to print an advisory warning in `verify-before-ship` when the diff touches a declared component's paths, naming the field to check before reporting the change as shipped. Advisory only — it must not fail the gate (the gate can't observe a remote or excluded target).
+
+**The finish flow's obligation:** when a project declares one or more not-covered components and the diff touched their paths, `/issue-finish`-shaped flows check that component's liveness signal after restarting and, if stale or unknown, state so explicitly — "merged but not yet live: `<component>` requires `<the declared manual action>`" — rather than reporting the issue shipped. Where the manual action needs a human (credentials, a physical device, an explicit destructive confirmation), the flow stops and names precisely what's needed rather than closing the issue as done.
+
+**Don't diverge.** The convention + the per-project declaration shape live here; the skill-side enforcement (reading the declaration, checking the liveness field, wording the finish summary) lives in `fleet-config`'s `skills/issue-finish/SKILL.md`, per the same split as the CI-expectations and UX-surface conventions above. Reference implementation proving this shape end-to-end: `app-launcher`'s `src/build_info.py` (shared git-sha + capture-timestamp helper) + `/api/version`'s `session_host` sub-block + `scripts/restart-session-host.ps1` (`-Confirm`-gated, manual-only, never wired into a normal ship flow) + `verify-before-ship.ps1`'s advisory warning reusing `classify_e2e.py`'s routing output (`app-launcher#615`). (Decision record: `ferraroroberto/project-scaffolding#199`; source instances `ferraroroberto/home-automation#314`, `ferraroroberto/app-launcher#611`/`#615`.)
+
 ---
 
 ## This repository
