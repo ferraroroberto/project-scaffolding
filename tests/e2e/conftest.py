@@ -16,6 +16,11 @@ launcher`'s `LAUNCHER_E2E_LIVE` / `tests/e2e/conftest.py`.
 vendored-component harnesses (their ESM imports don't run from `file://`).
 `pytest-playwright` supplies the `page` fixture.
 
+`pytest_sessionfinish` runs the leaked-browser-helper sweep
+(`_browser_sweep.py`, #203) once the whole session — fixtures included — is
+torn down, so a run that left a WebKit helper behind cleans up after itself
+instead of accumulating orphans that later block `git worktree remove`.
+
 The webapp uses no TLS locally, so no `browser_context_args` override is
 needed — unlike a self-signed-cert project, which would add
 `ignore_https_errors` here.
@@ -38,9 +43,11 @@ from tests._streamlit_lifecycle import (
     ensure_fresh_streamlit,
     kill_streamlit_on_port,
 )
+from tests.e2e._browser_sweep import sweep_browser_helpers
 from tests.e2e._e2e_live_guard import require_disposable_instance
 
-STATIC_DIR = Path(__file__).resolve().parents[2] / "app" / "webapp" / "static"
+REPO_ROOT = Path(__file__).resolve().parents[2]
+STATIC_DIR = REPO_ROOT / "app" / "webapp" / "static"
 
 # Explicit bounded default for Playwright action + navigation waits (#61).
 # Playwright's implicit 30 s stacks into opaque multi-minute hangs under
@@ -97,6 +104,22 @@ def static_server() -> Iterator[str]:
     """Serve app/webapp/static over HTTP on an ephemeral port for the session."""
     with serve_directory(STATIC_DIR) as base_url:
         yield base_url
+
+
+def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
+    """Sweep browser helpers this run orphaned inside *this* checkout (#203).
+
+    A session hook, not a fixture finalizer: it must run after *every* fixture
+    — including pytest-playwright's own session-scoped `browser` — has already
+    torn down, or the sweep would be looking at a browser that is still
+    legitimately running. Advisory by design: it reports and never changes
+    `exitstatus`, because an unkillable already-exited zombie is not a test
+    failure (see `_browser_sweep` for why those exist).
+    """
+    result = sweep_browser_helpers(REPO_ROOT)
+    print(f"\n{result.summary()}")
+    for entry in result.killed:
+        print(f"  reclaimed leaked helper: {entry}")
 
 
 @pytest.fixture(autouse=True)
