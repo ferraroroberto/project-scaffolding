@@ -400,6 +400,138 @@ without changing any test. Worst case on a wedge is a leaked driver process,
 not a hung suite. Reference implementation: `home-automation` PR #443
 (`tests/e2e/conftest.py`).
 
+### Post-run sweep for leaked browser helpers
+
+The watchdog above protects the *current* run's exit path from a
+*pre-existing* wedge. It says nothing about the browser's **child**
+processes — `WebKitNetworkProcess.exe`, `WebKitWebProcess.exe`,
+`WebKitGPUProcess.exe` — which the driver spawns per context and which can
+outlive the run. That gap let 31 stray `WebKitNetworkProcess` entries pile
+up on the fleet host over a single week (`project-scaffolding#203`), three of
+them holding a worktree directory as their working directory and blocking
+`git worktree remove` with a "busy" error nobody could explain.
+
+**Measure before you sweep — the residue is mostly already dead.** Probing
+those strays with `OpenProcess` + `GetExitCodeProcess` returns **exit code
+0**: they had already exited cleanly. Windows keeps an exited process's
+object alive until the last handle to it closes, and such an object still
+shows up in `tasklist`, WMI `Win32_Process`, and bulk `Get-Process` — while
+`taskkill`, `Stop-Process`, and `Get-Process -Id <pid>` all correctly answer
+*no such process*. That contradiction is not a mystery, it is the definition
+of a Windows zombie, and it is why "the orphan can't be killed" reports keep
+recurring. **A zombie is not a leak**: it holds no sockets and no CPU, only a
+process object (WMI still reports its last known ~27 MB working set, which is
+what makes it look alive). It goes away when the handle holder exits — or at
+reboot. Identifying that holder needs `SeDebugPrivilege`; from an unelevated
+session `DuplicateHandle` is denied on most system processes, so report the
+holder as **unknown** rather than guessing.
+
+**And measure the cascade before assuming it's broken.** On Playwright 1.61 /
+WebKit 2311 none of these abort shapes left a live helper behind — the Node
+driver notices its stdio pipe close and tears the browser tree down, and the
+helpers exit when their browser-main process dies:
+
+| Abort shape | Live helpers left |
+|---|---|
+| Clean `context.close()` + `browser.close()` + `playwright.stop()` | none |
+| `Stop-Process -Id <pytest pid>` (single PID, no tree) | none |
+| `taskkill /F /PID <browser main>` (no `/T`) | none |
+| `taskkill /F /T /PID <driver pid>` (the watchdog's own kill) | none |
+
+So a sweep's job is **not** to compensate for a broken cascade on the current
+stack; it is to reclaim whatever a *future* stack, a hard host kill, or an
+older pinned browser build leaves behind — and to say plainly which residue
+is unkillable rather than failing the gate over it.
+
+**The pattern — classify, then kill only what all three facts allow.** A kill
+needs the process to be really running, its parent to be dead (a *live*
+parent means an in-flight session: an agent's headed verification loop, a
+sibling job), and its working directory to be under the path this run owns.
+Anything the sweep can't establish gets its own verdict; nothing is ever
+folded into "killed" or "clean". Never kill by image name alone — that is the
+same discipline as the shared-Chrome-profile rule (never kill a live holder)
+and the tray-restart rule (never a blanket process-name kill).
+
+```python
+VERDICT_KILLED = "killed"
+VERDICT_ZOMBIE = "zombie"                       # already exited; nothing to kill
+VERDICT_PARENT_ALIVE = "skipped:parent-alive"   # someone's live session
+VERDICT_OUT_OF_SCOPE = "skipped:out-of-scope"   # a sibling checkout's helper
+VERDICT_CWD_UNKNOWN = "skipped:cwd-unknown"     # unknown, so hands off
+
+
+def classify(process: HelperProcess, scope: Path) -> str:
+    if process.exited:
+        return VERDICT_ZOMBIE
+    if process.parent_alive:
+        return VERDICT_PARENT_ALIVE
+    if process.cwd is None:
+        return VERDICT_CWD_UNKNOWN
+    if not path_is_within(process.cwd, scope):
+        return VERDICT_OUT_OF_SCOPE
+    return VERDICT_KILLED
+```
+
+Kill by **tree**, never by single PID — `/T` is what reaches the descendants
+a bare `Popen.kill()` cannot (same semantics as `fleet-config`'s
+`claude_progress.py:_kill_process_tree()`):
+
+```python
+subprocess.run(
+    ["taskkill", "/F", "/T", "/PID", str(pid)],
+    capture_output=True, timeout=10,
+    creationflags=subprocess.CREATE_NO_WINDOW,
+    check=False,
+)   # returncode 0 == killed, 128 == already gone; both are the desired end state
+```
+
+**Working directory is how you attribute a helper to a checkout.** Helpers
+inherit the pytest process's cwd, so a run inside `…/repo-wt-203` leaves
+helpers whose cwd is `…/repo-wt-203` — which is exactly why they block that
+worktree's removal. There is no Win32 accessor for another process's cwd; the
+practical route is
+`NtQueryInformationProcess(ProcessBasicInformation)` → `PEB` →
+`RTL_USER_PROCESS_PARAMETERS.CurrentDirectory.DosPath`, read with
+`ReadProcessMemory`. On x64 that is `PEB + 0x20` for `ProcessParameters` and
+`+ 0x38` for the `CurrentDirectory` `UNICODE_STRING` (its `Buffer` pointer 8
+bytes further in). Treat the reach as best-effort — degrade to `None` and
+report `skipped:cwd-unknown` rather than raising, exactly like `_driver_pid()`
+above.
+
+**Wire it as a session hook, not a fixture finalizer** — it must run after
+*every* fixture, including pytest-playwright's own session-scoped `browser`,
+has torn down, or it will be inspecting a browser that is still legitimately
+running:
+
+```python
+def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
+    result = sweep_browser_helpers(REPO_ROOT)
+    print(f"\n{result.summary()}")
+    for entry in result.killed:
+        print(f"  reclaimed leaked helper: {entry}")
+```
+
+Advisory by design: it reports and never changes `exitstatus`. An unkillable
+zombie is not a test failure, and a gate that goes red over one trains people
+to ignore it.
+
+Reference implementation: this repo's `tests/e2e/_browser_sweep.py`
+(stdlib-only, `mypy --strict`, proven by `tests/test_browser_sweep.py`),
+vendorable byte-identical in the same shape as `_e2e_live_guard.py` — the
+scope path is the only call-site argument. It also runs standalone, which is
+the thing to reach for when `git worktree remove` fails as busy:
+
+```powershell
+& .\.venv\Scripts\python.exe tests\e2e\_browser_sweep.py E:\automation\my-repo-wt-203 --dry-run
+```
+
+Two deliberate limits. Chromium is **not** swept: its helpers are plain
+`chrome.exe`, and the fleet's shared-Chrome-profile convention forbids
+touching anything that might be the user's own browser — only WebKit's
+unambiguously-Playwright image names are in the sweep set. And on non-Windows
+the sweep returns `supported=False`, which reads as **unknown**, never as a
+clean bill of health.
+
 ### Running it
 
 ```powershell

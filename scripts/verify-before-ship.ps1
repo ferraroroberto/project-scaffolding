@@ -46,6 +46,7 @@ $VendoredModules = @(
     "src/doc_capture/",
     "tests/e2e/_geometry.py",
     "tests/e2e/_e2e_live_guard.py",
+    "tests/e2e/_browser_sweep.py",
     "src/pooled_http.py",
     "scripts/classify_e2e.py"
 )

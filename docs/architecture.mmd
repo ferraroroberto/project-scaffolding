@@ -68,9 +68,11 @@ flowchart TB
     UNIT["test_*.py\none file per src/ module, hermetic\n(incl. test_doc_capture.py — browserless\nplan/hash/readme/adapter contract)"]
     E2E["e2e/conftest.py + test_smoke.py\npytest-playwright, force-restarts\nStreamlit via _streamlit_lifecycle.py\n+ test_vendored_components.py\n(drives _vendored/demo.html, light+dark)\n+ test_vendored_nav.py\n(mounts _vendored/nav skeleton, desktop+pill)"]
     GEOM["e2e/_geometry.py (vendor-verbatim, #157)\neffective 44px targets · overlap · overflow\nChart.js config reads · viewport x theme matrix\n+ test_geometry_helper.py\n+ _fixtures/geometry/ (hermetic twins + Chart.js)"]
+    SWEEP["e2e/_browser_sweep.py (vendor-verbatim, #203)\npytest_sessionfinish + standalone CLI\nclassify (running · orphaned · cwd-in-scope)\nthen taskkill /F /T; zombies reported, never killed\n+ test_browser_sweep.py"]
     TRAYBEHAVIOR["e2e/test_tray_lifecycle_behavior.py\nWindows-only, pytest.mark.slow, no browser\ndrives real tray.bat + the canonical tray_lifecycle.ps1\nvia _tray_harness.py's resolve_tray_lifecycle_path()\n+ _dummy_tray_app.py"]
   end
   E2E --> appdir
+  E2E -->|sweeps leaked helpers at session finish| SWEEP
   TRAYBEHAVIOR -->|materializes + drives| TRAYTMPL
   TRAYBEHAVIOR -->|resolves (shared path, falls back to\nfleet-config primary checkout), drives real lifecycle| FLEETCFGTRAY
 
