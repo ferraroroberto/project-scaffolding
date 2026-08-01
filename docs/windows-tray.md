@@ -4,7 +4,7 @@ Personal reference for projects that ship a **Windows tray app owning a long-liv
 
 > **Audience.** Me, plus any AI coding agent I hand a project to.
 > **Status.** Living reference, not a changelog. Update in place when the recipe changes.
-> **Canonical records.** The full tray-lifecycle gotcha series, oldest first: **#12** (single-instance via a named mutex, not a bound TCP port), [**#13**](https://github.com/ferraroroberto/project-scaffolding/issues/13) (`CREATE_NO_WINDOW` when shelling out to console tools), [**#29**](https://github.com/ferraroroberto/project-scaffolding/issues/29) (orphan-proof port reclaim on restart — this doc's original anchor), [**#39**](https://github.com/ferraroroberto/project-scaffolding/issues/39) (the single-instance mutex must hold *in-process* and adopt-or-spawn must be *race-safe*), [**#35**](https://github.com/ferraroroberto/project-scaffolding/issues/35) (non-blocking agent-side restart + child re-adoption), [**#54**](https://github.com/ferraroroberto/project-scaffolding/issues/54) (the full detect → kill → reclaim → start → verify lifecycle must live in one committed `.ps1` call, not inline `-Command` or cmd `for /f` capture, so a non-interactive `--restart` can't silently degrade to adopt-the-stale-build), and [**#153**](https://github.com/ferraroroberto/project-scaffolding/issues/153) (de-vendor `tray_lifecycle.ps1` from six per-app byte-copies to ONE shared, machine-local copy owned by `fleet-config`).
+> **Canonical records.** The full tray-lifecycle gotcha series, oldest first: **#12** (single-instance via a named mutex, not a bound TCP port), [**#13**](https://github.com/ferraroroberto/project-scaffolding/issues/13) (`CREATE_NO_WINDOW` when shelling out to console tools), [**#29**](https://github.com/ferraroroberto/project-scaffolding/issues/29) (orphan-proof port reclaim on restart — this doc's original anchor), [**#39**](https://github.com/ferraroroberto/project-scaffolding/issues/39) (the single-instance mutex must hold *in-process* and adopt-or-spawn must be *race-safe*), [**#35**](https://github.com/ferraroroberto/project-scaffolding/issues/35) (non-blocking agent-side restart + child re-adoption), [**#54**](https://github.com/ferraroroberto/project-scaffolding/issues/54) (the full detect → kill → reclaim → start → verify lifecycle must live in one committed `.ps1` call, not inline `-Command` or cmd `for /f` capture, so a non-interactive `--restart` can't silently degrade to adopt-the-stale-build), [**#153**](https://github.com/ferraroroberto/project-scaffolding/issues/153) (de-vendor `tray_lifecycle.ps1` from six per-app byte-copies to ONE shared, machine-local copy owned by `fleet-config`), and [**#201**](https://github.com/ferraroroberto/project-scaffolding/issues/201) (the webapp must self-heal: retry-with-backoff on the initial spawn, a dead/wedged-aware health watchdog, and a breadcrumb log file).
 
 ---
 
@@ -17,6 +17,7 @@ Personal reference for projects that ship a **Windows tray app owning a long-liv
 - Single-instance must be enforced **in the tray process** by a named mutex, not by the launcher `.bat`'s pre-check alone — two near-simultaneous starts both pass the `.bat`'s CIM blind-spot and both survive. Adopt-or-spawn must be **race-safe** (serialize the check-then-spawn), or two trays both spawn a duplicate service. One byte-identical primitive does both: `app/tray/single_instance.py`.
 - A restart is **adopt / reclaim / spawn**, not reclaim-only: re-attach to healthy owned children, kill stale port-holders, spawn only what's missing. Classify every child as **owned-and-cycled** (dies + respawns) or **linked-and-preserved** (PTY windows / launched apps that must survive a restart) — the reclaim sweep touches only the former.
 - The **agent** invokes `tray.bat --restart` fire-and-forget and verifies with a **bounded** poll of `GET /api/version` (hard timeout + attempt cap, fail loud) — never a foreground launch, never an unbounded wait, never re-deriving the kill by hand.
+- The webapp must **self-heal**: the initial spawn at tray boot retries with backoff (a lost transient race must not kill the webapp for the tray's lifetime), and a health watchdog distinguishes **dead** (not listening → auto-respawn) from **wedged** (listening but not answering → alert only). Every start/retry/wedge/respawn/recovery gets a line in a **breadcrumb file** — a `pythonw` tray has no stderr, so `logging` alone captures nothing. One byte-identical primitive does all three: `app/tray/watchdog.py`.
 
 ---
 
@@ -100,7 +101,7 @@ Don't re-derive the lifecycle logic per project. A copy-to-adapt **`tray.bat.tem
 
 **The lifecycle helper `tray_lifecycle.ps1` is machine infrastructure, not app code — it lives as ONE shared, machine-local copy owned by `fleet-config`, not a per-app vendored file.** Through `project-scaffolding#150`, this repo vendored it byte-for-byte into six sister repos the same way as the mutex primitive below; the 2026-07-09/10 tray cascade (#144→#150) then cost ~22 mechanical downstream PRs to fan out four bugfixes across those six copies, when every copy ran on the exact same Windows box and always propagated together anyway. `project-scaffolding#153` moved it out of the per-repo vendoring model: the canonical source now lives at `fleet-config`'s `tray/tray_lifecycle.ps1`, exposed at `%USERPROFILE%\.claude\tray\tray_lifecycle.ps1` by that repo's `install.ps1` junction (the same mechanism `fleet-config` already used for `hooks/` and `skills/`). Every `tray.bat` calls that one path directly — nothing to copy into a new tray app, and a fix merged in `fleet-config` is live everywhere instantly. `project-scaffolding` still owns the file's **canonical source** (edit it here, not in `fleet-config`, when changing its logic — `fleet-config` only carries the byte-copy consumed on this machine), its **behavioral e2e harness** (`tests/e2e/test_tray_lifecycle_behavior.py`, resolved via `_tray_harness.py`'s `resolve_tray_lifecycle_path()`), and this doc. `tray.bat` hard-errors (never silently no-ops) if the shared path is missing, naming `fleet-config`'s `install.ps1` as the fix — see the non-interactive-fix section above.
 
-The in-process single-instance + race-safe adopt-or-spawn primitive (gotcha #4) is the other channel and stays vendored exactly as before: **`app/tray/single_instance.py`** is **vendored verbatim** — copy it byte-for-byte into each tray app, never edit it per-app (the app-specific mutex *names* are passed at the call site, so the file stays identical fleet-wide). A fix made once in the scaffold re-propagates by re-copying. The split follows the channel rule in `app/webapp/static/_vendored/README.md`: `single_instance.py` is imported Python that ships *inside* each app's own process (an app-shipped asset → vendor + manifest); `tray_lifecycle.ps1` is shelled to by path and never imported, never ships anywhere but this one machine (machine-local infra → one shared copy). A new tray app therefore vendors **one** scaffold file — `single_instance.py` — plus the filled-in `tray.bat`, and needs `fleet-config` installed on the machine for the shared helper.
+The in-process single-instance + race-safe adopt-or-spawn primitive (gotcha #4) is the other channel and stays vendored exactly as before: **`app/tray/single_instance.py`** is **vendored verbatim** — copy it byte-for-byte into each tray app, never edit it per-app (the app-specific mutex *names* are passed at the call site, so the file stays identical fleet-wide). A fix made once in the scaffold re-propagates by re-copying. The split follows the channel rule in `app/webapp/static/_vendored/README.md`: `single_instance.py` is imported Python that ships *inside* each app's own process (an app-shipped asset → vendor + manifest); `tray_lifecycle.ps1` is shelled to by path and never imported, never ships anywhere but this one machine (machine-local infra → one shared copy). A new tray app therefore vendors **two** scaffold files — `single_instance.py` (gotcha #4) and `watchdog.py` (gotcha #5) — plus the filled-in `tray.bat`, and needs `fleet-config` installed on the machine for the shared helper. Both are imported Python running inside the app's own process, so both take the app-shipped channel; both keep the same rule that only *call-site arguments* differ per app, never the file's bytes.
 
 ## Gotcha #4 — single-instance must hold in-process; adopt-or-spawn must be race-safe
 
@@ -131,6 +132,83 @@ with cross_process_lock(rf"Global\whatsapp-radar-webapp-start-{self.config.port}
 The mutex *names* are the only per-app difference; the file is identical everywhere. A `Global\` prefix makes the lock span terminal-server sessions; use a bare/`Local\` name only if per-session scope is what you want.
 
 **The cascade caveat.** On a python.org "pythoncore" venv the symptom can *look* like a double-spawn even after the locks are correct: a venv-launched `pythonw.exe` re-execs the base interpreter, so each logical process appears as a parent/child PID pair (the venv stub waiting on the re-exec'd child). That is two PIDs, one logical process — distinct from the genuine double-spawn the locks fix. Pin which one you're seeing (parentage + CommandLine) before concluding the lock failed.
+
+## Gotcha #5 — the webapp must self-heal, and every attempt must leave a breadcrumb
+
+`project-scaffolding#201`. Gotchas #29/#39 make a *restart* deterministic; this is the orthogonal guarantee that the webapp survives the hours between restarts — and that when it doesn't, you can find out why. Three defects, all observed live, all from the same root: **the tray starts the webapp exactly once and then never looks at it again.**
+
+1. **The initial spawn is unretried.** `manager.start()` at tray boot races the world: the previous webapp's port may still be in `TIME_WAIT`, a `tailscale cert --check` renewal may be in flight, a dependency hub may not be up yet. One `OSError` and the webapp is dead for the tray's entire lifetime — no menu entry was clicked, so nothing ever tries again.
+2. **Nothing notices a later death or wedge.** A crashed uvicorn stops listening; a wedged one still `LISTEN`s but never answers `/healthz`. Both look identical from the tray's process table.
+3. **Neither event is diagnosable afterwards.** A tray launched by `pythonw` has **no `sys.stderr`**, so `logging.basicConfig()`'s default handler writes into the void and the boot-time traceback is captured nowhere. `photo-ocr#110`: the webapp died at tray boot and stayed down for **six days** with a completely empty log trail. Redirecting the uvicorn child's `stdout` to `DEVNULL` (the standard windowless-child recipe) does not help either — the missing record is the *tray's* own, not the child's.
+
+**The vendored primitive is `app/tray/watchdog.py`** — `retry_with_backoff`, `HealthWatchdog` (with `rearm()`), and `BreadcrumbLog`. Copy it byte-for-byte into a tray app; everything app-specific (the probe, the respawn action, the log path, the toast) is a call-site argument, exactly as `single_instance.py`'s mutex names are.
+
+**Dead vs wedged are not the same failure and must not get the same response.** `app-launcher#386` shipped its watchdog deliberately **alert-only**: auto-killing a process that is listening but not answering could mask whatever is actually wrong, and the failure mode wasn't understood well enough to automate. `photo-ocr#110` kept that precedent and split the cases — the decision lives in the caller's `on_wedge`, never inside the watchdog:
+
+| Symptom | Detection | Response |
+|---|---|---|
+| **dead** — not listening at all | `manager.is_port_in_use()` is False | auto-respawn, then `rearm()` if the respawn itself failed |
+| **wedged** — listening, `/healthz` silent | port in use but the probe fails | toast + breadcrumb only; recovery stays a human clicking *Restart webapp* |
+
+**`rearm()` is what stops a failed respawn going silent forever.** The watchdog is edge-triggered: `on_wedge` fires once and does not fire again until a *recovery* re-arms it. A handler that respawned and failed would therefore wait for a recovery that a genuinely-dead process can never produce on its own. Calling `rearm()` from inside the handler says "I acted; re-evaluate me next tick".
+
+The canonical wiring, at the end of `run_tray()`:
+
+```python
+from app.tray.watchdog import (
+    DEFAULT_STARTUP_RETRY_DELAYS_S, BreadcrumbLog, HealthWatchdog, retry_with_backoff,
+)
+
+# The breadcrumb file is the ONLY durable record under pythonw. Gitignored (*.log).
+wd_log = BreadcrumbLog(PROJECT_ROOT / "webapp" / "watchdog.log")
+
+def _on_start_attempt_failed(attempt: int, exc: BaseException) -> None:
+    wd_log(f"webapp start attempt {attempt} failed: {exc}")
+
+def _start() -> None:
+    try:
+        retry_with_backoff(
+            lambda: manager.start(wait=True),
+            DEFAULT_STARTUP_RETRY_DELAYS_S,
+            _on_start_attempt_failed,
+        )
+        wd_log("webapp started")
+    except Exception as exc:                      # exhausted -- loud, not silent
+        wd_log(f"webapp start FAILED permanently: {exc}")
+        _notify("<app> start failed", str(exc))
+
+threading.Thread(target=_start, daemon=True).start()
+
+watchdog_stop = threading.Event()
+
+def _on_wedge(count: int) -> None:
+    if manager.is_port_in_use():                  # wedged -> alert only (#386)
+        wd_log(f"webapp wedged ({count} consecutive failures) -- listening, not answering")
+        _notify("<app> webapp wedged", "Use Restart webapp")
+        return
+    wd_log(f"webapp not listening ({count} consecutive failures) -- respawning")
+    try:                                          # dead -> safe to respawn
+        manager.start(wait=True)
+        wd_log("webapp respawned successfully")
+    except Exception as exc:
+        wd_log(f"webapp respawn failed: {exc}")
+        watchdog.rearm()                          # try again next interval
+
+def _on_recover() -> None:
+    wd_log("webapp health recovered")
+
+watchdog = HealthWatchdog(manager.is_reachable, _on_wedge, _on_recover)
+threading.Thread(target=watchdog.run, args=(watchdog_stop,), daemon=True).start()
+# ... and watchdog_stop.set() on tray shutdown.
+```
+
+Notes that matter:
+
+- **Start the webapp on a background thread** so the tray icon still appears while uvicorn boots — the retry schedule (5 s / 15 s / 30 s) otherwise delays the tray by up to 50 s.
+- **The first probe fires after one full interval**, not immediately, so the watchdog doesn't race the spawn it supervises.
+- **The default threshold (3 consecutive failures at 60 s)** absorbs a normal tray-menu restart without a false alarm.
+- **`is_reachable` must be a real `/healthz` round-trip**, not "is the port bound" — the port check is precisely what cannot see a wedge.
+- **Breadcrumb writes are best-effort and never raise**; a full disk must not take the tray down. The file rotates to `watchdog.log.1` past ~1 MB so a tray running for months doesn't grow one unbounded.
 
 ## Re-adoption and child lifecycle on restart
 
@@ -165,6 +243,7 @@ No `Get-NetTCPConnection`/PID-hunting in the agent skill: that logic lives in `-
 
 ## Decision log
 
+- **2026-08-01** — Added **gotcha #5, tray webapp self-heal** (`project-scaffolding#201`), generalizing two independently-built sister implementations into one vendored primitive `app/tray/watchdog.py`. `app-launcher#386` built the edge-triggered `HealthWatchdog` first and made it deliberately **alert-only** — a wedged-but-listening process' failure mode wasn't understood well enough to auto-kill. `photo-ocr#110` then hit the worse variant (the webapp never came up at all after tray boot; **six days** of silent downtime with zero log trail, because a `pythonw` tray has no `sys.stderr` for `logging.basicConfig()` to write to), ported the watchdog, and added the three pieces this scaffold now carries: **retry-with-backoff on the initial spawn** (a transient race no longer kills the webapp for the tray's lifetime), a **dead-vs-wedged split** (not listening → auto-respawn; listening but silent → alert only, keeping #386's precedent), and **`rearm()`** (a handler that already respawned asks to be re-evaluated next tick instead of waiting for a recovery a dead process can never produce). The **breadcrumb file** is the load-bearing third piece and the one neither `logging` nor a `stdout=DEVNULL` child redirection provides: `webapp/watchdog.log`, gitignored via a new `*.log` rule, best-effort writes that never raise, rotating past ~1 MB. Deliberately **not** generalized into the primitive: the dead-vs-wedged *decision* itself, which stays in the caller's `on_wedge` (it needs the app's own port/manager knowledge, and #386's alert-only stance is a judgment call per app) — the doc carries the canonical wiring instead. Gated by `tests/test_watchdog.py` and `mypy --strict` via `$VendoredModules`. Propagation to `app-launcher` (upgrade its alert-only watchdog to the dead/wedged + `rearm()` shape) and to the trays with neither piece (`voice-transcriber`, `home-automation`, `whatsapp-radar`, `grocery-shopping-automation`) is a follow-on `/propagate-vendored` wave, subject to the propagation freeze in `CLAUDE.md`.
 - **2026-07-10** — **GO** on `project-scaffolding#153`: de-vendored `tray_lifecycle.ps1` from six per-app byte-copies to ONE shared, machine-local copy owned by `fleet-config`. Reasoning: the file is machine infrastructure, not app code — every copy executes on this one Windows box, nothing ever ships to another environment, and in practice every fix wave already propagated to all six trays anyway (the 2026-07-09/10 cascade, #144→#150, cost ~22 mechanical downstream PRs where a single shared copy would have cost the four scaffold PRs, full stop). Channel rule recorded in `app/webapp/static/_vendored/README.md`: "does it ship with the app?" — app-shipped assets (UI components here, `single_instance.py` for the tray) stay vendored + manifest + `/propagate-vendored`; machine-local infra (`tray_lifecycle.ps1`, the first instance) moves to one shared junctioned copy in `fleet-config`; specs/conventions stay at `CLAUDE.md`/`design.md` altitude, never copied. Landed as one wave: `fleet-config#340` (the shared copy + `install.ps1` junction), this repo's closing PR (template + delete + docs + tests), and six sister-repo PRs (`app-launcher`, `home-automation`, `local-llm-hub`, `photo-ocr`, `voice-transcriber`, `whatsapp-radar`) — all six adopters' prior copies verified byte-identical to this repo's pre-move canonical file before the swap. `app/tray/single_instance.py` stays vendored (imported Python that ships inside each app's process, not a shelled-to helper) — confirmed during planning per the issue's open question.
 - **2026-07-10** — Fixed the canonical template's own `launch` call (`project-scaffolding#145`), found the first time the post-#54 template was exercised **live** rather than statically (`photo-ocr#98`). `%~dp0` ends in a trailing backslash, and Windows argv parsing treats an odd run of backslashes before a closing quote as escaping it — so `-ScriptDir "%SCRIPT_DIR%"` swallowed the rest of the command line and `-TrayMatch` / `-Ports` reached the helper **empty**. Detect matched nothing, reclaim reclaimed nothing, and `--restart` degraded to exactly the adopt-the-stale-build start #54 exists to prevent: the fix reintroduced the bug it fixed. `SCRIPT_DIR` keeps its trailing separator for the path joins; a de-slashed `SCRIPT_DIR_ARG` is passed as the argument. Guarded by `tests/test_tray_lifecycle.py::test_tray_template_launch_args_survive_argv_parsing`, which drives the real template through a real `cmd` + `powershell -File` and reads the parsed switches back — the text-grep template tests could not see this, and did not.
 - **2026-07-08** — Documented the **`CREATE_NO_WINDOW`** convention (`project-scaffolding#13`), the fleet's second tray-lifecycle gotcha, after `local-llm-hub`'s Hub-tab health poll flashed a console window every 5–10s shelling to `docker info`/`nvidia-smi` without the flag. Out of scope here since the console-subprocess pattern applies to any Windows tray/daemon/GUI app generally, not the restart lifecycle this doc covers (same split as the note directly below) — the convention + worked helper live in `docs/app-onboarding.md` §1 and the `CLAUDE.md` "Windows console-subprocess suppression (`CREATE_NO_WINDOW`)" section instead.

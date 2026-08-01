@@ -18,7 +18,7 @@ flowchart TB
   subgraph appdir["app/ — Streamlit UI"]
     APPPY["app.py\npage config, sidebar,\nlight/dark toggle, st.navigation"]
     VIEWS["views/\nwelcome.py, pipeline_runner.py\none render() per file"]
-    TRAYLIB["tray/\nsingle_instance.py (named-mutex primitive, vendor-verbatim)"]
+    TRAYLIB["tray/\nsingle_instance.py (named-mutex primitive, vendor-verbatim)\nwatchdog.py (spawn retry/backoff + dead-vs-wedged\nhealth watchdog + breadcrumb log, vendor-verbatim, #201)"]
     WEBVEND["webapp/static/_vendored/\nnav/ (bottom-tab nav) · icons/ (Lucide sprite)\ncard/ · disclosure/ · modal/\nempty-state/ · switch/ · icon-tile/ · button/\nrange-tab/ · page-foot/ · home-head/ · select-native/\n+ demo.html (gallery / render harness)"]
     STYLES["styles/light.css\nruntime CSS overlay"]
     STCFG[".streamlit/config.toml\nnative dark theme"]
@@ -65,7 +65,7 @@ flowchart TB
   BRANDGEN -.->|imported via known local path by| DOWNSTREAM["downstream projects'\nscripts/gen_icons.py\n(app-launcher, photo-ocr, voice-transcriber,\nlocal-llm-hub, whatsapp-radar, home-automation)"]
 
   subgraph testsdir["tests/"]
-    UNIT["test_*.py\none file per src/ module, hermetic\n(incl. test_doc_capture.py — browserless\nplan/hash/readme/adapter contract)"]
+    UNIT["test_*.py\none file per src/ module, hermetic\n(incl. test_doc_capture.py — browserless\nplan/hash/readme/adapter contract;\ntest_watchdog.py — retry/edge-transition/breadcrumb,\nno sleeping, no threads)"]
     E2E["e2e/conftest.py + test_smoke.py\npytest-playwright, force-restarts\nStreamlit via _streamlit_lifecycle.py\n+ test_vendored_components.py\n(drives _vendored/demo.html, light+dark)\n+ test_vendored_nav.py\n(mounts _vendored/nav skeleton, desktop+pill)"]
     GEOM["e2e/_geometry.py (vendor-verbatim, #157)\neffective 44px targets · overlap · overflow\nChart.js config reads · viewport x theme matrix\n+ test_geometry_helper.py\n+ _fixtures/geometry/ (hermetic twins + Chart.js)"]
     SWEEP["e2e/_browser_sweep.py (vendor-verbatim, #203)\npytest_sessionfinish + standalone CLI\nclassify (running · orphaned · cwd-in-scope)\nthen taskkill /F /T; zombies reported, never killed\n+ test_browser_sweep.py"]
