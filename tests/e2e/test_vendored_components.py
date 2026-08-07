@@ -14,7 +14,9 @@ contracts" + the component token blocks); expected colors are the sRGB spec
 values (the demo page omits the P3 twins on purpose).
 
 The `nav/` component has its own harness — `test_vendored_nav.py` — because a
-fixed, body-level nav can't share the gallery's scrolling page.
+fixed, body-level nav can't share the gallery's scrolling page. The
+computed-style primitives both harnesses need (`style`, `set_theme`, `rgba`)
+live once in `_color_assertions.py` (#208).
 """
 
 from __future__ import annotations
@@ -24,6 +26,10 @@ import re
 import pytest
 from playwright.sync_api import Page, expect
 
+from tests.e2e._color_assertions import rgba as _rgba
+from tests.e2e._color_assertions import set_theme as _set_theme
+from tests.e2e._color_assertions import style as _style
+
 
 @pytest.fixture()
 def gallery(static_server: str, page: Page) -> Page:
@@ -31,37 +37,6 @@ def gallery(static_server: str, page: Page) -> Page:
     page.goto(f"{static_server}/_vendored/demo.html")
     page.wait_for_selector("body[data-demo-ready='1']")
     return page
-
-
-def _style(page: Page, selector: str, prop: str) -> str:
-    return page.eval_on_selector(
-        selector, "(el, prop) => getComputedStyle(el)[prop]", prop
-    )
-
-
-def _set_theme(page: Page, theme: str) -> None:
-    page.evaluate(
-        "(t) => { document.documentElement.dataset.theme = t; }", theme
-    )
-
-
-_RGBA_RE = re.compile(r"rgba?\((\d+), (\d+), (\d+)(?:, ([\d.]+))?\)")
-# Chromium serializes a computed color-mix() as `color(srgb R G B / A)` with
-# 0-1 float channels (legacy rgba() only when no color-mix is involved).
-_COLOR_SRGB_RE = re.compile(r"color\(srgb ([\d.]+) ([\d.]+) ([\d.]+)(?: / ([\d.]+))?\)")
-
-
-def _rgba(color: str) -> tuple[int, int, int, float]:
-    """Parse a getComputedStyle color string into (r, g, b, alpha 0-1)."""
-    m = _RGBA_RE.match(color)
-    if m:
-        a = float(m.group(4)) if m.group(4) is not None else 1.0
-        return int(m.group(1)), int(m.group(2)), int(m.group(3)), a
-    m = _COLOR_SRGB_RE.match(color)
-    assert m, f"unexpected color format: {color}"
-    a = float(m.group(4)) if m.group(4) is not None else 1.0
-    return (round(float(m.group(1)) * 255), round(float(m.group(2)) * 255),
-            round(float(m.group(3)) * 255), a)
 
 
 def _wait_bg(page: Page, selector: str, expected: str) -> None:

@@ -24,6 +24,7 @@ from pathlib import Path
 from collections.abc import Callable
 
 from src.no_window import NO_WINDOW
+from tests._port_probe import listening_pids
 
 _ROOT = Path(__file__).resolve().parent.parent
 _APP = _ROOT / "app" / "app.py"
@@ -43,36 +44,9 @@ def port_is_in_use(port: int) -> bool:
         return sock.connect_ex(("127.0.0.1", port)) == 0
 
 
-def _listening_pids(port: int) -> list[str]:
-    """PIDs LISTENing on ``port`` (Windows netstat / POSIX lsof)."""
-    if sys.platform == "win32":
-        out = subprocess.run(
-            ["netstat", "-ano", "-p", "TCP"],
-            capture_output=True, text=True, check=False,
-            creationflags=NO_WINDOW,
-        ).stdout
-        pids = set()
-        for line in out.splitlines():
-            parts = line.split()
-            if (
-                len(parts) >= 5
-                and parts[3] == "LISTENING"
-                and parts[1].endswith(f":{port}")
-            ):
-                pids.add(parts[4])
-        return sorted(pids)
-    out = subprocess.run(
-        # no-window-exempt: POSIX-only branch (guarded by sys.platform above);
-        # CREATE_NO_WINDOW does not exist off Windows.
-        ["lsof", "-ti", f"tcp:{port}", "-sTCP:LISTEN"],
-        capture_output=True, text=True, check=False,
-    ).stdout
-    return [pid for pid in out.split() if pid]
-
-
 def kill_streamlit_on_port(port: int) -> None:
     """Force-kill whatever process is LISTENing on ``port`` (best effort)."""
-    for pid in _listening_pids(port):
+    for pid in listening_pids(port):
         try:
             if sys.platform == "win32":
                 subprocess.run(

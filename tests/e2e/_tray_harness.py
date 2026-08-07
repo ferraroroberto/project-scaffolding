@@ -32,6 +32,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from src.no_window import NO_WINDOW
+from tests._port_probe import listening_pids
 
 _HERE = Path(__file__).resolve()
 ROOT = _HERE.parents[2]
@@ -326,19 +327,6 @@ def wait_for_tray_pids(venv_dir: Path, tray_match: str, timeout: float = 15.0) -
     return previous or []
 
 
-def _listening_pids_on_port(port: int) -> list[str]:
-    out = subprocess.run(
-        ["netstat", "-ano", "-p", "TCP"],
-        capture_output=True, text=True, creationflags=NO_WINDOW,
-    ).stdout
-    pids = set()
-    for line in out.splitlines():
-        parts = line.split()
-        if len(parts) >= 5 and parts[3] == "LISTENING" and parts[1].endswith(f":{port}"):
-            pids.add(parts[4])
-    return sorted(pids)
-
-
 def cleanup_env(env: TrayEnv) -> None:
     """Best-effort teardown so a failed assertion never leaks a process.
 
@@ -360,7 +348,7 @@ def cleanup_env(env: TrayEnv) -> None:
         ],
         capture_output=True, timeout=20, creationflags=NO_WINDOW,
     )
-    for pid in _listening_pids_on_port(env.port):
+    for pid in listening_pids(env.port):
         subprocess.run(
             ["taskkill", "/T", "/F", "/PID", pid],
             capture_output=True, creationflags=NO_WINDOW,

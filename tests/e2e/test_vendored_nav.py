@@ -9,16 +9,21 @@ The regression it exists to catch: `nav-tabs.css` used to hide `.tab-icon` on
 desktop and reveal a `.tab-emoji` span instead, while every real adopter ships
 SVG icons and no emoji span — so the desktop segmented control rendered
 label-only tabs with no icon at all, silently, in five apps.
+
+The computed-style primitives this harness shares with the gallery's
+(`style`, `set_theme`, `rgba`) live once in `_color_assertions.py` (#208).
 """
 
 from __future__ import annotations
 
-import re
 from collections.abc import Iterator
 
 import pytest
 from playwright.sync_api import Browser, Page, expect
 
+from tests.e2e._color_assertions import rgba as _rgba
+from tests.e2e._color_assertions import set_theme as _set_theme
+from tests.e2e._color_assertions import style as _style
 from tests.e2e.conftest import STATIC_DIR
 
 NAV_DIR = STATIC_DIR / "_vendored" / "nav"
@@ -30,30 +35,6 @@ _DESKTOP_ICON_PX = 14.72 * 1.05
 _ACCENT = "rgb(9, 105, 218)"
 _ACCENT_DARK = "rgb(47, 129, 247)"
 _MUTED = "rgb(101, 109, 118)"
-
-_RGBA_RE = re.compile(r"rgba?\((\d+), (\d+), (\d+)(?:, ([\d.]+))?\)")
-# Chromium serializes a computed color-mix() as `color(srgb R G B / A)` with
-# 0-1 float channels (legacy rgba() only when no color-mix is involved).
-_COLOR_SRGB_RE = re.compile(r"color\(srgb ([\d.]+) ([\d.]+) ([\d.]+)(?: / ([\d.]+))?\)")
-
-
-def _rgba(color: str) -> tuple[int, int, int, float]:
-    """Parse a getComputedStyle color string into (r, g, b, alpha 0-1)."""
-    m = _RGBA_RE.match(color)
-    if m:
-        a = float(m.group(4)) if m.group(4) is not None else 1.0
-        return int(m.group(1)), int(m.group(2)), int(m.group(3)), a
-    m = _COLOR_SRGB_RE.match(color)
-    assert m, f"unexpected color format: {color}"
-    a = float(m.group(4)) if m.group(4) is not None else 1.0
-    return (round(float(m.group(1)) * 255), round(float(m.group(2)) * 255),
-            round(float(m.group(3)) * 255), a)
-
-
-def _set_theme(page: Page, theme: str) -> None:
-    page.evaluate(
-        "(t) => { document.documentElement.dataset.theme = t; }", theme
-    )
 
 
 def _alpha(color: str) -> float:
@@ -129,12 +110,6 @@ def nav_mobile(static_server: str, browser: Browser) -> Iterator[Page]:
         yield page
     finally:
         context.close()
-
-
-def _style(page: Page, selector: str, prop: str) -> str:
-    return page.eval_on_selector(
-        selector, "(el, prop) => getComputedStyle(el)[prop]", prop
-    )
 
 
 def test_skeleton_ships_no_emoji_span() -> None:
