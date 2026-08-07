@@ -42,12 +42,21 @@ Clone this directory, rename it, and start building.
 
 ## Setup
 
-```bash
-cd E:\automation\project-scaffolding
-python -m venv .venv
-.venv\Scripts\activate
-pip install -r requirements.txt
+From the repo root, after cloning (Windows / PowerShell):
+
+```powershell
+py -m venv .venv
+& .\.venv\Scripts\python.exe -m pip install -r requirements.txt
 ```
+
+POSIX:
+
+```bash
+python3 -m venv .venv
+./.venv/bin/python -m pip install -r requirements.txt
+```
+
+Never activate the venv — invoke its interpreter directly, as above and everywhere else in this README. That keeps every command copy-pasteable into a script, a hook, or an agent tool call, none of which inherit an `activate` from an interactive shell.
 
 ## Run
 
@@ -153,7 +162,9 @@ Read settings from `src/config.py`, not from `os.environ` directly. Add new keys
 Two layers, both under `tests/`:
 
 - **Unit** (`tests/test_*.py`) — one file per `src/` module, hermetic. Runs in well under a second.
-- **Headless e2e** (`tests/e2e/`) — `pytest-playwright` against a real browser. The `streamlit_app` session fixture (`tests/e2e/conftest.py`) **force-restarts Streamlit against the current code on disk** via `tests/_streamlit_lifecycle.py`, so the suite can never pass against a stale process. One example smoke test ships; expand per the regression-suite rules in `CLAUDE.md` ("End-to-end UI testing"). `tests/e2e/test_tray_lifecycle_behavior.py` is the odd one out — no browser, Windows-only, `pytest.mark.slow` — it drives the real `tray.bat.template` + the canonical `tray_lifecycle.ps1` (project-scaffolding#153: the ONE shared, machine-local copy owned by `fleet-config`, resolved via `_tray_harness.py`'s `resolve_tray_lifecycle_path()`) against a dummy stdlib HTTP(S) app through a real cold-start/restart/verify cycle (`project-scaffolding#152`); see `tests/e2e/_tray_harness.py` for the shared plumbing. `tests/e2e/test_geometry_helper.py` proves the vendor-verbatim rendered-geometry helper (`_geometry.py`, #157) against its hermetic twin fixtures — every check passes on the compliant twin and fails on the violating twin at all eight 320-772px × light/dark matrix legs (two-engine run needs a one-time `playwright install webkit`).
+- **Headless e2e** (`tests/e2e/`) — `pytest-playwright` against a real browser. The `streamlit_app` session fixture (`tests/e2e/conftest.py`) **boots a disposable instance and refuses an occupied port** (`#191`/`#194`): before booting anything it checks the e2e port through the vendor-verbatim guard (`_e2e_live_guard.py`'s `require_disposable_instance`) and, with no opt-in set, ends the run rather than killing or adopting a process it did not start — a bare `pytest tests/e2e` must never drive a live app. On a free port it boots fresh against the current code on disk via `tests/_streamlit_lifecycle.py`, so the suite can never pass against a stale process. Set `STREAMLIT_E2E_LIVE=1` to explicitly permit reclaiming an occupied port (see below); if a run exits with the guard's refusal, that flag — not a manual kill — is the documented way past it.
+  - The suite is five files, **36 test functions / 71 collected items** (the browser and viewport parametrisation accounts for the difference): `test_smoke.py` (the example smoke test), `test_geometry_helper.py` (the rendered-geometry helper), `test_tray_lifecycle_behavior.py` (the tray lifecycle), and the two vendored-component harnesses `test_vendored_components.py` + `test_vendored_nav.py`. Expand per the regression-suite rules in `CLAUDE.md` ("End-to-end UI testing") — the target is under 15 tests *per project*; this scaffold carries more because it is also the proving ground for the vendor-verbatim primitives it ships.
+  - `tests/e2e/test_tray_lifecycle_behavior.py` is the odd one out — no browser, Windows-only, `pytest.mark.slow` — it drives the real `tray.bat.template` + the canonical `tray_lifecycle.ps1` (project-scaffolding#153: the ONE shared, machine-local copy owned by `fleet-config`, resolved via `_tray_harness.py`'s `resolve_tray_lifecycle_path()`) against a dummy stdlib HTTP(S) app through a real cold-start/restart/verify cycle (`project-scaffolding#152`); see `tests/e2e/_tray_harness.py` for the shared plumbing. `tests/e2e/test_geometry_helper.py` proves the vendor-verbatim rendered-geometry helper (`_geometry.py`, #157) against its hermetic twin fixtures — every check passes on the compliant twin and fails on the violating twin at all eight 320-772px × light/dark matrix legs (two-engine run needs a one-time `playwright install webkit`).
 
 One-time setup:
 
@@ -172,7 +183,13 @@ Run (POSIX: swap `.\.venv\Scripts\python.exe` for `./.venv/bin/python`):
 
 The e2e port is `STREAMLIT_E2E_PORT` in `tests/_streamlit_lifecycle.py` (default `8766`) — change it per project so two scaffolded projects don't collide.
 
-**Force-restart the dev Streamlit yourself** — the same thing the e2e fixture does, handy when an edit isn't showing up in the browser:
+`STREAMLIT_E2E_LIVE=1` is the one opt-in that lets the fixture **act on** that port when something is already listening on it — a kill + fresh restart through this repo's own `ensure_fresh_streamlit` helper, never a by-hand kill. Unset (the default), an occupied port is a hard refusal with a message naming the flag, not a silent adoption. Opt-**in** on purpose: forgetting an opt-*out* flag is what silently re-enables driving a live app. This scaffold's Streamlit dev server is stateless and cheap to restart, which is what makes reclaiming a legitimate choice here — a host holding user state (a session-host, a worker with in-flight jobs) gets its own disposable instance unconditionally instead. See `CLAUDE.md` ("End-to-end UI testing").
+
+```powershell
+$env:STREAMLIT_E2E_LIVE = "1"; & .\.venv\Scripts\python.exe -m pytest tests/e2e
+```
+
+**Force-restart the dev Streamlit yourself** — the same thing the e2e fixture does *under `STREAMLIT_E2E_LIVE=1`*, handy when an edit isn't showing up in the browser:
 
 ```powershell
 & .\.venv\Scripts\python.exe -c "from tests._streamlit_lifecycle import ensure_fresh_streamlit; ensure_fresh_streamlit()"

@@ -66,7 +66,8 @@ flowchart TB
 
   subgraph testsdir["tests/"]
     UNIT["test_*.py\none file per src/ module, hermetic\n(incl. test_doc_capture.py — browserless\nplan/hash/readme/adapter contract;\ntest_watchdog.py — retry/edge-transition/breadcrumb,\nno sleeping, no threads)"]
-    E2E["e2e/conftest.py + test_smoke.py\npytest-playwright, force-restarts\nStreamlit via _streamlit_lifecycle.py\n+ test_vendored_components.py\n(drives _vendored/demo.html, light+dark)\n+ test_vendored_nav.py\n(mounts _vendored/nav skeleton, desktop+pill)"]
+    MASTERSYNC["test_claude_master_sync.py\nasserts docs/agents/CLAUDE.master.md's body\nis byte-identical to CLAUDE.md's\n(footer excluded) — #59/#211 drift guard"]
+    E2E["e2e/conftest.py + test_smoke.py\npytest-playwright, boots a disposable\nStreamlit via _streamlit_lifecycle.py\n(occupied port refused unless STREAMLIT_E2E_LIVE)\n+ test_vendored_components.py\n(drives _vendored/demo.html, light+dark)\n+ test_vendored_nav.py\n(mounts _vendored/nav skeleton, desktop+pill)"]
     GEOM["e2e/_geometry.py (vendor-verbatim, #157)\neffective 44px targets · overlap · overflow\nChart.js config reads · viewport x theme matrix\n+ test_geometry_helper.py\n+ _fixtures/geometry/ (hermetic twins + Chart.js)"]
     SWEEP["e2e/_browser_sweep.py (vendor-verbatim, #203)\npytest_sessionfinish + standalone CLI\nclassify (running · orphaned · cwd-in-scope)\nthen taskkill /F /T; zombies reported, never killed\n+ test_browser_sweep.py"]
     TRAYBEHAVIOR["e2e/test_tray_lifecycle_behavior.py\nWindows-only, pytest.mark.slow, no browser\ndrives real tray.bat + the canonical tray_lifecycle.ps1\nvia _tray_harness.py's resolve_tray_lifecycle_path()\n+ _dummy_tray_app.py"]
@@ -85,6 +86,7 @@ flowchart TB
     BRANDDOC["brand-icons.md"]
   end
   AGENTSDIR -.->|source of truth for| CLAUDEMD
+  MASTERSYNC -.->|asserts CLAUDE.master.md == CLAUDE.md body| AGENTSDIR
   TRAYDOC -.->|documents| TRAYLIB
   TRAYDOC -.->|documents ownership of| FLEETCFGTRAY
   ONBOARD -.->|links| TRAYDOC
