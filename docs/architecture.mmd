@@ -33,6 +33,7 @@ flowchart TB
   subgraph srcdir["src/ — non-UI Python (reusable from CLI + tests)"]
     CONFIG["config.py\npaths + env-driven settings"]
     LOGGER["logger.py\nterminal + rotating file +\nStreamlit live panel, one log.info() call"]
+    NOWINDOW["no_window.py (#209)\nthe ONE CREATE_NO_WINDOW flag\nevery subprocess spawn imports\n(vendor-verbatim files keep a local copy)"]
     PIPELINES["pipelines/\nexample_pipeline.py\none run() per file, returns summary dict"]
     NOTIFY["notify/\nbase.py, factory.py, config.py, telegram.py\nvendor-verbatim Telegram notifier"]
     DOCCAP["doc_capture/\nengine.py + adapters.py (streamlit | url)\n+ launch.py + __main__.py (CLI)\nvendor-verbatim doc-capture screenshot engine\n(manifest-driven, fail-safe-masked,\ninput-hash-idempotent + README tour regen)"]
@@ -74,6 +75,10 @@ flowchart TB
   end
   E2E --> appdir
   E2E -->|sweeps leaked helpers at session finish| SWEEP
+  TSCERT -->|creationflags=NO_WINDOW| NOWINDOW
+  UNIT -->|creationflags=NO_WINDOW| NOWINDOW
+  E2E -->|creationflags=NO_WINDOW| NOWINDOW
+  TRAYBEHAVIOR -->|creationflags=NO_WINDOW| NOWINDOW
   TRAYBEHAVIOR -->|materializes + drives| TRAYTMPL
   TRAYBEHAVIOR -->|resolves (shared path, falls back to\nfleet-config primary checkout), drives real lifecycle| FLEETCFGTRAY
 

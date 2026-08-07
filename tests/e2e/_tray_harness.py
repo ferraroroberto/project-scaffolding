@@ -31,6 +31,8 @@ import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
 
+from src.no_window import NO_WINDOW
+
 _HERE = Path(__file__).resolve()
 ROOT = _HERE.parents[2]
 DUMMY_APP = _HERE.parent / "_dummy_tray_app.py"
@@ -90,8 +92,6 @@ def resolve_tray_lifecycle_path() -> Path:
 
 TRAY_LIFECYCLE_SRC = resolve_tray_lifecycle_path()
 
-_NO_WINDOW = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
-
 
 @dataclass
 class TrayEnv:
@@ -110,7 +110,7 @@ class TrayEnv:
 def _run_git(repo_dir: Path, *args: str) -> str:
     result = subprocess.run(
         ["git", "-C", str(repo_dir), *args],
-        capture_output=True, text=True, check=True, creationflags=_NO_WINDOW,
+        capture_output=True, text=True, check=True, creationflags=NO_WINDOW,
     )
     return result.stdout.strip()
 
@@ -278,7 +278,12 @@ def run_tray_bat(
     if nested:
         kwargs["stdin"] = subprocess.DEVNULL
         if sys.platform == "win32":
+            # no-window-exempt: this is the failure trigger under test, not a
+            # call site to harden -- `nested` is precisely the closed-stdin +
+            # CREATE_NO_WINDOW condition #54/#144 regressed under, so the flag
+            # must stay conditional here and cannot come from the shared helper.
             kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
+    # no-window-exempt: creationflags is set conditionally in `kwargs` above.
     return subprocess.run(cmd, **kwargs)  # type: ignore[call-overload]
 
 
@@ -293,7 +298,7 @@ def detect_pids(venv_dir: Path, tray_match: str) -> list[str]:
             "-File", str(TRAY_LIFECYCLE_SRC), "detect",
             "-VenvDir", str(venv_dir), "-TrayMatch", tray_match,
         ],
-        capture_output=True, text=True, timeout=20, creationflags=_NO_WINDOW,
+        capture_output=True, text=True, timeout=20, creationflags=NO_WINDOW,
     )
     return [line.strip() for line in result.stdout.splitlines() if line.strip().isdigit()]
 
@@ -324,7 +329,7 @@ def wait_for_tray_pids(venv_dir: Path, tray_match: str, timeout: float = 15.0) -
 def _listening_pids_on_port(port: int) -> list[str]:
     out = subprocess.run(
         ["netstat", "-ano", "-p", "TCP"],
-        capture_output=True, text=True, creationflags=_NO_WINDOW,
+        capture_output=True, text=True, creationflags=NO_WINDOW,
     ).stdout
     pids = set()
     for line in out.splitlines():
@@ -345,7 +350,7 @@ def cleanup_env(env: TrayEnv) -> None:
     for pid in detect_pids(env.venv_dir, env.tray_match):
         subprocess.run(
             ["taskkill", "/T", "/F", "/PID", pid],
-            capture_output=True, creationflags=_NO_WINDOW,
+            capture_output=True, creationflags=NO_WINDOW,
         )
     subprocess.run(
         [
@@ -353,12 +358,12 @@ def cleanup_env(env: TrayEnv) -> None:
             "-File", str(TRAY_LIFECYCLE_SRC), "reclaim",
             "-VenvDir", str(env.venv_dir), "-Ports", str(env.port),
         ],
-        capture_output=True, timeout=20, creationflags=_NO_WINDOW,
+        capture_output=True, timeout=20, creationflags=NO_WINDOW,
     )
     for pid in _listening_pids_on_port(env.port):
         subprocess.run(
             ["taskkill", "/T", "/F", "/PID", pid],
-            capture_output=True, creationflags=_NO_WINDOW,
+            capture_output=True, creationflags=NO_WINDOW,
         )
 
 
