@@ -52,4 +52,4 @@ def test_streamlit_popen_suppresses_console_window(
 
     lifecycle.ensure_fresh_streamlit(port=9999)
 
-    assert captured.get("creationflags") == lifecycle._NO_WINDOW
+    assert captured.get("creationflags") == lifecycle.NO_WINDOW

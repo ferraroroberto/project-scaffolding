@@ -26,8 +26,15 @@ import ssl
 import subprocess
 import sys
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
 
-_NO_WINDOW = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
+# Always launched as a subprocess by the harness (never imported), so
+# sys.path[0] is tests/e2e/, not the repo root -- and the stub venv it runs
+# under has no site-packages. Put the root on the path before importing the
+# shared CREATE_NO_WINDOW flag; src/no_window.py is stdlib-only by design.
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+
+from src.no_window import NO_WINDOW  # noqa: E402 -- needs the sys.path line above
 
 
 def _git_head(cwd: str) -> str:
@@ -38,7 +45,7 @@ def _git_head(cwd: str) -> str:
         ["git", "rev-parse", "HEAD"],
         cwd=cwd,
         text=True,
-        creationflags=_NO_WINDOW,
+        creationflags=NO_WINDOW,
     ).strip()
 
 

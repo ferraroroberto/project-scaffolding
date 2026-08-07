@@ -23,6 +23,8 @@ from datetime import datetime, UTC
 from pathlib import Path
 from collections.abc import Callable
 
+from src.no_window import NO_WINDOW
+
 _ROOT = Path(__file__).resolve().parent.parent
 _APP = _ROOT / "app" / "app.py"
 _MARKER = Path(__file__).resolve().parent / "_streamlit_restart_marker.txt"
@@ -32,7 +34,6 @@ _MARKER = Path(__file__).resolve().parent / "_streamlit_restart_marker.txt"
 STREAMLIT_E2E_PORT = 8766
 
 _HEALTH_TIMEOUT = 30.0
-_NO_WINDOW = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
 
 
 def port_is_in_use(port: int) -> bool:
@@ -48,7 +49,7 @@ def _listening_pids(port: int) -> list[str]:
         out = subprocess.run(
             ["netstat", "-ano", "-p", "TCP"],
             capture_output=True, text=True, check=False,
-            creationflags=_NO_WINDOW,
+            creationflags=NO_WINDOW,
         ).stdout
         pids = set()
         for line in out.splitlines():
@@ -61,6 +62,8 @@ def _listening_pids(port: int) -> list[str]:
                 pids.add(parts[4])
         return sorted(pids)
     out = subprocess.run(
+        # no-window-exempt: POSIX-only branch (guarded by sys.platform above);
+        # CREATE_NO_WINDOW does not exist off Windows.
         ["lsof", "-ti", f"tcp:{port}", "-sTCP:LISTEN"],
         capture_output=True, text=True, check=False,
     ).stdout
@@ -75,9 +78,10 @@ def kill_streamlit_on_port(port: int) -> None:
                 subprocess.run(
                     ["taskkill", "/F", "/PID", pid],
                     capture_output=True, check=False,
-                    creationflags=_NO_WINDOW,
+                    creationflags=NO_WINDOW,
                 )
             else:
+                # no-window-exempt: POSIX-only branch; there is no console to suppress.
                 subprocess.run(["kill", "-9", pid], capture_output=True, check=False)
         except OSError:
             pass
@@ -134,7 +138,7 @@ def ensure_fresh_streamlit(port: int = STREAMLIT_E2E_PORT) -> str:
             "--browser.gatherUsageStats", "false",
         ],
         cwd=str(_ROOT),
-        creationflags=_NO_WINDOW,
+        creationflags=NO_WINDOW,
     )
     base_url = f"http://localhost:{port}"
     if not _wait_until(lambda: _health_ok(base_url), timeout=_HEALTH_TIMEOUT):

@@ -4,6 +4,7 @@ import subprocess
 import sys
 from pathlib import Path
 
+from src.no_window import NO_WINDOW
 from tests.e2e._tray_harness import resolve_tray_lifecycle_path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -93,6 +94,7 @@ def test_tray_template_launch_args_survive_argv_parsing(tmp_path: Path) -> None:
         text=True,
         cwd=str(tmp_path),
         env=env,
+        creationflags=NO_WINDOW,
     )
     out = dict(
         line.split("=", 1)
@@ -205,7 +207,7 @@ def test_resolve_versionurls_returns_flat_string_list(tmp_path: Path) -> None:
     result = subprocess.run(
         [powershell, "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
          "-File", str(harness)],
-        check=False, capture_output=True, text=True,
+        check=False, capture_output=True, text=True, creationflags=NO_WINDOW,
     )
     types = [ln.strip() for ln in result.stdout.splitlines() if ln.strip()]
     assert types == ["String"], f"expected one String element, got {types}: {result.stdout}{result.stderr}"
@@ -237,6 +239,7 @@ def test_tray_lifecycle_helper_parses_on_windows(tmp_path: Path) -> None:
         capture_output=True,
         text=True,
         timeout=20,
+        creationflags=NO_WINDOW,
     )
 
     assert result.returncode == 0, result.stderr
