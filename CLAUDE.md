@@ -25,6 +25,7 @@ Codex is an intentionally-supported second agent on this machine, so the fleet k
 - User feedback via `st.error()` / `st.warning()` / `st.success()`, not `st.write()`.
 - **App layout:** the main file (e.g. `app.py`) handles only page config, shared state, the sidebar, and routing. Default to native multipage navigation — `st.navigation` + `st.Page`, one view per file exposing a `render()` function (the pattern this scaffold ships). Use `st.tabs()` for sub-sections *within* a view, and a sidebar radio only when asked.
 - **Ask before assuming (Streamlit specifics):** `st.session_state` key names & scope; caching strategy (`@st.cache_data` TTL vs. `@st.cache_resource`); widget `key=` names & input sources; page placement (new page vs. a section in an existing page). (The universal "ask before assuming" directive is in global.)
+- **Custom CSS/JS hooking into Streamlit's internal DOM** (raw `data-testid` selectors, `position: sticky` inside a `st.container(key=...)`) is fragile — Streamlit's `data-testid`s are undocumented and rename between versions, and its per-element `stLayoutWrapper` divs break naive sticky positioning. Gotchas + the fix: `docs/streamlit-css-hooking-gotchas.md`.
 
 ## Web-app visual identity (fleet design system)
 *Apply only if this project serves a FastAPI + static PWA web app. Streamlit POC spikes are exempt.*
