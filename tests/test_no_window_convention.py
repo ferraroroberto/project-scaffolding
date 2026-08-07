@@ -180,9 +180,9 @@ def test_every_exemption_states_a_reason() -> None:
     _, _, exemptions = _scan()
     assert exemptions, (
         "expected at least one annotated exemption (the POSIX-only branches in "
-        "tests/_streamlit_lifecycle.py and the deliberate unsuppressed "
-        "reproduction in tests/e2e/_tray_harness.py) -- if they were all "
-        "removed, delete this test rather than weakening it"
+        "tests/_port_probe.py and tests/_streamlit_lifecycle.py, and the "
+        "deliberate unsuppressed reproduction in tests/e2e/_tray_harness.py) -- "
+        "if they were all removed, delete this test rather than weakening it"
     )
 
     bare: list[str] = []
