@@ -61,6 +61,12 @@ prefix = "tests/e2e/"
 [[e2e.rule]]
 tier = "full"
 path = "tests/_streamlit_lifecycle.py"
+# ...and the port-to-PID probe that boot helper (and _tray_harness.py) reclaims
+# with -- a bad parse here breaks the e2e boot, so it must not route "none"
+# just because it lives under tests/ (#208).
+[[e2e.rule]]
+tier = "full"
+path = "tests/_port_probe.py"
 
 # Backend/tooling with no browser impact -> no browser suite needed.
 [[e2e.rule]]
