@@ -18,7 +18,9 @@ Claude Code auto-loads `CLAUDE.md` as project memory — putting the full instru
 
 ## Updating the master
 
-This repo's own `./CLAUDE.md` is the master copied verbatim — only the `## This repository` footer differs. **When you edit one, mirror the change to the other in the same commit;** otherwise the canonical template silently drifts from the repo that defines it (the drift `project-scaffolding#59` had to reconcile). Fleet-specific reality belongs in the *footer* or a sister repo's own `## This repository` block, never hardcoded into the shared body — keep the body generic so it copies cleanly into every repo.
+This repo's own `./CLAUDE.md` is the master copied verbatim — only the `## This repository` footer differs. **When you edit one, mirror the change to the other in the same commit.** Fleet-specific reality belongs in the *footer* or a sister repo's own `## This repository` block, never hardcoded into the shared body — keep the body generic so it copies cleanly into every repo.
+
+**This is enforced, not merely asked** — `tests/test_claude_master_sync.py` asserts the two bodies are byte-identical (footer excluded) and runs in the non-e2e phase of `scripts/verify-before-ship.ps1`, so an unmirrored edit fails the gate. The prose rule alone did not hold: the same drift had to be reconciled twice (`project-scaffolding#59`, then `#211`), and it is silent *and* propagating — `ADAPT_PROMPT.md` copies the master verbatim into every new repo, so whatever the master is missing, every repo stood up from it is missing too.
 
 When the master changes:
 1. Edit `CLAUDE.master.md` here **and** mirror the same edit into this repo's `./CLAUDE.md`.
