@@ -7,6 +7,12 @@ boot-check (the computed background actually flipped) so a matrix leg that
 silently failed to apply can never read as conformance — the same fail-loud
 idiom as `test_vendored_nav.py`'s coarse-pointer assert.
 
+Both twins are **one test node per matrix leg**, not one per (check x leg):
+the checks are independent by fixture construction, so a per-check split just
+re-loads the same page four more times per leg to re-prove fixed-pixel facts.
+Keep it that way — the suite is measured against CLAUDE.md's "< 15 tests"
+rule in collected nodes, not in `def`s (#209).
+
 Engines: the gate's bare `pytest` runs Chromium (like the vendored-component
 suites); the geometry math is engine-agnostic. One manual two-engine pass
 before re-vendoring:
@@ -17,7 +23,7 @@ before re-vendoring:
 
 from __future__ import annotations
 
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from pathlib import Path
 
 import pytest
@@ -127,44 +133,71 @@ def test_compliant_twin_passes_all_checks(
 # ---------------------------------------------------------------------------
 # Violating twin: every check fails at every matrix leg
 
-@pytest.mark.parametrize(("width", "theme"), MATRIX, ids=map(matrix_id, MATRIX))
-def test_violating_min_target_fails(
-    geometry_server: str, page: Page, width: int, theme: str
-) -> None:
-    _load(page, geometry_server, "violating.html")
-    _apply_leg_checked(page, width, theme)
-    with pytest.raises(AssertionError, match="below the 44px floor"):
-        assert_min_target(page.locator("#tinyClose"))
+# One entry per contract the violating twin breaks: a name for the failure
+# report, the call under test, and the substring its AssertionError must carry.
+# `violating.html` authors each violation on its own independently-targetable
+# element, so the four checks below cannot mask one another.
+_VIOLATIONS: tuple[tuple[str, Callable[[Page], None], str], ...] = (
+    (
+        "assert_min_target(#tinyClose)",
+        lambda page: assert_min_target(page.locator("#tinyClose")),
+        "below the 44px floor",
+    ),
+    (
+        "assert_no_overlap(.crowded .icon-btn)",
+        lambda page: assert_no_overlap(page.locator(".crowded .icon-btn")),
+        "overlap",
+    ),
+    (
+        "assert_chart_ticks(#badChart)",
+        lambda page: assert_chart_ticks(page, "#badChart", max_ticks=8),
+        "tick budget",
+    ),
+    (
+        "assert_no_horizontal_overflow()",
+        lambda page: assert_no_horizontal_overflow(page),
+        "horizontal overflow",
+    ),
+)
 
 
 @pytest.mark.parametrize(("width", "theme"), MATRIX, ids=map(matrix_id, MATRIX))
-def test_violating_overlap_fails(
+def test_violating_twin_fails_every_check(
     geometry_server: str, page: Page, width: int, theme: str
 ) -> None:
+    """Every check FAILS on the violating twin, at every matrix leg.
+
+    The mirror image of `test_compliant_twin_passes_all_checks`: one node per
+    leg exercising all four contracts, not one node per (contract x leg). The
+    four violations are fixed-pixel geometry and static Chart.js config, so
+    each was previously re-proving the same fact across all eight legs — 32
+    nodes for four facts, against this repo's own "< 15 tests" rule (#209).
+
+    Every contract is still asserted at every leg, and each is reported by
+    name: the loop collects outcomes instead of stopping at the first, so a
+    check that silently stopped failing is named even when another regressed
+    alongside it — strictly more diagnostic than the four `pytest.raises`
+    blocks this replaces.
+    """
     _load(page, geometry_server, "violating.html")
     _apply_leg_checked(page, width, theme)
-    with pytest.raises(AssertionError, match="overlap"):
-        assert_no_overlap(page.locator(".crowded .icon-btn"))
 
-
-@pytest.mark.parametrize(("width", "theme"), MATRIX, ids=map(matrix_id, MATRIX))
-def test_violating_chart_ticks_fail(
-    geometry_server: str, page: Page, width: int, theme: str
-) -> None:
-    _load(page, geometry_server, "violating.html")
-    _apply_leg_checked(page, width, theme)
-    with pytest.raises(AssertionError, match="tick budget"):
-        assert_chart_ticks(page, "#badChart", max_ticks=8)
-
-
-@pytest.mark.parametrize(("width", "theme"), MATRIX, ids=map(matrix_id, MATRIX))
-def test_violating_overflow_fails(
-    geometry_server: str, page: Page, width: int, theme: str
-) -> None:
-    _load(page, geometry_server, "violating.html")
-    _apply_leg_checked(page, width, theme)
-    with pytest.raises(AssertionError, match="horizontal overflow"):
-        assert_no_horizontal_overflow(page)
+    failures: list[str] = []
+    for name, check, expected in _VIOLATIONS:
+        try:
+            check(page)
+        except AssertionError as exc:
+            if expected not in str(exc):
+                failures.append(
+                    f"{name}: failed as required, but the message is missing "
+                    f"{expected!r} — got: {exc}"
+                )
+        else:
+            failures.append(
+                f"{name}: did NOT fail on the violating twin — the check has "
+                "stopped catching its contract"
+            )
+    assert not failures, "\n".join(failures)
 
 
 # ---------------------------------------------------------------------------
