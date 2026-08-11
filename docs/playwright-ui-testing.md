@@ -547,7 +547,15 @@ POSIX:
 ### Rules
 
 - **Keep it small.** Target < 15 tests total. If I'm tempted to add
-  #20, delete two first.
+  #20, delete two first. **Count collected pytest nodes, not `def`s** —
+  a parametrized matrix multiplies, and `/e2e-audit` measures the ratio
+  in nodes. Corollary: when a fixture is swept across a viewport/theme
+  matrix, assert **all** of its contracts in one test node per leg
+  rather than one node per (contract x leg). The per-contract split
+  re-loads the same page N times to re-prove facts that are fixed-pixel
+  or static-config — collect the outcomes in a list and assert once, so
+  every contract is still reported by name (`tests/e2e/test_geometry_helper.py`
+  is the worked example; project-scaffolding#209).
 - **No Page Object Model.** Too much ceremony at this scale.
 - **One shared fixture.** Don't build a framework until I have three
   tests that need the same helper.
