@@ -68,6 +68,7 @@ flowchart TB
   subgraph testsdir["tests/"]
     UNIT["test_*.py\none file per src/ module, hermetic\n(incl. test_doc_capture.py — browserless\nplan/hash/readme/adapter contract;\ntest_watchdog.py — retry/edge-transition/breadcrumb,\nno sleeping, no threads)"]
     MASTERSYNC["test_claude_master_sync.py\nasserts docs/agents/CLAUDE.master.md's body\nis byte-identical to CLAUDE.md's\n(footer excluded) — #59/#211 drift guard"]
+    GATEWATCHTEST["test_main_gate_watch_template.py (#222)\nstill-a-template · failure+main-only · idempotency\n+ anti-false-coverage guard: a live watcher\nmust name a workflow that exists"]
     E2E["e2e/conftest.py + test_smoke.py\npytest-playwright, boots a disposable\nStreamlit via _streamlit_lifecycle.py\n(occupied port refused unless STREAMLIT_E2E_LIVE)\n+ test_vendored_components.py\n(drives _vendored/demo.html, light+dark)\n+ test_vendored_nav.py\n(mounts _vendored/nav skeleton, desktop+pill)\nboth via e2e/_color_assertions.py\n(style · set_theme · rgba, #208)"]
     PORTPROBE["_port_probe.py (#208)\nlistening_pids(port): netstat / lsof\nthe ONE port-to-PID parse both\nlifecycle harnesses import"]
     GEOM["e2e/_geometry.py (vendor-verbatim, #157)\neffective 44px targets · overlap · overflow\nChart.js config reads · viewport x theme matrix\n+ test_geometry_helper.py\n+ _fixtures/geometry/ (hermetic twins + Chart.js)"]
@@ -96,6 +97,7 @@ flowchart TB
   end
   AGENTSDIR -.->|source of truth for| CLAUDEMD
   MASTERSYNC -.->|asserts CLAUDE.master.md == CLAUDE.md body| AGENTSDIR
+  GATEWATCHTEST -.->|asserts the template's contract| GATEWATCH
   TRAYDOC -.->|documents| TRAYLIB
   TRAYDOC -.->|documents ownership of| FLEETCFGTRAY
   ONBOARD -.->|links| TRAYDOC
@@ -103,6 +105,8 @@ flowchart TB
 
   CLAUDEMD["CLAUDE.md\n(+ one-line AGENTS.md pointer)\nagent conventions for derived repos"]
   FLEETTOML[".fleet.toml\nfleet-map card + [e2e] routing rules (#180)"]
+  GATEWATCH[".github/workflows/main-gate-watch.yml.template (#222)\ncopy-to-adapt red-main issue filer\nworkflow_run on the gate: main only, failure only\nidempotent — comments on the open ci-red-main issue\ninert here: this repo's gate is local-only, so nothing fires it"]
+  CLAUDEMD -.->|documents the Actions precondition for| GATEWATCH
 
   subgraph external["External dependencies"]
     STREAMLIT["Streamlit"]

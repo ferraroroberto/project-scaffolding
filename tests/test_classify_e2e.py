@@ -172,6 +172,7 @@ def test_real_rules_route_representative_paths() -> None:
     assert tier("README.md") == "skip"
     assert tier("scripts/classify_e2e.py") == "skip"
     assert tier(".fleet.toml") == "skip"
+    assert tier(".github/workflows/main-gate-watch.yml.template") == "skip"
 
     # Mixed real diff (static asset + backend) -> static; add a page -> full.
     assert tier("app/webapp/static/icons/foo.svg", "src/x.py") == "static"
