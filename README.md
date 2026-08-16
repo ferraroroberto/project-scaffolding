@@ -22,6 +22,7 @@ Clone this directory, rename it, and start building.
 - `launch_server.{bat,sh}` — local launch + Cloudflare Tunnel for
   public sharing (no API keys leave your machine).
 - `tray.bat.template` — copy-to-adapt canonical Windows tray launcher for apps that run a tray owning a long-lived service. Replace the four `__PLACEHOLDER__` tokens and you get the orphan-proof `tray.bat --restart` by default. See `docs/windows-tray.md`.
+- `.github/workflows/main-gate-watch.yml.template` — copy-to-adapt GitHub Actions watcher that files a `ci-red-main` tracking issue the moment your gate goes red on a push to `main` (and comments on it, rather than filing duplicates, while it stays red). Copy it to `.github/workflows/main-gate-watch.yml` and replace the one `__GATE_WORKFLOW_NAME__` token. **Only useful if your gate runs in Actions** — a repo gated locally (`verify-before-ship`, pytest on your machine) gets no coverage from it and should not install it. See `CLAUDE.md` ("GitHub Actions CI conventions", #222).
 - `%USERPROFILE%/.claude/tray/tray_lifecycle.ps1` — the ONE shared, machine-local tray lifecycle helper owned by `fleet-config` (not vendored in this repo), which `tray.bat.template` shells to with `-File` once (app-specific venv path / tray-match regex / owned ports / tray launch passed as arguments). Keeps detect → kill → reclaim → start → version verification out of cmd `for /f` parsing and inline `powershell -Command "…"`, both of which can break under a non-interactive `--restart` and silently adopt the stale build. `tray.bat` hard-errors (never no-ops) if the shared path is missing, naming `fleet-config`'s `install.ps1` as the fix. See `docs/windows-tray.md` (#54, #153).
 - `app/tray/single_instance.py` — canonical, **vendor-verbatim** named-mutex primitive for tray apps: `SingleInstance` (the tray's in-process single-instance lock) + `cross_process_lock` (serializes the webapp adopt-or-spawn so two trays can't both spawn it). Copy it byte-for-byte into a tray app — the per-app mutex *names* are passed at the call site, so the file stays identical fleet-wide. See `docs/windows-tray.md` (gotcha #4).
 - `app/tray/watchdog.py` — canonical, **vendor-verbatim** tray self-heal primitives (`#201`, manifest key `tray_watchdog`): `retry_with_backoff` (the initial webapp spawn survives a transient race instead of dying for the tray's lifetime), `HealthWatchdog` + `rearm()` (edge-triggered consecutive-failure monitor; the caller's `on_wedge` splits **dead** → auto-respawn from **wedged** → alert only), and `BreadcrumbLog` (the only durable record under `pythonw`, which has no `sys.stderr` for `logging` to write to). The probe, respawn action, log path and toast are all call-site arguments, so the file stays identical fleet-wide. Proven by `tests/test_watchdog.py`. See `docs/windows-tray.md` (gotcha #5).
@@ -110,6 +111,8 @@ data/                       input / output / logs (gitignored)
 launch_app.{bat,sh}
 launch_server.{bat,sh}
 tray.bat.template           canonical tray launcher (copy + adapt for tray apps)
+.github/workflows/
+  main-gate-watch.yml.template   red-main issue filer (copy + adapt; needs an Actions gate)
 ```
 
 See `CLAUDE.md` for the cross-project agent conventions.
