@@ -108,7 +108,7 @@ An installed PWA needs HTTPS (Service Workers + Web Push are HTTPS-only), and a 
 & .\.venv\Scripts\python.exe scripts\gen_tailscale_cert.py
 ```
 
-The generator auto-detects this machine's MagicDNS name from `tailscale status --json`, runs `tailscale cert`, and writes `cert.pem` / `key.pem` into `webapp/certificates/` — the same dir the launcher passes to uvicorn (section 1). Pass an explicit hostname (`gen_tailscale_cert.py tower.tail1121fd.ts.net`) to override the auto-detect.
+The generator auto-detects this machine's MagicDNS name from `tailscale status --json`, runs `tailscale cert`, and writes `cert.pem` / `key.pem` into `webapp/certificates/` — the same dir the launcher passes to uvicorn (section 1). Pass an explicit hostname (`gen_tailscale_cert.py <host>.ts.net`) to override the auto-detect.
 
 > **Auto-renew on startup is mandatory, not optional.** The Let's Encrypt leaf is **~90 days** — far shorter than a self-signed root's 10 years — so a manual re-issue *will* eventually be forgotten and the app *will* one day serve an expired cert. The generator ships a `--check` mode that renews the cert **only** if it is a `.ts.net` leaf expiring within ~30 days; it **no-ops a self-signed cert** and never blocks startup on an error. Wire `--check` into the app's own webapp launcher so a stale cert self-heals on the next boot, **before uvicorn binds**:
 >
