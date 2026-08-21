@@ -12,7 +12,9 @@
     Stages:
       1. byte-compile  — every .py under app/ src/ tests/ parses
       2. ruff          — lint the whole repo (ruff defaults + pyupgrade)
-      3. mypy --strict — the vendor-verbatim primitives only ($VendoredModules)
+      3. mypy --strict — the vendor-verbatim primitives only; the list is
+                         derived from .fleet.toml's [components] catalog via
+                         scripts/vendored_catalog.py, never hand-maintained here
       4. pytest (non-e2e) — unit suite, tests/e2e excluded
       5. pytest (e2e)  — diff-proportionate: the browser slice is routed by
                          scripts/classify_e2e.py against the .fleet.toml [e2e]
@@ -39,18 +41,21 @@ if (-not (Test-Path $py)) {
 
 # Vendor-verbatim primitives — copied byte-identical into consumer repos. Each
 # is gated with mypy --strict here so it passes what consumers enforce BEFORE it
-# ships. Append the next module to this list when a new vendored primitive lands.
-$VendoredModules = @(
-    "app/tray/single_instance.py",
-    "app/tray/watchdog.py",
-    "src/notify/",
-    "src/doc_capture/",
-    "tests/e2e/_geometry.py",
-    "tests/e2e/_e2e_live_guard.py",
-    "tests/e2e/_browser_sweep.py",
-    "src/pooled_http.py",
-    "scripts/classify_e2e.py"
-)
+# ships. The list is NOT maintained here: it is derived from .fleet.toml's
+# [components] catalog, the one canonical answer to "what does this scaffold
+# publish" (#230). A second hand-kept list is how a component ends up gated in
+# one place and invisible in another — add the component to [components] and it
+# is gated, catalogued and drift-checked from that single declaration.
+$catalogLines = & $py "scripts/vendored_catalog.py" "mypy-targets"
+$catalogExit = $LASTEXITCODE
+$VendoredModules = @($catalogLines | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+if ($catalogExit -ne 0 -or $VendoredModules.Count -eq 0) {
+    Write-Host "[FAIL] could not derive the vendored-module list from .fleet.toml [components]" -ForegroundColor Red
+    Write-Host "       (an empty list would pass 'mypy --strict' while checking nothing)" -ForegroundColor Red
+    Write-Host "       Run: $py scripts/vendored_catalog.py mypy-targets" -ForegroundColor Red
+    exit 1
+}
+Write-Host "vendored components (mypy --strict): $($VendoredModules.Count) targets from .fleet.toml [components]" -ForegroundColor DarkGray
 
 function Invoke-Stage {
     param([string]$Name, [scriptblock]$Body)

@@ -60,7 +60,7 @@ def _tailscale_hostname() -> str:
     if result.returncode != 0:
         raise SystemExit("tailscale status failed. Is tailscale running?")
     data = json.loads(result.stdout)
-    name = data.get("Self", {}).get("DNSName", "").rstrip(".")
+    name = str(data.get("Self", {}).get("DNSName", "")).rstrip(".")
     if not name:
         raise SystemExit("Could not detect Tailscale hostname from 'tailscale status'.")
     return name
