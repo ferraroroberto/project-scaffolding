@@ -136,9 +136,13 @@ extensions = ["bat"]
 #     `scripts/verify-before-ship.ps1` derives its `mypy --strict` gate list
 #     from this table -- one catalog, not three hand-maintained lists.
 #   * Copy-to-adapt templates (`tray.bat.template`,
-#     `.github/workflows/main-gate-watch.yml.template`) are deliberately ABSENT:
-#     they are edited on arrival, so byte-identity never holds and an
-#     "undeclared carrier" finding over them would be pure noise.
+#     `.github/workflows/main-gate-watch.yml.template`, `scripts/gen_tailscale_cert.py`)
+#     are deliberately ABSENT: they are edited on arrival, so byte-identity
+#     never holds and an "undeclared carrier" finding over them would be pure
+#     noise. `gen_tailscale_cert.py` was reclassified out of this table in #232:
+#     every real adopter had already adapted it (its own `NO_WINDOW` import,
+#     `grocery-shopping-automation`'s different `CERT_DIR`), so "verbatim" never
+#     held in practice.
 [components]
 # Web-app UI components (app/webapp/static/_vendored/) -- see that dir's README.
 nav             = { src = "app/webapp/static/_vendored/nav" }
@@ -166,7 +170,6 @@ browser_sweep   = { src = "tests/e2e/_browser_sweep.py" }
 
 # Scripts + library modules copied byte-for-byte into adopters.
 classify_e2e    = { src = "scripts/classify_e2e.py" }
-tailscale_cert  = { src = "scripts/gen_tailscale_cert.py" }
 pooled_http     = { src = "src/pooled_http.py" }
 no_window       = { src = "src/no_window.py" }
 notify          = { src = "src/notify" }
