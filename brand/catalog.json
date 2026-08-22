@@ -17,6 +17,7 @@
     {"file": "house.svg", "glyph": "house", "consumers": ["home-automation"]},
     {"file": "hub.svg", "glyph": "share-2", "consumers": ["local-llm-hub"]},
     {"file": "lightbulb.svg", "glyph": "lightbulb", "consumers": ["inspiration-system"]},
+    {"file": "list-checks.svg", "glyph": "list-checks", "consumers": ["task-os"]},
     {"file": "mail.svg", "glyph": "mail", "consumers": ["email-archiver"]},
     {"file": "mic.svg", "glyph": "mic", "consumers": ["voice-transcriber"]},
     {"file": "radar.svg", "glyph": "radar", "consumers": ["whatsapp-radar"]},

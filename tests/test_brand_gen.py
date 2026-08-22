@@ -26,7 +26,7 @@ def test_catalog_is_stable_and_specific() -> None:
         "version": "1.23.0",
         "license": "ISC",
     }
-    assert len(ICONS) == 20
+    assert len(ICONS) == 21
     assert all(icon["consumers"] for icon in ICONS)
     assert len({icon["glyph"] for icon in ICONS}) == len(ICONS)
 
