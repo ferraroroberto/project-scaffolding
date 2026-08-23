@@ -76,11 +76,14 @@ flowchart TB
     E2E["e2e/conftest.py + test_smoke.py\npytest-playwright, boots a disposable\nStreamlit via _streamlit_lifecycle.py\n(occupied port refused unless STREAMLIT_E2E_LIVE)\n+ test_vendored_components.py\n(drives _vendored/demo.html, light+dark)\n+ test_vendored_nav.py\n(mounts _vendored/nav skeleton, desktop+pill)\nboth via e2e/_color_assertions.py\n(style · set_theme · rgba, #208)"]
     PORTPROBE["_port_probe.py (#208)\nlistening_pids(port): netstat / lsof\nthe ONE port-to-PID parse both\nlifecycle harnesses import"]
     GEOM["e2e/_geometry.py (vendor-verbatim, #157)\neffective 44px targets · overlap · overflow\nChart.js config reads · viewport x theme matrix\n+ test_geometry_helper.py\n+ _fixtures/geometry/ (hermetic twins + Chart.js)"]
-    SWEEP["e2e/_browser_sweep.py (vendor-verbatim, #203)\npytest_sessionfinish + standalone CLI\nclassify (running · orphaned · cwd-in-scope)\nthen taskkill /F /T; zombies reported, never killed\n+ test_browser_sweep.py"]
+    SWEEP["e2e/_browser_sweep.py (vendor-verbatim, #203/#236)\npytest_sessionfinish + standalone CLI\nliveness = running · exited · wedged · unknown\n(an exit code is NOT an exit — GetProcessTimes\nexit time is the discriminator, #236)\nkill only running · orphaned · cwd-in-scope;\nzombies AND wedges reported, never killed\n+ test_browser_sweep.py"]
+    CWDISO["e2e/test_helper_cwd_isolation.py (#236)\npins conftest._neutral_driver_cwd: neither the\nNode driver nor any helper may hold this\ncheckout as its cwd — a wedge would pin it forever"]
     TRAYBEHAVIOR["e2e/test_tray_lifecycle_behavior.py\nWindows-only, pytest.mark.slow, no browser\ndrives real tray.bat + the canonical tray_lifecycle.ps1\nvia _tray_harness.py's resolve_tray_lifecycle_path()\n+ _dummy_tray_app.py"]
   end
   E2E --> appdir
   E2E -->|sweeps leaked helpers at session finish| SWEEP
+  E2E -->|starts the Playwright driver from %TEMP%| CWDISO
+  CWDISO -->|reads liveness + PEB cwd via| SWEEP
   E2E -->|kills a stale Streamlit by port| PORTPROBE
   TRAYBEHAVIOR -->|reclaim backstop, kills by port| PORTPROBE
   PORTPROBE -->|creationflags=NO_WINDOW| NOWINDOW

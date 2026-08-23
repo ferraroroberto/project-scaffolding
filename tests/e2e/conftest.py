@@ -16,6 +16,10 @@ launcher`'s `LAUNCHER_E2E_LIVE` / `tests/e2e/conftest.py`.
 vendored-component harnesses (their ESM imports don't run from `file://`).
 `pytest-playwright` supplies the `page` fixture.
 
+`playwright` overrides pytest-playwright's own session fixture for one reason:
+to start the Node driver from a neutral working directory, so nothing it
+spawns can pin this checkout (`_neutral_driver_cwd`, #236).
+
 `pytest_sessionfinish` runs the leaked-browser-helper sweep
 (`_browser_sweep.py`, #203) once the whole session — fixtures included — is
 torn down, so a run that left a WebKit helper behind cleans up after itself
@@ -29,6 +33,7 @@ needed — unlike a self-signed-cert project, which would add
 from __future__ import annotations
 
 import os
+import tempfile
 import threading
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -37,6 +42,7 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 import pytest
+from playwright.sync_api import Playwright, sync_playwright
 
 from tests._streamlit_lifecycle import (
     STREAMLIT_E2E_PORT,
@@ -82,6 +88,64 @@ def streamlit_app() -> Iterator[str]:
 
 
 @contextmanager
+def _neutral_driver_cwd() -> Iterator[str]:
+    """Run the enclosed block with this process's cwd outside the checkout (#236).
+
+    Everything Playwright spawns inherits a working directory: the Node driver
+    takes this process's (`playwright/_impl/_transport.py` passes no `cwd`),
+    each browser takes the driver's, and each helper — `WebKitWebProcess`,
+    `WebKitGPUProcess`, `WebKitNetworkProcess` — takes the browser's. Run the
+    suite from `<repo>-wt-<N>` and that whole tree roots itself in the
+    worktree, and **Windows will not delete a directory that is a live
+    process's cwd**.
+
+    That would be self-clearing if the helpers ever exited. They do not always:
+    a helper killed with its browser (a teardown watchdog's `taskkill /F /T`,
+    a hard host kill) can wedge *inside* termination — `ExitStatus` set, so
+    `taskkill` answers "no running instance", yet a thread still alive and the
+    cwd handle still held. Nothing can reap it, so the directory it pins is
+    pinned for good; six empty, undeletable worktrees accumulated on the fleet
+    host that way (`home-automation#681`).
+
+    So don't fight the wedge — make it harmless. With the driver started from
+    `%TEMP%` no helper ever roots in the checkout, and a wedged one pins a
+    directory nobody wants to delete. `gettempdir()` deliberately, **not**
+    `mkdtemp()`: a per-run temp directory would become unremovable by the exact
+    mechanism this exists to avoid.
+
+    Only the driver's *spawn* needs the neutral cwd — the driver's own working
+    directory is fixed at spawn and is what every later `launch()` inherits —
+    so this restores the caller's cwd immediately and pytest carries on from
+    the checkout as before. `tests/e2e/test_helper_cwd_isolation.py` pins it.
+    """
+    original = os.getcwd()
+    neutral = tempfile.gettempdir()
+    os.chdir(neutral)
+    try:
+        yield neutral
+    finally:
+        os.chdir(original)
+
+
+@pytest.fixture(scope="session")
+def playwright() -> Iterator[Playwright]:
+    """pytest-playwright's session driver, started from a neutral cwd (#236).
+
+    Same fixture name as pytest-playwright's own, so the override is picked up
+    automatically without changing a single test. The *only* difference is
+    `_neutral_driver_cwd` around the spawn: this repo's e2e suite regularly
+    runs from a linked worktree, and a driver started there roots every browser
+    and helper it spawns in a directory the run is expected to delete afterwards.
+    """
+    with _neutral_driver_cwd():
+        pw = sync_playwright().start()
+    try:
+        yield pw
+    finally:
+        pw.stop()
+
+
+@contextmanager
 def serve_directory(directory: Path) -> Iterator[str]:
     """Serve *directory* over loopback HTTP on an ephemeral port.
 
@@ -113,13 +177,21 @@ def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
     — including pytest-playwright's own session-scoped `browser` — has already
     torn down, or the sweep would be looking at a browser that is still
     legitimately running. Advisory by design: it reports and never changes
-    `exitstatus`, because an unkillable already-exited zombie is not a test
-    failure (see `_browser_sweep` for why those exist).
+    `exitstatus`, because neither an unkillable already-exited zombie nor a
+    helper wedged inside termination is a test failure (see `_browser_sweep`
+    for why both exist).
+
+    A wedge rooted in *this* checkout is still printed by name: it is the one
+    residue nothing can reap, so `git worktree remove` will fail as "busy"
+    afterwards and the reader needs to know why (#236). `_neutral_driver_cwd`
+    above is what stops this run from creating one.
     """
     result = sweep_browser_helpers(REPO_ROOT)
     print(f"\n{result.summary()}")
     for entry in result.killed:
         print(f"  reclaimed leaked helper: {entry}")
+    for entry in result.pinning_scope:
+        print(f"  UNREAPABLE, pins this checkout: {entry}")
 
 
 @pytest.fixture(autouse=True)
