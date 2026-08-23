@@ -411,9 +411,13 @@ up on the fleet host over a single week (`project-scaffolding#203`), three of
 them holding a worktree directory as their working directory and blocking
 `git worktree remove` with a "busy" error nobody could explain.
 
-**Measure before you sweep — the residue is mostly already dead.** Probing
-those strays with `OpenProcess` + `GetExitCodeProcess` returns **exit code
-0**: they had already exited cleanly. Windows keeps an exited process's
+**Measure before you sweep — but measure the right thing.** Probing those
+strays with `OpenProcess` + `GetExitCodeProcess` returns **exit code 0**.
+`#203` read that as "they had already exited cleanly" and stopped there, and
+that inference is the single most expensive mistake in this document's history
+— see "An exit code is not an exit" below.
+
+The half that is true: Windows really does keep a genuinely-exited process's
 object alive until the last handle to it closes, and such an object still
 shows up in `tasklist`, WMI `Win32_Process`, and bulk `Get-Process` — while
 `taskkill`, `Stop-Process`, and `Get-Process -Id <pid>` all correctly answer
@@ -427,21 +431,71 @@ session `DuplicateHandle` is denied on most system processes, so report the
 holder as **unknown** rather than guessing.
 
 **And measure the cascade before assuming it's broken.** On Playwright 1.61 /
-WebKit 2311 none of these abort shapes left a live helper behind — the Node
+WebKit 2311 none of these abort shapes left a *live* helper behind — the Node
 driver notices its stdio pipe close and tears the browser tree down, and the
 helpers exit when their browser-main process dies:
 
-| Abort shape | Live helpers left |
-|---|---|
-| Clean `context.close()` + `browser.close()` + `playwright.stop()` | none |
-| `Stop-Process -Id <pytest pid>` (single PID, no tree) | none |
-| `taskkill /F /PID <browser main>` (no `/T`) | none |
-| `taskkill /F /T /PID <driver pid>` (the watchdog's own kill) | none |
+| Abort shape | Live helpers left | Wedged helpers left |
+|---|---|---|
+| Clean `context.close()` + `browser.close()` + `playwright.stop()` | none | none |
+| `Stop-Process -Id <pytest pid>` (single PID, no tree) | none | none |
+| `taskkill /F /PID <browser main>` (no `/T`) | none | none |
+| `taskkill /F /T /PID <driver pid>` (the watchdog's own kill) | none | **yes — see below** |
+
+The second column is `#236`'s correction. "No live helper" was measured
+correctly and is not the same claim as "no residue": tree-killing the driver
+kills each browser out from under its own helpers, and a helper killed that
+way can wedge *inside* termination — permanent, unkillable, and still holding
+its working directory. A repo whose teardown watchdog force-kills the driver
+tree (`home-automation`) manufactures these routinely; one that never
+force-kills does not.
 
 So a sweep's job is **not** to compensate for a broken cascade on the current
 stack; it is to reclaim whatever a *future* stack, a hard host kill, or an
 older pinned browser build leaves behind — and to say plainly which residue
 is unkillable rather than failing the gate over it.
+
+#### An exit code is not an exit (`#236`)
+
+`GetExitCodeProcess` returning a real code does **not** mean the process has
+finished dying. Measured on the fleet host against 53 live
+`WebKitNetworkProcess.exe` entries, every one of which the pre-`#236` sweep
+classified as a harmless `zombie`:
+
+| probe | reports |
+|---|---|
+| `GetExitCodeProcess` | `0` — "exited" |
+| `GetProcessTimes` exit time | `0` — **never exited** |
+| Toolhelp32 `cntThreads` | `1` — **live thread** |
+| `ReadProcessMemory` on its PEB | **succeeds** — address space intact |
+| `CurrentDirectory.DosPath` | a real worktree path |
+| `taskkill /F /T` · `Stop-Process -Force` | "There is no running instance of the task" |
+
+These are processes **wedged inside termination**: `ExitStatus` is set, so
+every Win32 accessor answers "gone", but a thread never finished dying and the
+**cwd handle is still held**. They are unkillable *and* still pinning a
+directory — the one state that makes `git worktree remove` fail as "busy", and
+exactly the state an `exited → zombie` shortcut swallows before cwd is ever
+consulted. Of those 53, **39 were rooted in a repo checkout**; six empty,
+undeletable worktrees had accumulated over four days while the sweep reported
+`zombie=39` and exited green.
+
+**`GetProcessTimes`'s exit time is the discriminator.** The kernel stamps it
+only once the process has genuinely finished dying, so:
+
+```python
+def liveness(exit_code: int | None, exit_time: int | None) -> str:
+    if exit_code is None:               return STATE_UNKNOWN
+    if exit_code == STILL_ACTIVE:       return STATE_RUNNING   # exit time is 0 here too
+    if exit_time is None:               return STATE_UNKNOWN
+    return STATE_EXITED if exit_time > 0 else STATE_WEDGED
+```
+
+Liveness is therefore a **tri-state plus unknown**, never a bool, and a wedged
+helper gets its cwd read (its PEB is intact) and its own verdict. Reporting is
+all a sweep can do about one — see "Don't fight the wedge" below for the fix
+that stops them mattering, and "Freeing a pinned directory" for the remedy when
+one already pins something.
 
 **The pattern — classify, then kill only what all three facts allow.** A kill
 needs the process to be really running, its parent to be dead (a *live*
@@ -454,15 +508,31 @@ and the tray-restart rule (never a blanket process-name kill).
 
 ```python
 VERDICT_KILLED = "killed"
-VERDICT_ZOMBIE = "zombie"                       # already exited; nothing to kill
+VERDICT_ZOMBIE = "zombie"                       # really exited; nothing to kill
+VERDICT_WEDGED_PINNING = "wedged:pins-scope"    # unreapable AND holds this scope
+VERDICT_WEDGED_ELSEWHERE = "wedged:out-of-scope"
+VERDICT_WEDGED_CWD_UNKNOWN = "wedged:cwd-unknown"
+VERDICT_STATE_UNKNOWN = "skipped:state-unknown" # liveness not established
 VERDICT_PARENT_ALIVE = "skipped:parent-alive"   # someone's live session
 VERDICT_OUT_OF_SCOPE = "skipped:out-of-scope"   # a sibling checkout's helper
 VERDICT_CWD_UNKNOWN = "skipped:cwd-unknown"     # unknown, so hands off
 
 
 def classify(process: HelperProcess, scope: Path) -> str:
-    if process.exited:
+    if process.state == STATE_UNKNOWN:
+        return VERDICT_STATE_UNKNOWN
+    if process.state == STATE_EXITED:
         return VERDICT_ZOMBIE
+    if process.state == STATE_WEDGED:
+        # No kill either way — a wedge is unreapable. The cwd decides how
+        # loudly it is reported, not what is done to it (#236).
+        if process.cwd is None:
+            return VERDICT_WEDGED_CWD_UNKNOWN
+        return (
+            VERDICT_WEDGED_PINNING
+            if path_is_within(process.cwd, scope)
+            else VERDICT_WEDGED_ELSEWHERE
+        )
     if process.parent_alive:
         return VERDICT_PARENT_ALIVE
     if process.cwd is None:
@@ -488,7 +558,8 @@ subprocess.run(
 **Working directory is how you attribute a helper to a checkout.** Helpers
 inherit the pytest process's cwd, so a run inside `…/repo-wt-203` leaves
 helpers whose cwd is `…/repo-wt-203` — which is exactly why they block that
-worktree's removal. There is no Win32 accessor for another process's cwd; the
+worktree's removal, and exactly what "Don't fight the wedge" below stops
+happening. There is no Win32 accessor for another process's cwd; the
 practical route is
 `NtQueryInformationProcess(ProcessBasicInformation)` → `PEB` →
 `RTL_USER_PROCESS_PARAMETERS.CurrentDirectory.DosPath`, read with
@@ -511,9 +582,16 @@ def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
         print(f"  reclaimed leaked helper: {entry}")
 ```
 
-Advisory by design: it reports and never changes `exitstatus`. An unkillable
-zombie is not a test failure, and a gate that goes red over one trains people
-to ignore it.
+Advisory by design: it reports and never changes `exitstatus`. Neither an
+unkillable zombie nor a wedge is a test failure, and a gate that goes red over
+one trains people to ignore it. A wedge that pins *this* checkout is still
+printed by name — nothing can reap it, so the `git worktree remove` that
+follows will fail and the reader needs to know why:
+
+```python
+    for entry in result.pinning_scope:
+        print(f"  UNREAPABLE, pins this checkout: {entry}")
+```
 
 Reference implementation: this repo's `tests/e2e/_browser_sweep.py`
 (stdlib-only, `mypy --strict`, proven by `tests/test_browser_sweep.py`),
@@ -531,6 +609,94 @@ touching anything that might be the user's own browser — only WebKit's
 unambiguously-Playwright image names are in the sweep set. And on non-Windows
 the sweep returns `supported=False`, which reads as **unknown**, never as a
 clean bill of health.
+
+### Don't fight the wedge — start the driver from a neutral cwd
+
+Reclassifying a wedge only improves the *reporting*. Nothing can reap one, so
+the sweep can never free the directory a wedged helper pins. **The fix is to
+stop helpers rooting in the checkout in the first place.**
+
+Everything Playwright spawns inherits a working directory: the Node driver
+takes pytest's (`playwright/_impl/_transport.py` passes no `cwd`), each browser
+takes the driver's, and each helper takes the browser's. Run the suite from
+`<repo>-wt-<N>` and that whole tree roots itself in the worktree the run is
+expected to delete afterwards. Start the driver from `%TEMP%` instead and a
+wedged helper pins a directory nobody wants to delete:
+
+```python
+@contextmanager
+def _neutral_driver_cwd() -> Iterator[str]:
+    original = os.getcwd()
+    neutral = tempfile.gettempdir()      # NOT mkdtemp(): a per-run temp dir
+    os.chdir(neutral)                    # would become unremovable the same way
+    try:
+        yield neutral
+    finally:
+        os.chdir(original)               # only the *spawn* needs it
+
+
+@pytest.fixture(scope="session")
+def playwright() -> Iterator[Playwright]:
+    with _neutral_driver_cwd():
+        pw = sync_playwright().start()
+    try:
+        yield pw
+    finally:
+        pw.stop()
+```
+
+Same fixture name as pytest-playwright's own, so the override applies without
+touching a single test (pytest-playwright's version is these four lines minus
+the `with`). The driver's working directory is fixed at spawn and is what every
+later `launch()` inherits, so the caller's cwd is restored immediately and
+pytest carries on from the checkout as before. A repo that also runs the
+bounded-teardown watchdog above composes the two in one override — neutral cwd
+around the `start()`, `_bounded_teardown` around the `stop()`; they touch
+opposite ends of the same fixture and neither replaces the other. In fact the
+watchdog is what makes this fix load-bearing: force-killing the driver tree is
+precisely what leaves a helper wedged.
+
+Verified in `home-automation#681`: a full 302-execution run in a worktree
+produced 5 fresh wedged `WebKitNetworkProcess` helpers; all five rooted in
+`%TEMP%`, and the worktree tore down clean. The same run pre-fix left 4 helpers
+rooted in the worktree and `remove-worktree` returned `rc=1 Worktree NOT
+removed`.
+
+Pin the arrangement with a test, not with prose —
+`tests/e2e/test_helper_cwd_isolation.py` asserts that neither the driver nor
+any live helper holds a cwd under the checkout. A wedge itself is a
+load-sensitive teardown race and cannot be reproduced on demand; the *rooting*
+that turns one into a permanent pin is deterministic and cheap to check while a
+browser is live.
+
+### Freeing a pinned directory — rebooting the host is not the remedy
+
+For a pin already on disk, a wedged process's cwd handle can be closed out from
+under it: read `RTL_USER_PROCESS_PARAMETERS.CurrentDirectory.Handle` from its
+PEB (x64 offset `params + 0x48`, right after the `DosPath` `UNICODE_STRING`),
+then `NtDuplicateObject(source, handle, NULL, NULL, 0, 0,
+DUPLICATE_CLOSE_SOURCE)`. Verified against six real pinned worktrees — every
+close returned `STATUS_SUCCESS`, every directory deleted immediately, host
+still up. That supersedes "reboot the fleet host", which was the previously
+prescribed remedy and let the directories come straight back.
+
+Two guards are what make it safe, and neither is optional:
+
+- **Refuse outright on a *live* holder.** Yanking the cwd handle out of a
+  healthy process corrupts a running browser or build. Act only on a process
+  proven wedged — Win32 reports it exited *and* `GetProcessTimes` reports no
+  exit time. A holder that cannot be inspected is `UNKNOWN`, never folded into
+  "clear". Same rule as the shared-Chrome-profile and safe-restart conventions.
+- **Verify by asking the filesystem, not by re-reading the PEB.** Closing the
+  handle leaves the cwd *string* behind, so a PEB re-read still reports a pin
+  that is already gone. Check for `DELETE` access on the directory instead.
+
+Working implementation to copy from: `home-automation`'s
+`scripts/unpin_directory.py` (stdlib + `ctypes`, no repo imports;
+`<path>` reports, `<path> --close` frees). This scaffold does not ship one —
+the driver-cwd fix above means a repo that adopts it stops creating pins, and
+an operator script for pins created by something else is worth vendoring only
+once a second repo needs it.
 
 ### Running it
 
