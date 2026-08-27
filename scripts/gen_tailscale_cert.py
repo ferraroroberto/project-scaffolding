@@ -33,6 +33,10 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from cryptography import x509
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 # Run standalone (`python scripts/gen_tailscale_cert.py`), so sys.path[0] is
@@ -66,33 +70,41 @@ def _tailscale_hostname() -> str:
     return name
 
 
-def _tailscale_hostname_from_cert(cert_path: Path) -> str | None:
-    """Return the .ts.net DNS SAN from the cert, or None if not a Tailscale cert."""
+def _load_cert(cert_path: Path) -> x509.Certificate | None:
+    """Read and parse `cert_path`. Returns None -- with a [WARN] naming the
+    path and the error printed -- if the file can't be read or isn't a valid
+    cert. Callers must treat None as *unknown*, never as "safe to skip"; see
+    `_check_and_renew`, which is the only caller that gets to decide that."""
+    from cryptography import x509
     try:
-        from cryptography import x509
-        cert = x509.load_pem_x509_certificate(cert_path.read_bytes())
+        return x509.load_pem_x509_certificate(cert_path.read_bytes())
+    except (OSError, ValueError) as exc:
+        print(f"[WARN] Could not read/parse {cert_path}: {exc}")
+        return None
+
+
+def _tailscale_hostname_from_cert(cert: x509.Certificate) -> str | None:
+    """Return the .ts.net DNS SAN from an already-parsed cert, or None if it
+    isn't a Tailscale cert (e.g. self-signed, no matching SAN)."""
+    from cryptography import x509
+    try:
         san = cert.extensions.get_extension_for_class(x509.SubjectAlternativeName)
-        for name in san.value.get_values_for_type(x509.DNSName):
-            if ".ts.net" in name:
-                return name
-    except Exception:
-        pass
+    except x509.ExtensionNotFound:
+        return None
+    for name in san.value.get_values_for_type(x509.DNSName):
+        if ".ts.net" in name:
+            return name
     return None
 
 
-def _expiring_within(cert_path: Path, days: int) -> bool:
-    """Return True if the cert expires within `days` days."""
+def _expiring_within(cert: x509.Certificate, days: int) -> bool:
+    """Return True if an already-parsed cert expires within `days` days."""
     try:
-        from cryptography import x509
-        cert = x509.load_pem_x509_certificate(cert_path.read_bytes())
-        try:
-            expiry = cert.not_valid_after_utc
-        except AttributeError:  # cryptography < 42
-            expiry = cert.not_valid_after.replace(tzinfo=datetime.UTC)
-        threshold = datetime.datetime.now(datetime.UTC) + datetime.timedelta(days=days)
-        return expiry < threshold
-    except Exception:
-        return False
+        expiry = cert.not_valid_after_utc
+    except AttributeError:  # cryptography < 42
+        expiry = cert.not_valid_after.replace(tzinfo=datetime.UTC)
+    threshold = datetime.datetime.now(datetime.UTC) + datetime.timedelta(days=days)
+    return expiry < threshold
 
 
 def _provision(hostname: str) -> None:
@@ -131,11 +143,20 @@ def _check_and_renew() -> None:
     if not cert_path.exists():
         return
 
-    hostname = _tailscale_hostname_from_cert(cert_path)
-    if hostname is None:
-        return  # self-signed (or unreadable) cert; leave it alone
+    cert = _load_cert(cert_path)
+    if cert is None:
+        # Unreadable/corrupt cert -- an unknown, not a healthy non-expiring
+        # cert. _load_cert already printed the [WARN] with the reason; make
+        # the consequence explicit too, so a truncated cert.pem doesn't look
+        # like a quiet, correctly-skipped self-signed one.
+        print(f"[WARN] Skipping Tailscale cert renewal check -- could not confirm expiry of {cert_path}.")
+        return
 
-    if not _expiring_within(cert_path, RENEW_WITHIN_DAYS):
+    hostname = _tailscale_hostname_from_cert(cert)
+    if hostname is None:
+        return  # self-signed (or non-Tailscale) cert; leave it alone
+
+    if not _expiring_within(cert, RENEW_WITHIN_DAYS):
         return
 
     print(f"[INFO] Tailscale cert for {hostname} expires within {RENEW_WITHIN_DAYS} days -- renewing.")

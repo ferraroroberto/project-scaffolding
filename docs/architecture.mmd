@@ -37,6 +37,7 @@ flowchart TB
     PIPELINES["pipelines/\nexample_pipeline.py\none run() per file, returns summary dict"]
     NOTIFY["notify/\nbase.py, factory.py, config.py, telegram.py\nvendor-verbatim Telegram notifier"]
     DOCCAP["doc_capture/\nengine.py + adapters.py (streamlit | url)\n+ launch.py + __main__.py (CLI)\nvendor-verbatim doc-capture screenshot engine\n(manifest-driven, fail-safe-masked,\ninput-hash-idempotent + README tour regen)"]
+    POOLEDHTTP["pooled_http.py (#192)\nbuild_session() / pooled_request()\nvendor-verbatim pooled requests.Session\n+ single-retry-on-ConnectionError"]
   end
   VIEWS -->|orchestrates, business logic stays here| PIPELINES
   VIEWS --> LOGGER
@@ -123,6 +124,7 @@ flowchart TB
     PLAYWRIGHT["Playwright"]
     RUFFMYPY["ruff / mypy / pytest"]
     RESVG["resvg-py\n(SVG -> PNG rasterizer, prebuilt wheel)"]
+    REQUESTS["requests\n(pooled_http.py's Session + HTTPAdapter)"]
   end
   APPPY --> STREAMLIT
   LAUNCHSRV --> CLOUDFLARE
@@ -133,3 +135,4 @@ flowchart TB
   DOCCAP -.->|capture time only| PLAYWRIGHT
   VERIFY --> RUFFMYPY
   BRANDGEN --> RESVG
+  POOLEDHTTP --> REQUESTS
