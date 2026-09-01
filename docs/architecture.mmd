@@ -38,6 +38,7 @@ flowchart TB
     NOTIFY["notify/\nbase.py, factory.py, config.py, telegram.py\nvendor-verbatim Telegram notifier"]
     DOCCAP["doc_capture/\nengine.py + adapters.py (streamlit | url)\n+ launch.py + __main__.py (CLI)\nvendor-verbatim doc-capture screenshot engine\n(manifest-driven, fail-safe-masked,\ninput-hash-idempotent + README tour regen)"]
     POOLEDHTTP["pooled_http.py (#192)\nbuild_session() / pooled_request()\nvendor-verbatim pooled requests.Session\n+ single-retry-on-ConnectionError"]
+    RUNTIMEDATA["runtime_data.py (#243)\nruntime_db_path(app, file, env_var=)\nvendor-verbatim SQLite-location resolver\nFLEET_DATA_ROOT -> C:/sqlite/&lt;app&gt;/\n(off the spinning disk, one dir per app)"]
   end
   VIEWS -->|orchestrates, business logic stays here| PIPELINES
   VIEWS --> LOGGER

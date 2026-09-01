@@ -131,6 +131,15 @@ Windows ephemeral-port exhaustion (global `CLAUDE.md`; `fleet-config#440`) makes
   - **Reclassifying is not fixing.** Nothing can reap a wedge, so the e2e conftest starts the Playwright driver from a neutral cwd (`gettempdir()`, never `mkdtemp()`) and every helper it spawns roots in `%TEMP%` instead of the checkout; a directory already pinned is freed by closing the holder's cwd handle remotely, never by rebooting the host.
   - Full pattern, abort-cascade matrix, liveness discriminator and the PEB cwd-attribution trick: `docs/playwright-ui-testing.md` → "Post-run sweep for leaked browser helpers".
 
+## Runtime data lives on a fast drive, not wherever the repo was cloned
+*Apply only if this project persists SQLite (or similar fsync-heavy state) from a long-lived process.*
+
+- **Resolve the path — is a `/propagate-vendored` component: `src/runtime_data.py` (manifest key `runtime_data`).** `runtime_db_path(app, filename, env_var=...)` returns `<root>/<app>/<filename>`; root = `FLEET_DATA_ROOT` → else `C:\sqlite` (Windows) / `$XDG_DATA_HOME/sqlite`. One subdirectory **per app**, so two apps can both own a `telemetry.sqlite3`. A repo-relative `Path(__file__).parent.parent / "webapp" / "x.sqlite3"` is a **defect**: it makes the physical drive a consequence of where someone cloned.
+- **Change the path; never junction it.** A junction migrates data with no code change and records nothing — undrivable by tests, invisible to a reader, and walked by any recursive delete.
+- **Keep the app's existing full-path override** (`TELEMETRY_DB_PATH`, `WR_DB_PATH`, …) as highest precedence — pass it as `env_var=`. Every unit/e2e harness sets it; outrank it and a test run writes into the live store.
+- **Outside the git tree is outside git-derived backup.** `fleet-config`'s `backup_private.py` backs up the `C:\sqlite` root as an explicit source; an app inventing its own root elsewhere is unbacked.
+- **Why:** seven always-on services `fsync`ing to the drive their checkouts sat on kept a spinning HDD audibly clicking around the clock (`#243`, diagnosed on `tower`; the drive itself measured healthy).
+
 ## GitHub Actions CI conventions
 *Apply whenever this project adds a `.github/workflows/` file.*
 
