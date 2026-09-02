@@ -175,3 +175,4 @@ no_window       = { src = "src/no_window.py" }
 runtime_data    = { src = "src/runtime_data.py" }
 notify          = { src = "src/notify" }
 doc_capture     = { src = "src/doc_capture" }
+build_info      = { src = "src/build_info.py" }

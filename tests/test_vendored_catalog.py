@@ -48,6 +48,7 @@ HISTORICALLY_GATED = (
     "tests/e2e/_browser_sweep.py",
     "src/pooled_http.py",
     "scripts/classify_e2e.py",
+    "src/build_info.py",
 )
 
 
