@@ -43,6 +43,7 @@ FLAG_HOME = "src/no_window.py"
 VENDOR_VERBATIM = frozenset({
     "tests/e2e/_browser_sweep.py",
     "scripts/classify_e2e.py",
+    "src/build_info.py",
 })
 
 EXEMPT_MARKER = "no-window-exempt"
