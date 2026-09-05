@@ -10,12 +10,13 @@ Three conventions for every section below:
 - ***(PWA)*** in a heading = *apply only if this project serves a FastAPI + static PWA web app; Streamlit POC spikes are exempt*. Other gates are spelled out under their own heading.
 - **Don't diverge, don't re-author.** Every convention, vendored component and token contract below is owned *here*: fix it in this scaffold and re-vendor downstream, never fork it in a consuming app. Each section closes with its reference docs + decision record.
 
-## Agent config artifacts (`AGENTS.md` pointer; `.agents/` / `.codex/` gitignored)
-*Applies to every repo — app or not.*
+## Agent config artifacts (instructions and scoped project skills)
+*Apply when adopting this scaffold's agent configuration layout.*
 
-- **`AGENTS.md` is a committed one-line pointer to `CLAUDE.md` — never a find-replaced copy.** Machine-scope instructions are the single global file symlinked into each agent home (`~/.claude/CLAUDE.md`, `~/.codex/AGENTS.md`, …) by `fleet-config/install.ps1` — no generator, no sync step.
-- **`.agents/` and `.codex/` are gitignored, never committed** — auto-generated mirror/tooling noise; the real Codex config lives machine-scope in `~/.codex/`. This scaffold's `.gitignore` excludes both while deliberately **not** ignoring the committed `AGENTS.md`.
-- **Don't diverge** — a clone inherits the pointer and the two `.gitignore` lines. (`#28`.)
+- **`AGENTS.md` is a committed short pointer to `CLAUDE.md`, never a copy.** Keep the existing instruction chain; machine-scope policy remains owned by `fleet-config`.
+- **Maintain one source per project skill.** Keep existing sources in place; discover native compatibility before adding a per-skill junction/symlink at the same repository or package scope. Never broaden a nested skill into a root or user-global catalog. Preserve real `.agents` directories and report name/target collisions without overwriting them.
+- **Agent directories are ignored by default, not disposable noise.** `.claude/`, `.agents/`, `.codex/`, `.pi/` and `.grok/` may hold private context or owned discovery artifacts. Only deliberately shared skill sources receive narrow ignore exceptions; generated links, local settings and conversations remain ignored. Fresh clones/worktrees recreate their own links to their own sources.
+- **Adoption and proof:** follow the scaffold's [portable project skills](https://github.com/ferraroroberto/project-scaffolding/blob/main/docs/agents/project-skills.md) contract for scope, helper exclusions, collisions, ignore allowlists and native discovery checks. Installer mechanics belong to `fleet-config`, not a per-project fork. (`#28`, `#250`.)
 
 ## Streamlit conventions
 *Apply only if this project uses Streamlit.*

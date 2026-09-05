@@ -64,6 +64,10 @@ python3 -m venv .venv
 
 Never activate the venv — invoke its interpreter directly, as above and everywhere else in this README. That keeps every command copy-pasteable into a script, a hook, or an agent tool call, none of which inherit an `activate` from an interactive shell.
 
+### Agent setup after cloning
+
+`AGENTS.md` points to the maintained `CLAUDE.md`; keep both committed. This scaffold seeds no executable project skills. When adopting existing root or package skills, keep one source per skill and follow [Portable project skills](docs/agents/project-skills.md) to inspect native discovery, preserve private context and real agent directories, and recreate only the missing scoped links. Ignored links are local onboarding artifacts and must be recreated for each clone/worktree. That reference includes the Claude/Codex/Pi/Grok evidence matrix and collision/ignore checks; fleet-wide installation belongs to `fleet-config`.
+
 ## Run
 
 ```bash
