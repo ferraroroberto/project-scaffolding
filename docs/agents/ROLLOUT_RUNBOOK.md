@@ -15,7 +15,7 @@ Phase 0 — Discovery
 1. Ask the user: parent directory path; which subfolders to skip (defaults: `old/`, `node_modules/`, anything without a README.md or requirements.txt and not obviously a code repo).
 2. Per in-scope repo, inventory:
    - existing AGENTS.md / AGENTS_*.md / CLAUDE.md
-   - .claude/ directory contents
+   - root/nested skill sources and real directories/links under agent roots; apply `project-skills.md` for native discovery, scoped links, collisions and privacy (never mirror entire directories)
    - whether Streamlit is used (grep `import streamlit` and `streamlit` in requirements.txt)
    - venv folder name (.venv vs venv vs other)
    - git remote presence (skip push if absent)
@@ -50,6 +50,8 @@ Standard commit template (adjust per repo to mention only changes that actually 
     - Remove split AGENTS_*.md files (where present)
     - Migrate use_container_width=True → width="stretch" (where applicable)
     - Fix dangling README links to deleted split files (where applicable)
+
+For skill discovery adoption, follow `project-skills.md` after inventory: keep the original maintained source, create only missing same-scope links, narrowly allowlist deliberately shared sources, and verify root/package/sibling catalogs. Generated links are recreated per clone/worktree; private context is never copied. Fleet-wide installer mechanics remain in fleet-config.
 
 Phase 4 — Final verification sweep
 - Repo-wide: every in-scope repo has CLAUDE.md, AGENTS.md, no split files, no use_container_width (Streamlit repos), no dangling AGENTS_*.md links.

@@ -29,14 +29,16 @@ data/input/*
 .idea/
 *.swp
 
-# Claude Code local settings
+# Agent-local context and generated scoped discovery links (all depths).
+# Ignored does not mean disposable: preserve real directories and private skills.
+# Share only reviewed canonical skill sources with narrow per-skill exceptions;
+# see docs/agents/project-skills.md. Never unignore whole context directories.
+# AGENTS.md and CLAUDE.md are committed instruction artifacts, not ignored.
 .claude/
-
-# Codex / other-agent local artifacts — auto-generated per-repo mirror noise.
-# Cross-agent instructions are maintained in CLAUDE.md (AGENTS.md is a committed
-# one-line pointer to it, deliberately NOT ignored). Real Codex config: ~/.codex/.
 .agents/
 .codex/
+.pi/
+.grok/
 
 # Launcher scratch (ephemeral images/logs written by the tray launcher)
 .launcher-tmp/
