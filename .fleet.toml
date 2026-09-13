@@ -30,6 +30,13 @@ tier       = "static"
 prefix     = "app/webapp/static/"
 extensions = ["svg", "png", "jpg", "jpeg", "gif", "ico", "webp", "avif", "woff", "woff2", "ttf", "eot", "otf", "webmanifest"]
 
+# The component gallery is NOT an inert fragment: it carries a module script
+# and is the page test_vendored_components.py and test_vendored_nav.py drive,
+# so it runs the whole suite (#258). Must precede the inert-HTML rule below.
+[[e2e.rule]]
+tier = "full"
+path = "app/webapp/static/_vendored/demo.html"
+
 # A vendored HTML fragment is pure markup with no behaviour of its own; its
 # .css/.js siblings are NOT covered by this rule and fall through to "full"
 # below (the component-contract harnesses in tests/e2e/ assert those).
@@ -111,13 +118,14 @@ path = "CLAUDE.md"
 tier       = "none"
 extensions = ["bat"]
 
-# Surfaces (#258): a diff that would route "full" but whose every full-tier
-# path sits in ONE surface below runs only that surface's pytest_targets.
-# Anything shared stays OUT of every surface on purpose -- conftest.py,
-# _color_assertions.py, demo.html (the nav harness mounts on the gallery),
-# icons/ (the nav harness renders the sprite), the Streamlit app -- so a change
-# there keeps the whole suite. A path in two surfaces, or a diff spanning two,
-# also keeps the whole suite. tests/test_classify_e2e.py pins these.
+# Surfaces (#258): a diff that would route "full" but whose every full- or
+# static-tier path sits in ONE surface below runs only that surface's
+# pytest_targets. Anything shared stays OUT of every surface on purpose --
+# conftest.py, _color_assertions.py, demo.html (both vendored harnesses drive
+# the gallery), icons/ (the nav harness renders the sprite), the Streamlit app
+# -- so a change there keeps the whole suite. A path in two surfaces, or a diff
+# spanning two, also keeps the whole suite. tests/test_classify_e2e.py pins
+# these, including that every importer of a surface's helper is in its targets.
 [[e2e.surface]]
 name           = "nav"
 prefixes       = ["app/webapp/static/_vendored/nav/"]

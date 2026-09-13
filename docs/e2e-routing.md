@@ -89,11 +89,11 @@ pytest_targets = ["tests/e2e/test_vendored_nav.py"]      # one or more test path
 The classifier narrows to `surface` **only** when every one of these holds; otherwise the verdict stays whole-suite `full`:
 
 - no changed path is unclassified (the rules come first; a surface can never rescue an unmatched path);
-- every path whose rule tier is `full` matches a surface, and exactly one (a path claimed by two surfaces is ambiguous);
+- every path whose rule tier is `full` **or `static`** matches a surface, and exactly one (a path claimed by two surfaces is ambiguous). "Inert" markup can still be the page another harness drives, so a static path no surface owns keeps the whole suite;
 - all of those paths belong to the **same** surface (a diff spanning two surfaces runs everything);
-- the surface declaration is usable: every entry has a `name`, at least one `prefixes`/`paths` matcher, and a non-empty `pytest_targets` list of whitespace-free paths that exist on disk, with no duplicate names. One bad entry disables **all** surfaces, and the reason appears in `E2E_REASON`.
+- the surface declaration is usable. Every entry needs a `name` made only of `[A-Za-z0-9_.-]`, because names are echoed into the `E2E_*` lines the gate parses. It needs at least one matcher, and every `prefixes` entry must end in `/` so `app/board` can never claim `app/boardroom/`. `pytest_targets` must be a non-empty list of relative, whitespace-free paths that exist inside `full_pytest_target`, with no `..` and no absolute path. Names must be unique. One bad entry disables **all** surfaces, and the reason is appended to `E2E_REASON` on any `full` verdict (a `skip` or `static` verdict never consults surfaces).
 
-Paths routed `none` ride along silently; a `static` path adds `static_pytest_target`. The gate prints `E2E_TIER=surface`, `E2E_SURFACE=<name>` and a space-separated `E2E_PYTEST_TARGET`, which `verify-before-ship.ps1` splits into separate pytest arguments. Browsers are the suite default, exactly as for `full`.
+Paths routed `none` ride along silently; a `static` path inside the surface adds `static_pytest_target`. The gate prints `E2E_TIER=surface`, `E2E_SURFACE=<name>` and a space-separated `E2E_PYTEST_TARGET`, which `verify-before-ship.ps1` splits into separate pytest arguments. Browsers are the suite default, exactly as for `full`.
 
 **Surface-writing guidance.** A surface owns a feature's own files and its own tests, nothing shared. Keep global stylesheets, shared JS, `conftest.py`, shared test helpers and page shells out of every surface, so a change there still runs the whole suite. When one harness mounts on another surface's page (this repo's nav harness loads the component gallery), list that harness in the owning surface's `pytest_targets` too. Pin every surface in `tests/test_classify_e2e.py`, with one path that narrows and one shared path that must not, in the same PR that declares it.
 
@@ -111,6 +111,16 @@ E2E_TIER=static
 E2E_BROWSERS=chromium
 E2E_PYTEST_TARGET=tests/e2e/test_smoke.py
 E2E_REASON=static-asset: app/webapp/static/icons/foo.svg
+```
+
+A `surface` verdict adds one line and a space-separated target:
+
+```
+E2E_TIER=surface
+E2E_BROWSERS=
+E2E_PYTEST_TARGET=tests/e2e/test_vendored_components.py tests/e2e/test_vendored_nav.py
+E2E_REASON=surface components: app/webapp/static/_vendored/card/card.css
+E2E_SURFACE=components
 ```
 
 `verify-before-ship.ps1` runs the byte-compile + non-e2e pytest phases **unconditionally** (they already cover backend Python), then routes **only** the browser phase on `E2E_TIER`. On CI (`$env:CI -eq "true"`) routing is bypassed and the full suite always runs — the local gate is where routing is proven first.

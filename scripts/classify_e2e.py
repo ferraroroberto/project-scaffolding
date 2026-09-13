@@ -33,7 +33,8 @@ Tiers:
                 would route ``full``, but every ``full`` path belongs to ONE
                 declared ``[[e2e.surface]]`` -> only that surface's
                 ``pytest_targets`` run (plus ``static_pytest_target`` when a
-                static path rides along). Any unclassified path, a ``full``
+                static path rides along, which must sit in the same
+                surface). Any unclassified path, a ``full``/``static``
                 path outside every surface, a path in two surfaces, a diff
                 spanning two surfaces, or an unusable surface declaration
                 keeps the whole-suite ``full``. Without ``[[e2e.surface]]``
@@ -49,6 +50,7 @@ route:
 
 from __future__ import annotations
 
+import re
 import subprocess
 import sys
 import tomllib
@@ -129,12 +131,37 @@ def _str_list(raw: object) -> tuple[str, ...] | None:
     return tuple(raw)
 
 
-def load_surfaces(raw: object, repo_root: Path) -> tuple[list[Surface], str]:
+_SURFACE_NAME = re.compile(r"[A-Za-z0-9_.-]+")
+
+
+def _target_problem(target: str, repo_root: Path, suite_dir: str) -> str | None:
+    """Why *target* can't be a surface target, or None if it can.
+
+    A target must be a relative path inside the e2e suite that exists on disk:
+    an absolute path, a `..` hop, or `tests` (swapping the browser suite for
+    the unit suite) would each run something other than a slice of the suite.
+    """
+    if Path(target).is_absolute() or ".." in Path(target).parts:
+        return "is not a relative path inside the suite"
+    suite_root = (repo_root / suite_dir).resolve()
+    resolved = (repo_root / target).resolve()
+    if resolved != suite_root and not resolved.is_relative_to(suite_root):
+        return f"is outside {suite_dir}"
+    if not resolved.exists():
+        return "does not exist"
+    return None
+
+
+def load_surfaces(raw: object, repo_root: Path, suite_dir: str = "tests/e2e") -> tuple[list[Surface], str]:
     """Parse `[[e2e.surface]]` into `(surfaces, note)`.
 
-    All-or-nothing: one malformed entry, a duplicate name, or a target missing
-    on disk disables every surface (the note says why), so a stale or
+    All-or-nothing: one malformed entry, a duplicate name, or an unusable
+    target disables every surface (the note says why), so a stale or
     half-edited map can only ever widen routing back to the whole suite.
+    Names are restricted to `[A-Za-z0-9_.-]` because they are echoed into the
+    `E2E_*` lines the gate parses -- a newline in one could forge a later
+    `E2E_TIER=` line. Prefixes must end in `/`, so `app/board` can never claim
+    `app/boardroom/`.
     """
     if raw is None:
         return [], ""
@@ -149,14 +176,16 @@ def load_surfaces(raw: object, repo_root: Path) -> tuple[list[Surface], str]:
         targets = _str_list(entry.get("pytest_targets"))
         prefixes = _str_list(entry.get("prefixes", []))
         paths = _str_list(entry.get("paths", []))
-        if (not isinstance(name, str) or not name.strip() or not targets
-                or prefixes is None or paths is None or not (prefixes or paths)):
+        if (not isinstance(name, str) or not _SURFACE_NAME.fullmatch(name) or not targets
+                or prefixes is None or paths is None or not (prefixes or paths)
+                or not all(p.endswith("/") for p in prefixes)):
             return [], bad
         if any(s.name == name for s in surfaces):
             return [], f"[[e2e.surface]] name {name!r} declared twice -- surfaces disabled"
-        missing = [t for t in targets if not (repo_root / t).exists()]
-        if missing:
-            return [], f"surface {name!r} target {missing[0]} does not exist -- surfaces disabled"
+        for target in targets:
+            problem = _target_problem(target, repo_root, suite_dir)
+            if problem:
+                return [], f"surface {name!r} target {target} {problem} -- surfaces disabled"
         surfaces.append(Surface(name=name, pytest_targets=targets, prefixes=prefixes, paths=paths))
     return surfaces, ""
 
@@ -200,12 +229,13 @@ def load_config(fleet_toml: Path = FLEET_TOML) -> E2EConfig:
     if not rules:
         return E2EConfig(rules=[], source="empty")
 
-    surfaces, surfaces_note = load_surfaces(e2e.get("surface"), fleet_toml.parent)
+    full_pytest_target = str(e2e.get("full_pytest_target", "tests/e2e"))
+    surfaces, surfaces_note = load_surfaces(e2e.get("surface"), fleet_toml.parent, full_pytest_target)
     return E2EConfig(
         rules=rules,
         static_pytest_target=str(e2e.get("static_pytest_target", "tests/e2e")),
         static_browsers=tuple(e2e.get("static_browsers", ["chromium"])),
-        full_pytest_target=str(e2e.get("full_pytest_target", "tests/e2e")),
+        full_pytest_target=full_pytest_target,
         source="declared",
         surfaces=surfaces,
         surfaces_note=surfaces_note,
@@ -241,25 +271,26 @@ def _narrow_to_surface(
     """The `surface` routing for a would-be-full diff, or None to keep whole `full`.
 
     Narrows only a confidently-classified single-surface diff; every `return
-    None` below is a fail-safe back to the whole suite.
+    None` below is a fail-safe back to the whole suite. Static paths must sit
+    in the winning surface too: "inert" markup can still be the page another
+    harness drives (this repo's component gallery), so a static path no
+    surface owns keeps the whole suite rather than riding along on a smoke run.
     """
-    if not config.surfaces:
-        return None
     if any(label == "unclassified" for _, _, label in classified):
         return None
     hit: Surface | None = None
     example = ""
     for path, cat, _label in classified:
-        if cat != Category.FULL:
+        if cat == Category.NONE:
             continue
         owners = [s for s in config.surfaces if s.matches(path)]
         if len(owners) != 1:
-            return None  # a full path outside every surface, or inside two
+            return None  # outside every surface (incl. no surfaces declared), or inside two
         if hit is not None and owners[0].name != hit.name:
             return None  # the diff spans two surfaces
         if hit is None:
             hit, example = owners[0], path
-    if hit is None:
+    if hit is None:  # unreachable when the diff's top tier is FULL; narrows the type
         return None
     targets = list(hit.pytest_targets)
     has_static = any(cat == Category.STATIC for _, cat, _ in classified)

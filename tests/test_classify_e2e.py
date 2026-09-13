@@ -14,6 +14,7 @@ Two jobs:
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 from scripts.classify_e2e import (
@@ -207,7 +208,7 @@ def _surface_cfg(*surfaces: Surface, note: str = "") -> E2EConfig:
 
 
 _BOARD = _surf("board", ("tests/e2e/test_board.py",),
-               prefixes=("app/board/",), paths=("tests/e2e/test_board.py",))
+               prefixes=("app/board/", "app/static/board/"), paths=("tests/e2e/test_board.py",))
 _JOBS = _surf("jobs", ("tests/e2e/test_jobs.py", "tests/e2e/test_jobs_agenda.py"),
               prefixes=("app/jobs/",))
 
@@ -228,9 +229,17 @@ def test_surface_target_list_is_space_separated() -> None:
 
 
 def test_static_path_riding_a_surface_adds_the_smoke_target() -> None:
-    r = classify(["app/board/board.js", "app/static/icon.svg"], _surface_cfg(_BOARD))
+    r = classify(["app/board/board.js", "app/static/board/icon.svg"], _surface_cfg(_BOARD))
     assert r.tier == "surface"
     assert r.pytest_target == "tests/e2e/test_board.py tests/e2e/test_smoke.py"
+
+
+def test_static_path_outside_the_surface_keeps_whole_full() -> None:
+    # "Inert" markup can be the page another harness drives, so a static path
+    # the winning surface does not own must not ride along on a smoke run.
+    r = classify(["app/board/board.js", "app/static/icon.svg"], _surface_cfg(_BOARD))
+    assert r.tier == "full"
+    assert r.pytest_target == "tests/e2e"
 
 
 def test_no_surfaces_declared_keeps_whole_full() -> None:
@@ -297,6 +306,18 @@ def test_load_surfaces_absent_is_no_surfaces_and_no_note(tmp_path: Path) -> None
     assert load_surfaces(None, tmp_path) == ([], "")
 
 
+def test_load_surfaces_rejects_targets_outside_the_suite(tmp_path: Path) -> None:
+    _write_targets(tmp_path, "tests/e2e/test_board.py", "tests/test_unit.py", "outside/t.py")
+    outside = str((tmp_path / "outside" / "t.py").resolve())
+    for target in ("../outside/t.py", "tests/e2e/../../outside/t.py", outside, "tests", "tests/test_unit.py"):
+        surfaces, note = load_surfaces(
+            [{"name": "board", "prefixes": ["app/board/"], "pytest_targets": ["tests/e2e/test_board.py", target]}],
+            tmp_path,
+        )
+        assert surfaces == [], target
+        assert "surfaces disabled" in note, target
+
+
 def test_load_surfaces_parses_a_valid_entry(tmp_path: Path) -> None:
     _write_targets(tmp_path, "tests/e2e/test_board.py")
     surfaces, note = load_surfaces(
@@ -321,18 +342,23 @@ def test_load_surfaces_missing_target_disables_every_surface(tmp_path: Path) -> 
 
 
 def test_load_surfaces_malformed_entries_disable_every_surface(tmp_path: Path) -> None:
-    _write_targets(tmp_path, "t.py")
-    good = {"name": "ok", "prefixes": ["app/ok/"], "pytest_targets": ["t.py"]}
+    _write_targets(tmp_path, "tests/e2e/t.py")
+    good = {"name": "ok", "prefixes": ["app/ok/"], "pytest_targets": ["tests/e2e/t.py"]}
     malformed = [
         "not a table",
-        {"prefixes": ["app/x/"], "pytest_targets": ["t.py"]},                 # no name
+        {"prefixes": ["app/x/"], "pytest_targets": ["tests/e2e/t.py"]},                 # no name
         {"name": "x", "prefixes": ["app/x/"]},                                 # no targets
         {"name": "x", "prefixes": ["app/x/"], "pytest_targets": []},           # empty targets
-        {"name": "x", "prefixes": ["app/x/"], "pytest_targets": "t.py"},       # not a list
-        {"name": "x", "pytest_targets": ["t.py"]},                             # no matcher
-        {"name": "x", "prefixes": [""], "pytest_targets": ["t.py"]},           # empty prefix
+        {"name": "x", "prefixes": ["app/x/"], "pytest_targets": "tests/e2e/t.py"},       # not a list
+        {"name": "x", "pytest_targets": ["tests/e2e/t.py"]},                             # no matcher
+        {"name": "x", "prefixes": [""], "pytest_targets": ["tests/e2e/t.py"]},           # empty prefix
         {"name": "x", "prefixes": ["app/x/"], "pytest_targets": ["a b.py"]},   # whitespace
-        {"name": "ok", "prefixes": ["app/y/"], "pytest_targets": ["t.py"]},    # duplicate name
+        {"name": "ok", "prefixes": ["app/y/"], "pytest_targets": ["tests/e2e/t.py"]},    # duplicate name
+        {"name": " ", "prefixes": ["app/x/"], "pytest_targets": ["tests/e2e/t.py"]},     # blank name
+        {"name": "x\nE2E_TIER=skip", "prefixes": ["app/x/"], "pytest_targets": ["tests/e2e/t.py"]},  # forged line
+        {"name": "x", "prefixes": "app/x/", "paths": ["a"], "pytest_targets": ["tests/e2e/t.py"]},  # str prefixes
+        {"name": "x", "prefixes": ["app/x/"], "paths": "a", "pytest_targets": ["tests/e2e/t.py"]},  # str paths
+        {"name": "x", "prefixes": ["app/board"], "pytest_targets": ["tests/e2e/t.py"]},  # no dir boundary
     ]
     for bad in malformed:
         surfaces, note = load_surfaces([good, bad], tmp_path)
@@ -375,9 +401,32 @@ def test_real_surfaces_route_representative_paths() -> None:
     # Shared infrastructure belongs to no surface -> whole suite.
     assert route("tests/e2e/conftest.py") == ("full", "tests/e2e")
     assert route("tests/e2e/_color_assertions.py") == ("full", "tests/e2e")
-    assert route("app/webapp/static/_vendored/demo.html")[0] == "static"  # inert-html rule, not a surface
+    assert route("app/webapp/static/_vendored/demo.html") == ("full", "tests/e2e")
+    # A shared static path riding along with a surface change keeps the whole suite.
+    assert route("app/webapp/static/_vendored/nav/nav-tabs.css",
+                 "app/webapp/static/_vendored/icons/icons-sprite.html") == ("full", "tests/e2e")
     assert route("app/webapp/static/_vendored/icons/icons.js") == ("full", "tests/e2e")
     assert route("app/app.py") == ("full", "tests/e2e")
     # Two surfaces in one diff -> whole suite.
     assert route("app/webapp/static/_vendored/nav/nav-tabs.css",
                  "app/webapp/static/_vendored/card/card.css") == ("full", "tests/e2e")
+
+
+def test_real_surface_helpers_are_only_imported_by_their_own_targets() -> None:
+    """A surface-owned `tests/e2e/_*.py` helper must not be imported outside it.
+
+    Otherwise editing the helper would narrow to a surface that does not run
+    every test the edit can break.
+    """
+    cfg = load_config(REAL_FLEET_TOML)
+    suite = REPO_ROOT / "tests" / "e2e"
+    for surface in cfg.surfaces:
+        for helper in (p for p in surface.paths if Path(p).name.startswith("_") and p.endswith(".py")):
+            module = Path(helper).stem
+            pattern = re.compile(rf"^\s*(from|import)\s.*\b{re.escape(module)}\b", re.MULTILINE)
+            importers = {
+                f"tests/e2e/{f.relative_to(suite).as_posix()}"
+                for f in suite.rglob("*.py")
+                if f.name != Path(helper).name and pattern.search(f.read_text(encoding="utf-8"))
+            }
+            assert importers <= set(surface.pytest_targets), (surface.name, helper, importers)
