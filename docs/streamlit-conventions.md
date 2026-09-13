@@ -1,6 +1,6 @@
 # Streamlit conventions
 
-Moved verbatim from `CLAUDE.md` (`#254`) so the always-on file stays under its size cap. `CLAUDE.md` keeps each section's heading, its *apply only if* gate and one-line rules, and points here for the full procedure, reasoning, snippets and decision records. Headings match `CLAUDE.md`'s, so a reference to a section by name resolves in either file.
+Moved verbatim from `CLAUDE.md` (`#254`) so the always-on file stays under its size cap. `CLAUDE.md` keeps each section's heading, its *apply only if* gate and one-line rules, and points here for the full procedure, reasoning, snippets and decision records. Headings match `CLAUDE.md`'s, so a reference to a section by name resolves in either file. Two lines are the exception: the `st.set_page_config` rule and the no-`streamlit`-imports-outside-the-UI-directory boundary were reworded from absolutes to guidance, because nothing enforces them (prompt-drift R-27).
 
 ## Streamlit conventions
 *Apply only if this project uses Streamlit.*
