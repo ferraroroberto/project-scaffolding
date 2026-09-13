@@ -10,7 +10,8 @@ from __future__ import annotations
 
 import streamlit as st
 
-from src import clear_log_buffer, get_logger, stream_to_streamlit
+from app.log_panel import stream_to_streamlit
+from src import clear_log_buffer, get_logger
 from src.pipelines import example_pipeline
 
 log = get_logger("ui.pipeline_runner")
@@ -51,8 +52,9 @@ def render() -> None:
             - `from src import get_logger` returns a stdlib `logging.Logger`
               wired to three handlers: colored terminal, rotating file,
               and an in-memory ring buffer.
-            - `stream_to_streamlit(...)` runs the pipeline on a background
-              thread and polls that ring buffer ~4×/s to refresh the panel.
+            - `stream_to_streamlit(...)` (from `app/log_panel.py`) runs the
+              pipeline on a background thread and polls that ring buffer
+              ~4×/s to refresh the panel.
             - For console-only scripts, just call `get_logger(...)` and
               log normally — no Streamlit dependency triggered.
             """
