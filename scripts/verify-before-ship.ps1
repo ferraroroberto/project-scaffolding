@@ -79,8 +79,10 @@ Invoke-Stage "pytest (unit, non-e2e)"             { & $py -m pytest --ignore=tes
 # running the whole tests/e2e suite, classify the branch's changed files vs
 # main and run a browser slice proportionate to the diff: backend/docs-only ->
 # skip the browser suite, static assets -> the narrow smoke target, real
-# UI/behaviour -> the full suite. Fail-safe: a mixed/ambiguous/unrecognized
-# diff (or no [e2e] table declared) runs the full suite. The path->tier rules
+# UI/behaviour -> the full suite, or only its declared surface's targets when
+# every full-tier path sits in one [[e2e.surface]] (#258). Fail-safe: a
+# mixed/ambiguous/unrecognized diff (or no [e2e] table declared) runs the full
+# suite. The path->tier rules
 # live in .fleet.toml [e2e] (one auditable place); scripts/classify_e2e.py is
 # the mechanism. On CI the full suite always runs -- the local gate is where
 # routing is proven first.
@@ -112,7 +114,9 @@ if ($tier -eq "skip") {
     Write-Host ""
     Write-Host ">> e2e routing: $tier" -ForegroundColor Cyan
     Write-Host "   reason: $routeReason" -ForegroundColor DarkGray
-    $e2eArgs = @($e2eTarget)
+    # A `surface` tier (#258) names several targets, space-separated -- split
+    # them into separate pytest args (one arg "a.py b.py" is a missing path).
+    $e2eArgs = @($e2eTarget -split '\s+' | Where-Object { $_ })
     foreach ($b in ($e2eBrowsers -split ',' | Where-Object { $_ })) {
         $e2eArgs += @("--browser", $b)
     }

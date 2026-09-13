@@ -115,7 +115,7 @@ Diff-keyed gate at finish: checks the touched web UI still conforms to the desig
 ## Diff-proportionate e2e routing (`.fleet.toml` `[e2e]` + `classify_e2e.py`)
 *Apply only if this project has a browser e2e suite (`tests/e2e/`) wired into `verify-before-ship.*`.*
 
-- `scripts/classify_e2e.py` routes only the browser phase to `skip`/`static`/`full` from the repo's own `.fleet.toml` `[e2e]` table, worst-wins; uncertainty (unmatched path, empty diff, unusable table) always escalates to `full`, CSS/JS route to `full`, and CI always runs the full suite.
+- `scripts/classify_e2e.py` routes only the browser phase to `skip`/`static`/`full` from the repo's own `.fleet.toml` `[e2e]` table, worst-wins (optional `[[e2e.surface]]` narrows a single-surface `full` diff to that surface's targets, #258); uncertainty (unmatched path, empty diff, unusable table) always escalates to `full`, CSS/JS route to `full`, and CI always runs the full suite.
 - A new e2e-relevant directory gets its `full` rule in `.fleet.toml` **and** a representative assertion in `tests/test_classify_e2e.py` in the same PR. Full text: `docs/e2e-routing.md` → "Diff-proportionate e2e routing". (`#180`.)
 ## End-to-end UI testing
 *Apply only if this project serves a browser UI (Streamlit, FastAPI, Flask, etc.).*

@@ -14,14 +14,17 @@ Two jobs:
 
 from __future__ import annotations
 
+import ast
 from pathlib import Path
 
 from scripts.classify_e2e import (
     Category,
     E2EConfig,
     Rule,
+    Surface,
     classify,
     load_config,
+    load_surfaces,
 )
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -150,9 +153,10 @@ def test_real_rules_route_representative_paths() -> None:
     def tier(*paths: str) -> str:
         return classify(list(paths), cfg).tier
 
-    # Real browser surface -> full.
-    assert tier("app/webapp/static/_vendored/card/card.css") == "full"
-    assert tier("app/webapp/static/_vendored/nav/nav-tabs.js") == "full"
+    # Real browser surface -> full. A vendored component's .css/.js is a
+    # full-tier path its declared surface narrows (#258) -- never skip/static.
+    assert tier("app/webapp/static/_vendored/card/card.css") == "surface"
+    assert tier("app/webapp/static/_vendored/nav/nav-tabs.js") == "surface"
     assert tier("app/app.py") == "full"
     assert tier("app/views/welcome.py") == "full"
     assert tier("app/styles/light.css") == "full"
@@ -177,3 +181,282 @@ def test_real_rules_route_representative_paths() -> None:
     # Mixed real diff (static asset + backend) -> static; add a page -> full.
     assert tier("app/webapp/static/icons/foo.svg", "src/x.py") == "static"
     assert tier("app/webapp/static/icons/foo.svg", "app/app.py") == "full"
+
+
+# ------------------------------------------------ surface tier (#258)
+
+def _surf(name: str, targets: tuple[str, ...], *, prefixes: tuple[str, ...] = (),
+          paths: tuple[str, ...] = ()) -> Surface:
+    return Surface(name=name, pytest_targets=targets, prefixes=prefixes, paths=paths)
+
+
+_SURFACE_RULES = (
+    Rule(tier=Category.STATIC, prefix="app/static/", extensions=("svg",)),
+    Rule(tier=Category.FULL, prefix="app/"),
+    Rule(tier=Category.FULL, prefix="tests/e2e/"),
+    Rule(tier=Category.NONE, prefix="docs/"),
+    Rule(tier=Category.NONE, path=".fleet.toml"),
+    Rule(tier=Category.NONE, prefix="scripts/"),
+)
+
+
+def _surface_cfg(*surfaces: Surface, note: str = "") -> E2EConfig:
+    return _cfg(
+        *_SURFACE_RULES,
+        static_pytest_target="tests/e2e/test_smoke.py",
+        surfaces=list(surfaces),
+        surfaces_note=note,
+    )
+
+
+_BOARD = _surf("board", ("tests/e2e/test_board.py",),
+               prefixes=("app/board/", "app/static/board/"), paths=("tests/e2e/test_board.py",))
+_JOBS = _surf("jobs", ("tests/e2e/test_jobs.py", "tests/e2e/test_jobs_agenda.py"),
+              prefixes=("app/jobs/",))
+
+
+def test_single_surface_diff_routes_surface() -> None:
+    r = classify(["app/board/board.js", "tests/e2e/test_board.py", "docs/x.md"],
+                 _surface_cfg(_BOARD, _JOBS))
+    assert r.tier == "surface"
+    assert r.surface == "board"
+    assert r.pytest_target == "tests/e2e/test_board.py"
+    assert r.browsers == []  # suite-default browsers, exactly like full
+
+
+def test_surface_target_list_is_space_separated() -> None:
+    r = classify(["app/jobs/jobs.css"], _surface_cfg(_BOARD, _JOBS))
+    assert r.tier == "surface"
+    assert r.pytest_target == "tests/e2e/test_jobs.py tests/e2e/test_jobs_agenda.py"
+
+
+def test_static_path_riding_a_surface_adds_the_smoke_target() -> None:
+    r = classify(["app/board/board.js", "app/static/board/icon.svg"], _surface_cfg(_BOARD))
+    assert r.tier == "surface"
+    assert r.pytest_target == "tests/e2e/test_board.py tests/e2e/test_smoke.py"
+
+
+def test_static_path_outside_the_surface_keeps_whole_full() -> None:
+    # "Inert" markup can be the page another harness drives, so a static path
+    # the winning surface does not own must not ride along on a smoke run.
+    r = classify(["app/board/board.js", "app/static/icon.svg"], _surface_cfg(_BOARD))
+    assert r.tier == "full"
+    assert r.pytest_target == "tests/e2e"
+
+
+def test_no_surfaces_declared_keeps_whole_full() -> None:
+    r = classify(["app/board/board.js"], _surface_cfg())
+    assert r.tier == "full"
+    assert r.pytest_target == "tests/e2e"
+
+
+def test_unclassified_path_keeps_whole_full_even_inside_a_surface() -> None:
+    # `legacy/` matches no rule, yet a surface claims it: unclassified must win.
+    legacy = _surf("legacy", ("tests/e2e/test_board.py",), prefixes=("legacy/",))
+    r = classify(["legacy/thing.xyz"], _surface_cfg(legacy))
+    assert r.tier == "full"
+    assert r.pytest_target == "tests/e2e"
+
+
+def test_full_path_outside_every_surface_keeps_whole_full() -> None:
+    r = classify(["app/board/board.js", "app/shared/styles.css"], _surface_cfg(_BOARD))
+    assert r.tier == "full"
+    assert r.pytest_target == "tests/e2e"
+
+
+def test_multi_surface_diff_keeps_whole_full() -> None:
+    r = classify(["app/board/board.js", "app/jobs/jobs.css"], _surface_cfg(_BOARD, _JOBS))
+    assert r.tier == "full"
+    assert r.pytest_target == "tests/e2e"
+
+
+def test_path_in_two_surfaces_keeps_whole_full() -> None:
+    overlap = _surf("board-too", ("tests/e2e/test_other.py",), prefixes=("app/board/",))
+    r = classify(["app/board/board.js"], _surface_cfg(_BOARD, overlap))
+    assert r.tier == "full"
+    assert r.pytest_target == "tests/e2e"
+
+
+def test_diff_editing_the_routing_sources_keeps_whole_full() -> None:
+    for source in (".fleet.toml", "scripts/classify_e2e.py"):
+        r = classify(["app/board/board.js", source], _surface_cfg(_BOARD))
+        assert r.tier == "full", source
+        assert r.pytest_target == "tests/e2e", source
+
+
+def test_dotdot_path_keeps_whole_full() -> None:
+    r = classify(["app/board/../shared/styles.css"], _surface_cfg(_BOARD))
+    assert r.tier == "full"
+
+
+def test_empty_diff_keeps_whole_full_with_surfaces() -> None:
+    r = classify([], _surface_cfg(_BOARD))
+    assert r.tier == "full"
+    assert r.pytest_target == "tests/e2e"
+
+
+def test_missing_table_keeps_whole_full_with_surfaces() -> None:
+    cfg = E2EConfig(rules=[], source="missing", surfaces=[_BOARD])
+    assert classify(["app/board/board.js"], cfg).tier == "full"
+
+
+def test_none_only_diff_still_skips_with_surfaces() -> None:
+    assert classify(["docs/x.md"], _surface_cfg(_BOARD)).tier == "skip"
+
+
+def test_disabled_surfaces_note_is_surfaced_in_full_reasons() -> None:
+    r = classify(["app/board/board.js"], _surface_cfg(note="surfaces disabled: because"))
+    assert r.tier == "full"
+    assert "surfaces disabled: because" in r.reasons
+
+
+def _write_targets(root: Path, *names: str) -> None:
+    for name in names:
+        (root / name).parent.mkdir(parents=True, exist_ok=True)
+        (root / name).write_text("", encoding="utf-8")
+
+
+def test_load_surfaces_absent_is_no_surfaces_and_no_note(tmp_path: Path) -> None:
+    assert load_surfaces(None, tmp_path) == ([], "")
+
+
+def test_load_surfaces_rejects_targets_outside_the_suite(tmp_path: Path) -> None:
+    _write_targets(tmp_path, "tests/e2e/test_board.py", "tests/test_unit.py", "outside/t.py")
+    outside = str((tmp_path / "outside" / "t.py").resolve())
+    for target in ("../outside/t.py", "tests/e2e/../../outside/t.py", outside, "tests", "tests/test_unit.py"):
+        surfaces, note = load_surfaces(
+            [{"name": "board", "prefixes": ["app/board/"], "pytest_targets": ["tests/e2e/test_board.py", target]}],
+            tmp_path,
+        )
+        assert surfaces == [], target
+        assert "surfaces disabled" in note, target
+
+
+def test_load_surfaces_parses_a_valid_entry(tmp_path: Path) -> None:
+    _write_targets(tmp_path, "tests/e2e/test_board.py")
+    surfaces, note = load_surfaces(
+        [{"name": "board", "prefixes": ["app/board/"], "pytest_targets": ["tests/e2e/test_board.py"]}],
+        tmp_path,
+    )
+    assert note == ""
+    assert [s.name for s in surfaces] == ["board"]
+
+
+def test_load_surfaces_missing_target_disables_every_surface(tmp_path: Path) -> None:
+    _write_targets(tmp_path, "tests/e2e/test_board.py")
+    surfaces, note = load_surfaces(
+        [
+            {"name": "board", "prefixes": ["app/board/"], "pytest_targets": ["tests/e2e/test_board.py"]},
+            {"name": "jobs", "prefixes": ["app/jobs/"], "pytest_targets": ["tests/e2e/test_gone.py"]},
+        ],
+        tmp_path,
+    )
+    assert surfaces == []
+    assert "does not exist" in note
+
+
+def test_load_surfaces_malformed_entries_disable_every_surface(tmp_path: Path) -> None:
+    _write_targets(tmp_path, "tests/e2e/t.py")
+    good = {"name": "ok", "prefixes": ["app/ok/"], "pytest_targets": ["tests/e2e/t.py"]}
+    malformed = [
+        "not a table",
+        {"prefixes": ["app/x/"], "pytest_targets": ["tests/e2e/t.py"]},                 # no name
+        {"name": "x", "prefixes": ["app/x/"]},                                 # no targets
+        {"name": "x", "prefixes": ["app/x/"], "pytest_targets": []},           # empty targets
+        {"name": "x", "prefixes": ["app/x/"], "pytest_targets": "tests/e2e/t.py"},       # not a list
+        {"name": "x", "pytest_targets": ["tests/e2e/t.py"]},                             # no matcher
+        {"name": "x", "prefixes": [""], "pytest_targets": ["tests/e2e/t.py"]},           # empty prefix
+        {"name": "x", "prefixes": ["app/x/"], "pytest_targets": ["a b.py"]},   # whitespace
+        {"name": "ok", "prefixes": ["app/y/"], "pytest_targets": ["tests/e2e/t.py"]},    # duplicate name
+        {"name": " ", "prefixes": ["app/x/"], "pytest_targets": ["tests/e2e/t.py"]},     # blank name
+        {"name": "x\nE2E_TIER=skip", "prefixes": ["app/x/"], "pytest_targets": ["tests/e2e/t.py"]},  # forged line
+        {"name": "x", "prefixes": "app/x/", "paths": ["a"], "pytest_targets": ["tests/e2e/t.py"]},  # str prefixes
+        {"name": "x", "prefixes": ["app/x/"], "paths": "a", "pytest_targets": ["tests/e2e/t.py"]},  # str paths
+        {"name": "x", "prefixes": ["app/board"], "pytest_targets": ["tests/e2e/t.py"]},  # no dir boundary
+    ]
+    for bad in malformed:
+        surfaces, note = load_surfaces([good, bad], tmp_path)
+        assert surfaces == [], bad
+        assert "surfaces disabled" in note, bad
+    assert load_surfaces({"name": "x"}, tmp_path)[0] == []  # not a list at all
+
+
+def test_load_config_reads_surfaces_relative_to_the_toml(tmp_path: Path) -> None:
+    _write_targets(tmp_path, "tests/e2e/test_board.py")
+    toml = tmp_path / ".fleet.toml"
+    toml.write_text(
+        '[e2e]\n'
+        '[[e2e.rule]]\ntier = "full"\nprefix = "app/"\n'
+        '[[e2e.surface]]\nname = "board"\nprefixes = ["app/board/"]\n'
+        'pytest_targets = ["tests/e2e/test_board.py"]\n',
+        encoding="utf-8",
+    )
+    cfg = load_config(toml)
+    assert [s.name for s in cfg.surfaces] == ["board"]
+    assert classify(["app/board/x.js"], cfg).tier == "surface"
+
+
+def test_real_surfaces_route_representative_paths() -> None:
+    """This repo's declared surfaces narrow what they own and nothing shared (#258)."""
+    cfg = load_config(REAL_FLEET_TOML)
+    assert cfg.surfaces_note == "", cfg.surfaces_note
+    assert {s.name for s in cfg.surfaces} == {"nav", "components", "geometry"}
+
+    def route(*paths: str) -> tuple[str, str]:
+        r = classify(list(paths), cfg)
+        return r.tier, r.pytest_target
+
+    assert route("app/webapp/static/_vendored/nav/nav-tabs.css") == (
+        "surface", "tests/e2e/test_vendored_nav.py")
+    assert route("app/webapp/static/_vendored/card/card.css") == (
+        "surface", "tests/e2e/test_vendored_components.py tests/e2e/test_vendored_nav.py")
+    assert route("tests/e2e/_geometry.py") == ("surface", "tests/e2e/test_geometry_helper.py")
+
+    # Shared infrastructure belongs to no surface -> whole suite.
+    assert route("tests/e2e/conftest.py") == ("full", "tests/e2e")
+    assert route("tests/e2e/_color_assertions.py") == ("full", "tests/e2e")
+    assert route("app/webapp/static/_vendored/demo.html") == ("full", "tests/e2e")
+    assert route("app/webapp/static/_vendored/icons/icons-sprite.html") == ("full", "tests/e2e")
+    # A shared static path riding along with a surface change keeps the whole suite.
+    assert route("app/webapp/static/_vendored/nav/nav-tabs.css",
+                 "app/webapp/static/_vendored/icons/icons-sprite.html") == ("full", "tests/e2e")
+    assert route("app/webapp/static/_vendored/icons/icons.js") == ("full", "tests/e2e")
+    assert route("app/app.py") == ("full", "tests/e2e")
+    # Two surfaces in one diff -> whole suite.
+    assert route("app/webapp/static/_vendored/nav/nav-tabs.css",
+                 "app/webapp/static/_vendored/card/card.css") == ("full", "tests/e2e")
+
+
+def test_real_surface_helpers_are_only_imported_by_their_own_targets() -> None:
+    """A surface-owned `tests/e2e/_*.py` helper must not be imported outside it.
+
+    Otherwise editing the helper would narrow to a surface that does not run
+    every test the edit can break.
+    """
+    cfg = load_config(REAL_FLEET_TOML)
+    suite = REPO_ROOT / "tests" / "e2e"
+
+    def imported_names(source: Path) -> set[str]:
+        names: set[str] = set()
+        for node in ast.walk(ast.parse(source.read_text(encoding="utf-8"))):
+            if isinstance(node, ast.Import):
+                names.update(part for alias in node.names for part in alias.name.split("."))
+            elif isinstance(node, ast.ImportFrom):
+                names.update((node.module or "").split("."))
+                names.update(alias.name for alias in node.names)
+        return names
+
+    all_py = list(suite.rglob("*.py"))
+    for surface in cfg.surfaces:
+        owned = {
+            f for f in all_py
+            if surface.matches(f"tests/e2e/{f.relative_to(suite).as_posix()}")
+            and f.name.startswith("_")
+        }
+        for helper in owned:
+            importers = {
+                f"tests/e2e/{f.relative_to(suite).as_posix()}"
+                for f in all_py
+                if f != helper and helper.stem in imported_names(f)
+            }
+            assert importers <= set(surface.pytest_targets), (surface.name, helper.name, importers)
