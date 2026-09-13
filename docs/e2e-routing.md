@@ -106,3 +106,18 @@ A routing table is only safe if it stays honest as the layout evolves — a new 
 - **`tests/test_classify_e2e.py`** loads the real `.fleet.toml` and asserts representative paths (a vendored CSS, an app page, a backend module, an SVG asset) each land in the tier their rule intends. An edit that silently under-routes a real e2e surface fails there.
 
 Keep both. When you add a new e2e-relevant directory, add its `full` rule to `.fleet.toml` **and** a representative assertion to that test, in the same PR — the same anti-staleness contract as the `.fleet.toml` `description` field and `docs/architecture.mmd`.
+
+## Diff-proportionate e2e routing (`.fleet.toml` `[e2e]` + `classify_e2e.py`)
+
+Moved verbatim from `CLAUDE.md` (`#254`) so the always-on file stays under its size cap. `CLAUDE.md` keeps each section's heading, its *apply only if* gate and one-line rules, and points here for the full procedure, reasoning, snippets and decision records. Headings match `CLAUDE.md`'s, so a reference to a section by name resolves in either file.
+
+*Apply only if this project has a browser e2e suite (`tests/e2e/`) wired into `verify-before-ship.*`.*
+
+Makes the local gate's browser phase proportionate to the diff instead of running all of `tests/e2e` every change. Proven in `app-launcher` (`scripts/classify_e2e.py`, `#568`/PR `#574`), promoted here parameterized.
+
+- **Mechanism shared, rules declared per-project.** `scripts/classify_e2e.py` reads an `[e2e]` table from the repo's own `.fleet.toml` (paths→tier map). TOML so stdlib `tomllib` loads it with zero custom parsing, rules versioned beside the code they classify. `.fleet.toml` is the single auditable home for the routing table.
+- **Three tiers, worst-wins across the diff:** `skip` (every changed path declared `none` — backend/docs/tooling) — no browser suite runs; `static` (worst path declared `static` inert asset) → narrow `static_pytest_target`; `full` (any `full` path, any unmatched path, empty diff, or no usable `[e2e]` table) → whole `full_pytest_target`.
+- **Fail-safe is the point — uncertainty escalates, never narrows.** Unrecognized path, mixed diff, malformed/absent table all route to `full`. The table can only shrink an already-recognized-narrow diff, never a matched change further. CSS/JS route to `full` (no curated "layout subset" — drift-prone, under-testing risk); `static` stays to genuinely inert types (images, fonts, inert vendored HTML fragments). Rules are first-match-wins — declare specific `static` rules before the broader `full` prefix they sit under.
+- **Wiring:** `verify-before-ship.*` runs byte-compile + non-e2e pytest **unconditionally**, then routes **only** the browser phase on the classifier's `E2E_TIER`. On CI (`$env:CI`) routing is bypassed, full suite always runs.
+- **Anti-drift guard mandatory — two required:** the `unclassified→full` fail-safe, **and** `tests/test_classify_e2e.py` loading the real `.fleet.toml` and asserting representative paths land in their intended tier. New e2e-relevant directory → add its `full` rule to `.fleet.toml` **and** a representative assertion to that test **in the same PR** (same anti-staleness contract as `.fleet.toml` `description` and `docs/architecture.mmd`).
+- **Ref:** full schema/rule-writing: `docs/e2e-routing.md`. Web-app-shaped adopters (grocery, whatsapp-radar, family-accounting, mathgamesforkids, life-os, website, home-automation) get one-line pointer issues for follow-on adoption — not scoped here. (`#180`; source instance `app-launcher#568`.)
