@@ -20,7 +20,7 @@ Conventions:
 ## Streamlit conventions
 *Apply only if this project uses Streamlit.*
 
-- Before writing or reviewing Streamlit code, read `docs/streamlit-conventions.md` — `st.set_page_config` first, `width=` not `use_container_width=True`, state in `st.session_state`, `@st.cache_data`/`@st.cache_resource`, explicit widget `key=`s, `st.navigation` multipage, `streamlit` imported only from the UI directory, `st.error`/`st.warning`/`st.success` feedback, what to ask before assuming, and the DOM-hooking CSS gotchas.
+- Before writing or reviewing Streamlit code, read `docs/streamlit-conventions.md` — `st.set_page_config` first (checked by `tests/test_streamlit_conventions.py`), `width=` not `use_container_width=True`, state in `st.session_state`, `@st.cache_data`/`@st.cache_resource`, explicit widget `key=`s, `st.navigation` multipage, `streamlit` imported only from the UI directory (ruff `TID251`), `st.error`/`st.warning`/`st.success` feedback, what to ask before assuming, and the DOM-hooking CSS gotchas.
 
 ## Web-app visual identity (fleet design system) *(PWA)*
 

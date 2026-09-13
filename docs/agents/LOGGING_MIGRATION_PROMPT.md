@@ -18,7 +18,7 @@ Approach (plan mode — present, get approval, then execute in phases of ≤5 fi
    - `print("ERROR ...")` / printed tracebacks → `log.error(..., exc_info=True)`
    - `print("WARN ...")` / `print("⚠️ ...")` → `log.warning(...)`
    - Debug/trace prints → `log.debug(...)`
-4. For Streamlit apps, prefer the project's existing logger setup if there is one (see project-scaffolding/src/logger.py for the canonical 3-sink pattern: terminal + file + Streamlit live panel).
+4. For Streamlit apps, prefer the project's existing logger setup if there is one (see project-scaffolding/src/logger.py for the canonical 3-sink pattern: terminal + file + in-memory buffer, rendered as a Streamlit live panel by project-scaffolding/app/log_panel.py — `streamlit` stays out of `src/`).
 5. Ensure root logging is configured exactly once per entrypoint (don't add `logging.basicConfig` to library modules).
 6. Verify per phase: `& .\.venv\Scripts\python.exe -m py_compile <changed files>`; for Streamlit changes, boot-test once.
 

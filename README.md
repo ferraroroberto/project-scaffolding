@@ -11,8 +11,8 @@ Clone this directory, rename it, and start building.
 - An **elegant logger** (`src/logger.py`) that writes to:
   - the **terminal**, color-coded by level,
   - a **rotating file** at `data/logs/app.log`,
-  - a **live panel inside the Streamlit UI**, all from a single
-    `log.info(...)` call.
+  - a **live panel inside the Streamlit UI** (rendered by
+    `app/log_panel.py`), all from a single `log.info(...)` call.
 - `app/.streamlit/config.toml` — dark theme + sane server defaults.
 - A **light-mode toggle** in the sidebar, backed by
   [`app/styles/light.css`](app/styles/light.css) (CSS overlay, no restart).
@@ -100,6 +100,7 @@ app/
   styles/light.css          light-mode overlay (runtime-injected)
   app.py                    Streamlit entry: page config,
                             st.navigation + light/dark toggle
+  log_panel.py              Streamlit live/one-shot log panels over the logger's ring buffer
   views/                    one render() per file (welcome, ...)
   tray/single_instance.py   vendor-verbatim named-mutex primitive for tray apps
   tray/watchdog.py          vendor-verbatim tray self-heal primitives (spawn retry/backoff, health watchdog, breadcrumb log)
@@ -132,6 +133,7 @@ See `CLAUDE.md` for the cross-project agent conventions.
 
 - `app/app.py` prepends the project root to `sys.path`, so `from src.X import Y` works everywhere downstream.
 - UI code in `app/` imports from `src/`, **never the other way around**.
+- `streamlit` is imported only under `app/` — enforced by ruff `TID251` (banned-api in `pyproject.toml`, `app/**` is the one ignore), including imports inside functions. See [`docs/streamlit-conventions.md`](docs/streamlit-conventions.md).
 - Views can import siblings as top-level modules (`from views import welcome`) because Streamlit puts `app/` on `sys.path` when it runs `app/app.py`.
 - The view directory is named `views/` (not `pages/`) on purpose: Streamlit auto-discovers any subdirectory called `pages/` and adds it to the sidebar, which would duplicate the navigation built in `app.py`.
 - Pipelines run standalone with `python -m src.pipelines.<name>` — they must not import from `app/`.
@@ -164,7 +166,7 @@ One call → three sinks:
 
 1. Color-tinted, timestamped terminal output.
 2. Rotating file at `data/logs/app.log` (1 MB × 3 backups).
-3. In-memory ring buffer that Streamlit views can render live via the `src.stream_to_streamlit` helper (runs the work on a background thread and streams its logs into a live panel; see `app/views/pipeline_runner.py` for the canonical usage) or one-shot via `src.render_log_panel`.
+3. In-memory ring buffer that Streamlit views can render live via `app.log_panel.stream_to_streamlit` (runs the work on a background thread and streams its logs into a live panel; see `app/views/pipeline_runner.py` for the canonical usage) or one-shot via `app.log_panel.render_log_panel`.
 
 Do not configure root logging elsewhere — it is set up once in `src/logger.py` and is idempotent.
 
@@ -234,7 +236,7 @@ The final **routed e2e** stage is diff-proportionate ([`docs/e2e-routing.md`](do
 ## What NOT to do
 
 - Don't sprinkle `print()` for progress — use the logger.
-- Don't import Streamlit inside `src/pipelines/*` or at the top of `src/logger.py`'s public path (the logger imports it lazily inside the Streamlit-only helpers, which is intentional).
+- Don't import Streamlit anywhere in `src/`, not even lazily inside a function — ruff `TID251` fails the gate. Streamlit-only helpers belong under `app/` (e.g. `app/log_panel.py`).
 - Don't hardcode paths. Build them off `src.config.ROOT_DIR`, `INPUT_DIR`, `OUTPUT_DIR`, `LOG_DIR`.
 - Don't add per-project files to this scaffold itself. Clone it, rename, and customise downstream.
 

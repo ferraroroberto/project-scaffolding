@@ -18,6 +18,7 @@ flowchart TB
   subgraph appdir["app/ — Streamlit UI"]
     APPPY["app.py\npage config, sidebar,\nlight/dark toggle, st.navigation"]
     VIEWS["views/\nwelcome.py, pipeline_runner.py\none render() per file"]
+    LOGPANEL["log_panel.py (#256)\nstream_to_streamlit / render_log_panel\nStreamlit panels over the logger's ring buffer"]
     TRAYLIB["tray/\nsingle_instance.py (named-mutex primitive, vendor-verbatim)\nwatchdog.py (spawn retry/backoff + dead-vs-wedged\nhealth watchdog + breadcrumb log, vendor-verbatim, #201)"]
     WEBVEND["webapp/static/_vendored/\nnav/ (bottom-tab nav) · icons/ (Lucide sprite)\ncard/ · disclosure/ · modal/\nempty-state/ · switch/ · icon-tile/ · button/\nrange-tab/ · page-foot/ · home-head/ · select-native/\n+ demo.html (gallery / render harness)"]
     STYLES["styles/light.css\nruntime CSS overlay"]
@@ -32,7 +33,7 @@ flowchart TB
 
   subgraph srcdir["src/ — non-UI Python (reusable from CLI + tests)"]
     CONFIG["config.py\npaths + env-driven settings"]
-    LOGGER["logger.py\nterminal + rotating file +\nStreamlit live panel, one log.info() call"]
+    LOGGER["logger.py\nterminal + rotating file +\nin-memory ring buffer, one log.info() call\n(never imports streamlit: ruff TID251, #256)"]
     NOWINDOW["no_window.py (#209)\nthe ONE CREATE_NO_WINDOW flag\nevery subprocess spawn imports\n(vendor-verbatim files keep a local copy)"]
     PIPELINES["pipelines/\nexample_pipeline.py\none run() per file, returns summary dict"]
     NOTIFY["notify/\nbase.py, factory.py, config.py, telegram.py\nvendor-verbatim Telegram notifier"]
@@ -42,6 +43,8 @@ flowchart TB
   end
   VIEWS -->|orchestrates, business logic stays here| PIPELINES
   VIEWS --> LOGGER
+  VIEWS --> LOGPANEL
+  LOGPANEL -->|reads ring buffer| LOGGER
   PIPELINES --> LOGGER
   PIPELINES --> CONFIG
   LOGGER -->|writes| DATALOGS
