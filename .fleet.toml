@@ -111,6 +111,46 @@ path = "CLAUDE.md"
 tier       = "none"
 extensions = ["bat"]
 
+# Surfaces (#258): a diff that would route "full" but whose every full-tier
+# path sits in ONE surface below runs only that surface's pytest_targets.
+# Anything shared stays OUT of every surface on purpose -- conftest.py,
+# _color_assertions.py, demo.html (the nav harness mounts on the gallery),
+# icons/ (the nav harness renders the sprite), the Streamlit app -- so a change
+# there keeps the whole suite. A path in two surfaces, or a diff spanning two,
+# also keeps the whole suite. tests/test_classify_e2e.py pins these.
+[[e2e.surface]]
+name           = "nav"
+prefixes       = ["app/webapp/static/_vendored/nav/"]
+paths          = ["tests/e2e/test_vendored_nav.py"]
+pytest_targets = ["tests/e2e/test_vendored_nav.py"]
+
+# The gallery components. test_vendored_nav.py mounts on the same gallery
+# page, so a component stylesheet can reach it -- both harnesses run.
+[[e2e.surface]]
+name     = "components"
+prefixes = [
+    "app/webapp/static/_vendored/button/",
+    "app/webapp/static/_vendored/card/",
+    "app/webapp/static/_vendored/disclosure/",
+    "app/webapp/static/_vendored/empty-state/",
+    "app/webapp/static/_vendored/home-head/",
+    "app/webapp/static/_vendored/icon-tile/",
+    "app/webapp/static/_vendored/modal/",
+    "app/webapp/static/_vendored/page-foot/",
+    "app/webapp/static/_vendored/range-tab/",
+    "app/webapp/static/_vendored/select-native/",
+    "app/webapp/static/_vendored/switch/",
+]
+paths          = ["tests/e2e/test_vendored_components.py"]
+pytest_targets = ["tests/e2e/test_vendored_components.py", "tests/e2e/test_vendored_nav.py"]
+
+# The rendered-geometry helper and its hermetic fixtures.
+[[e2e.surface]]
+name           = "geometry"
+prefixes       = ["tests/e2e/_fixtures/geometry/"]
+paths          = ["tests/e2e/_geometry.py", "tests/e2e/test_geometry_helper.py"]
+pytest_targets = ["tests/e2e/test_geometry_helper.py"]
+
 # ---------------------------------------------------------------------------
 # [components] -- the canonical catalog of this scaffold's vendor-verbatim
 # components (#230). ONLY project-scaffolding carries this table; an adopter
