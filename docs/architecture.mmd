@@ -103,7 +103,9 @@ flowchart TB
     PLAYWRIGHTDOC["playwright-ui-testing.md"]
     CHROMEDOC["shared-chrome-profile.md"]
     BRANDDOC["brand-icons.md"]
+    CONVDOCS["streamlit-, webapp-pwa-, ci-,\nlong-lived-process-conventions.md,\nmulti-repo-fanout.md\nfull text of CLAUDE.md's one-line sections (#254)"]
   end
+  CLAUDEMD -.->|points to full text in| CONVDOCS
   AGENTSDIR -.->|source of truth for| CLAUDEMD
   MASTERSYNC -.->|asserts CLAUDE.master.md == CLAUDE.md body| AGENTSDIR
   GATEWATCHTEST -.->|asserts the template's contract| GATEWATCH

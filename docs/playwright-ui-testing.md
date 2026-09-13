@@ -1054,3 +1054,43 @@ The corresponding rules in `docs/agents/CLAUDE.master.md` (the **End-to-end
 UI testing** section) are the *enforcement* layer: they tell every AI
 agent that drops into a downstream repo what to do and what not to do.
 This doc is the *teaching* layer: it tells *me* why those rules exist.
+
+## End-to-end UI testing
+
+Moved verbatim from `CLAUDE.md` (`#254`) so the always-on file stays under its size cap. `CLAUDE.md` keeps each section's heading, its *apply only if* gate and one-line rules, and points here for the full procedure, reasoning, snippets and decision records. Headings match `CLAUDE.md`'s, so a reference to a section by name resolves in either file.
+
+*Apply only if this project serves a browser UI (Streamlit, FastAPI, Flask, etc.).*
+
+Two loops, kept separate. Full setup/bootstrap recipe: `docs/playwright-ui-testing.md`.
+
+### Iterative verification (headed, agent-driven)
+- Drive the running app via **Playwright MCP server in `--headed` mode** (Claude Code, Codex CLI); no MCP support → small `playwright` Python script via Bash, `headless=False`.
+- Boot the app **once** on a fixed port (Streamlit default 8501), leave it running. Don't restart between iterations unless `set_page_config` or top-level imports changed.
+- Prefer a11y `snapshot` over `screenshot` (DOM cheaper than pixels in tokens). Screenshot only on failure or final visual confirmation.
+- Cap ≤5 actions per cycle, then report. Stop and ask if page state is unexpected — don't loop blindly.
+- Target widgets via stable `key=` using `page.get_by_role(..., name=...)` or `page.get_by_test_id(...)`.
+- Do NOT create files under `tests/e2e/` for verification — throwaway, conversation-only. Promotion to a permanent test is a separate, deliberate decision.
+
+### Regression suite (headless, pytest-playwright)
+Optional, lives at `tests/e2e/`. Don't create the folder until the first regression test is actually justified.
+
+- Add a test only when all three hold: (1) silent breakage would hurt, (2) can't be caught by a unit test under `tests/`, (3) behavior has stabilized.
+- Run via `& .\.venv\Scripts\python.exe -m pytest tests/e2e/` (Windows) / `./.venv/bin/python -m pytest tests/e2e/` (POSIX). No LLM in the loop, zero per-run cost.
+- One shared session fixture boots the app plus any service dependencies (API process, worker, PTY host, …) once per pytest run. Engine-agnostic: `streamlit run`, `uvicorn`, `flask run` are all just the launch command.
+- Default to isolation: boot a disposable instance; if target port occupied with no opt-in, **refuse** (`pytest.exit`, naming the flag) rather than killing/reusing what's there. Bare `pytest tests/e2e` must never silently drive a live app the harness didn't start (`#191`).
+- Opt-in to *acting on* an occupied port = one loudly-named env var per project (`LAUNCHER_E2E_LIVE`; scaffold's `STREAMLIT_E2E_LIVE`) — never an opt-**out** flag (e.g. `E2E_FORCE_AUTOBOOT=1` has backwards polarity: forgetting to set it silently re-enables adoption).
+- What the flag permits differs per repo — don't conflate: `app-launcher`'s `LAUNCHER_E2E_LIVE` = read-only assertions against the live tray, never a kill (`_require_live_tray` guard; `--e2e-autoboot` never adopts the live session-host on `:8446`, always spawns its own on a free port). This scaffold's `STREAMLIT_E2E_LIVE` = kill-and-restart via `ensure_fresh_streamlit`, legitimate only because the target is a stateless, cheap-to-restart dev server *and* goes through this repo's own canonical restart helper, never a by-hand kill (`#197`). A repo adopting the vendored guard picks its own meaning, documented in the guard's exit message pointing at that repo's CLAUDE.md. **Log** which instance (disposable vs acted-on-live) the suite is driving and why, so a hung run is diagnosable from its own output.
+- Isolate anything stateful — never adopt-and-mutate a host holding the user's live work, even under the live opt-in. The reclaim-on-opt-in rule is safe only for a stateless, cheap-to-restart webapp. A host owning user state or child processes (session-host, worker with in-flight jobs, PTY host) must **always** get the harness's own disposable instance on a free port, injected via env override — never the live fixed port, opt-in or not. Litmus test: is the thing I'd be touching holding work the user would be upset to lose? If yes, isolate unconditionally. Same bar — a destructive test scopes to what it created: snapshot pre-existing ids before acting, kill only the delta, never `.first`/"whatever's in the list" (`app-launcher#260`).
+- Is a `/propagate-vendored` component: `tests/e2e/_e2e_live_guard.py` (manifest key `e2e_live_guard`). The policy — check target port, refuse (`pytest.exit`, naming the flag) if occupied with no opt-in, else log the decision — is shape-independent; only the port number, flag name, and how the disposable instance boots are call-site parameters (`#191` shipped it prose-only; `#194` reversed that). Same vendoring pattern as `app/tray/single_instance.py` and `tests/e2e/_geometry.py`: copy the file byte-identical into an app's `tests/e2e/`, call `require_disposable_instance(port, flag_env_name)` from the fixture, let `/propagate-vendored e2e_live_guard` hash-verify and re-vendor fleet-wide. (`tray_lifecycle.ps1` is NOT a valid precedent — de-vendored in `#153`.) Adopter records the entry in its own `.fleet.toml`'s `[vendored]` table — never here.
+- Boot failure is a hard failure — never `pytest.skip`. A suite that skips when the app isn't up reports green on a build it never tested. Skip is fine for the ad-hoc "use whatever tray I have running" path; the pre-ship path must fail loud.
+- Keep the suite small — target < 15 tests total. Tempted to add #20 → delete two first.
+- No Page Object Model. Too much ceremony for this size.
+- Don't gate commits on e2e. Run on push or in CI, not in pre-commit.
+- When you remove a feature, remove its e2e test in the same commit.
+
+### Mobile / phone-first UI testing
+*Apply only if the app's primary surface is a phone.*
+
+- Project the regression suite onto **WebKit** with a device-emulation descriptor (Playwright ships iPhone/Android descriptors — viewport, user-agent, touch, scale factor). WebKit shares the iOS Safari rendering + JS engine, reproducing most "Safari is unhappy" bugs on Windows/Linux before a real phone.
+- Make the projection **always-on** — a parametrised `browser_name`/device fixture so every test runs the mobile projection too. An opt-in projection gets forgotten.
+- WebKit-on-Windows is *not* real iOS: no iOS shell, no real WKWebView memory limits, no Apple keyboard, no Add-to-Home-Screen container. For residual shell-only bugs, attach PC DevTools to a real phone via `ios-webkit-debug-proxy` (bridges the iOS Web Inspector to a local port Edge/Chrome DevTools can attach to). Playwright cannot drive real iOS Safari — only its bundled WebKit and the iOS Simulator on macOS.
