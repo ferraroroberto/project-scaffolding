@@ -14,7 +14,7 @@ Two jobs:
 
 from __future__ import annotations
 
-import re
+import ast
 from pathlib import Path
 
 from scripts.classify_e2e import (
@@ -195,6 +195,8 @@ _SURFACE_RULES = (
     Rule(tier=Category.FULL, prefix="app/"),
     Rule(tier=Category.FULL, prefix="tests/e2e/"),
     Rule(tier=Category.NONE, prefix="docs/"),
+    Rule(tier=Category.NONE, path=".fleet.toml"),
+    Rule(tier=Category.NONE, prefix="scripts/"),
 )
 
 
@@ -273,6 +275,18 @@ def test_path_in_two_surfaces_keeps_whole_full() -> None:
     r = classify(["app/board/board.js"], _surface_cfg(_BOARD, overlap))
     assert r.tier == "full"
     assert r.pytest_target == "tests/e2e"
+
+
+def test_diff_editing_the_routing_sources_keeps_whole_full() -> None:
+    for source in (".fleet.toml", "scripts/classify_e2e.py"):
+        r = classify(["app/board/board.js", source], _surface_cfg(_BOARD))
+        assert r.tier == "full", source
+        assert r.pytest_target == "tests/e2e", source
+
+
+def test_dotdot_path_keeps_whole_full() -> None:
+    r = classify(["app/board/../shared/styles.css"], _surface_cfg(_BOARD))
+    assert r.tier == "full"
 
 
 def test_empty_diff_keeps_whole_full_with_surfaces() -> None:
@@ -402,6 +416,7 @@ def test_real_surfaces_route_representative_paths() -> None:
     assert route("tests/e2e/conftest.py") == ("full", "tests/e2e")
     assert route("tests/e2e/_color_assertions.py") == ("full", "tests/e2e")
     assert route("app/webapp/static/_vendored/demo.html") == ("full", "tests/e2e")
+    assert route("app/webapp/static/_vendored/icons/icons-sprite.html") == ("full", "tests/e2e")
     # A shared static path riding along with a surface change keeps the whole suite.
     assert route("app/webapp/static/_vendored/nav/nav-tabs.css",
                  "app/webapp/static/_vendored/icons/icons-sprite.html") == ("full", "tests/e2e")
@@ -420,13 +435,28 @@ def test_real_surface_helpers_are_only_imported_by_their_own_targets() -> None:
     """
     cfg = load_config(REAL_FLEET_TOML)
     suite = REPO_ROOT / "tests" / "e2e"
+
+    def imported_names(source: Path) -> set[str]:
+        names: set[str] = set()
+        for node in ast.walk(ast.parse(source.read_text(encoding="utf-8"))):
+            if isinstance(node, ast.Import):
+                names.update(part for alias in node.names for part in alias.name.split("."))
+            elif isinstance(node, ast.ImportFrom):
+                names.update((node.module or "").split("."))
+                names.update(alias.name for alias in node.names)
+        return names
+
+    all_py = list(suite.rglob("*.py"))
     for surface in cfg.surfaces:
-        for helper in (p for p in surface.paths if Path(p).name.startswith("_") and p.endswith(".py")):
-            module = Path(helper).stem
-            pattern = re.compile(rf"^\s*(from|import)\s.*\b{re.escape(module)}\b", re.MULTILINE)
+        owned = {
+            f for f in all_py
+            if surface.matches(f"tests/e2e/{f.relative_to(suite).as_posix()}")
+            and f.name.startswith("_")
+        }
+        for helper in owned:
             importers = {
                 f"tests/e2e/{f.relative_to(suite).as_posix()}"
-                for f in suite.rglob("*.py")
-                if f.name != Path(helper).name and pattern.search(f.read_text(encoding="utf-8"))
+                for f in all_py
+                if f != helper and helper.stem in imported_names(f)
             }
-            assert importers <= set(surface.pytest_targets), (surface.name, helper, importers)
+            assert importers <= set(surface.pytest_targets), (surface.name, helper.name, importers)

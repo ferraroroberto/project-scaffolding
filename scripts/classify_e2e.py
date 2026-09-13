@@ -132,6 +132,8 @@ def _str_list(raw: object) -> tuple[str, ...] | None:
 
 
 _SURFACE_NAME = re.compile(r"[A-Za-z0-9_.-]+")
+# The files that define routing itself; a diff touching either never narrows.
+_ROUTING_SOURCES = frozenset({".fleet.toml", "scripts/classify_e2e.py"})
 
 
 def _target_problem(target: str, repo_root: Path, suite_dir: str) -> str | None:
@@ -277,6 +279,10 @@ def _narrow_to_surface(
     surface owns keeps the whole suite rather than riding along on a smoke run.
     """
     if any(label == "unclassified" for _, _, label in classified):
+        return None
+    # A diff that edits the surface map (or the mechanism reading it) must not
+    # be judged by its own unreviewed map; a `..` hop defeats prefix matching.
+    if any(path in _ROUTING_SOURCES or ".." in path.split("/") for path, _, _ in classified):
         return None
     hit: Surface | None = None
     example = ""

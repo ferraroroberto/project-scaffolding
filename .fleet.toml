@@ -32,10 +32,14 @@ extensions = ["svg", "png", "jpg", "jpeg", "gif", "ico", "webp", "avif", "woff",
 
 # The component gallery is NOT an inert fragment: it carries a module script
 # and is the page test_vendored_components.py and test_vendored_nav.py drive,
-# so it runs the whole suite (#258). Must precede the inert-HTML rule below.
+# and it fetches the icon sprite into that page -- so both run the whole suite
+# (#258). Must precede the inert-HTML rule below.
 [[e2e.rule]]
 tier = "full"
 path = "app/webapp/static/_vendored/demo.html"
+[[e2e.rule]]
+tier = "full"
+path = "app/webapp/static/_vendored/icons/icons-sprite.html"
 
 # A vendored HTML fragment is pure markup with no behaviour of its own; its
 # .css/.js siblings are NOT covered by this rule and fall through to "full"
