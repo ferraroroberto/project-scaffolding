@@ -111,6 +111,69 @@ def test_tray_template_launch_args_survive_argv_parsing(tmp_path: Path) -> None:
     assert not out.get("SCRIPTDIR", "x").endswith("\\")
 
 
+def test_tray_template_does_not_leak_app_name_to_children(tmp_path: Path) -> None:
+    """The template must not hand a bare `APP_NAME` to the tray it starts (#264).
+
+    `setlocal` scopes a variable away from the *calling* console only; every
+    process tray.bat launches still inherits it. A bare `APP_NAME` then rode the
+    whole tray -> service chain into every session and app that service spawns,
+    where another project reads `APP_NAME` as its own config key
+    (ferraroroberto/app-launcher#963). The usual restart route is an agent in a
+    session that already carries the leaked value, so the caller presets it:
+    the template must clear it, not merely stop setting it. The stub helper
+    records the environment it inherited plus its `-AppName` argument.
+    """
+    if sys.platform != "win32":
+        return
+    powershell = shutil.which("powershell.exe")
+    if powershell is None:
+        return
+
+    fake_home = tmp_path / "_home"
+    probe = fake_home / ".claude" / "tray" / "tray_lifecycle.ps1"
+    probe.parent.mkdir(parents=True)
+    probe.write_text(
+        "param([Parameter(Position=0)][string]$Action, [string]$AppName,\n"
+        " [string]$ScriptDir, [string]$VenvDir, [string]$TrayMatch,\n"
+        " [string]$Ports, [string]$TrayLaunch, [string]$VersionUrl, [switch]$Restart)\n"
+        "$state = if (Test-Path Env:APP_NAME) { 'present:' + $env:APP_NAME } else { 'absent' }\n"
+        "Write-Output \"APPNAMEENV=$state\"\n"
+        "Write-Output \"APPNAMEARG=$AppName\"\n",
+        encoding="utf-8",
+    )
+
+    batch = (ROOT / "tray.bat.template").read_text(encoding="utf-8")
+    batch = (
+        batch.replace("__APP_NAME__", "ProbeApp")
+        .replace("__TRAY_LAUNCH__", "launcher.py tray")
+        .replace("__TRAY_MATCH__", r"launcher\.py\s+tray")
+        .replace("__OWNED_PORTS__", "8445")
+    )
+    (tmp_path / "tray.bat").write_text(batch, encoding="utf-8")
+
+    env = {k: v for k, v in os.environ.items() if k.upper() != "APP_NAME"}
+    env["APP_NAME"] = "LeakedFromCaller"
+    env["USERPROFILE"] = str(fake_home)
+    result = subprocess.run(
+        ["cmd", "/c", str(tmp_path / "tray.bat")],
+        check=False,
+        capture_output=True,
+        text=True,
+        cwd=str(tmp_path),
+        env=env,
+        creationflags=NO_WINDOW,
+    )
+    out = dict(
+        line.split("=", 1)
+        for line in result.stdout.splitlines()
+        if "=" in line and line.split("=", 1)[0].isupper()
+    )
+
+    assert out.get("APPNAMEENV") == "absent", result.stdout + result.stderr
+    # The display name still reaches the lifecycle helper as its argument.
+    assert out.get("APPNAMEARG") == "ProbeApp", result.stdout + result.stderr
+
+
 def test_tray_template_is_ascii_only() -> None:
     """A non-ASCII byte anywhere in the template corrupts non-interactive
     --restart (#183).
