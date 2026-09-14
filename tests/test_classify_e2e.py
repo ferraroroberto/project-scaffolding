@@ -460,3 +460,21 @@ def test_real_surface_helpers_are_only_imported_by_their_own_targets() -> None:
                 if f != helper and helper.stem in imported_names(f)
             }
             assert importers <= set(surface.pytest_targets), (surface.name, helper.name, importers)
+
+
+# ------------------------------------------------------- vendored-copy lint fit
+
+def test_classifier_fits_the_strictest_adopter_line_length() -> None:
+    """No line over 100 columns (project-scaffolding#262).
+
+    This file is vendored byte-verbatim, so it can't be reformatted downstream.
+    whatsapp-radar lints its whole tree at ``line-length = 100`` with ``E``
+    selected; a longer line here fails that adopter's gate on re-vendor.
+    """
+    source = REPO_ROOT / "scripts" / "classify_e2e.py"
+    long_lines = [
+        (number, len(line))
+        for number, line in enumerate(source.read_text(encoding="utf-8").splitlines(), start=1)
+        if len(line) > 100
+    ]
+    assert long_lines == []
