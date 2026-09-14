@@ -73,7 +73,7 @@ set "VERSION_URL="
 set "RESTART_ARG="
 if defined WANT_RESTART set "RESTART_ARG=-Restart"
 
-%PS% -NoProfile -NonInteractive -File "%TRAY_PS%" launch -AppName "%APP_NAME%" -ScriptDir "%SCRIPT_DIR%" -VenvDir "%TRAY_VENV%" -TrayMatch "launcher\.py\s+tray" -Ports "%OWNED_PORTS%" -TrayLaunch "%TRAY_LAUNCH%" -VersionUrl "%VERSION_URL%" !RESTART_ARG!
+%PS% -NoProfile -NonInteractive -File "%TRAY_PS%" launch -AppName "%TRAY_APP_NAME%" -ScriptDir "%SCRIPT_DIR%" -VenvDir "%TRAY_VENV%" -TrayMatch "launcher\.py\s+tray" -Ports "%OWNED_PORTS%" -TrayLaunch "%TRAY_LAUNCH%" -VersionUrl "%VERSION_URL%" !RESTART_ARG!
 exit /b %ERRORLEVEL%
 ```
 
@@ -93,6 +93,7 @@ Adapt per repo:
 
 - **Ports** — replace `8445,8446` with the ports *this tray owns*. `photo-ocr` → `8444`. `voice-transcriber` → `8443` (plus `:8091` only if the tray owns it; **not** `:8090`, which is mutex-shared with the local-LLM hub).
 - **Tray match** — replace `launcher\.py\s+tray` with this project's tray entry invocation.
+- **App name** — set `TRAY_APP_NAME`, never a bare `APP_NAME`. `setlocal` hides a variable from the calling console but not from child processes, so the whole tray → service chain inherits every tray-local name, and so does every session or app that service spawns — where `APP_NAME` is another project's own config key (`ferraroroberto/app-launcher#963`). The template also clears an inherited `APP_NAME` right after `setlocal`, because the usual restart route is an agent in a session that already carries the old leaked value (`project-scaffolding#264`).
 - Everything else (the `.venv` paths, the CommandLine-scoped reclaim, the release delay) stays as-is.
 
 ## Single source of truth — two channels, not one (project-scaffolding#153)
