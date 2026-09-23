@@ -208,11 +208,15 @@ def test_empty_state_contract(gallery: Page) -> None:
 
 
 def test_modal_contract(gallery: Page) -> None:
-    """modal: opens via the native API, 34px close, AA disabled recipe on Save."""
+    """modal: opens via the native API, 34px close, 48px primary, AA disabled Save."""
     gallery.click("#openModalBtn")
     expect(gallery.locator("#demoDialog")).to_be_visible()
     assert _style(gallery, "#demoDialogClose", "width") == "34px"
     assert _style(gallery, "#demoDialogClose", "height") == "34px"
+    # Save is the spec's 48px button-primary, not the page's 36px --control-h
+    # (#280): the gallery sets --control-h: 36px, so a regression reads 36px.
+    assert _style(gallery, "#demoSaveBtn", "height") == "48px"
+    assert_min_target(gallery.locator("#demoSaveBtn"))
     # Disabled primary = the flat card-off/muted/line recipe, not opacity.
     assert _style(gallery, "#demoSaveBtn", "backgroundColor") == "rgb(246, 248, 250)"
     assert _style(gallery, "#demoSaveBtn", "color") == "rgb(101, 109, 118)"
