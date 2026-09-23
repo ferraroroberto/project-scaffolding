@@ -127,6 +127,8 @@
   .tile-row { display: flex; gap: var(--gap); }
   #themeToggle { align-self: flex-end; }
 </style>
+<!-- base.css loads FIRST: element-level rules every component builds on. -->
+<link rel="stylesheet" href="base/base.css">
 <link rel="stylesheet" href="card/card.css">
 <link rel="stylesheet" href="disclosure/disclosure.css">
 <link rel="stylesheet" href="modal/modal.css">
@@ -144,6 +146,14 @@
 <body>
 <div class="gallery">
   <button type="button" id="themeToggle" class="empty-state-action">Toggle theme</button>
+
+  <h2>base (bare form controls, no component class)</h2>
+  <div class="card" id="demoBase" style="display: flex; flex-direction: column; gap: var(--space-sm);">
+    <button type="button" id="demoBaseButton">Bare button</button>
+    <input type="text" id="demoBaseInput" value="Bare input" aria-label="Bare input">
+    <select id="demoBaseSelect" aria-label="Bare select"><option>Bare select</option></select>
+    <textarea id="demoBaseTextarea" rows="2" aria-label="Bare textarea">Bare textarea</textarea>
+  </div>
 
   <h2>card</h2>
   <div class="card" id="demoCard">

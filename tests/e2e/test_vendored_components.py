@@ -55,12 +55,32 @@ def _wait_bg(page: Page, selector: str, expected: str) -> None:
 # --------------------------------------------------------------------- light
 
 
+_BASE_CONTROLS = ("#demoBaseButton", "#demoBaseInput", "#demoBaseSelect", "#demoBaseTextarea")
+
+
+def _assert_base_inherits(page: Page) -> None:
+    """base: every bare form control takes the body's font and text color.
+
+    Without the base rule the UA stylesheet gives controls their own font
+    (Arial at 13.33px on Windows Chrome) and a system text color (#266).
+    """
+    body = {prop: _style(page, "body", prop) for prop in ("fontFamily", "fontSize", "color")}
+    for sel in _BASE_CONTROLS:
+        for prop, want in body.items():
+            assert _style(page, sel, prop) == want, (sel, prop)
+
+
 def test_card_contract(gallery: Page) -> None:
-    """card: rounded.lg corners, spacing.md padding, hairline border, title glyph 18px."""
+    """card: rounded.lg corners, spacing.md padding, hairline border, title glyph 18px.
+
+    Also carries the base rule's light-theme check: a node of its own would
+    breach the suite's ratcheted budget (.fleet.toml [e2e] test_budget).
+    """
     assert _style(gallery, "#demoCard", "borderRadius") == "16px"
     assert _style(gallery, "#demoCard", "paddingTop") == "16px"
     assert _style(gallery, "#demoCard", "borderTopWidth") == "1px"
     assert _style(gallery, "#demoCard .card-title .icon", "width") == "18px"
+    _assert_base_inherits(gallery)
 
 
 def test_disclosure_contract(gallery: Page) -> None:
@@ -232,6 +252,9 @@ def test_dark_theme_values(gallery: Page) -> None:
     _set_theme(gallery, "dark")
     # card surface goes to the dark elevated value.
     assert _style(gallery, "#demoCard", "backgroundColor") == "rgb(22, 27, 34)"
+    # base: bare controls follow the body's text color into the dark theme.
+    _assert_base_inherits(gallery)
+    assert _style(gallery, "#demoBaseButton", "color") == "rgb(230, 237, 243)"
     # switch on-track stays green, at the brighter dark success value
     # (waits out the 0.15s track transition).
     _wait_bg(gallery, "#demoSwitchOn", "rgb(63, 185, 80)")
