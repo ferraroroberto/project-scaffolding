@@ -77,12 +77,12 @@ def _assert_base_inherits(page: Page) -> None:
 _ACTION_LIST = "#demoActionList"
 
 
-def _assert_action_row_colors(page: Page, *, muted: str, accent_text: str,
-                              control_border: str, attention: str) -> None:
+def _assert_action_row_colors(page: Page, *, muted: str, accent: tuple[int, int, int],
+                              accent_text: str, control_border: str, attention: str) -> None:
     """action-row: the theme-dependent colors (meta, verb, filter, favorite)."""
     assert _style(page, "#demoActionTwoLine .action-row-meta", "color") == muted
     r, g, b, a = _rgba(_style(page, "#demoActionVerb", "backgroundColor"))
-    assert (r, g, b) == _rgba(_style(page, "#demoButtonPrimary", "backgroundColor"))[:3]
+    assert (r, g, b) == accent
     assert 0 < a < 1
     assert _style(page, "#demoActionVerb", "color") == accent_text
     assert _style(page, "#demoActionFilter", "borderTopColor") == control_border
@@ -159,7 +159,7 @@ def test_card_contract(gallery: Page) -> None:
     _assert_base_inherits(gallery)
     _assert_action_row(gallery)
     _assert_action_row_colors(
-        gallery, muted="rgb(101, 109, 118)", accent_text="rgb(5, 80, 174)",
+        gallery, muted="rgb(101, 109, 118)", accent=(9, 105, 218), accent_text="rgb(5, 80, 174)",
         control_border="rgb(129, 139, 152)", attention="rgb(154, 103, 0)",
     )
 
@@ -180,7 +180,8 @@ def test_switch_contract(gallery: Page) -> None:
     assert _style(gallery, "#demoSwitchOn", "height") == "26px"
     # THE green decision (design.md v2): on = colors.success, not accent.
     assert _style(gallery, "#demoSwitchOn", "backgroundColor") == "rgb(26, 127, 55)"
-    assert _style(gallery, "#demoSwitchOff", "backgroundColor") == "rgb(209, 217, 224)"
+    # off-track = control-border (fleet-config#963), a 3:1+ control boundary.
+    assert _style(gallery, "#demoSwitchOff", "backgroundColor") == "rgb(129, 139, 152)"
 
 
 def test_switch_builder(gallery: Page) -> None:
@@ -231,11 +232,12 @@ def test_button_contract(gallery: Page) -> None:
     assert _style(gallery, "#demoButtonPrimary", "color") == "rgb(255, 255, 255)"
     assert _style(gallery, "#demoButtonPrimary", "minHeight") == "48px"
     # tint: accent-soft fill — accent-tinted and non-opaque (color-mix with
-    # transparent), never a second solid. Accent text.
+    # transparent), never a second solid. Text in accent-text, not the base
+    # accent, which drops under AA on its own tint (fleet-config#963).
     r, g, b, a = _rgba(_style(gallery, "#demoButtonTint", "backgroundColor"))
     assert (r, g, b) == (9, 105, 218)
     assert 0 < a < 1
-    assert _style(gallery, "#demoButtonTint", "color") == "rgb(9, 105, 218)"
+    assert _style(gallery, "#demoButtonTint", "color") == "rgb(5, 80, 174)"  # accent-text
     # ghost: TRANSPARENT fill (not a tint), muted text, hairline line border.
     assert _style(gallery, "#demoButtonGhost", "backgroundColor") == "rgba(0, 0, 0, 0)"
     assert _style(gallery, "#demoButtonGhost", "color") == "rgb(101, 109, 118)"
@@ -253,7 +255,7 @@ def test_button_contract(gallery: Page) -> None:
     dr, dg, db, da = _rgba(_style(gallery, "#demoButtonDanger", "backgroundColor"))
     assert (dr, dg, db) == (207, 34, 46)
     assert 0 < da < 1
-    assert _style(gallery, "#demoButtonDanger", "color") == "rgb(207, 34, 46)"
+    assert _style(gallery, "#demoButtonDanger", "color") == "rgb(164, 14, 38)"  # danger-text
 
 
 def _assert_range_selection_reads_in_greyscale(page: Page) -> None:
@@ -286,7 +288,7 @@ def test_range_tab_contract(gallery: Page, static_server: str, browser: Browser)
     r, g, b, a = _rgba(_style(gallery, "#demoRangeDay", "backgroundColor"))
     assert (r, g, b) == (9, 105, 218)
     assert 0 < a < 1
-    assert _style(gallery, "#demoRangeDay", "color") == "rgb(9, 105, 218)"
+    assert _style(gallery, "#demoRangeDay", "color") == "rgb(5, 80, 174)"  # accent-text
     assert _style(gallery, "#demoRangeDisabled", "opacity") == "0.45"
     # clicking a resting pill flips .active onto it (caller-owned toggle).
     gallery.click("#demoRangeWeek")
@@ -380,6 +382,8 @@ def test_dark_theme_values(gallery: Page) -> None:
     # switch on-track stays green, at the brighter dark success value
     # (waits out the 0.15s track transition).
     _wait_bg(gallery, "#demoSwitchOn", "rgb(63, 185, 80)")
+    # off-track is the dark control-border (fleet-config#963), not the hairline.
+    _wait_bg(gallery, "#demoSwitchOff", "rgb(110, 118, 129)")
     # icon-tile fill steps to the brighter dark tile-blue.
     assert _style(gallery, "#demoTileBlue", "backgroundColor") == "rgb(47, 129, 247)"
     # structure is theme-independent: closed height and radii hold.
@@ -389,14 +393,22 @@ def test_dark_theme_values(gallery: Page) -> None:
     gallery.click("#openModalBtn")
     assert _style(gallery, "#demoSaveBtn", "backgroundColor") == "rgb(1, 4, 9)"
     assert _style(gallery, "#demoSaveBtn", "color") == "rgb(125, 133, 144)"
-    # button-primary re-skins to the dark accent; the shared disabled recipe
-    # holds AA on the dark card-off/muted surface too.
-    assert _style(gallery, "#demoButtonPrimary", "backgroundColor") == "rgb(47, 129, 247)"
+    # Enabled, the modal primary fills with the dark accent-fill (#1f6feb),
+    # one step below accent so white text holds AA (fleet-config#963).
+    gallery.eval_on_selector("#demoSaveBtn", "el => { el.disabled = false; }")
+    assert _style(gallery, "#demoSaveBtn", "backgroundColor") == "rgb(31, 111, 235)"
+    gallery.eval_on_selector("#demoSaveBtn", "el => { el.disabled = true; }")
+    # button-primary takes the same dark accent-fill; the shared disabled
+    # recipe holds AA on the dark card-off/muted surface too. The tints set
+    # their text in the dark *-text tokens.
+    assert _style(gallery, "#demoButtonPrimary", "backgroundColor") == "rgb(31, 111, 235)"
+    assert _style(gallery, "#demoButtonTint", "color") == "rgb(88, 166, 255)"
+    assert _style(gallery, "#demoButtonDanger", "color") == "rgb(255, 123, 114)"
     assert _style(gallery, "#demoButtonDisabled", "backgroundColor") == "rgb(1, 4, 9)"
     assert _style(gallery, "#demoButtonDisabled", "color") == "rgb(125, 133, 144)"
-    # range-tab active pill re-skins to the dark accent, and its selection
+    # range-tab active pill re-skins to the dark accent-text, and its selection
     # still reads without hue on the dark surfaces.
-    assert _style(gallery, "#demoRangeDay", "color") == "rgb(47, 129, 247)"
+    assert _style(gallery, "#demoRangeDay", "color") == "rgb(88, 166, 255)"
     _assert_range_selection_reads_in_greyscale(gallery)
     # page-foot readout re-skins to the dark muted value.
     assert _style(gallery, "#demoBuildReadout", "color") == "rgb(125, 133, 144)"
@@ -411,6 +423,7 @@ def test_dark_theme_values(gallery: Page) -> None:
     # action-row re-skins from the dark tokens; its rows-scale heights hold.
     assert _style(gallery, "#demoActionTwoLine", "minHeight") == "60px"
     _assert_action_row_colors(
-        gallery, muted="rgb(125, 133, 144)", accent_text="rgb(88, 166, 255)",
+        gallery, muted="rgb(125, 133, 144)", accent=(47, 129, 247),
+        accent_text="rgb(88, 166, 255)",
         control_border="rgb(110, 118, 129)", attention="rgb(210, 153, 34)",
     )

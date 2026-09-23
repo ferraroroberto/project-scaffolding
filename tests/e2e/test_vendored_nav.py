@@ -32,8 +32,10 @@ NAV_DIR = STATIC_DIR / "_vendored" / "nav"
 # which transcribes ~/.claude/design.md). --font-label 0.92rem @ 16px root
 # = 14.72px; the icon is sized 1.05em of that.
 _DESKTOP_ICON_PX = 14.72 * 1.05
-_ACCENT = "rgb(9, 105, 218)"
-_ACCENT_DARK = "rgb(47, 129, 247)"
+# Active-tab text and icon sit on the accent-soft tint, so they take
+# accent-text, not the base accent (fleet-config#963).
+_ACCENT_TEXT = "rgb(5, 80, 174)"
+_ACCENT_TEXT_DARK = "rgb(88, 166, 255)"
 _MUTED = "rgb(101, 109, 118)"
 
 
@@ -126,9 +128,9 @@ def test_desktop_icon_is_visible(nav: Page) -> None:
     assert box["width"] == pytest.approx(_DESKTOP_ICON_PX, abs=0.5)
     assert box["height"] == pytest.approx(_DESKTOP_ICON_PX, abs=0.5)
     # Painted by the stylesheet, not by per-path attributes, so the glyph takes
-    # the tab's colour: accent when active, muted when not.
+    # the tab's colour: accent-text when active, muted when not.
     assert _style(nav, "#tabHome .tab-icon", "fill") == "none"
-    assert _style(nav, "#tabHome .tab-icon", "stroke") == _ACCENT
+    assert _style(nav, "#tabHome .tab-icon", "stroke") == _ACCENT_TEXT
     assert _style(nav, "#tabStats .tab-icon", "stroke") == _MUTED
     # The icon leads; the label follows.
     label = nav.locator("#tabHome .tab-label").bounding_box()
@@ -171,7 +173,7 @@ def test_mobile_pill_stacks_icon_over_label(nav_mobile: Page) -> None:
     expect(icon).to_be_visible()
     assert _style(nav_mobile, "#tabHome .tab-icon", "width") == "20px"
     assert _style(nav_mobile, "#tabHome .tab-icon", "height") == "20px"
-    assert _style(nav_mobile, "#tabHome .tab-icon", "stroke") == _ACCENT
+    assert _style(nav_mobile, "#tabHome .tab-icon", "stroke") == _ACCENT_TEXT
     box = icon.bounding_box()
     label = nav_mobile.locator("#tabHome .tab-label").bounding_box()
     assert box is not None and label is not None
@@ -192,10 +194,10 @@ def test_mobile_pill_active_tab_is_accent_tint_not_inset_surface(
     r, g, b, a = _rgba(_style(nav_mobile, "#tabHome", "backgroundColor"))
     assert (r, g, b) == (9, 105, 218)
     assert 0 < a < 1
-    assert _style(nav_mobile, "#tabHome", "color") == _ACCENT
+    assert _style(nav_mobile, "#tabHome", "color") == _ACCENT_TEXT
 
     _set_theme(nav_mobile, "dark")
-    _wait_style(nav_mobile, "#tabHome", "color", _ACCENT_DARK)
+    _wait_style(nav_mobile, "#tabHome", "color", _ACCENT_TEXT_DARK)
     dark_bg = _style(nav_mobile, "#tabHome", "backgroundColor")
     # The pre-fix `--card-off` fill resolved to this exact opaque literal.
     assert dark_bg != "rgb(1, 9, 9)"

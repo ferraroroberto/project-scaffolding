@@ -62,7 +62,7 @@ Each `.tab` holds one `<svg class="tab-icon">` stroke glyph and one `<span class
 | --- | --- | --- |
 | `--card` | `#ffffff` | tab bar surface (desktop) |
 | `--card-off` | `#f6f8fa` | active-tab fill |
-| `--accent` | `#0969da` | active-tab text/icon |
+| `--accent-text` | `#0550ae` (dark `#58a6ff`) | active-tab text/icon (text on the `accent-soft` tint, fleet-config#963) |
 | `--muted` | `#656d76` | inactive-tab text |
 | `--line` | `#d1d9e0` | bar border, active-tab border (mobile) |
 | `--space-xs` | `4px` | bar padding / gap (desktop) |
