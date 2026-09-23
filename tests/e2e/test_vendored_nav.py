@@ -37,6 +37,9 @@ _DESKTOP_ICON_PX = 14.72 * 1.05
 _ACCENT_TEXT = "rgb(5, 80, 174)"
 _ACCENT_TEXT_DARK = "rgb(88, 166, 255)"
 _MUTED = "rgb(101, 109, 118)"
+# design.md layout.wide / layout.rail (fleet-config#968).
+_WIDE = 1100
+_RAIL = 80
 
 
 def _alpha(color: str) -> float:
@@ -88,8 +91,8 @@ def _mount_nav(page: Page, base_url: str) -> Page:
 
 @pytest.fixture()
 def nav(static_server: str, page: Page) -> Page:
-    """The nav skeleton at a desktop viewport (fine pointer)."""
-    page.set_viewport_size({"width": 1100, "height": 800})
+    """The nav skeleton at a desktop viewport (fine pointer), below the rail."""
+    page.set_viewport_size({"width": _WIDE - 1, "height": 800})
     return _mount_nav(page, static_server)
 
 
@@ -119,8 +122,17 @@ def test_skeleton_ships_no_emoji_span() -> None:
     assert "tab-emoji" not in (NAV_DIR / "nav-tabs.html").read_text(encoding="utf-8")
 
 
-def test_desktop_icon_is_visible(nav: Page) -> None:
-    """Desktop segmented control renders the SVG icon beside the label."""
+def test_desktop_control_and_wide_rail(nav: Page) -> None:
+    """Desktop: the icon beside the label in the column, a left rail when wide.
+
+    Below layout.wide the segmented control holds the layout.measure column.
+    At 1100px and up it is the 80px full-height rail (#281, fleet-config#968):
+    tabs stacked icon over label, content offset past it even when an app's
+    own `body`/`.app` padding shorthand loads after the vendored file.
+    """
+    nav_box = nav.locator(".tabs").bounding_box()
+    assert nav_box is not None
+    assert nav_box["width"] == 772 - 12 - 12  # layout.measure minus 2x --gap
     icon = nav.locator("#tabHome .tab-icon")
     expect(icon).to_be_visible()
     box = icon.bounding_box()
@@ -136,6 +148,35 @@ def test_desktop_icon_is_visible(nav: Page) -> None:
     label = nav.locator("#tabHome .tab-label").bounding_box()
     assert label is not None
     assert box["x"] + box["width"] <= label["x"]
+
+    nav.set_viewport_size({"width": 1440, "height": 900})
+    rail = nav.locator(".tabs").bounding_box()
+    assert rail == {"x": 0, "y": 0, "width": _RAIL, "height": 900}, rail
+    assert _style(nav, ".tabs", "backgroundColor") == "rgb(255, 255, 255)"  # card
+    assert _style(nav, ".tabs", "borderRightWidth") == "1px"
+    assert _style(nav, ".tabs", "borderRightColor") == "rgb(209, 217, 224)"  # line
+    assert _style(nav, ".tabs", "borderLeftWidth") == "0px"
+    tabs = nav.evaluate(
+        "() => [...document.querySelectorAll('.tabs .tab')].map((t) => {"
+        " const l = t.querySelector('.tab-label'); const lb = l.getBoundingClientRect();"
+        " const ib = t.querySelector('.tab-icon').getBoundingClientRect();"
+        " const b = t.getBoundingClientRect();"
+        " return { top: b.top, height: b.height, iconW: ib.width,"
+        "  iconAbove: ib.bottom <= lb.top + 0.5, labelW: lb.width,"
+        "  clipped: l.scrollWidth > l.clientWidth + 0.5 }; })"
+    )
+    assert [t["top"] for t in tabs] == sorted(t["top"] for t in tabs), tabs
+    for t in tabs:
+        assert t["iconAbove"] and t["iconW"] == 24, t  # icons.size.feature
+        assert t["labelW"] > 1 and not t["clipped"], t
+        assert t["height"] >= 44, t
+    # Placement only: the active state is the column's, unchanged.
+    assert _style(nav, "#tabHome", "color") == _ACCENT_TEXT
+    expect(nav.locator("#tabHome")).to_have_attribute("aria-selected", "true")
+    # Content clears the rail, even against an app's later padding shorthand.
+    nav.add_style_tag(content="body { padding: 0; } .app { padding: 0 12px; }")
+    app_x = nav.evaluate("() => document.querySelector('.app').getBoundingClientRect().x")
+    assert app_x >= _RAIL, app_x
 
 
 def test_legacy_emoji_span_stays_hidden(nav: Page) -> None:
@@ -191,7 +232,7 @@ def test_narrow_desktop_stacks_icon_over_label(nav: Page) -> None:
 
 
 def test_mobile_pill_stacks_icon_over_label(nav_mobile: Page) -> None:
-    """The floating pill keeps its 20px icon above the label."""
+    """The floating pill keeps its 20px icon above the label; no rail when coarse."""
     icon = nav_mobile.locator("#tabHome .tab-icon")
     expect(icon).to_be_visible()
     assert _style(nav_mobile, "#tabHome .tab-icon", "width") == "20px"
@@ -201,6 +242,11 @@ def test_mobile_pill_stacks_icon_over_label(nav_mobile: Page) -> None:
     label = nav_mobile.locator("#tabHome .tab-label").bounding_box()
     assert box is not None and label is not None
     assert box["y"] + box["height"] <= label["y"]
+    # A coarse pointer never gets the wide-layout rail, at any width (#281).
+    nav_mobile.set_viewport_size({"width": 1440, "height": 900})
+    assert nav_mobile.evaluate(f"matchMedia('(min-width: {_WIDE}px)').matches")
+    bar = nav_mobile.locator(".tabs").bounding_box()
+    assert bar is not None and bar["width"] > _RAIL and bar["height"] < 100, bar
 
 
 def test_mobile_pill_active_tab_is_accent_tint_not_inset_surface(
