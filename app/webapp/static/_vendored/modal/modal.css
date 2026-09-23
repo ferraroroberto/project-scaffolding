@@ -144,7 +144,7 @@ body:has(dialog[open]) .app { overflow: hidden; }
   min-height: var(--control-h);
   border: 1px solid var(--accent-border-strong);
   border-radius: var(--radius-md);
-  background: var(--accent);
+  background: var(--accent-fill);
   color: var(--accent-fg);
   font: inherit;
   font-weight: 700;

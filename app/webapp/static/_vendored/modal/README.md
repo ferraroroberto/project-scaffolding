@@ -54,7 +54,7 @@ The fleet's canonical **editor modal**: a native `<dialog>` with a `heading-lg` 
 | `--ink` | `#1f2328` | text |
 | `--muted` | `#656d76` | close glyph, disabled text |
 | `--line` | `#d1d9e0` | row dividers, control borders |
-| `--accent` | `#0969da` | primary button fill |
+| `--accent-fill` | `#0969da` (dark `#1f6feb`) | primary button fill |
 | `--accent-fg` | `#ffffff` | primary button text |
 | `--accent-border-strong` | `color-mix(in srgb, var(--accent) 28%, transparent)` | primary button border |
 | `--close-bg` | `#f6f8fa` (light) / `#30363d` (dark) | close button fill |
