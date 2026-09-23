@@ -153,18 +153,41 @@ def test_legacy_emoji_span_stays_hidden(nav: Page) -> None:
     expect(nav.locator("#tabHome .tab-icon")).to_be_visible()
 
 
-def test_narrow_desktop_collapses_to_a_centred_icon(nav: Page) -> None:
-    """Below 520px on a fine pointer: label clipped, icon centred, no phantom gap."""
-    nav.set_viewport_size({"width": 500, "height": 800})
-    icon = nav.locator("#tabHome .tab-icon")
-    expect(icon).to_be_visible()
-    # The label leaves the accessibility tree intact but the flex flow entirely,
-    # so `.tab`'s gap reserves no space beside the icon.
-    expect(nav.locator("#tabHome")).to_have_accessible_name("Home")
-    tab = nav.locator("#tabHome").bounding_box()
-    box = icon.bounding_box()
-    assert tab is not None and box is not None
-    assert box["x"] + box["width"] / 2 == pytest.approx(tab["x"] + tab["width"] / 2, abs=1)
+_LONG_LABELS = ("Capture", "History", "Settings", "Energy", "Family")
+
+
+def test_narrow_desktop_stacks_icon_over_label(nav: Page) -> None:
+    """Below 520px on a fine pointer: never icon-only; the icon stacks over its label.
+
+    Five tabs of 6-8 letters, the case that clipped with the icon beside the
+    label (#278): every label renders whole under its centred icon, and each
+    tab keeps the 44px floor.
+    """
+    nav.evaluate(
+        "(labels) => { const bar = document.querySelector('.tabs');"
+        " while (bar.querySelectorAll('.tab').length < labels.length)"
+        "   bar.appendChild(bar.querySelector('.tab:last-child').cloneNode(true));"
+        " bar.querySelectorAll('.tab-label').forEach((l, i) => { l.textContent = labels[i]; }); }",
+        list(_LONG_LABELS),
+    )
+    for width in (320, 500):
+        nav.set_viewport_size({"width": width, "height": 800})
+        metrics = nav.evaluate(
+            "() => [...document.querySelectorAll('.tabs .tab')].map((t) => {"
+            " const l = t.querySelector('.tab-label').getBoundingClientRect();"
+            " const i = t.querySelector('.tab-icon').getBoundingClientRect();"
+            " const b = t.getBoundingClientRect(); const s = t.querySelector('.tab-label');"
+            " return { clipped: s.scrollWidth > s.clientWidth + 0.5, labelW: l.width,"
+            "  iconAbove: i.bottom <= l.top + 0.5, height: b.height,"
+            "  offCentre: Math.abs((i.left + i.right) / 2 - (b.left + b.right) / 2) }; })"
+        )
+        assert len(metrics) == len(_LONG_LABELS)
+        for label, m in zip(_LONG_LABELS, metrics):
+            assert not m["clipped"] and m["labelW"] > 1, (width, label, m)
+            assert m["iconAbove"], (width, label, m)
+            assert m["height"] >= 44, (width, label, m)
+            assert m["offCentre"] <= 1, (width, label, m)
+    expect(nav.locator("#tabHome")).to_have_accessible_name("Capture")
 
 
 def test_mobile_pill_stacks_icon_over_label(nav_mobile: Page) -> None:
