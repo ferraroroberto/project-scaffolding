@@ -161,12 +161,14 @@ prefixes = [
 paths          = ["tests/e2e/test_vendored_components.py"]
 pytest_targets = ["tests/e2e/test_vendored_components.py", "tests/e2e/test_vendored_nav.py"]
 
-# The rendered-geometry helper and its hermetic fixtures.
+# The rendered-geometry helper and its hermetic fixtures. The component
+# harness imports the helper for range-tab's touch targets (#267), so an
+# edit to _geometry.py runs it too.
 [[e2e.surface]]
 name           = "geometry"
 prefixes       = ["tests/e2e/_fixtures/geometry/"]
 paths          = ["tests/e2e/_geometry.py", "tests/e2e/test_geometry_helper.py"]
-pytest_targets = ["tests/e2e/test_geometry_helper.py"]
+pytest_targets = ["tests/e2e/test_geometry_helper.py", "tests/e2e/test_vendored_components.py"]
 
 # ---------------------------------------------------------------------------
 # [components] -- the canonical catalog of this scaffold's vendor-verbatim

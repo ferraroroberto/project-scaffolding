@@ -24,11 +24,15 @@ from __future__ import annotations
 import re
 
 import pytest
-from playwright.sync_api import Page, expect
+from playwright.sync_api import Browser, Page, expect
 
+from tests.e2e._color_assertions import contrast as _contrast
 from tests.e2e._color_assertions import rgba as _rgba
 from tests.e2e._color_assertions import set_theme as _set_theme
 from tests.e2e._color_assertions import style as _style
+from tests.e2e._geometry import assert_min_target, assert_no_overlap
+
+_RANGE_ROWS = ("#demoRange2", "#demoRangeTabs", "#demoRange5")
 
 
 @pytest.fixture()
@@ -175,9 +179,31 @@ def test_button_contract(gallery: Page) -> None:
     assert _style(gallery, "#demoButtonDanger", "color") == "rgb(207, 34, 46)"
 
 
-def test_range_tab_contract(gallery: Page) -> None:
-    """range-tab: control-h height, card-off resting, accent-soft active pill."""
+def _assert_range_selection_reads_in_greyscale(page: Page) -> None:
+    """The selected pill's border clears 3:1 (WCAG non-text) against a resting one.
+
+    Contrast is luminance-only, so this is the greyscale test: before #267 the
+    active and resting pills differed by ~1.06:1 on border, ~1.2:1 on fill and
+    ~1:1 on text, so selection read through hue alone.
+    """
+    backdrop = _style(page, "body", "backgroundColor")
+    for row in _RANGE_ROWS:
+        active = _style(page, f"{row} .range-tab.active", "borderTopColor")
+        resting = _style(page, f"{row} .range-tab:not(.active):not(:disabled)", "borderTopColor")
+        ratio = _contrast(active, resting, backdrop)
+        assert ratio >= 3, f"{row}: active vs resting border {ratio:.2f}:1"
+
+
+def test_range_tab_contract(gallery: Page, static_server: str, browser: Browser) -> None:
+    """range-tab: control-h height, card-off resting, accent-soft active pill.
+
+    Plus #267: a selected state that survives greyscale, one-line labels, and
+    44px effective targets on a coarse pointer (checked here rather than in a
+    new node, to hold the suite's ratcheted budget).
+    """
     assert _style(gallery, "#demoRangeDay", "height") == "36px"
+    assert _style(gallery, "#demoRangeDay", "whiteSpace") == "nowrap"
+    _assert_range_selection_reads_in_greyscale(gallery)
     assert _style(gallery, "#demoRangeWeek", "backgroundColor") == "rgb(246, 248, 250)"
     assert _style(gallery, "#demoRangeWeek", "color") == "rgb(101, 109, 118)"
     r, g, b, a = _rgba(_style(gallery, "#demoRangeDay", "backgroundColor"))
@@ -189,6 +215,25 @@ def test_range_tab_contract(gallery: Page) -> None:
     gallery.click("#demoRangeWeek")
     expect(gallery.locator("#demoRangeWeek")).to_have_class(re.compile(r"\bactive\b"))
     expect(gallery.locator("#demoRangeDay")).not_to_have_class(re.compile(r"\bactive\b"))
+
+    # Coarse pointer: the visual pill stays 36px, the ::before reaches the 44px
+    # floor, and no two expanded rectangles overlap (an adjacent cluster).
+    context = browser.new_context(
+        viewport={"width": 390, "height": 844}, has_touch=True, is_mobile=True
+    )
+    try:
+        phone = context.new_page()
+        phone.goto(f"{static_server}/_vendored/demo.html")
+        phone.wait_for_selector("body[data-demo-ready='1']")
+        assert phone.evaluate("matchMedia('(pointer: coarse)').matches"), (
+            "coarse-pointer emulation is not active"
+        )
+        for row in _RANGE_ROWS:
+            assert_min_target(phone.locator(f"{row} .range-tab"))
+        assert_no_overlap(phone.locator(".range-tabs .range-tab"))
+        assert _style(phone, "#demoRangeDay", "height") == "36px"
+    finally:
+        context.close()
 
 
 def test_page_foot_contract(gallery: Page) -> None:
@@ -272,8 +317,10 @@ def test_dark_theme_values(gallery: Page) -> None:
     assert _style(gallery, "#demoButtonPrimary", "backgroundColor") == "rgb(47, 129, 247)"
     assert _style(gallery, "#demoButtonDisabled", "backgroundColor") == "rgb(1, 4, 9)"
     assert _style(gallery, "#demoButtonDisabled", "color") == "rgb(125, 133, 144)"
-    # range-tab active pill re-skins to the dark accent.
+    # range-tab active pill re-skins to the dark accent, and its selection
+    # still reads without hue on the dark surfaces.
     assert _style(gallery, "#demoRangeDay", "color") == "rgb(47, 129, 247)"
+    _assert_range_selection_reads_in_greyscale(gallery)
     # page-foot readout re-skins to the dark muted value.
     assert _style(gallery, "#demoBuildReadout", "color") == "rgb(125, 133, 144)"
     # home-head toggle fill re-skins to the dark --close-bg (var(--line) = #30363d);
