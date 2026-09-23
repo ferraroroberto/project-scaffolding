@@ -53,3 +53,24 @@ def rgba(color: str) -> tuple[int, int, int, float]:
     a = float(m.group(4)) if m.group(4) is not None else 1.0
     return (round(float(m.group(1)) * 255), round(float(m.group(2)) * 255),
             round(float(m.group(3)) * 255), a)
+
+
+def contrast(color: str, other: str, backdrop: str) -> float:
+    """WCAG contrast ratio of two computed colors, each composited over `backdrop`.
+
+    Luminance-only, so it is also the "tell them apart in greyscale" measure.
+    A translucent token (a `color-mix(... transparent)`) is judged as it
+    renders, over the opaque surface behind it.
+    """
+    br, bg, bb, _ = rgba(backdrop)
+
+    def luminance(c: str) -> float:
+        r, g, b, a = rgba(c)
+        channels = [(a * fg + (1 - a) * back) / 255
+                    for fg, back in ((r, br), (g, bg), (b, bb))]
+        lin = [c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4
+               for c in channels]
+        return 0.2126 * lin[0] + 0.7152 * lin[1] + 0.0722 * lin[2]
+
+    hi, lo = sorted((luminance(color), luminance(other)), reverse=True)
+    return (hi + 0.05) / (lo + 0.05)

@@ -9,9 +9,10 @@
  *
  * Contract: a row of equal-width pills, resting state is card-off fill +
  * hairline border + muted text; the active pill is accent-soft fill + accent
- * text + accent-border-strong border. Height is fixed (--control-h) and
- * content is flex-centered so a smaller font-size override in a compact
- * context changes only the label, never the box.
+ * text + a solid accent border. Height is fixed (--control-h) and content is
+ * flex-centered so a smaller font-size override in a compact context changes
+ * only the label, never the box. Labels stay on one line, and a row holds at
+ * most five pills; six or more options use select-native (README).
  */
 
 .range-tabs { display: flex; gap: 5px; margin-bottom: 12px; }
@@ -30,16 +31,23 @@
   color: var(--muted);
   font-size: var(--font-label);
   font-weight: 600;
+  white-space: nowrap;
   cursor: pointer;
 }
 /* Extends the tap target to >=44px vertically (36 + 2x4 = 44) without
  * inflating the visual pill — width is left alone since every real instance
- * is already wider than 44px (fleet nav/switch pattern). */
+ * is already wider than 44px at five pills or fewer (fleet nav/switch
+ * pattern). Expansion is vertical only, so side-by-side pills in the cluster
+ * never overlap. */
 .range-tab::before { content: ""; position: absolute; inset: -4px 0; }
 .range-tab.active {
   background: var(--accent-soft);
   color: var(--accent);
-  border-color: var(--accent-border-strong);
+  /* Solid accent, not a translucent mix: the border is the one channel that
+     reads without hue (>=3:1 against the resting --line in both themes;
+     accent-soft fill and accent text are ~1:1 with the resting pill in
+     greyscale). */
+  border-color: var(--accent);
 }
 .range-tab:disabled {
   opacity: 0.45;

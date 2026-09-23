@@ -256,12 +256,22 @@
     </div>
   </div>
 
-  <h2>range-tab</h2>
+  <h2>range-tab (2, 3 and 5 options; five is the cap)</h2>
+  <nav class="range-tabs" id="demoRange2" aria-label="Demo mode">
+    <button type="button" class="range-tab active" data-range="auto">Auto</button>
+    <button type="button" class="range-tab" data-range="manual">Manual</button>
+  </nav>
   <nav class="range-tabs" id="demoRangeTabs" aria-label="Demo range">
     <button type="button" class="range-tab active" id="demoRangeDay" data-range="day">Day</button>
     <button type="button" class="range-tab" id="demoRangeWeek" data-range="week">Week</button>
     <button type="button" class="range-tab" id="demoRangeMonth" data-range="month">Month</button>
-    <button type="button" class="range-tab" id="demoRangeDisabled" disabled>Off</button>
+  </nav>
+  <nav class="range-tabs" id="demoRange5" aria-label="Demo window">
+    <button type="button" class="range-tab" data-range="1h">1h</button>
+    <button type="button" class="range-tab active" data-range="6h">6h</button>
+    <button type="button" class="range-tab" data-range="24h">24h</button>
+    <button type="button" class="range-tab" data-range="7d">7d</button>
+    <button type="button" class="range-tab" id="demoRangeDisabled" data-range="30d" disabled>30d</button>
   </nav>
 
   <h2>home-head</h2>
@@ -319,11 +329,13 @@
 
   // range-tab: click swaps which pill carries .active (caller's job — no
   // shared builder, per the component's README).
-  document.getElementById('demoRangeTabs').addEventListener('click', (e) => {
-    const btn = e.target.closest('.range-tab');
-    if (!btn || btn.disabled) return;
-    document.querySelectorAll('#demoRangeTabs .range-tab').forEach((b) => {
-      b.classList.toggle('active', b === btn);
+  document.querySelectorAll('.range-tabs').forEach((row) => {
+    row.addEventListener('click', (e) => {
+      const btn = e.target.closest('.range-tab');
+      if (!btn || btn.disabled) return;
+      row.querySelectorAll('.range-tab').forEach((b) => {
+        b.classList.toggle('active', b === btn);
+      });
     });
   });
 

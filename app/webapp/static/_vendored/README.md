@@ -23,7 +23,7 @@ A cloned web app inherits both: design **tokens** (wire your CSS custom properti
 | [`switch/`](switch/) | The one boolean control (shadcn Switch shape, **green** on-track per design.md v2); `switchEl()`/`setSwitch()` builders. | ✅ |
 | [`icon-tile/`](icon-tile/) | The Home-screen rounded-square: one `tile-*` fill + centered feature-size glyph. | ✅ |
 | [`button/`](button/) | The four-tier action vocabulary — `button-primary`/`button-tint`/`button-ghost`/`button-surface`, one shared disabled recipe, the `.danger` tint variant. | ✅ |
-| [`range-tab/`](range-tab/) | The ghost segmented control (Day/Week/Month, timer presets): equal-width pills, card-off resting / accent-soft active, one canonical height (`--control-h`). | ✅ |
+| [`range-tab/`](range-tab/) | The ghost segmented control (Day/Week/Month, timer presets): equal-width pills, card-off resting / accent-soft active with a solid accent border, one canonical height (`--control-h`), five options max. | ✅ |
 | [`page-foot/`](page-foot/) | The build-identity footer: `Build: <sha> · YYYY-MM-DD HH:MM` via the one shared `fmtBuildTime`/`buildReadoutText`. | ✅ |
 | [`home-head/`](home-head/) | The home-only header card: one 52px row (disclosure closed-summary geometry) — leading glyph + title + inline status left, icon-only theme toggle right. | ✅ |
 | [`select-native/`](select-native/) | The native `<select>` at the `control` height (36px); height from explicit `height`, never `min-height` (the iOS stubby-select gotcha). | ✅ |
