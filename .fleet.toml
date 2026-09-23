@@ -145,6 +145,7 @@ pytest_targets = ["tests/e2e/test_vendored_nav.py"]
 [[e2e.surface]]
 name     = "components"
 prefixes = [
+    "app/webapp/static/_vendored/base/",
     "app/webapp/static/_vendored/button/",
     "app/webapp/static/_vendored/card/",
     "app/webapp/static/_vendored/disclosure/",
@@ -201,6 +202,7 @@ pytest_targets = ["tests/e2e/test_geometry_helper.py"]
 #     held in practice.
 [components]
 # Web-app UI components (app/webapp/static/_vendored/) -- see that dir's README.
+base            = { src = "app/webapp/static/_vendored/base" }
 nav             = { src = "app/webapp/static/_vendored/nav" }
 icons           = { src = "app/webapp/static/_vendored/icons" }
 card            = { src = "app/webapp/static/_vendored/card" }
