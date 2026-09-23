@@ -880,6 +880,10 @@ what the browser actually laid out:
   expansion (the `.hit-target` pattern the vendored `switch`,
   `range-tab`, and `modal` components use). Zero matches raise —
   a selector typo must fail loud, never read as conformance.
+  The in-page measurement behind them is the public
+  `EFFECTIVE_RECT_JS` (`_EFFECTIVE_RECT_JS` stays as an alias).
+  fleet-config's `/design-review` imports it from this checkout,
+  so keep the name and its returned keys stable (#269).
 - `assert_min_target(locator, min_px=44)` — every match's *effective*
   width AND height meet the spec's `components.hit-target.min`.
 - `assert_no_overlap(locators)` — O(n²) pairwise sweep over effective
