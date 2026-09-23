@@ -44,6 +44,11 @@ path = "app/webapp/static/_vendored/demo.html"
 [[e2e.rule]]
 tier = "full"
 path = "app/webapp/static/_vendored/icons/icons-sprite.html"
+# The text-size boot snippet is a <script>, not markup: the component harness
+# loads it byte-for-byte into a page's <head> (#276).
+[[e2e.rule]]
+tier = "full"
+path = "app/webapp/static/_vendored/text-size/text-size-boot.html"
 
 # A vendored HTML fragment is pure markup with no behaviour of its own; its
 # .css/.js siblings are NOT covered by this rule and fall through to "full"
@@ -158,6 +163,7 @@ prefixes = [
     "app/webapp/static/_vendored/range-tab/",
     "app/webapp/static/_vendored/select-native/",
     "app/webapp/static/_vendored/switch/",
+    "app/webapp/static/_vendored/text-size/",
 ]
 paths          = ["tests/e2e/test_vendored_components.py"]
 pytest_targets = ["tests/e2e/test_vendored_components.py", "tests/e2e/test_vendored_nav.py"]
@@ -220,6 +226,7 @@ range-tab       = { src = "app/webapp/static/_vendored/range-tab" }
 home-head       = { src = "app/webapp/static/_vendored/home-head" }
 page-foot       = { src = "app/webapp/static/_vendored/page-foot" }
 action-row      = { src = "app/webapp/static/_vendored/action-row" }
+text-size       = { src = "app/webapp/static/_vendored/text-size" }
 
 # Windows tray primitives -- docs/windows-tray.md (gotchas #4, #5).
 single_instance = { src = "app/tray/single_instance.py" }

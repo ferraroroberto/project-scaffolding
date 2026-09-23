@@ -27,6 +27,7 @@ A cloned web app inherits both: design **tokens** (wire your CSS custom properti
 | [`page-foot/`](page-foot/) | The build-identity footer: `Build: <sha> · YYYY-MM-DD HH:MM` via the one shared `fmtBuildTime`/`buildReadoutText`. | ✅ |
 | [`home-head/`](home-head/) | The home-only header card: one 52px row (disclosure closed-summary geometry) — leading glyph + title + inline status left, icon-only theme toggle right. | ✅ |
 | [`action-row/`](action-row/) | A list row that does something: tap the row for the primary action, one trailing 44px kebab, at most one leading toggle and one dominant verb, one-line title + one `body-sm` context line, the filter field above a long list. The floating menu stays app-side. | ✅ |
+| [`text-size/`](text-size/) | The Small / Default / Large text-size setting that makes the zoom lock acceptable: the inline `<head>` boot script (stamps `data-theme` + `data-textsize` pre-paint), the root `font-size` steps, and a range-tab control with its `bindTextSize()` binder. | ✅ |
 | [`select-native/`](select-native/) | The native `<select>` at the `control` height (36px); height from explicit `height`, never `min-height` (the iOS stubby-select gotcha). | ✅ |
 
 _Each folder carries a `README.md` with files, a vendoring recipe, the markup contract, and its required design tokens — same shape as `nav/`. [`demo.html`](demo.html) is the component gallery: open it over HTTP to eyeball every component in light + dark; `tests/e2e/test_vendored_components.py` drives the same page and asserts each component's key computed styles in both themes._

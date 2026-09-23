@@ -31,8 +31,10 @@ from tests.e2e._color_assertions import rgba as _rgba
 from tests.e2e._color_assertions import set_theme as _set_theme
 from tests.e2e._color_assertions import style as _style
 from tests.e2e._geometry import assert_min_target, assert_no_overlap
+from tests.e2e.conftest import STATIC_DIR
 
 _RANGE_ROWS = ("#demoRange2", "#demoRangeTabs", "#demoRange5")
+_BOOT_SNIPPET = STATIC_DIR / "_vendored" / "text-size" / "text-size-boot.html"
 
 
 @pytest.fixture()
@@ -273,12 +275,57 @@ def _assert_range_selection_reads_in_greyscale(page: Page) -> None:
         assert ratio >= 3, f"{row}: active vs resting border {ratio:.2f}:1"
 
 
+def _assert_text_size(page: Page, static_server: str) -> None:
+    """text-size (#276, fleet-config#967): Large scales rem type, not px geometry.
+
+    Then the vendored boot snippet, byte-for-byte from its file, stamps the
+    stored size and theme from `<head>` before the body parses, and falls
+    back to `default` on an unknown value.
+    """
+    root = "html"
+    assert page.get_attribute(root, "data-textsize") == "default"
+    assert _style(page, root, "fontSize") == "16px"
+    page.click("#demoTextSizeLarge")
+    assert page.get_attribute(root, "data-textsize") == "large"
+    assert _style(page, root, "fontSize") == "18px"  # 112.5% of 16px
+    assert _style(page, "body", "fontSize") == "18px"  # rem type follows
+    assert page.evaluate("localStorage.getItem('demo.textsize')") == "large"
+    expect(page.locator("#demoTextSizeLarge")).to_have_attribute("aria-pressed", "true")
+    expect(page.locator("#demoTextSizeLarge")).to_have_class(re.compile(r"\bactive\b"))
+    # Geometry is px and holds at the Large step.
+    assert _style(page, "#demoRangeDay", "height") == "36px"
+    assert _style(page, "#demoActionOneLine", "minHeight") == "52px"
+    assert _style(page, "#demoActionKebab", "width") == "44px"
+
+    probe = f"{static_server}/_vendored/__boot_probe.html"
+    html = (
+        "<!DOCTYPE html><html><head>"
+        + _BOOT_SNIPPET.read_text(encoding="utf-8")
+        + '<link rel="stylesheet" href="text-size/text-size.css"></head>'
+        "<body><script>window.seenAtBody = [document.documentElement.dataset.textsize,"
+        " document.documentElement.dataset.theme];</script></body></html>"
+    )
+    page.route(probe, lambda route: route.fulfill(body=html, content_type="text/html"))
+    for stored, want in (("small", "small"), ("huge", "default")):
+        page.evaluate(
+            "(v) => { localStorage.setItem('my-app.textsize', v);"
+            " localStorage.setItem('my-app.theme', 'dark'); }", stored,
+        )
+        page.goto(probe)
+        assert page.evaluate("window.seenAtBody") == [want, "dark"], stored
+    assert _style(page, root, "fontSize") == "16px"  # 'huge' fell back to 100%
+    page.evaluate("localStorage.setItem('my-app.textsize', 'small')")
+    page.goto(probe)
+    assert _style(page, root, "fontSize") == "15px"  # 93.75% of 16px
+
+
 def test_range_tab_contract(gallery: Page, static_server: str, browser: Browser) -> None:
     """range-tab: control-h height, card-off resting, accent-soft active pill.
 
     Plus #267: a selected state that survives greyscale, one-line labels, and
     44px effective targets on a coarse pointer (checked here rather than in a
-    new node, to hold the suite's ratcheted budget).
+    new node, to hold the suite's ratcheted budget). Plus #276: the text-size
+    control built on it, and its boot snippet.
     """
     assert _style(gallery, "#demoRangeDay", "height") == "36px"
     assert _style(gallery, "#demoRangeDay", "whiteSpace") == "nowrap"
@@ -313,6 +360,10 @@ def test_range_tab_contract(gallery: Page, static_server: str, browser: Browser)
         assert _style(phone, "#demoRangeDay", "height") == "36px"
     finally:
         context.close()
+
+    # The text-size control is a range-tab row (#276), checked here for the
+    # same budget reason. It navigates away from the gallery, so it runs last.
+    _assert_text_size(gallery, static_server)
 
 
 def test_page_foot_contract(gallery: Page) -> None:

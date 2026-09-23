@@ -150,6 +150,7 @@
 <link rel="stylesheet" href="home-head/home-head.css">
 <link rel="stylesheet" href="select-native/select-native.css">
 <link rel="stylesheet" href="action-row/action-row.css">
+<link rel="stylesheet" href="text-size/text-size.css">
 </head>
 <body>
 <div class="gallery">
@@ -282,6 +283,13 @@
     <button type="button" class="range-tab" id="demoRangeDisabled" data-range="30d" disabled>30d</button>
   </nav>
 
+  <h2>text-size (a range-tab control; scales the rem root, not px geometry)</h2>
+  <nav class="range-tabs" id="demoTextSize" aria-label="Text size">
+    <button type="button" class="range-tab" data-textsize="small">Small</button>
+    <button type="button" class="range-tab" data-textsize="default">Default</button>
+    <button type="button" class="range-tab" id="demoTextSizeLarge" data-textsize="large">Large</button>
+  </nav>
+
   <h2>home-head</h2>
   <div class="card home-head" id="demoHomeHead">
     <span class="home-title">
@@ -374,6 +382,7 @@
   import { emptyStateEl } from './empty-state/empty-state.js';
   import { switchEl, setSwitch } from './switch/switch.js';
   import { buildReadoutText } from './page-foot/page-foot.js';
+  import { bindTextSize } from './text-size/text-size.js';
 
   // Inject the real vendored sprite so <use href="#i-NAME"> resolves.
   const sprite = await fetch('./icons/icons-sprite.html').then((r) => r.text());
@@ -395,9 +404,13 @@
   live.id = 'demoSwitchBuilt';
   document.getElementById('demoSwitchHost').appendChild(live);
 
+  // text-size: the vendored binder owns this row (it stores `demo.textsize`),
+  // so the generic range-tab wiring below skips it.
+  bindTextSize(document.getElementById('demoTextSize'), 'demo');
+
   // range-tab: click swaps which pill carries .active (caller's job — no
   // shared builder, per the component's README).
-  document.querySelectorAll('.range-tabs').forEach((row) => {
+  document.querySelectorAll('.range-tabs:not(#demoTextSize)').forEach((row) => {
     row.addEventListener('click', (e) => {
       const btn = e.target.closest('.range-tab');
       if (!btn || btn.disabled) return;
