@@ -74,17 +74,94 @@ def _assert_base_inherits(page: Page) -> None:
             assert _style(page, sel, prop) == want, (sel, prop)
 
 
+_ACTION_LIST = "#demoActionList"
+
+
+def _assert_action_row_colors(page: Page, *, muted: str, accent_text: str,
+                              control_border: str, attention: str) -> None:
+    """action-row: the theme-dependent colors (meta, verb, filter, favorite)."""
+    assert _style(page, "#demoActionTwoLine .action-row-meta", "color") == muted
+    r, g, b, a = _rgba(_style(page, "#demoActionVerb", "backgroundColor"))
+    assert (r, g, b) == _rgba(_style(page, "#demoButtonPrimary", "backgroundColor"))[:3]
+    assert 0 < a < 1
+    assert _style(page, "#demoActionVerb", "color") == accent_text
+    assert _style(page, "#demoActionFilter", "borderTopColor") == control_border
+    assert _style(page, "#demoActionFavOn", "color") == attention
+
+
+def _assert_action_row(page: Page) -> None:
+    """action-row (#268, fleet-config#965): tap-the-row geometry and contract.
+
+    Rows sit full-bleed in a zero-padded card on rows-scale heights; the
+    title and context line truncate to one line; the favorite shows its
+    pressed state by glyph fill, not only by color; every target is a real
+    44px box, and no two touch.
+    """
+    assert _style(page, _ACTION_LIST, "paddingTop") == "0px"
+    assert _style(page, "#demoActionOneLine", "minHeight") == "52px"
+    assert _style(page, "#demoActionTwoLine", "minHeight") == "60px"
+    # No vertical rules: rows divide on a top hairline, accessories on none.
+    assert _style(page, "#demoActionTwoLine", "borderTopWidth") == "1px"
+    assert _style(page, "#demoActionKebab", "borderLeftWidth") == "0px"
+    # The main button is the row: it fills the row's full height.
+    heights = page.evaluate(
+        "() => { const row = document.getElementById('demoActionVerbRow');"
+        " const main = row.querySelector('.action-row-main');"
+        " return [row.clientHeight, main.getBoundingClientRect().height]; }"
+    )
+    assert heights[0] == heights[1], heights
+    # Title: body at 600, one line, ellipsized; context: body-sm.
+    title = "#demoActionLongTitle"
+    assert _style(page, title, "fontWeight") == "600"
+    assert _style(page, title, "fontSize") == "16px"
+    assert _style(page, title, "whiteSpace") == "nowrap"
+    assert _style(page, title, "textOverflow") == "ellipsis"
+    assert page.eval_on_selector(title, "el => el.scrollWidth > el.clientWidth")
+    assert _style(page, "#demoActionLong .action-row-meta", "fontSize") == "14px"
+    assert _style(page, "#demoActionLong .action-row-meta", "textOverflow") == "ellipsis"
+    # Favorite: outline at rest, filled glyph when pressed; the caller flips
+    # aria-pressed only.
+    assert _style(page, "#demoActionFavOn .action-row-fav-on", "display") != "none"
+    assert _style(page, "#demoActionFavOn .action-row-fav-off", "display") == "none"
+    assert _style(page, "#demoActionFavOff .action-row-fav-on", "display") == "none"
+    page.click("#demoActionFavOff")
+    expect(page.locator("#demoActionFavOff")).to_have_attribute("aria-pressed", "true")
+    assert _style(page, "#demoActionFavOff .action-row-fav-off", "display") == "none"
+    page.click("#demoActionFavOff")
+    # Every accessory and main button is a >=44px target; none overlap.
+    buttons = page.locator(f"{_ACTION_LIST} .action-row button")
+    assert_min_target(buttons)
+    assert_no_overlap(buttons)
+    assert _style(page, "#demoActionKebab", "width") == "44px"
+    assert _style(page, "#demoActionFilter", "height") == "44px"
+    # The open kebab takes the accent; the filter hides rows (a flex row
+    # must still honour [hidden]).
+    page.click("#demoActionKebab")
+    expect(page.locator("#demoActionKebab")).to_have_attribute("aria-expanded", "true")
+    assert _style(page, "#demoActionKebab", "color") == "rgb(9, 105, 218)"
+    page.fill("#demoActionFilterInput", "backup")
+    expect(page.locator(f"{_ACTION_LIST} .action-row:visible")).to_have_count(1)
+    page.fill("#demoActionFilterInput", "")
+    expect(page.locator(f"{_ACTION_LIST} .action-row:visible")).to_have_count(4)
+
+
 def test_card_contract(gallery: Page) -> None:
     """card: rounded.lg corners, spacing.md padding, hairline border, title glyph 18px.
 
-    Also carries the base rule's light-theme check: a node of its own would
-    breach the suite's ratcheted budget (.fleet.toml [e2e] test_budget).
+    Also carries the base rule's and the action-row's (a card modifier)
+    light-theme checks: a node of their own would breach the suite's
+    ratcheted budget (.fleet.toml [e2e] test_budget).
     """
     assert _style(gallery, "#demoCard", "borderRadius") == "16px"
     assert _style(gallery, "#demoCard", "paddingTop") == "16px"
     assert _style(gallery, "#demoCard", "borderTopWidth") == "1px"
     assert _style(gallery, "#demoCard .card-title .icon", "width") == "18px"
     _assert_base_inherits(gallery)
+    _assert_action_row(gallery)
+    _assert_action_row_colors(
+        gallery, muted="rgb(101, 109, 118)", accent_text="rgb(5, 80, 174)",
+        control_border="rgb(129, 139, 152)", attention="rgb(154, 103, 0)",
+    )
 
 
 def test_disclosure_contract(gallery: Page) -> None:
@@ -331,3 +408,9 @@ def test_dark_theme_values(gallery: Page) -> None:
     # the 36px control height is theme-independent.
     assert _style(gallery, "#demoSelectNative", "height") == "36px"
     assert _style(gallery, "#demoSelectNative", "backgroundColor") == "rgb(13, 17, 23)"
+    # action-row re-skins from the dark tokens; its rows-scale heights hold.
+    assert _style(gallery, "#demoActionTwoLine", "minHeight") == "60px"
+    _assert_action_row_colors(
+        gallery, muted="rgb(125, 133, 144)", accent_text="rgb(88, 166, 255)",
+        control_border="rgb(110, 118, 129)", attention="rgb(210, 153, 34)",
+    )
