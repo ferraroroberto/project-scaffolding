@@ -30,6 +30,8 @@
     --line-muted: #d8dee4;
     --accent: #0969da;
     --accent-fg: #ffffff;
+    --accent-text: #0550ae;
+    --control-border: #818b98;
     --on: #1a7f37;
     --deficit: #cf222e;
     --attention: #9a6700;
@@ -64,6 +66,7 @@
     --font-heading-xl: 2rem;
     --font-heading-lg: 1.5rem;
     --font-body: 1rem;
+    --font-body-sm: 0.875rem;
     --font-label: 0.92rem;
     --font-caption: 0.78rem;
     --icon-inline: 16px;
@@ -82,6 +85,8 @@
     --line-muted: #21262d;
     --accent: #2f81f7;
     --accent-fg: #ffffff;
+    --accent-text: #58a6ff;
+    --control-border: #6e7681;
     --on: #3fb950;
     --deficit: #f85149;
     --attention: #d29922;
@@ -142,6 +147,7 @@
      equal specificity — same source-order convention as disclosure). -->
 <link rel="stylesheet" href="home-head/home-head.css">
 <link rel="stylesheet" href="select-native/select-native.css">
+<link rel="stylesheet" href="action-row/action-row.css">
 </head>
 <body>
 <div class="gallery">
@@ -296,6 +302,66 @@
     </select>
   </div>
 
+  <h2>action-row (filter, one line, two line, favorite, dominant verb)</h2>
+  <div class="card action-list" id="demoActionList">
+    <label class="action-row-filter" id="demoActionFilter">
+      <svg class="icon" aria-hidden="true"><use href="#i-search"></use></svg>
+      <input type="search" id="demoActionFilterInput" placeholder="Filter rows" aria-label="Filter rows">
+    </label>
+    <ul class="action-rows">
+      <li class="action-row" id="demoActionOneLine">
+        <button type="button" class="action-row-main">
+          <span class="action-row-title">meeting-prep</span>
+        </button>
+        <button type="button" class="action-row-kebab" aria-label="More actions"
+                aria-haspopup="menu" aria-expanded="false">
+          <svg class="icon" aria-hidden="true"><use href="#i-ellipsis-vertical"></use></svg>
+        </button>
+      </li>
+      <li class="action-row" id="demoActionTwoLine">
+        <button type="button" class="action-row-fav" id="demoActionFavOn" aria-pressed="true" aria-label="Favorite">
+          <svg class="icon action-row-fav-off" aria-hidden="true"><use href="#i-star"></use></svg>
+          <svg class="icon action-row-fav-on" aria-hidden="true"><use href="#i-star-fill"></use></svg>
+        </button>
+        <button type="button" class="action-row-main">
+          <span class="action-row-title">journal-daily</span>
+          <span class="action-row-meta">Last run yesterday · 3 conversations</span>
+        </button>
+        <button type="button" class="action-row-kebab" aria-label="More actions"
+                aria-haspopup="menu" aria-expanded="false">
+          <svg class="icon" aria-hidden="true"><use href="#i-ellipsis-vertical"></use></svg>
+        </button>
+      </li>
+      <li class="action-row" id="demoActionLong">
+        <button type="button" class="action-row-fav" id="demoActionFavOff" aria-pressed="false" aria-label="Favorite">
+          <svg class="icon action-row-fav-off" aria-hidden="true"><use href="#i-star"></use></svg>
+          <svg class="icon action-row-fav-on" aria-hidden="true"><use href="#i-star-fill"></use></svg>
+        </button>
+        <button type="button" class="action-row-main">
+          <span class="action-row-title" id="demoActionLongTitle">closed-company-accounting-quarterly-reconciliation</span>
+          <span class="action-row-meta">Last run 12 Sep · a context line long enough to need its own ellipsis</span>
+        </button>
+        <button type="button" class="action-row-kebab" aria-label="More actions"
+                aria-haspopup="menu" aria-expanded="false">
+          <svg class="icon" aria-hidden="true"><use href="#i-ellipsis-vertical"></use></svg>
+        </button>
+      </li>
+      <li class="action-row" id="demoActionVerbRow">
+        <button type="button" class="action-row-main">
+          <span class="action-row-title">Nightly backup</span>
+          <span class="action-row-meta">Next in 14h · Daily 03:00</span>
+        </button>
+        <button type="button" class="action-row-verb" id="demoActionVerb" aria-label="Run">
+          <svg class="icon" aria-hidden="true"><use href="#i-play"></use></svg>
+        </button>
+        <button type="button" class="action-row-kebab" id="demoActionKebab" aria-label="More actions"
+                aria-haspopup="menu" aria-expanded="false">
+          <svg class="icon" aria-hidden="true"><use href="#i-ellipsis-vertical"></use></svg>
+        </button>
+      </li>
+    </ul>
+  </div>
+
   <h2>page-foot</h2>
   <footer class="page-foot" id="demoPageFoot">
     <p id="demoBuildReadout"></p>
@@ -336,6 +402,27 @@
       row.querySelectorAll('.range-tab').forEach((b) => {
         b.classList.toggle('active', b === btn);
       });
+    });
+  });
+
+  // action-row: the caller owns the behaviour (per the component's README).
+  // The favorite flips aria-pressed, the kebab keeps aria-expanded in step
+  // with its (app-side) menu, and the filter hides rows that don't match.
+  document.querySelectorAll('.action-row-fav').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      btn.setAttribute('aria-pressed', String(btn.getAttribute('aria-pressed') !== 'true'));
+    });
+  });
+  document.querySelectorAll('.action-row-kebab').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      btn.setAttribute('aria-expanded', String(btn.getAttribute('aria-expanded') !== 'true'));
+    });
+  });
+  document.getElementById('demoActionFilterInput').addEventListener('input', (e) => {
+    const needle = e.target.value.trim().toLowerCase();
+    document.querySelectorAll('#demoActionList .action-row').forEach((row) => {
+      const title = row.querySelector('.action-row-title').textContent.toLowerCase();
+      row.hidden = !title.includes(needle);
     });
   });
 

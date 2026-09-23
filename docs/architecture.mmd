@@ -20,7 +20,7 @@ flowchart TB
     VIEWS["views/\nwelcome.py, pipeline_runner.py\none render() per file"]
     LOGPANEL["log_panel.py (#256)\nstream_to_streamlit / render_log_panel\nStreamlit panels over the logger's ring buffer"]
     TRAYLIB["tray/\nsingle_instance.py (named-mutex primitive, vendor-verbatim)\nwatchdog.py (spawn retry/backoff + dead-vs-wedged\nhealth watchdog + breadcrumb log, vendor-verbatim, #201)"]
-    WEBVEND["webapp/static/_vendored/\nbase/ (controls inherit the font, #266)\nnav/ (bottom-tab nav) · icons/ (Lucide sprite)\ncard/ · disclosure/ · modal/\nempty-state/ · switch/ · icon-tile/ · button/\nrange-tab/ · page-foot/ · home-head/ · select-native/\n+ demo.html (gallery / render harness)"]
+    WEBVEND["webapp/static/_vendored/\nbase/ (controls inherit the font, #266)\nnav/ (bottom-tab nav) · icons/ (Lucide sprite)\ncard/ · disclosure/ · modal/\nempty-state/ · switch/ · icon-tile/ · button/\nrange-tab/ · page-foot/ · home-head/ · select-native/\naction-row/ (tap-the-row list row, #268)\n+ demo.html (gallery / render harness)"]
     STYLES["styles/light.css\nruntime CSS overlay"]
     STCFG[".streamlit/config.toml\nnative dark theme"]
   end

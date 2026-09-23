@@ -145,6 +145,7 @@ pytest_targets = ["tests/e2e/test_vendored_nav.py"]
 [[e2e.surface]]
 name     = "components"
 prefixes = [
+    "app/webapp/static/_vendored/action-row/",
     "app/webapp/static/_vendored/base/",
     "app/webapp/static/_vendored/button/",
     "app/webapp/static/_vendored/card/",
@@ -218,6 +219,7 @@ icon-tile       = { src = "app/webapp/static/_vendored/icon-tile" }
 range-tab       = { src = "app/webapp/static/_vendored/range-tab" }
 home-head       = { src = "app/webapp/static/_vendored/home-head" }
 page-foot       = { src = "app/webapp/static/_vendored/page-foot" }
+action-row      = { src = "app/webapp/static/_vendored/action-row" }
 
 # Windows tray primitives -- docs/windows-tray.md (gotchas #4, #5).
 single_instance = { src = "app/tray/single_instance.py" }
