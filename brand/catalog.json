@@ -20,6 +20,7 @@
     {"file": "list-checks.svg", "glyph": "list-checks", "consumers": ["task-os"]},
     {"file": "mail.svg", "glyph": "mail", "consumers": ["email-archiver"]},
     {"file": "mic.svg", "glyph": "mic", "consumers": ["voice-transcriber"]},
+    {"file": "presentation.svg", "glyph": "presentation", "consumers": ["facilitation-suite"]},
     {"file": "radar.svg", "glyph": "radar", "consumers": ["whatsapp-radar"]},
     {"file": "rocket.svg", "glyph": "rocket", "consumers": ["app-launcher"]},
     {"file": "shopping-basket.svg", "glyph": "shopping-basket", "consumers": ["grocery-shopping-automation"]},
