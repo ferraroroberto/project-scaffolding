@@ -122,7 +122,7 @@ Diff-keyed gate at finish: checks the touched web UI still conforms to the desig
 
 - Two loops, kept separate — read `docs/playwright-ui-testing.md` → "End-to-end UI testing" before driving or testing the UI. **Iterative verification:** headed Playwright MCP (else a `headless=False` script), app booted once on a fixed port, a11y snapshot over screenshot, ≤5 actions per cycle, never new files under `tests/e2e/`.
 - **Regression suite** (`tests/e2e/`, created only once a test is justified): boot a disposable instance and **refuse** an occupied port unless the project's loudly-named opt-in env var is set (vendored `tests/e2e/_e2e_live_guard.py`, manifest key `e2e_live_guard`); always isolate stateful hosts; boot failure is a hard failure, never `pytest.skip`; under 15 tests, no Page Object Model, not gated in pre-commit; remove a feature's test with the feature.
-- **Phone-first apps:** always-on WebKit device-emulation projection; residual iOS-shell bugs via `ios-webkit-debug-proxy`.
+- **Phone-first apps:** a WebKit device-emulation projection, only for tests where the engine or viewport matters (layout, touch targets, nav, composer, safe-area); functional tests run on one engine (`#290`); residual iOS-shell bugs via `ios-webkit-debug-proxy` and the device itself.
 ## Verification (before declaring a task done)
 Examples — adapt to the project's actual tooling.
 
