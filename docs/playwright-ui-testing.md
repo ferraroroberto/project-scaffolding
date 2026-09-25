@@ -784,12 +784,39 @@ day a scaffold-derived project grows its first stateful child process.
 
 ### Mobile projection (phone-first apps only)
 
-If the app's primary surface is a phone, run the regression suite on
+If the app's primary surface is a phone, add a second projection:
 **WebKit** with a Playwright device descriptor (iPhone / Android —
 viewport, user-agent, touch, scale). WebKit shares the iOS Safari
-rendering + JS engine, so it catches most engine-specific mobile bugs on
-a normal Windows/Linux box. Make the projection always-on via a
-parametrised fixture so it can't be forgotten.
+rendering + JS engine, and the descriptor gives the phone's viewport.
+
+**Run it only where the engine or the viewport changes the outcome**
+(`#290`, fleet-config#1026): layout and geometry, touch targets, the
+nav, the composer and keyboard input, safe-area. Functional tests
+(routes, polling, payloads, menus, readbacks, dialogs with no geometry
+and no engine branch) run on **one** engine. Pin them with a fixture or
+marker (app-launcher's `chromium_projection_only`), and keep the
+projection always-on for the tests that qualify, so it can't be
+forgotten there.
+
+Why not the whole suite. app-launcher measured it (app-launcher#1220):
+
+- 0 WebKit-engine product bugs in 400 merged PRs. Of 32 WebKit-only
+  reds, one was an engine-independent race that the slower engine
+  showed first (#732); the rest were test bugs, flakes or load.
+- WebKit was 61% of browser time (1212 s against 762 s for Chromium
+  over 310 nodes each).
+- iOS-specific bugs don't reproduce in desktop WebKit anyway: the
+  headless projection can't see `env(safe-area-inset-*)` or
+  installed-PWA geometry (app-launcher#1099), and the phone-visible bugs
+  of that window were found on the device. The real iPhone check stays
+  on-device.
+
+What the rule gives up: WebKit-only JS behaviour in functional flows (a
+Safari-divergent API on a path only a behavioural test drives), and the
+slower engine exposing a race first. A test that later gains a layout
+assertion moves back to both engines. fleet-config's `/e2e-audit`
+reports `projection_fit`, the tests that pay for the second projection
+without any engine or viewport signal.
 
 WebKit-on-Windows is not real iOS (no iOS shell, no real WKWebView
 limits, no Apple keyboard). For the residual shell-only bugs, attach PC
