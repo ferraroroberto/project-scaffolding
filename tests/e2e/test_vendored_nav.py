@@ -232,7 +232,17 @@ def test_narrow_desktop_stacks_icon_over_label(nav: Page) -> None:
 
 
 def test_mobile_pill_stacks_icon_over_label(nav_mobile: Page) -> None:
-    """The floating pill keeps its 20px icon above the label; no rail when coarse."""
+    """The floating pill keeps its 20px icon above the label; no rail when coarse.
+
+    The phone `.app` padding is part of the same contract (#288): the top is
+    the safe area alone, so the first card starts directly under the status
+    bar (the emulator's safe area is 0); the sides keep `--gap` and the bottom
+    keeps the reserve that clears the floating bar.
+    """
+    assert _style(nav_mobile, ".app", "paddingTop") == "0px"
+    assert _style(nav_mobile, ".app", "paddingLeft") == "12px"
+    assert _style(nav_mobile, ".app", "paddingRight") == "12px"
+    assert _style(nav_mobile, ".app", "paddingBottom") == f"{21 + 61 + 21 + 12}px"
     icon = nav_mobile.locator("#tabHome .tab-icon")
     expect(icon).to_be_visible()
     assert _style(nav_mobile, "#tabHome .tab-icon", "width") == "20px"
