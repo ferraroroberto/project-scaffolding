@@ -22,6 +22,7 @@ from scripts.classify_e2e import (
     E2EConfig,
     Rule,
     Surface,
+    changed_selectors,
     classify,
     load_config,
     load_surfaces,
@@ -161,7 +162,9 @@ def test_real_rules_route_representative_paths() -> None:
     assert tier("app/views/welcome.py") == "full"
     assert tier("app/styles/light.css") == "full"
     assert tier("app/tray/single_instance.py") == "full"
-    assert tier("tests/e2e/test_smoke.py") == "full"
+    # An edited test module no surface owns runs only itself (#289); a shared helper runs all.
+    assert tier("tests/e2e/test_smoke.py") == "surface"
+    assert tier("tests/e2e/conftest.py") == "full"
     assert tier("tests/_streamlit_lifecycle.py") == "full"
     assert tier("tests/_port_probe.py") == "full"
 
@@ -469,6 +472,179 @@ def test_real_surface_helpers_are_only_imported_by_their_own_targets() -> None:
                 if f != helper and helper.stem in imported_names(f)
             }
             assert importers <= set(surface.pytest_targets), (surface.name, helper.name, importers)
+
+
+# ------------------------------------------ shared stylesheets (#289)
+
+_SHEET = "app/shared/styles.css"
+_BASE_CSS = """/* tokens */
+:root {
+  --accent: #0969da;
+}
+
+#tabBoard .board-card {
+  padding: 8px;
+}
+
+.jobs-row, .jobs-row:hover {
+  color: red;
+}
+
+@media (pointer: coarse) {
+  .board-card { padding: 12px; }
+}
+"""
+
+
+def _edit(old: str, new: str) -> str:
+    assert _BASE_CSS.count(old) == 1, old
+    return _BASE_CSS.replace(old, new)
+
+
+def test_changed_selectors_names_the_rule_a_declaration_edit_touches() -> None:
+    new = _edit("padding: 8px;", "padding: 10px;")
+    assert changed_selectors(_BASE_CSS, new) == {"#tabBoard .board-card"}
+
+
+def test_changed_selectors_splits_a_selector_list() -> None:
+    new = _edit("color: red;", "color: blue;")
+    assert changed_selectors(_BASE_CSS, new) == {".jobs-row", ".jobs-row:hover"}
+
+
+def test_changed_selectors_names_an_added_and_a_removed_rule() -> None:
+    added = _BASE_CSS + "\n.board-chip {\n  gap: 4px;\n}\n"
+    assert changed_selectors(_BASE_CSS, added) == {".board-chip"}
+    assert changed_selectors(added, _BASE_CSS) == {".board-chip"}
+
+
+def test_changed_selectors_ignores_comment_and_blank_lines() -> None:
+    new = _edit("/* tokens */", "/* design tokens */\n")
+    assert changed_selectors(_BASE_CSS, new) == set()
+
+
+def test_changed_selectors_brace_inside_a_string_is_not_a_block() -> None:
+    new = _edit("padding: 8px;", 'padding: 8px;\n  content: "{";')
+    assert changed_selectors(_BASE_CSS, new) == {"#tabBoard .board-card"}
+
+
+def test_changed_selectors_fail_safe_cases_are_none() -> None:
+    cases = {
+        "a token in :root": _edit("--accent: #0969da;", "--accent: #0550ae;"),
+        "a custom property in a rule": _edit("padding: 8px;", "--pad: 8px;"),
+        "a rule inside @media": _edit("padding: 12px;", "padding: 14px;"),
+        "an @media prelude": _edit("(pointer: coarse)", "(pointer: fine)"),
+        "an @import": "@import url(x.css);\n" + _BASE_CSS,
+        "an @font-face": _BASE_CSS + "@font-face {\n  font-family: X;\n}\n",
+        "a nested rule": _edit("padding: 8px;", "padding: 8px;\n  & .x { gap: 0; }"),
+        "an unbalanced sheet": _BASE_CSS + ".board-x {\n",
+    }
+    for why, new in cases.items():
+        assert changed_selectors(_BASE_CSS, new) is None, why
+    assert changed_selectors(None, _BASE_CSS) is None
+    assert changed_selectors(_BASE_CSS, None) is None
+
+
+_SHEET_BOARD = Surface(name="board", pytest_targets=("tests/e2e/test_board.py",),
+                       prefixes=("app/board/",), selectors=("#tabBoard", ".board-"))
+_SHEET_JOBS = Surface(name="jobs", pytest_targets=("tests/e2e/test_jobs.py",),
+                      prefixes=("app/jobs/",), selectors=(".jobs-",))
+
+
+def _sheet_cfg(*surfaces: Surface, root: Path | None = None) -> E2EConfig:
+    kw: dict = {"repo_root": root} if root else {}
+    return _cfg(*_SURFACE_RULES, static_pytest_target="tests/e2e/test_smoke.py",
+                surfaces=list(surfaces), shared_stylesheets=(_SHEET,), **kw)
+
+
+def test_sheet_rules_owned_by_one_surface_narrow_to_it() -> None:
+    r = classify([_SHEET], _sheet_cfg(_SHEET_BOARD, _SHEET_JOBS),
+                 {_SHEET: {"#tabBoard .board-card", ".board-chip"}})
+    assert (r.tier, r.surface, r.pytest_target) == ("surface", "board", "tests/e2e/test_board.py")
+    r = classify([_SHEET, "app/board/board.js"], _sheet_cfg(_SHEET_BOARD, _SHEET_JOBS),
+                 {_SHEET: {".board-chip"}})
+    assert (r.tier, r.surface) == ("surface", "board")
+
+
+def test_sheet_fail_safes_keep_the_whole_suite() -> None:
+    cfg = _sheet_cfg(_SHEET_BOARD, _SHEET_JOBS)
+    cases = {
+        "no diff text for the sheet": ([_SHEET], {}),
+        "an unsafe change": ([_SHEET], {_SHEET: None}),
+        "only comments changed": ([_SHEET], {_SHEET: set()}),
+        "an unmapped selector": ([_SHEET], {_SHEET: {".board-card", "body"}}),
+        "rules of two surfaces": ([_SHEET], {_SHEET: {".board-card", ".jobs-row"}}),
+        "the sheet's surface differs": ([_SHEET, "app/jobs/j.js"], {_SHEET: {".board-card"}}),
+    }
+    for why, (paths, sheets) in cases.items():
+        r = classify(paths, cfg, sheets)
+        assert (r.tier, r.pytest_target) == ("full", "tests/e2e"), why
+    both = Surface(name="also", pytest_targets=("tests/e2e/test_other.py",),
+                   prefixes=("app/other/",), selectors=(".board-card",))
+    r = classify([_SHEET], _sheet_cfg(_SHEET_BOARD, both), {_SHEET: {".board-card"}})
+    assert r.tier == "full", "a selector two surfaces claim"
+
+
+def test_undeclared_sheet_ignores_selector_data() -> None:
+    cfg = _cfg(*_SURFACE_RULES, surfaces=[_SHEET_BOARD])
+    assert classify([_SHEET], cfg, {_SHEET: {".board-card"}}).tier == "full"
+
+
+def test_load_config_reads_shared_stylesheets_and_selectors(tmp_path: Path) -> None:
+    _write_targets(tmp_path, "tests/e2e/test_board.py")
+    toml = tmp_path / ".fleet.toml"
+    toml.write_text(
+        '[e2e]\nshared_stylesheets = ["app/shared/styles.css"]\n'
+        '[[e2e.rule]]\ntier = "full"\nprefix = "app/"\n'
+        '[[e2e.surface]]\nname = "board"\npytest_targets = ["tests/e2e/test_board.py"]\n'
+        'prefixes = ["app/board/"]\nselectors = ["#tabBoard", ".board-"]\n',
+        encoding="utf-8")
+    cfg = load_config(toml)
+    assert cfg.shared_stylesheets == ("app/shared/styles.css",)
+    assert cfg.surfaces[0].selectors == ("#tabBoard", ".board-")
+    assert cfg.repo_root == tmp_path
+    toml.write_text(toml.read_text(encoding="utf-8").replace('".board-"]', '":root"]'),
+                    encoding="utf-8")
+    assert load_config(toml).surfaces == [], "a :root selector prefix disables every surface"
+
+
+# ------------------------------------------ self-only e2e modules (#289)
+
+def _suite(tmp_path: Path, **files: str) -> Path:
+    for name, body in files.items():
+        (tmp_path / "tests" / "e2e" / name).parent.mkdir(parents=True, exist_ok=True)
+        (tmp_path / "tests" / "e2e" / name).write_text(body, encoding="utf-8")
+    return tmp_path
+
+
+def test_an_edited_test_module_outside_every_surface_runs_only_itself(tmp_path: Path) -> None:
+    root = _suite(tmp_path, **{"test_a.py": "import pytest\n", "test_b_test.py": ""})
+    cfg = _sheet_cfg(_SHEET_BOARD, root=root)
+    r = classify(["tests/e2e/test_a.py"], cfg)
+    assert (r.tier, r.surface, r.pytest_target) == ("surface", "self", "tests/e2e/test_a.py")
+    assert r.browsers == []  # every projection, like full
+    r = classify(["tests/e2e/test_a.py", "tests/e2e/test_b_test.py", "docs/x.md"], cfg)
+    assert r.pytest_target == "tests/e2e/test_a.py tests/e2e/test_b_test.py"
+
+
+def test_a_self_only_module_rides_along_with_one_surface(tmp_path: Path) -> None:
+    root = _suite(tmp_path, **{"test_a.py": ""})
+    r = classify(["app/board/board.js", "tests/e2e/test_a.py"], _sheet_cfg(_SHEET_BOARD, root=root))
+    assert (r.tier, r.surface) == ("surface", "board")
+    assert r.pytest_target == "tests/e2e/test_board.py tests/e2e/test_a.py"
+
+
+def test_shared_or_imported_or_deleted_modules_keep_the_whole_suite(tmp_path: Path) -> None:
+    root = _suite(tmp_path, **{
+        "conftest.py": "", "_helper.py": "", "test_a.py": "",
+        "test_base.py": "", "test_child.py": "from test_base import thing\n",
+    })
+    cfg = _sheet_cfg(_SHEET_BOARD, root=root)
+    for path in ("tests/e2e/conftest.py", "tests/e2e/_helper.py", "tests/e2e/test_base.py",
+                 "tests/e2e/test_gone.py"):
+        r = classify([path], cfg)
+        assert (r.tier, r.pytest_target) == ("full", "tests/e2e"), path
+    r = classify(["tests/e2e/test_a.py", "app/unowned/x.js"], cfg)
+    assert r.tier == "full", "a module does not excuse a path outside every surface"
 
 
 # ------------------------------------------------------- vendored-copy lint fit
