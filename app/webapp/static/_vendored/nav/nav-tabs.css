@@ -209,7 +209,15 @@
      fixed .app scroller (its overscroll-behavior: none stops chaining), and
      the nav declines pan gestures outright — so the WKWebView bounce that
      moves `visualViewport.offsetTop` (home-automation#300) still has no entry
-     point. */
+     point.
+
+     Page-head dependency (#287): this shell and the `.tabs` anchor below
+     assume the web view spans the WHOLE screen, which iOS gives an installed
+     app only when the page sets
+     `<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">`
+     plus `viewport-fit=cover` in its viewport meta. Without them the app starts
+     below an opaque status bar and the pill lands one status-bar height
+     (about 59pt) too low, mostly off-screen (parking-manager#24). */
   @media (display-mode: standalone) {
     .app {
       position: fixed;
