@@ -205,6 +205,9 @@ def test_empty_state_contract(gallery: Page) -> None:
         "Nothing reachable"
     )
     expect(gallery.locator("#demoEmptyHost .empty-state-action")).to_have_text("Retry")
+    # The action is the block's one standalone button: a real 44px, not a hit-area
+    # expansion (#286; it rendered 38.6px tall from padding + one label line).
+    assert_min_target(gallery.locator("#demoEmptyHost .empty-state-action"))
 
 
 def test_modal_contract(gallery: Page) -> None:
