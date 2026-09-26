@@ -173,7 +173,9 @@
        tabs technically scrollable so iOS anchors fixed to the screen bottom. */
     min-height: calc(100vh + 1px);
     min-height: calc(100dvh + 1px);
-    padding: calc(env(safe-area-inset-top, 0px) + var(--gap)) var(--gap) calc(
+    /* Top is the safe area alone (#288): the first card starts directly under
+       the status bar, as in app-launcher. Sides and bottom keep --gap. */
+    padding: env(safe-area-inset-top, 0px) var(--gap) calc(
       env(safe-area-inset-bottom, 0px) + var(--bottom-tabs-margin, 21px) +
       var(--bottom-tabs-height, 61px) + var(--bottom-tabs-margin, 21px) + var(--gap)
     );

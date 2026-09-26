@@ -80,7 +80,7 @@ At `(min-width: 1100px) and (pointer: fine)` (`design.md` `layout.wide`, fleet-c
 | `--muted` | `#656d76` | inactive-tab text |
 | `--line` | `#d1d9e0` | bar border, active-tab border (mobile) |
 | `--space-xs` | `4px` | bar padding / gap (desktop) |
-| `--gap` | `12px` | bottom-padding reserve |
+| `--gap` | `12px` | bottom-padding reserve; phone `.app` side padding (the phone top padding is `env(safe-area-inset-top)` alone, #288) |
 | `--font-label` | `0.92rem` | tab label (desktop) |
 | `--font-caption` | `0.78rem` | tab label (narrow desktop) |
 | `--row-sm` | `44px` | stacked narrow-desktop tab min-height (`hit-target.min`) |
