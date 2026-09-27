@@ -206,38 +206,34 @@ tests/
     test_classify.py     # one test per stable behavior
 ```
 
-`conftest.py` boots the app once per pytest session:
+`conftest.py` boots its **own disposable** Streamlit once per pytest
+session, and **refuses** rather than adopts if the target port is
+already occupied — see "Boot-disposable-or-refuse, fail loud" above.
+Don't hand-roll this: copy from this repo's own `tests/e2e/conftest.py`
+(the `streamlit_app` fixture) and the vendored
+`tests/e2e/_e2e_live_guard.py` (manifest key `e2e_live_guard`), which
+owns the check-refuse-log policy so it can't drift per project. Shape,
+condensed:
 
 ```python
-import subprocess
-import time
-import socket
-
 import pytest
 from playwright.sync_api import sync_playwright
 
+from tests._streamlit_lifecycle import ensure_fresh_streamlit, kill_streamlit_on_port
+from tests.e2e._e2e_live_guard import require_disposable_instance
 
-def _port_open(port: int) -> bool:
-    with socket.socket() as s:
-        try:
-            s.connect(("127.0.0.1", port))
-            return True
-        except OSError:
-            return False
+PORT = 8501
+LIVE_FLAG_ENV = "STREAMLIT_E2E_LIVE"  # loudly-named opt-in, never opt-out
 
 
 @pytest.fixture(scope="session")
 def streamlit_app():
-    proc = subprocess.Popen(
-        [".venv/Scripts/python.exe", "-m", "streamlit", "run", "app/app.py",
-         "--server.headless", "true", "--server.port", "8501"],
-    )
-    for _ in range(60):
-        if _port_open(8501):
-            break
-        time.sleep(0.5)
-    yield "http://localhost:8501"
-    proc.terminate()
+    require_disposable_instance(PORT, LIVE_FLAG_ENV)  # pytest.exit()s if occupied and not opted in
+    base_url = ensure_fresh_streamlit(PORT)
+    try:
+        yield base_url
+    finally:
+        kill_streamlit_on_port(PORT)
 
 
 @pytest.fixture(scope="session")
@@ -725,14 +721,19 @@ POSIX:
 - **No Page Object Model.** Too much ceremony at this scale.
 - **One shared fixture.** Don't build a framework until I have three
   tests that need the same helper.
-- **Boot-or-adopt, fail loud.** The session fixture should boot the app
-  — and any service dependencies (a separate API process, a worker, a
-  PTY host) — on a free/fixed port, or adopt one already listening, and
-  **hard-fail (never `pytest.skip`)** if it can't. A suite that skips on
-  a missing server reports green on a build it never tested. The
-  `streamlit_app` skeleton above is the single-process Streamlit
-  instance of this pattern; `uvicorn` / `flask run` are the same shape,
-  and a multi-process app boots each dependency the same way.
+- **Boot-disposable-or-refuse, fail loud.** The session fixture should
+  boot its **own** disposable instance — and any service dependencies (a
+  separate API process, a worker, a PTY host) — on a free port, and
+  **refuse** (`pytest.exit`, naming the opt-in flag) rather than
+  adopting an already-listening one; a bare `pytest tests/e2e` must
+  never silently drive a live app the harness didn't start (`#191`).
+  Boot failure is a **hard failure** (never `pytest.skip`) — a suite
+  that skips on a missing server reports green on a build it never
+  tested. The real `tests/e2e/conftest.py` + the vendored
+  `tests/e2e/_e2e_live_guard.py` (manifest key `e2e_live_guard`) are the
+  reference implementation of this pattern for the single-process
+  Streamlit case; `uvicorn` / `flask run` are the same shape, and a
+  multi-process app boots each dependency the same way.
 - **Don't gate commits on it.** Run on push or in CI, never in
   pre-commit. Slow pre-commit hooks train me to bypass them.
 - **Delete with the feature.** When I remove a feature, remove its
@@ -740,12 +741,16 @@ POSIX:
 
 ### Isolating stateful hosts (never adopt-and-mutate)
 
-The "boot-or-adopt, fail loud" rule above is safe *only* because a
-Streamlit/Flask/uvicorn dev server is stateless and cheap to restart —
-adopting a live one costs nothing if the suite happens to touch it.
-That assumption breaks the moment a project grows a long-lived,
-**stateful** child process that owns the user's real work: a worker
-with in-flight jobs, a PTY host, a session-host holding live shells.
+The "boot-disposable-or-refuse, fail loud" rule above defaults to a
+harness-owned disposable instance and refuses an occupied port outright
+— but a project can still opt in (`STREAMLIT_E2E_LIVE` or equivalent) to
+*reclaiming* that occupied port instead of refusing. Reclaiming is safe
+*only* because a Streamlit/Flask/uvicorn dev server is stateless and
+cheap to restart — killing and relaunching a live one costs nothing if
+the suite happens to touch it. That assumption breaks the moment a
+project grows a long-lived, **stateful** child process that owns the
+user's real work: a worker with in-flight jobs, a PTY host, a
+session-host holding live shells.
 
 This bit app-launcher for real (`app-launcher#260`): its pre-ship e2e
 gate adopted the live tray's session-host on its fixed port — the same

@@ -40,6 +40,7 @@ flowchart TB
     DOCCAP["doc_capture/\nengine.py + adapters.py (streamlit | url)\n+ launch.py + __main__.py (CLI)\nvendor-verbatim doc-capture screenshot engine\n(manifest-driven, fail-safe-masked,\ninput-hash-idempotent + README tour regen)"]
     POOLEDHTTP["pooled_http.py (#192)\nbuild_session() / pooled_request()\nvendor-verbatim pooled requests.Session\n+ single-retry-on-ConnectionError"]
     RUNTIMEDATA["runtime_data.py (#243)\nruntime_db_path(app, file, env_var=)\nvendor-verbatim SQLite-location resolver\nFLEET_DATA_ROOT -> C:/sqlite/&lt;app&gt;/\n(off the spinning disk, one dir per app)"]
+    BUILDINFO["build_info.py (#199/#246/#247)\nbuild_identity(): git_sha + built_at\ncaptured once at import, bounded retry inside\nthe capture, never re-resolved later\nvendor-verbatim, self-contained (no local imports)"]
   end
   VIEWS -->|orchestrates, business logic stays here| PIPELINES
   VIEWS --> LOGGER
