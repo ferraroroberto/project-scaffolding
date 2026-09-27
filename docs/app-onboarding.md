@@ -24,9 +24,11 @@ python -m venv .venv
 & .\.venv\Scripts\python.exe -m pip install -r requirements.txt
 
 # Config + secrets. .env is the SECRETS file; .venv is the virtualenv DIR — never
-# conflate the two. Copy the examples to real files (the reals are gitignored).
-copy .env.example .env                       # then fill in secrets
-copy config\*.sample.json config\            # then rename each to its real name
+# conflate the two. The scaffold ships neither an .env.example nor a config/
+# directory (src/config.py's defaults let the app boot with no .env at all) --
+# only create these once the new app actually needs secrets or config keys:
+copy .env.example .env                       # only if you added .env.example
+copy config\*.sample.json config\            # only if you added a config/ dir
 ```
 
 Set this app's identity before anything else: update `.fleet.toml` (its architecture-map card — replace the scaffold's placeholder values with this repo's `layer` / `icon` / `description` / `port`), and update `README.md` + `CLAUDE.md` for the new app's name and shape.
