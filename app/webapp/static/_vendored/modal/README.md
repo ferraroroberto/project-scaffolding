@@ -53,7 +53,8 @@ The fleet's canonical **editor modal**: a native `<dialog>` with a `heading-lg` 
 | `--card-off` | `#f6f8fa` | disabled primary fill |
 | `--ink` | `#1f2328` | text |
 | `--muted` | `#656d76` | close glyph, disabled text |
-| `--line` | `#d1d9e0` | row dividers, control borders |
+| `--line` | `#d1d9e0` | row dividers |
+| `--control-border` | `#818b98` (dark `#6e7681`) | inline control borders (WCAG 1.4.11) |
 | `--accent-fill` | `#0969da` (dark `#1f6feb`) | primary button fill |
 | `--accent-fg` | `#ffffff` | primary button text |
 | `--accent-border-strong` | `color-mix(in srgb, var(--accent) 28%, transparent)` | primary button border |
@@ -65,7 +66,7 @@ The fleet's canonical **editor modal**: a native `<dialog>` with a `heading-lg` 
 | `--space-lg` | `24px` | mobile top anchor gap |
 | `--gap` | `12px` | mobile max-height reserve |
 | `--font-heading-lg` | `1.5rem` | title |
-| `--font-label` | `0.92rem` | control text |
+| `--font-label` | `0.875rem` | control text |
 | `--icon-title` | `18px` | close glyph (`icons.size.title`) |
 
 ## Don't diverge

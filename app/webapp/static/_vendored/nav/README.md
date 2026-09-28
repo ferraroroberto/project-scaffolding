@@ -81,8 +81,8 @@ At `(min-width: 1100px) and (pointer: fine)` (`design.md` `layout.wide`, fleet-c
 | `--line` | `#d1d9e0` | bar border, active-tab border (mobile) |
 | `--space-xs` | `4px` | bar padding / gap (desktop) |
 | `--gap` | `12px` | bottom-padding reserve; phone `.app` side padding (the phone top padding is `env(safe-area-inset-top)` alone, #288) |
-| `--font-label` | `0.92rem` | tab label (desktop) |
-| `--font-caption` | `0.78rem` | tab label (narrow desktop) |
+| `--font-label` | `0.875rem` | tab label (desktop) |
+| `--font-caption` | `0.75rem` | tab label (narrow desktop) |
 | `--row-sm` | `44px` | stacked narrow-desktop tab min-height (`hit-target.min`) |
 | `--row-lg` | `60px` | rail tab min-height |
 | `--space-sm` | `8px` | rail tab padding |

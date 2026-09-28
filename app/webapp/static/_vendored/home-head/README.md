@@ -56,7 +56,7 @@ The fleet's canonical **home-head**: a home-only header card rendered as **one r
 | `--ink` | `#1f2328` | title text |
 | `--muted` | `#656d76` | status + toggle glyph |
 | `--font-body` | `1rem` | title text size |
-| `--font-label` | `0.92rem` | status text size |
+| `--font-label` | `0.875rem` | status text size |
 
 ## Don't diverge
 

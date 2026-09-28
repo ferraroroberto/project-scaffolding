@@ -74,8 +74,8 @@ Define these CSS custom properties in your app's `:root` / `[data-theme="dark"]`
 | `--radius-md` | `12px` | corners (`rounded.md`), all tiers |
 | `--control-h` | `36px` | surface tier height |
 | `--font-body` | `1rem` | tint text |
-| `--font-label` | `0.92rem` | surface text |
-| `--font-caption` | `0.78rem` | ghost text |
+| `--font-label` | `0.875rem` | surface text |
+| `--font-caption` | `0.75rem` | ghost text |
 
 ## Don't diverge
 
