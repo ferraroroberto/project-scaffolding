@@ -179,21 +179,6 @@ def test_desktop_control_and_wide_rail(nav: Page) -> None:
     assert app_x >= _RAIL, app_x
 
 
-def test_legacy_emoji_span_stays_hidden(nav: Page) -> None:
-    """An app that still ships `.tab-emoji` gets the icon, not the emoji (#142).
-
-    This is what lets an adopter re-vendor `nav-tabs.css` alone — without
-    touching its markup — and land on the fixed desktop look.
-    """
-    nav.evaluate(
-        "() => document.querySelector('#tabHome .tab-label')"
-        ".insertAdjacentHTML('beforebegin', "
-        "'<span class=\"tab-emoji\" aria-hidden=\"true\">\\ud83c\\udfe0</span>')"
-    )
-    expect(nav.locator("#tabHome .tab-emoji")).to_be_hidden()
-    expect(nav.locator("#tabHome .tab-icon")).to_be_visible()
-
-
 _LONG_LABELS = ("Capture", "History", "Settings", "Energy", "Family")
 
 

@@ -19,10 +19,10 @@ Two escape hatches, both deliberate and both self-documenting:
 * An inline ``# no-window-exempt: <reason>`` comment anywhere in the call's
   source lines. Used for genuinely POSIX-only branches and for the one harness
   that must *reproduce* an unsuppressed spawn.
-* ``VENDOR_VERBATIM`` -- a file copied byte-identical into adopter repos cannot
-  import `src/no_window.py` (the import would not resolve there, and the
-  hash-verified bytes must stay self-contained), so it derives the flag
-  locally on purpose.
+* A vendor-verbatim file (one whose `.py` sits under a `src` catalogued in
+  `.fleet.toml` `[components]`) cannot import `src/no_window.py` (the import
+  would not resolve in an adopter's tree, and the hash-verified bytes must
+  stay self-contained), so it derives the flag locally on purpose.
 """
 
 from __future__ import annotations
@@ -30,23 +30,42 @@ from __future__ import annotations
 import ast
 from pathlib import Path
 
+from scripts.vendored_catalog import load_catalog
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
 #: Trees that ship code. `data/`, `docs/` and `.venv/` are not scanned.
 SCANNED_DIRS = ("app", "src", "scripts", "tests")
 
-#: The one module allowed to define the flag, plus the vendor-verbatim files
-#: that must keep a self-contained local definition (mirrors the
-#: `$VendoredModules` entries in `scripts/verify-before-ship.ps1` that spawn
-#: subprocesses). Anything else importing `src.no_window` is the rule.
+#: The one module allowed to define the flag.
 FLAG_HOME = "src/no_window.py"
-VENDOR_VERBATIM = frozenset({
-    "tests/e2e/_browser_sweep.py",
-    "scripts/classify_e2e.py",
-    "src/build_info.py",
-})
 
 EXEMPT_MARKER = "no-window-exempt"
+
+
+def _vendor_verbatim_files() -> frozenset[str]:
+    """Python files published vendor-verbatim, per `.fleet.toml [components]`.
+
+    Every `src` catalogued there is, by definition, copied byte-identical into
+    adopter repos (#230), so any of its `.py` files that spawns a subprocess is
+    expected to re-derive the flag locally rather than import `src/no_window.py`.
+    Derived from the catalog rather than hand-kept here -- a second list is
+    exactly the drift #230 removed elsewhere (the old `$VendoredModules` in
+    `scripts/verify-before-ship.ps1`), and this one carried no test forcing it
+    to track the catalog.
+    """
+    catalog = load_catalog(REPO_ROOT)
+    files: set[str] = set()
+    for entry in catalog.values():
+        src = entry["src"]
+        path = REPO_ROOT / src
+        if src.endswith(".py"):
+            files.add(src)
+        elif path.is_dir():
+            files.update(p.relative_to(REPO_ROOT).as_posix() for p in path.rglob("*.py"))
+    files.discard(FLAG_HOME)
+    return frozenset(files)
+
 
 _SPAWN_ATTRS = frozenset({"run", "Popen", "call", "check_output", "check_call"})
 _ASYNC_SPAWN_ATTRS = frozenset({"create_subprocess_exec", "create_subprocess_shell"})
@@ -106,6 +125,7 @@ def _scan() -> tuple[list[str], list[str], list[str]]:
     unflagged: list[str] = []
     rederived: list[str] = []
     exemptions: list[str] = []
+    vendor_verbatim = _vendor_verbatim_files()
 
     for path in _python_files():
         rel = _rel(path)
@@ -124,7 +144,7 @@ def _scan() -> tuple[list[str], list[str], list[str]]:
                     unflagged.append(where)
 
             elif _is_flag_literal(node) and rel != FLAG_HOME:
-                if rel in VENDOR_VERBATIM:
+                if rel in vendor_verbatim:
                     continue
                 where = f"{rel}:{getattr(node, 'lineno', 0)}"
                 if _exempt(node, lines):
@@ -165,9 +185,9 @@ def test_the_no_window_flag_is_defined_in_exactly_one_place() -> None:
         "`subprocess.CREATE_NO_WINDOW` re-derived outside "
         f"`{FLAG_HOME}`:\n  " + "\n  ".join(rederived)
         + "\n\nImport it instead (`from src.no_window import NO_WINDOW`). Only "
-        "a vendor-verbatim file may keep a local copy -- add it to "
-        "VENDOR_VERBATIM here and to `$VendoredModules` in "
-        "scripts/verify-before-ship.ps1 if that is what it is."
+        "a vendor-verbatim file may keep a local copy -- if that is what it "
+        "is, catalog its `src` in `.fleet.toml [components]` (scripts/"
+        "vendored_catalog.py) rather than exempting it here."
     )
 
 

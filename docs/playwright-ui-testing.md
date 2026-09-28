@@ -946,8 +946,9 @@ nav harness's coarse-pointer assert.
 copy the file byte-identical into the app's `tests/e2e/`; every
 selector, budget, and theme mechanism is a call-site argument, so the
 copy never forks (it imports only the stdlib and
-`playwright.sync_api`). It is mypy-strict-gated here via
-`$VendoredModules` so it ships clean.
+`playwright.sync_api`). It is catalogued in `.fleet.toml`'s
+`[components]` table, so it stays mypy-strict-gated here and ships
+clean.
 
 The helper is proven by its own suite
 (`tests/e2e/test_geometry_helper.py`) against hermetic twin fixture
