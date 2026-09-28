@@ -377,7 +377,7 @@ def test_page_foot_contract(gallery: Page) -> None:
     """page-foot: centered footer, muted/caption readout text, shared build-text format."""
     assert _style(gallery, "#demoPageFoot", "textAlign") == "center"
     assert _style(gallery, "#demoBuildReadout", "color") == "rgb(101, 109, 118)"
-    assert _style(gallery, "#demoBuildReadout", "fontSize") == "12.48px"  # 0.78rem @ 16px root
+    assert _style(gallery, "#demoBuildReadout", "fontSize") == "12px"  # 0.75rem @ 16px root
     text = gallery.locator("#demoBuildReadout").inner_text()
     assert re.match(r"^Build: abc1234 · \d{4}-\d{2}-\d{2} \d{2}:\d{2}$", text), text
 
@@ -414,13 +414,13 @@ def test_home_head_contract(gallery: Page) -> None:
 
 
 def test_select_native_contract(gallery: Page) -> None:
-    """select-native: control-height (36px via explicit height, not min-height), hairline border, input-bg fill."""
+    """select-native: control-height (36px via explicit height, not min-height), control-border border, input-bg fill."""
     # THE iOS decision: height is an explicit `height` (respected), never
     # `min-height` (ignored on a bare <select>, rendering it stubby).
     assert _style(gallery, "#demoSelectNative", "height") == "36px"
     assert _style(gallery, "#demoSelectNative", "borderRadius") == "12px"
     assert _style(gallery, "#demoSelectNative", "borderTopWidth") == "1px"
-    assert _style(gallery, "#demoSelectNative", "borderTopColor") == "rgb(209, 217, 224)"
+    assert _style(gallery, "#demoSelectNative", "borderTopColor") == "rgb(129, 139, 152)"  # control-border
     # input-bg is card-off in light (var(--card-off) = #f6f8fa).
     assert _style(gallery, "#demoSelectNative", "backgroundColor") == "rgb(246, 248, 250)"
     assert _style(gallery, "#demoSelectNative", "color") == "rgb(31, 35, 40)"
@@ -442,8 +442,9 @@ def test_dark_theme_values(gallery: Page) -> None:
     _wait_bg(gallery, "#demoSwitchOn", "rgb(63, 185, 80)")
     # off-track is the dark control-border (fleet-config#963), not the hairline.
     _wait_bg(gallery, "#demoSwitchOff", "rgb(110, 118, 129)")
-    # icon-tile fill steps to the brighter dark tile-blue.
-    assert _style(gallery, "#demoTileBlue", "backgroundColor") == "rgb(47, 129, 247)"
+    # icon-tile fill steps to the dark tile-blue (the emphasis step, so the
+    # white glyph holds contrast).
+    assert _style(gallery, "#demoTileBlue", "backgroundColor") == "rgb(31, 111, 235)"
     # structure is theme-independent: closed height and radii hold.
     assert _style(gallery, "#demoDisclosureClosed .collapse-summary", "height") == "52px"
     assert _style(gallery, "#demoCard", "borderRadius") == "16px"
@@ -478,6 +479,7 @@ def test_dark_theme_values(gallery: Page) -> None:
     # the 36px control height is theme-independent.
     assert _style(gallery, "#demoSelectNative", "height") == "36px"
     assert _style(gallery, "#demoSelectNative", "backgroundColor") == "rgb(13, 17, 23)"
+    assert _style(gallery, "#demoSelectNative", "borderTopColor") == "rgb(110, 118, 129)"
     # action-row re-skins from the dark tokens; its rows-scale heights hold.
     assert _style(gallery, "#demoActionTwoLine", "minHeight") == "60px"
     _assert_action_row_colors(

@@ -29,9 +29,9 @@ from tests.e2e.conftest import STATIC_DIR
 NAV_DIR = STATIC_DIR / "_vendored" / "nav"
 
 # Desktop token values the assertions below key on (from demo.html's :root,
-# which transcribes ~/.claude/design.md). --font-label 0.92rem @ 16px root
-# = 14.72px; the icon is sized 1.05em of that.
-_DESKTOP_ICON_PX = 14.72 * 1.05
+# which transcribes ~/.claude/design.md). --font-label 0.875rem @ 16px root
+# = 14px; the icon is sized 1.05em of that.
+_DESKTOP_ICON_PX = 14 * 1.05
 # Active-tab text and icon sit on the accent-soft tint, so they take
 # accent-text, not the base accent (fleet-config#963).
 _ACCENT_TEXT = "rgb(5, 80, 174)"

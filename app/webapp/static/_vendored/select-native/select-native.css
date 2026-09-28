@@ -30,7 +30,7 @@
   font-size: var(--font-label);
   padding: 0 10px;
   border-radius: var(--radius-md);
-  border: 1px solid var(--line);
+  border: 1px solid var(--control-border);
   background: var(--input-bg);
   color: var(--ink);
   font-family: inherit;

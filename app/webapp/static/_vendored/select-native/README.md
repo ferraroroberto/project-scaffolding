@@ -1,6 +1,6 @@
 # `select-native` — the native select at control height
 
-The fleet's canonical **native `<select>`**: sized to the `control` token (36px) so a row of inline controls (select / input / toggle) lines up on one line — canvas-subtle fill, hairline border, `rounded.md` corners, label-size text. Contract: `~/.claude/design.md` → "Base UI" → **Select** (sized to `control`, 36px), and the `control` component token. Normalized from home-automation's shipped `styles.css` `.select-native`.
+The fleet's canonical **native `<select>`**: sized to the `control` token (36px) so a row of inline controls (select / input / toggle) lines up on one line — canvas-subtle fill, `control-border` border, `rounded.md` corners, label-size text. Contract: `~/.claude/design.md` → "Base UI" → **Select** (sized to `control`, 36px), and the `control` component token. Normalized from home-automation's shipped `styles.css` `.select-native`.
 
 ## Files
 
@@ -37,9 +37,9 @@ The fleet's canonical **native `<select>`**: sized to the `control` token (36px)
 | Token | Light value | Used for |
 | --- | --- | --- |
 | `--control-h` | `36px` | select height (the `control` lockstep) |
-| `--font-label` | `0.92rem` | option/label text |
+| `--font-label` | `0.875rem` | option/label text |
 | `--radius-md` | `12px` | corners |
-| `--line` | `#d1d9e0` | border |
+| `--control-border` | `#818b98` (dark `#6e7681`) | border (WCAG 1.4.11 control boundary) |
 | `--input-bg` | `var(--card-off)` | fill |
 | `--ink` | `#1f2328` | text |
 
