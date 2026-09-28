@@ -6,14 +6,16 @@ The fleet's canonical **editor modal**: a native `<dialog>` with a `heading-lg` 
 
 | File | Role |
 | --- | --- |
-| `modal.css` | Visual + structural contract: the dialog shell, iOS anchoring + scroll-lock rules, header/close, rows, the shared 36px inline control, sticky action bar + AA disabled recipe. References design tokens only. |
+| `modal.css` | Visual + structural contract: the dialog shell, iOS anchoring + scroll-lock rules, header/close, rows, sticky action bar, full-width footer primary. References design tokens only. |
 | `modal.html` | Markup skeleton to copy and adapt. |
 
 ## How to vendor
 
 1. Copy this `modal/` folder **verbatim** into your app's static dir. Do **not** edit `modal.css` per-app — every iOS rule in it is on-device-validated (home-automation #214/#300/#303).
-2. Link the CSS, paste the skeleton, and drive it with the native dialog API:
+2. Link the CSS **together with its two companions**, paste the skeleton, and drive it with the native dialog API. `modal.css` does not re-declare the inline control or the primary button — `select-native/select-native.css` owns `.input-native`/`.select-native` (the 36px control) and `button/button.css` owns `.button-primary` and its AA disabled recipe:
    ```html
+   <link rel="stylesheet" href="/static/_vendored/select-native/select-native.css">
+   <link rel="stylesheet" href="/static/_vendored/button/button.css">
    <link rel="stylesheet" href="/static/_vendored/modal/modal.css">
    ```
    ```js
@@ -34,7 +36,7 @@ The fleet's canonical **editor modal**: a native `<dialog>` with a `heading-lg` 
     <div class="row"><span>Label</span> <input class="input-native"></div>
     <div class="row"><span>Label</span> <select class="select-native">…</select></div>
     <div class="detail-actions">
-      <button class="detail-save-btn">Save</button>
+      <button class="button-primary detail-save-btn">Save</button>
     </div>
   </div>
 </dialog>
@@ -42,7 +44,7 @@ The fleet's canonical **editor modal**: a native `<dialog>` with a `heading-lg` 
 
 - Use the **native** dialog API (`showModal()`/`close()`) — never a hand-rolled overlay (the shadcn Dialog rule in `design.md`).
 - Exactly **one** primary action; it starts `disabled` until something changes.
-- The disabled recipe (card-off/muted/line) is part of the contract — opacity-based disabling drops sub-AA in both themes.
+- The disabled recipe (card-off/muted/line) is part of the contract, inherited from `button-primary` — opacity-based disabling drops sub-AA in both themes. `.detail-save-btn` only adds the footer's full width.
 - On mobile the dialog is top-anchored (safe-area aware); on desktop it keeps UA centering. Don't override.
 
 ## Required design tokens
