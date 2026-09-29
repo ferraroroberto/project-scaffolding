@@ -174,8 +174,11 @@ def test_path_is_within_rejects_empty_and_none() -> None:
 
 
 def test_dry_run_classifies_without_killing() -> None:
+    """A dry run must never claim `killed` — nothing was touched (#299)."""
     result = sweep.sweep_browser_helpers(SCOPE, dry_run=True, processes=[_helper()])
-    assert [entry.verdict for entry in result.entries] == [sweep.VERDICT_KILLED]
+    assert [entry.verdict for entry in result.entries] == [sweep.VERDICT_WOULD_KILL]
+    assert result.killed == ()
+    assert len(result.would_kill) == 1
     assert result.supported is True
 
 
@@ -186,7 +189,7 @@ def test_summary_reports_a_verdict_breakdown() -> None:
         processes=[_helper(), _helper(pid=1, state=sweep.STATE_EXITED)],
     )
     summary = result.summary()
-    assert "killed=1" in summary
+    assert "would-kill=1" in summary
     assert "zombie=1" in summary
     assert len(result.zombies) == 1
 

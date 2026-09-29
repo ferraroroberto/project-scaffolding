@@ -263,6 +263,7 @@ def test_mobile_pill_active_tab_is_accent_tint_not_inset_surface(
     _set_theme(nav_mobile, "dark")
     _wait_style(nav_mobile, "#tabHome", "color", _ACCENT_TEXT_DARK)
     dark_bg = _style(nav_mobile, "#tabHome", "backgroundColor")
-    # The pre-fix `--card-off` fill resolved to this exact opaque literal.
-    assert dark_bg != "rgb(1, 9, 9)"
+    # The pre-fix `--card-off` fill resolved to this exact opaque literal
+    # (#010409 -- demo.html's dark `--card-off`, #299).
+    assert dark_bg != "rgb(1, 4, 9)"
     assert 0 < _alpha(dark_bg) < 1
