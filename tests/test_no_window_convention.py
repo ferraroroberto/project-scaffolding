@@ -104,27 +104,36 @@ def _is_flag_literal(node: ast.AST) -> bool:
     )
 
 
-def _exempt(node: ast.AST, lines: list[str]) -> bool:
-    """True if the node carries the exempt marker.
-
-    Searched across the lines the node itself spans *plus* the contiguous
-    comment block immediately above it -- the natural place to write a
-    multi-line reason, and where `# type: ignore`-style trailing comments
-    would not fit.
+def _window(node: ast.AST, lines: list[str]) -> tuple[int, int]:
+    """The exemption-detection window for *node*: its own span plus the
+    contiguous comment block immediately above it -- the natural place to
+    write a multi-line reason, and where `# type: ignore`-style trailing
+    comments would not fit. 1-indexed, inclusive on both ends.
     """
     start = getattr(node, "lineno", 0)
     end = getattr(node, "end_lineno", start) or start
     above = start - 1
     while above > 0 and lines[above - 1].lstrip().startswith("#"):
         above -= 1
-    return any(EXEMPT_MARKER in line for line in lines[above:end])
+    return above + 1, end
 
 
-def _scan() -> tuple[list[str], list[str], list[str]]:
-    """Return (unflagged spawns, stray flag literals, exemption reasons)."""
+def _exempt(node: ast.AST, lines: list[str]) -> bool:
+    """True if the node carries the exempt marker within its own window."""
+    window_start, window_end = _window(node, lines)
+    return any(EXEMPT_MARKER in line for line in lines[window_start - 1 : window_end])
+
+
+def _scan() -> tuple[list[str], list[str], list[tuple[str, int, int]]]:
+    """Return (unflagged spawns, stray flag literals, exemptions).
+
+    Each exemption is `(where, window_start, window_end)` -- the same
+    1-indexed inclusive window `_exempt` searched, so a caller checking the
+    reason never widens the search to markers elsewhere in the file.
+    """
     unflagged: list[str] = []
     rederived: list[str] = []
-    exemptions: list[str] = []
+    exemptions: list[tuple[str, int, int]] = []
     vendor_verbatim = _vendor_verbatim_files()
 
     for path in _python_files():
@@ -139,7 +148,7 @@ def _scan() -> tuple[list[str], list[str], list[str]]:
                     continue
                 where = f"{rel}:{node.lineno}"
                 if _exempt(node, lines):
-                    exemptions.append(where)
+                    exemptions.append((where, *_window(node, lines)))
                 else:
                     unflagged.append(where)
 
@@ -148,7 +157,7 @@ def _scan() -> tuple[list[str], list[str], list[str]]:
                     continue
                 where = f"{rel}:{getattr(node, 'lineno', 0)}"
                 if _exempt(node, lines):
-                    exemptions.append(where)
+                    exemptions.append((where, *_window(node, lines)))
                 else:
                     rederived.append(where)
 
@@ -191,6 +200,26 @@ def test_the_no_window_flag_is_defined_in_exactly_one_place() -> None:
     )
 
 
+def _bare_exemptions(
+    exemptions: list[tuple[str, int, int]], *, root: Path = REPO_ROOT
+) -> list[str]:
+    """Exemptions whose own detection window carries no reasoned marker.
+
+    Scoped to each exemption's own `(window_start, window_end)` -- never the
+    whole file -- so a bare marker is never excused by an unrelated reasoned
+    marker elsewhere in the same file (#299).
+    """
+    bare: list[str] = []
+    for where, window_start, window_end in exemptions:
+        rel, _, _ = where.rpartition(":")
+        lines = (root / rel).read_text(encoding="utf-8").splitlines()
+        window = lines[window_start - 1 : window_end]
+        marked = [ln for ln in window if EXEMPT_MARKER in ln]
+        if not any(ln.split(EXEMPT_MARKER, 1)[1].strip(" :#").strip() for ln in marked):
+            bare.append(where)
+    return bare
+
+
 def test_every_exemption_states_a_reason() -> None:
     """Guard the guard: the escape hatch must never be a bare marker.
 
@@ -206,14 +235,32 @@ def test_every_exemption_states_a_reason() -> None:
         "if they were all removed, delete this test rather than weakening it"
     )
 
-    bare: list[str] = []
-    for where in exemptions:
-        rel, _, lineno = where.rpartition(":")
-        lines = (REPO_ROOT / rel).read_text(encoding="utf-8").splitlines()
-        marked = [ln for ln in lines if EXEMPT_MARKER in ln]
-        if not any(ln.split(EXEMPT_MARKER, 1)[1].strip(" :#").strip() for ln in marked):
-            bare.append(where)
-
+    bare = _bare_exemptions(exemptions)
     assert not bare, (
         f"`# {EXEMPT_MARKER}` with no reason after it:\n  " + "\n  ".join(bare)
     )
+
+
+def test_bare_marker_is_not_excused_by_a_reasoned_marker_elsewhere_in_the_file(
+    tmp_path: Path,
+) -> None:
+    """A bare marker must be caught even when another marker earlier in the
+    same file carries a reason -- the old check scanned the whole file and
+    let this pass silently (#299)."""
+    source = "\n".join(
+        [
+            "# no-window-exempt: reasoned, explains why this branch is exempt",
+            "subprocess.Popen(['reasoned'])",
+            "",
+            "subprocess.Popen(['bare'])  # no-window-exempt",
+            "",
+        ]
+    )
+    (tmp_path / "sample.py").write_text(source, encoding="utf-8")
+    # Windows as `_scan()` would compute them: the reasoned call's own
+    # comment-plus-call span, and the bare call's single line.
+    exemptions = [("sample.py:2", 1, 2), ("sample.py:4", 4, 4)]
+
+    bare = _bare_exemptions(exemptions, root=tmp_path)
+
+    assert bare == ["sample.py:4"]

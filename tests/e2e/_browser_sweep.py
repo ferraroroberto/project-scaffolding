@@ -106,6 +106,8 @@ STATE_UNKNOWN = "unknown"
 
 VERDICT_KILLED = "killed"
 VERDICT_KILL_FAILED = "kill-failed"
+VERDICT_WOULD_KILL = "would-kill"
+"""Dry-run twin of `VERDICT_KILLED` — nominated for the kill, never attempted."""
 VERDICT_ZOMBIE = "zombie"
 VERDICT_WEDGED_PINNING = "wedged:pins-scope"
 """Wedged **and** rooted in this run's scope — the leak that blocks worktree removal."""
@@ -177,6 +179,11 @@ class SweepResult:
     @property
     def killed(self) -> tuple[SweepEntry, ...]:
         return self.with_verdict(VERDICT_KILLED)
+
+    @property
+    def would_kill(self) -> tuple[SweepEntry, ...]:
+        """Dry-run nominees: what a real run would have killed, untouched."""
+        return self.with_verdict(VERDICT_WOULD_KILL)
 
     @property
     def zombies(self) -> tuple[SweepEntry, ...]:
@@ -583,7 +590,9 @@ def sweep_browser_helpers(
     *scope* must be a directory only this run owns — the repo/worktree root
     the suite ran from. Pass *processes* to classify an already-captured
     table (tests, or a caller enumerating once for several scopes);
-    *dry_run* classifies without killing anything.
+    *dry_run* classifies without killing anything — a kill-nominated helper
+    is reported as `VERDICT_WOULD_KILL`, never `VERDICT_KILLED`, because
+    nothing was actually touched.
 
     Only a `STATE_RUNNING` helper is ever killed. A wedged one is *reported*
     against the scope it pins and never touched — no signal can reap it
@@ -596,8 +605,11 @@ def sweep_browser_helpers(
     entries: list[SweepEntry] = []
     for process in table:
         verdict = classify(process, scope)
-        if verdict == VERDICT_KILLED and not dry_run and not kill_process_tree(process.pid):
-            verdict = VERDICT_KILL_FAILED
+        if verdict == VERDICT_KILLED:
+            if dry_run:
+                verdict = VERDICT_WOULD_KILL
+            elif not kill_process_tree(process.pid):
+                verdict = VERDICT_KILL_FAILED
         entries.append(SweepEntry(process=process, verdict=verdict))
     return SweepResult(supported=True, scope=str(scope), entries=tuple(entries))
 
