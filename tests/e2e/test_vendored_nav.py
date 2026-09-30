@@ -179,6 +179,50 @@ def test_desktop_control_and_wide_rail(nav: Page) -> None:
     assert app_x >= _RAIL, app_x
 
 
+# An app's generic icon utility, as home-automation and local-llm-hub ship it
+# on every glyph, the nav's included. It loads after nav-tabs.css.
+_APP_ICON_UTILITY = ".icon { display: inline-block; width: 1em; height: 1em; }"
+
+
+def _adopt_icon_utility(page: Page) -> None:
+    page.add_style_tag(content=_APP_ICON_UTILITY)
+    page.evaluate(
+        "() => document.querySelectorAll('.tabs .tab-icon')"
+        ".forEach((i) => i.classList.add('icon'))"
+    )
+
+
+def _icon_width(page: Page) -> float:
+    box = page.locator("#tabHome .tab-icon").bounding_box()
+    assert box is not None
+    return float(box["width"])
+
+
+def test_app_icon_utility_does_not_resize_nav_glyphs(nav: Page) -> None:
+    """An app's later `.icon { width: 1em }` can't shrink the nav's glyphs (#303).
+
+    The icon-size rules used to be a bare `.tab-icon`, the same specificity as
+    an app's icon utility, so whichever stylesheet loaded last won: the rail's
+    icons rendered at 1em of the 12px caption (12px, not 24px) in
+    home-automation, and local-llm-hub was right only because its styles.css
+    loads first. The rail also keeps its 24px when an app leaves
+    `--icon-feature` undefined.
+    """
+    _adopt_icon_utility(nav)
+    assert _icon_width(nav) == pytest.approx(_DESKTOP_ICON_PX, abs=0.5)
+    nav.evaluate(
+        "() => document.documentElement.style.setProperty('--icon-feature', 'initial')"
+    )
+    nav.set_viewport_size({"width": 1440, "height": 900})
+    assert _icon_width(nav) == 24  # icons.size.feature
+
+
+def test_app_icon_utility_does_not_resize_pill_glyphs(nav_mobile: Page) -> None:
+    """The pill's 20px glyph survives an app's later icon utility too (#303)."""
+    _adopt_icon_utility(nav_mobile)
+    assert _icon_width(nav_mobile) == 20  # icons.size.nav-tab
+
+
 _LONG_LABELS = ("Capture", "History", "Settings", "Energy", "Family")
 
 
