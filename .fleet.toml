@@ -11,6 +11,15 @@ layer       = "governance"
 icon        = "📐"
 description = "Canonical master — the scaffold &amp; CLAUDE.md every project derives from."
 
+# Wide views (fleet-config#1113, design.md Layout): page width follows the shape of a
+# view's content, per view. A one-dimensional view (settings, a form, one list, a
+# detail) keeps the 772px measure; a two-dimensional one (board lanes, a many-field
+# table, a tree with attribute columns, calendar days) may span the window. A web
+# app declares those views here, by tab id; an undeclared view keeps the measure.
+# fleet-config's design_lint + /design-review read the key. Uncomment and edit:
+# [design]
+# wide_views = ["board", "table"]
+
 # Diff-proportionate e2e routing (project-scaffolding#180). scripts/verify-
 # before-ship.ps1's browser phase classifies the branch's changed files
 # against the rules below (first match wins, in this order) instead of
