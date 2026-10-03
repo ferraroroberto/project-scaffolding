@@ -426,6 +426,44 @@ def test_select_native_contract(gallery: Page) -> None:
     assert _style(gallery, "#demoSelectNative", "color") == "rgb(31, 35, 40)"
 
 
+def test_toast_contract(gallery: Page) -> None:
+    """toast: nav-bar glass, centred above the nav, one line; only an error tints, never green."""
+    gallery.click("#demoToastShow")
+    toast = gallery.locator("#toast")
+    expect(toast).to_be_visible()
+    expect(toast).to_have_attribute("role", "status")
+    expect(toast).to_have_attribute("aria-live", "polite")
+    assert _style(gallery, "#toast", "position") == "fixed"
+    # The nav-bar glass (--tabbar-bg), not a solid block and not a status colour.
+    assert _style(gallery, "#toast", "backgroundColor") == "rgba(255, 255, 255, 0.85)"
+    assert "blur(20px)" in _style(gallery, "#toast", "backdropFilter")
+    assert _style(gallery, "#toast", "color") == "rgb(31, 35, 40)"
+    assert _style(gallery, "#toast", "fontWeight") == "700"
+    assert _style(gallery, "#toast", "textAlign") == "center"
+    assert _style(gallery, "#toast", "borderRadius") == "12px"
+    # 8px above the nav: nav height 61 + 2 x margin 21 + 8, with no safe-area inset here.
+    assert _style(gallery, "#toast", "bottom") == "111px"
+    geo = gallery.evaluate(
+        "() => { const r = document.getElementById('toast').getBoundingClientRect();"
+        " return { mid: (r.left + r.right) / 2, vw: innerWidth, w: r.width, h: r.height }; }"
+    )
+    assert abs(geo["mid"] - geo["vw"] / 2) <= 1, geo  # centred
+    assert geo["w"] <= 560 and geo["h"] < 60, geo  # max-content: one line, bounded
+    # Only a real error tints, and it interrupts.
+    gallery.click("#demoToastError")
+    expect(toast).to_have_attribute("aria-live", "assertive")
+    assert _style(gallery, "#toast", "borderTopColor") == "rgb(207, 34, 46)"
+    assert _style(gallery, "#toast", "color") == "rgb(255, 255, 255)"
+    assert _style(gallery, "#toast", "backgroundColor") != "rgba(255, 255, 255, 0.85)"
+    # The next neutral toast drops the tint again.
+    gallery.click("#demoToastShow")
+    assert _style(gallery, "#toast", "backgroundColor") == "rgba(255, 255, 255, 0.85)"
+    # Dark: the same glass over the dark nav-bar fill.
+    _set_theme(gallery, "dark")
+    assert _style(gallery, "#toast", "backgroundColor") == "rgba(22, 27, 34, 0.86)"
+    assert _style(gallery, "#toast", "color") == "rgb(230, 237, 243)"
+
+
 # ---------------------------------------------------------------------- dark
 
 
