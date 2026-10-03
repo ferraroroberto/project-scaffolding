@@ -170,6 +170,7 @@ prefixes = [
     "app/webapp/static/_vendored/modal/",
     "app/webapp/static/_vendored/page-foot/",
     "app/webapp/static/_vendored/range-tab/",
+    "app/webapp/static/_vendored/row-menu/",
     "app/webapp/static/_vendored/select-native/",
     "app/webapp/static/_vendored/switch/",
     "app/webapp/static/_vendored/text-size/",
@@ -238,6 +239,7 @@ page-foot       = { src = "app/webapp/static/_vendored/page-foot" }
 action-row      = { src = "app/webapp/static/_vendored/action-row" }
 text-size       = { src = "app/webapp/static/_vendored/text-size" }
 toast           = { src = "app/webapp/static/_vendored/toast" }
+row-menu        = { src = "app/webapp/static/_vendored/row-menu" }
 
 # Windows tray primitives -- docs/windows-tray.md (gotchas #4, #5).
 single_instance = { src = "app/tray/single_instance.py" }
