@@ -482,6 +482,150 @@ def test_toast_contract(gallery: Page) -> None:
     assert _style(gallery, "#toast", "color") == "rgb(230, 237, 243)"
 
 
+_ROW_MENU_KEBAB = "#demoRowMenuKebab"
+_ROW_MENU = ".row-menu"
+_ROW_MENU_CHOSEN = "#demoRowMenuChosen"
+
+
+def _row_menu_labels(page: Page) -> list[str]:
+    """The captions of the open menu's rows, in order."""
+    return page.eval_on_selector_all(
+        f"{_ROW_MENU} .row-menu-label", "els => els.map(e => e.textContent)"
+    )
+
+
+def _focused_label(page: Page) -> str:
+    """The caption of the menu row holding focus ('' when focus is elsewhere)."""
+    return page.evaluate(
+        "() => { const el = document.activeElement;"
+        " return el && el.classList.contains('row-menu-item') ? el.textContent : ''; }"
+    )
+
+
+def test_row_menu_contract(gallery: Page) -> None:
+    """row-menu: opens on the kebab, isn't clipped by a sideways scroller, closes
+    on outside tap / Escape / choosing, follows the menu-button keyboard pattern,
+    and re-skins in dark; the items are the caller's data."""
+    kebab = gallery.locator(_ROW_MENU_KEBAB)
+    menu = gallery.locator(_ROW_MENU)
+    expect(menu).to_have_count(0)
+    # The anchor is wired for the menu-button pattern.
+    expect(kebab).to_have_attribute("aria-haspopup", "menu")
+    expect(kebab).to_have_attribute("aria-expanded", "false")
+
+    # Open on the kebab: the hidden item is absent, the destructive one is last
+    # behind a divider, and focus lands on the first row (the only tab stop).
+    kebab.click()
+    expect(menu).to_be_visible()
+    expect(kebab).to_have_attribute("aria-expanded", "true")
+    expect(kebab).to_have_attribute("aria-controls", menu.get_attribute("id") or "")
+    expect(menu).to_have_attribute("role", "menu")
+    assert _row_menu_labels(gallery) == ["Rename", "Archive", "Delete"]
+    kinds = gallery.eval_on_selector_all(
+        f"{_ROW_MENU} > *", "els => els.map(e => e.getAttribute('role'))"
+    )
+    assert kinds == ["menuitem", "menuitem", "separator", "menuitem"], kinds
+    assert _focused_label(gallery) == "Rename"
+    tab_stops = gallery.eval_on_selector_all(
+        f"{_ROW_MENU} .row-menu-item", "els => els.filter(e => e.tabIndex === 0).length"
+    )
+    assert tab_stops == 1
+    # A disabled row stays focusable and says why; it is flat muted text.
+    expect(gallery.locator(".row-menu-item", has_text="Archive")).to_have_attribute(
+        "aria-disabled", "true"
+    )
+    expect(gallery.locator(".row-menu-item", has_text="Archive")).to_have_attribute(
+        "title", "Nothing to archive"
+    )
+
+    # Light surface and states.
+    assert _style(gallery, _ROW_MENU, "position") == "fixed"
+    assert _style(gallery, _ROW_MENU, "backgroundColor") == "rgb(255, 255, 255)"
+    assert _style(gallery, _ROW_MENU, "borderTopColor") == "rgb(209, 217, 224)"  # --line
+    assert _style(gallery, _ROW_MENU, "borderTopLeftRadius") == "12px"
+    assert _style(gallery, _ROW_MENU, "boxShadow") != "none"
+    row = ".row-menu-item"
+    assert _style(gallery, row, "color") == "rgb(31, 35, 40)"
+    assert _style(gallery, ".row-menu-danger", "color") == "rgb(164, 14, 38)"  # --danger-text
+    assert _style(gallery, '.row-menu-item[aria-disabled="true"]', "color") == "rgb(101, 109, 118)"
+    assert gallery.eval_on_selector(row, "el => el.getBoundingClientRect().height") >= 44
+
+    # Not clipped: the scroller is 96px tall with overflow-x (so overflow-y clips
+    # an absolute child), yet the menu is fully on screen and extends past it,
+    # and its last row is what a hit test finds at its centre.
+    geo = gallery.evaluate(
+        "() => { const s = document.getElementById('demoRowMenuScroller').getBoundingClientRect();"
+        " const m = document.querySelector('.row-menu').getBoundingClientRect();"
+        " const last = document.querySelector('.row-menu-danger').getBoundingClientRect();"
+        " const hit = document.elementFromPoint((last.left + last.right) / 2,"
+        " (last.top + last.bottom) / 2);"
+        " return { menuBottom: m.bottom, scrollerBottom: s.bottom, top: m.top, left: m.left,"
+        " right: m.right, vw: innerWidth, vh: innerHeight,"
+        " hitIsRow: !!hit && hit.closest('.row-menu-danger') !== null }; }"
+    )
+    assert geo["menuBottom"] > geo["scrollerBottom"], geo
+    assert geo["top"] >= 0 and geo["left"] >= 0, geo
+    assert geo["right"] <= geo["vw"] and geo["menuBottom"] <= geo["vh"], geo
+    assert geo["hitIsRow"], geo
+
+    # Keyboard: arrows move (a disabled row is reachable) and wrap; Home / End jump.
+    gallery.keyboard.press("ArrowDown")
+    assert _focused_label(gallery) == "Archive"
+    gallery.keyboard.press("ArrowDown")
+    assert _focused_label(gallery) == "Delete"
+    gallery.keyboard.press("ArrowDown")
+    assert _focused_label(gallery) == "Rename"
+    gallery.keyboard.press("End")
+    assert _focused_label(gallery) == "Delete"
+    gallery.keyboard.press("Home")
+    assert _focused_label(gallery) == "Rename"
+
+    # Escape closes, and focus returns to the kebab.
+    gallery.keyboard.press("Escape")
+    expect(menu).to_have_count(0)
+    expect(kebab).to_have_attribute("aria-expanded", "false")
+    expect(kebab).to_be_focused()
+
+    # ArrowUp on the anchor opens on the last row.
+    gallery.keyboard.press("ArrowUp")
+    expect(menu).to_be_visible()
+    assert _focused_label(gallery) == "Delete"
+    gallery.keyboard.press("Escape")
+
+    # A second tap of the kebab closes; a press outside closes.
+    kebab.click()
+    expect(menu).to_be_visible()
+    kebab.click()
+    expect(menu).to_have_count(0)
+    kebab.click()
+    gallery.click("h2 >> nth=0")
+    expect(menu).to_have_count(0)
+    expect(kebab).to_have_attribute("aria-expanded", "false")
+
+    # Choosing a disabled row does nothing and keeps the menu open.
+    kebab.click()
+    # `force`: Playwright treats aria-disabled as not actionable, but a real tap lands.
+    gallery.click(".row-menu-item >> text=Archive", force=True)
+    expect(menu).to_be_visible()
+    assert gallery.text_content(_ROW_MENU_CHOSEN) == "Chosen: none"
+    # Choosing a live row closes the menu, runs its action, focus back on the kebab.
+    gallery.click(".row-menu-item >> text=Rename")
+    expect(menu).to_have_count(0)
+    assert gallery.text_content(_ROW_MENU_CHOSEN) == "Chosen: Rename"
+    expect(kebab).to_be_focused()
+
+    # Dark: the same menu on the dark surface.
+    kebab.click()
+    _set_theme(gallery, "dark")
+    assert _style(gallery, _ROW_MENU, "backgroundColor") == "rgb(22, 27, 34)"
+    assert _style(gallery, _ROW_MENU, "borderTopColor") == "rgb(48, 54, 61)"
+    assert _style(gallery, row, "color") == "rgb(230, 237, 243)"
+    assert _style(gallery, ".row-menu-danger", "color") == "rgb(255, 123, 114)"
+    assert _style(gallery, '.row-menu-item[aria-disabled="true"]', "color") == "rgb(125, 133, 144)"
+    gallery.keyboard.press("Escape")
+    expect(menu).to_have_count(0)
+
+
 # ---------------------------------------------------------------------- dark
 
 

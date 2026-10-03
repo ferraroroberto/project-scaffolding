@@ -157,6 +157,7 @@
 <link rel="stylesheet" href="action-row/action-row.css">
 <link rel="stylesheet" href="text-size/text-size.css">
 <link rel="stylesheet" href="toast/toast.css">
+<link rel="stylesheet" href="row-menu/row-menu.css">
 </head>
 <body>
 <div class="gallery">
@@ -388,6 +389,20 @@
     <button type="button" class="button-tint danger" id="demoToastError">Show error</button>
   </div>
 
+  <h2>row-menu (kebab menu, inside a sideways-scrolling column)</h2>
+  <div class="card" style="display: flex; flex-direction: column; gap: var(--space-sm);">
+    <!-- A fixed-height sideways scroller: its overflow-x forces overflow-y to
+         clip, so an absolutely-placed menu would lose everything below 96px. -->
+    <div id="demoRowMenuScroller" style="overflow-x: auto; height: 96px; border: 1px solid var(--line);">
+      <div style="display: flex; align-items: flex-start; width: 640px;">
+        <button type="button" class="action-row-kebab" id="demoRowMenuKebab" aria-label="Row actions">
+          <svg class="icon" aria-hidden="true"><use href="#i-ellipsis-vertical"></use></svg>
+        </button>
+      </div>
+    </div>
+    <p id="demoRowMenuChosen" style="margin: 0; color: var(--muted); font-size: var(--font-body-sm);">Chosen: none</p>
+  </div>
+
   <h2>page-foot</h2>
   <footer class="page-foot" id="demoPageFoot">
     <p id="demoBuildReadout"></p>
@@ -400,6 +415,7 @@
   import { buildReadoutText } from './page-foot/page-foot.js';
   import { bindTextSize } from './text-size/text-size.js';
   import { showToast } from './toast/toast.js';
+  import { createRowMenu } from './row-menu/row-menu.js';
 
   // Inject the real vendored sprite so <use href="#i-NAME"> resolves.
   const sprite = await fetch('./icons/icons-sprite.html').then((r) => r.text());
@@ -445,7 +461,7 @@
       btn.setAttribute('aria-pressed', String(btn.getAttribute('aria-pressed') !== 'true'));
     });
   });
-  document.querySelectorAll('.action-row-kebab').forEach((btn) => {
+  document.querySelectorAll('#demoActionList .action-row-kebab').forEach((btn) => {
     btn.addEventListener('click', () => {
       btn.setAttribute('aria-expanded', String(btn.getAttribute('aria-expanded') !== 'true'));
     });
@@ -471,6 +487,20 @@
   document.getElementById('demoToastError').addEventListener('click', () => {
     showToast('Could not reach the server', 'error', { ms: 0 });
   });
+
+  // row-menu: the items are data. One hidden, one disabled (with its hint) and
+  // one destructive show the whole contract; choosing writes the label out.
+  const demoRowMenu = createRowMenu();
+  const demoChosen = (label) => () => {
+    document.getElementById('demoRowMenuChosen').textContent = 'Chosen: ' + label;
+  };
+  demoRowMenu.attach('demo-row', document.getElementById('demoRowMenuKebab'), [
+    { label: 'Rename', glyph: 'pencil', onTap: demoChosen('Rename') },
+    { label: 'Pin', glyph: 'pin', hidden: true, onTap: demoChosen('Pin') },
+    { label: 'Archive', glyph: 'folder', disabled: true, hint: 'Nothing to archive', onTap: demoChosen('Archive') },
+    { label: 'Delete', glyph: 'trash-2', danger: true, onTap: demoChosen('Delete') },
+  ]);
+  demoRowMenu.endRender();
 
   // Modal wiring.
   const dlg = document.getElementById('demoDialog');
