@@ -118,8 +118,14 @@ def nav_mobile(static_server: str, browser: Browser) -> Iterator[Page]:
 
 
 def test_skeleton_ships_no_emoji_span() -> None:
-    """The markup skeleton demonstrates icon + label only (#142)."""
-    assert "tab-emoji" not in (NAV_DIR / "nav-tabs.html").read_text(encoding="utf-8")
+    """The markup skeleton demonstrates icon + label only (#142), and no Settings tab."""
+    skeleton = (NAV_DIR / "nav-tabs.html").read_text(encoding="utf-8")
+    assert "tab-emoji" not in skeleton
+    # Settings is the page-header gear, never a tab (fleet-config#1200): a new
+    # app copies this skeleton, so a Settings tab here becomes one in every app.
+    assert 'data-tab="settings"' not in skeleton
+    assert 'id="tabSettings"' not in skeleton
+    assert '<span class="tab-label">Settings</span>' not in skeleton
 
 
 def test_desktop_control_and_wide_rail(nav: Page) -> None:
@@ -223,7 +229,7 @@ def test_app_icon_utility_does_not_resize_pill_glyphs(nav_mobile: Page) -> None:
     assert _icon_width(nav_mobile) == 20  # icons.size.nav-tab
 
 
-_LONG_LABELS = ("Capture", "History", "Settings", "Energy", "Family")
+_LONG_LABELS = ("Capture", "History", "Insights", "Energy", "Family")
 
 
 def test_narrow_desktop_stacks_icon_over_label(nav: Page) -> None:

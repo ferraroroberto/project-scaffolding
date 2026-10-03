@@ -383,7 +383,7 @@ def test_page_foot_contract(gallery: Page) -> None:
 
 
 def test_home_head_contract(gallery: Page) -> None:
-    """home-head: 52px row at 0-14px inset, title glyph 18px, status ellipsizes, right-pinned 34px toggle."""
+    """home-head: 52px row at 0-14px inset, title glyph 18px, status ellipsizes, right-pinned 34px toggle + Settings gear (44px targets)."""
     # One row at the disclosure closed-summary geometry (rows.md 52px, 0 14px).
     assert _style(gallery, "#demoHomeHead", "minHeight") == "52px"
     assert _style(gallery, "#demoHomeHead", "paddingLeft") == "14px"
@@ -399,18 +399,36 @@ def test_home_head_contract(gallery: Page) -> None:
     assert _style(gallery, "#demoHomeToggle", "height") == "34px"
     assert _style(gallery, "#demoHomeToggle", "backgroundColor") == "rgb(246, 248, 250)"
     assert _style(gallery, "#demoHomeToggle", "borderTopWidth") == "0px"
-    # The toggle is pinned to the right: its right edge sits within ~1px of the
-    # row's content edge (row right minus the 14px inset), past the status.
+    # The Settings gear (fleet-config#1200: never a tab) is the second trailing
+    # action: the same 34px square and fill as the toggle, whatever its
+    # `.button-surface` tier would draw on its own.
+    gear = "#demoHomeSettings"
+    assert _style(gallery, gear, "width") == "34px"
+    assert _style(gallery, gear, "height") == "34px"
+    assert _style(gallery, gear, "backgroundColor") == "rgb(246, 248, 250)"
+    assert _style(gallery, gear, "borderTopWidth") == "0px"
+    expect(gallery.locator(gear)).to_have_attribute("aria-label", "Settings")
+    # The pair is pinned to the right: the gear's right edge sits within ~1px of
+    # the row's content edge (row right minus the 14px inset), the toggle sits
+    # one --gap (12px) to its left, and both come after the status. Only the
+    # first action takes the auto margin, so the pair stays together.
     pinned = gallery.evaluate(
         "() => {"
-        " const row = document.getElementById('demoHomeHead').getBoundingClientRect();"
-        " const tog = document.getElementById('demoHomeToggle').getBoundingClientRect();"
-        " const status = document.getElementById('demoHomeStatus').getBoundingClientRect();"
-        " return { gap: (row.right - 14) - tog.right, afterStatus: tog.left >= status.right - 1 };"
+        " const r = (id) => document.getElementById(id).getBoundingClientRect();"
+        " const row = r('demoHomeHead'), tog = r('demoHomeToggle'),"
+        "   gear = r('demoHomeSettings'), status = r('demoHomeStatus');"
+        " return { gap: (row.right - 14) - gear.right, pair: gear.left - tog.right,"
+        "   afterStatus: tog.left >= status.right - 1 };"
         "}"
     )
     assert abs(pinned["gap"]) <= 1.5, pinned
+    assert abs(pinned["pair"] - 12) <= 1.5, pinned
     assert pinned["afterStatus"], pinned
+    # Both are 44px targets (a 34px visual plus the 5px ::before), and the
+    # 12px gap keeps the two expansions from overlapping.
+    actions = gallery.locator("#demoHomeHead .home-toggle")
+    assert_min_target(actions)
+    assert_no_overlap(actions)
 
 
 def test_select_native_contract(gallery: Page) -> None:
@@ -513,6 +531,7 @@ def test_dark_theme_values(gallery: Page) -> None:
     # the 52px row geometry is theme-independent.
     assert _style(gallery, "#demoHomeHead", "minHeight") == "52px"
     assert _style(gallery, "#demoHomeToggle", "backgroundColor") == "rgb(48, 54, 61)"
+    assert _style(gallery, "#demoHomeSettings", "backgroundColor") == "rgb(48, 54, 61)"
     # select-native fill re-skins to the dark --input-bg (var(--bg) = #0d1117);
     # the 36px control height is theme-independent.
     assert _style(gallery, "#demoSelectNative", "height") == "36px"
