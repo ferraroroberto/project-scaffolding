@@ -177,11 +177,11 @@ def test_disclosure_contract(gallery: Page) -> None:
 
 
 def test_switch_contract(gallery: Page) -> None:
-    """switch: 44x26 track, green (success) on-track, off-track = border."""
+    """switch: 44x26 track, accent-fill on-track (never green), off-track = border."""
     assert _style(gallery, "#demoSwitchOn", "width") == "44px"
     assert _style(gallery, "#demoSwitchOn", "height") == "26px"
-    # THE green decision (design.md v2): on = colors.success, not accent.
-    assert _style(gallery, "#demoSwitchOn", "backgroundColor") == "rgb(26, 127, 55)"
+    # on = accent-fill (design.md `switch.trackOn`, fleet-config#1200), never green.
+    assert _style(gallery, "#demoSwitchOn", "backgroundColor") == "rgb(9, 105, 218)"
     # off-track = control-border (fleet-config#963), a 3:1+ control boundary.
     assert _style(gallery, "#demoSwitchOff", "backgroundColor") == "rgb(129, 139, 152)"
 
@@ -193,7 +193,7 @@ def test_switch_builder(gallery: Page) -> None:
     expect(built).to_have_attribute("aria-checked", "false")
     built.click()
     expect(built).to_have_attribute("aria-checked", "true")
-    _wait_bg(gallery, "#demoSwitchBuilt", "rgb(26, 127, 55)")
+    _wait_bg(gallery, "#demoSwitchBuilt", "rgb(9, 105, 218)")
 
 
 def test_empty_state_contract(gallery: Page) -> None:
@@ -475,9 +475,9 @@ def test_dark_theme_values(gallery: Page) -> None:
     # base: bare controls follow the body's text color into the dark theme.
     _assert_base_inherits(gallery)
     assert _style(gallery, "#demoBaseButton", "color") == "rgb(230, 237, 243)"
-    # switch on-track stays green, at the brighter dark success value
-    # (waits out the 0.15s track transition).
-    _wait_bg(gallery, "#demoSwitchOn", "rgb(63, 185, 80)")
+    # switch on-track re-skins to the dark accent-fill (waits out the 0.15s
+    # track transition).
+    _wait_bg(gallery, "#demoSwitchOn", "rgb(31, 111, 235)")
     # off-track is the dark control-border (fleet-config#963), not the hairline.
     _wait_bg(gallery, "#demoSwitchOff", "rgb(110, 118, 129)")
     # icon-tile fill steps to the dark tile-blue (the emphasis step, so the

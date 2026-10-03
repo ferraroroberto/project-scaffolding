@@ -20,7 +20,7 @@ A cloned web app inherits both: design **tokens** (wire your CSS custom properti
 | [`disclosure/`](disclosure/) | Collapsible `<details>`/summary card: 52px closed header, chevron pinned right, the shared `.card--collapsible` padding-zeroing modifier. | ✅ |
 | [`modal/`](modal/) | The editor `<dialog>` shell: title + 34px × close, label/value rows, full-width primary with the AA disabled recipe, on-device-validated iOS anchoring/scroll-lock rules. | ✅ |
 | [`empty-state/`](empty-state/) | Canonical zero-items block: feature-size glyph + one-line reason + optional quiet action; `emptyStateEl()` builder. | ✅ |
-| [`switch/`](switch/) | The one boolean control (shadcn Switch shape, **green** on-track per design.md v2); `switchEl()`/`setSwitch()` builders. | ✅ |
+| [`switch/`](switch/) | The one boolean control (shadcn Switch shape, accent on-track, never green); `switchEl()`/`setSwitch()` builders. | ✅ |
 | [`icon-tile/`](icon-tile/) | The Home-screen rounded-square: one `tile-*` fill + centered feature-size glyph. | ✅ |
 | [`button/`](button/) | The four-tier action vocabulary — `button-primary`/`button-tint`/`button-ghost`/`button-surface`, one shared disabled recipe, the `.danger` tint variant. | ✅ |
 | [`range-tab/`](range-tab/) | The ghost segmented control (Day/Week/Month, timer presets): equal-width pills, card-off resting / accent-soft active with a solid accent border, one canonical height (`--control-h`), five options max. | ✅ |
