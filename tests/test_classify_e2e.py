@@ -410,17 +410,25 @@ def test_real_surfaces_route_representative_paths() -> None:
         return r.tier, r.pytest_target
 
     assert route("app/webapp/static/_vendored/nav/nav-tabs.css") == (
-        "surface", "tests/e2e/test_vendored_nav.py")
+        "surface", "tests/e2e/test_vendored_font_inherit.py tests/e2e/test_vendored_nav.py")
     assert route("app/webapp/static/_vendored/card/card.css") == (
-        "surface", "tests/e2e/test_vendored_components.py tests/e2e/test_vendored_nav.py")
+        "surface",
+        "tests/e2e/test_vendored_components.py tests/e2e/test_vendored_font_inherit.py "
+        "tests/e2e/test_vendored_nav.py")
     # base.css sits under the nav too (the nav harness mounts on the gallery).
     assert route("app/webapp/static/_vendored/base/base.css") == (
-        "surface", "tests/e2e/test_vendored_components.py tests/e2e/test_vendored_nav.py")
+        "surface",
+        "tests/e2e/test_vendored_components.py tests/e2e/test_vendored_font_inherit.py "
+        "tests/e2e/test_vendored_nav.py")
     assert route("app/webapp/static/_vendored/action-row/action-row.css") == (
-        "surface", "tests/e2e/test_vendored_components.py tests/e2e/test_vendored_nav.py")
+        "surface",
+        "tests/e2e/test_vendored_components.py tests/e2e/test_vendored_font_inherit.py "
+        "tests/e2e/test_vendored_nav.py")
     # The text-size boot snippet is behaviour, not an inert fragment (#276).
     assert route("app/webapp/static/_vendored/text-size/text-size-boot.html") == (
-        "surface", "tests/e2e/test_vendored_components.py tests/e2e/test_vendored_nav.py")
+        "surface",
+        "tests/e2e/test_vendored_components.py tests/e2e/test_vendored_font_inherit.py "
+        "tests/e2e/test_vendored_nav.py")
     assert route("tests/e2e/_geometry.py") == (
         "surface", "tests/e2e/test_geometry_helper.py tests/e2e/test_vendored_components.py")
 

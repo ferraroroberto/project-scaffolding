@@ -151,8 +151,9 @@ extensions = ["bat"]
 [[e2e.surface]]
 name           = "nav"
 prefixes       = ["app/webapp/static/_vendored/nav/"]
+# The font-inherit harness also mounts the real nav (#319), so a nav edit runs it.
 paths          = ["tests/e2e/test_vendored_nav.py"]
-pytest_targets = ["tests/e2e/test_vendored_nav.py"]
+pytest_targets = ["tests/e2e/test_vendored_font_inherit.py", "tests/e2e/test_vendored_nav.py"]
 
 # The gallery components. test_vendored_nav.py mounts on the same gallery
 # page, so a component stylesheet can reach it -- both harnesses run.
@@ -176,8 +177,8 @@ prefixes = [
     "app/webapp/static/_vendored/text-size/",
     "app/webapp/static/_vendored/toast/",
 ]
-paths          = ["tests/e2e/test_vendored_components.py"]
-pytest_targets = ["tests/e2e/test_vendored_components.py", "tests/e2e/test_vendored_nav.py"]
+paths          = ["tests/e2e/test_vendored_components.py", "tests/e2e/test_vendored_font_inherit.py"]
+pytest_targets = ["tests/e2e/test_vendored_components.py", "tests/e2e/test_vendored_font_inherit.py", "tests/e2e/test_vendored_nav.py"]
 
 # The rendered-geometry helper and its hermetic fixtures. The component
 # harness imports the helper for range-tab's touch targets (#267), so an
