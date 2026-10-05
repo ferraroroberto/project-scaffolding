@@ -47,7 +47,8 @@
     --tile-yellow: #bf8700;
     --input-bg: var(--card-off);
     --toggle-knob: #ffffff;
-    --close-bg: var(--card-off);
+    /* --close-bg is left unset on purpose: the home-head toggles and the
+       modal close fall back to transparent, unpainted icon buttons (#324). */
     --accent-soft: color-mix(in srgb, var(--accent) 16%, transparent);
     --accent-border-soft: color-mix(in srgb, var(--accent) 24%, transparent);
     --accent-border-strong: color-mix(in srgb, var(--accent) 28%, transparent);
@@ -107,7 +108,6 @@
     --tile-yellow: #9e6a03;
     --input-bg: var(--bg);
     --toggle-knob: #ffffff;
-    --close-bg: var(--line);
   }
 
   /* Gallery chrome only — not part of any component. */
@@ -150,6 +150,7 @@
 <link rel="stylesheet" href="switch/switch.css">
 <link rel="stylesheet" href="icon-tile/icon-tile.css">
 <link rel="stylesheet" href="button/button.css">
+<link rel="stylesheet" href="icon-button/icon-button.css">
 <link rel="stylesheet" href="range-tab/range-tab.css">
 <link rel="stylesheet" href="page-foot/page-foot.css">
 <link rel="stylesheet" href="home-head/home-head.css">
@@ -259,6 +260,33 @@
     <button type="button" class="button-surface" id="demoButtonSurface">Options</button>
     <button type="button" class="button-primary" id="demoButtonDisabled" disabled>Save</button>
     <button type="button" class="button-tint danger" id="demoButtonDanger">Delete</button>
+  </div>
+
+  <h2>icon-button (glyph only: no fill, border or shadow at rest)</h2>
+  <div class="card" id="demoIconButtons" style="display: flex; flex-direction: column; gap: var(--space-sm);">
+    <span class="icon-button-group" id="demoIconButtonGroup">
+      <button type="button" class="icon-button" id="demoIconButton" aria-label="Edit" title="Edit">
+        <svg class="icon" aria-hidden="true"><use href="#i-pencil"></use></svg>
+      </button>
+      <button type="button" class="icon-button" id="demoIconButtonPressed" aria-pressed="true" aria-label="Pin" title="Pin">
+        <svg class="icon" aria-hidden="true"><use href="#i-pin"></use></svg>
+      </button>
+      <button type="button" class="icon-button danger" id="demoIconButtonDanger" aria-label="Delete" title="Delete">
+        <svg class="icon" aria-hidden="true"><use href="#i-trash-2"></use></svg>
+      </button>
+      <button type="button" class="icon-button" id="demoIconButtonDisabled" aria-label="Edit" title="Edit" disabled>
+        <svg class="icon" aria-hidden="true"><use href="#i-pencil"></use></svg>
+      </button>
+    </span>
+    <!-- A context picking a bigger box: the glyph stays 16px, the gap shrinks. -->
+    <span class="icon-button-group" id="demoIconButtonGroupWide" style="--icon-btn-box: var(--control-h);">
+      <button type="button" class="icon-button" id="demoIconButtonWide" aria-label="Previous" title="Previous">
+        <svg class="icon" aria-hidden="true"><use href="#i-chevron-left"></use></svg>
+      </button>
+      <button type="button" class="icon-button" aria-label="Next" title="Next">
+        <svg class="icon" aria-hidden="true"><use href="#i-chevron-right"></use></svg>
+      </button>
+    </span>
   </div>
 
   <h2>icon-tile</h2>
