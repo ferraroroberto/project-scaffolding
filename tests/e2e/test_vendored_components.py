@@ -493,8 +493,7 @@ def test_home_head_contract(gallery: Page) -> None:
     assert _style(gallery, "#demoHomeToggle", "backgroundColor") == _TRANSPARENT
     assert _style(gallery, "#demoHomeToggle", "borderTopWidth") == "0px"
     # The Settings gear (fleet-config#1200: never a tab) is the second trailing
-    # action: the same unpainted 34px box as the toggle, whatever its
-    # `.button-surface` tier would draw on its own (card-off fill, line border).
+    # action: the same unpainted 34px box as the toggle, with no button tier.
     gear = "#demoHomeSettings"
     assert _style(gallery, gear, "width") == "34px"
     assert _style(gallery, gear, "height") == "34px"

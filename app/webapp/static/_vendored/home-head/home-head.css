@@ -57,9 +57,8 @@
  * .status is present). Each is an icon button (design.md, fleet-config#1259;
  * the same contract as the modal's .detail-close and icon-button/): a glyph
  * on nothing — no fill, border or shadow at rest: --close-bg defaults to
- * transparent, and an app leaves it unset. The gear also carries
- * `.button-surface`; this rule is the more specific one, so the pair draws
- * identically whatever the stylesheet order.
+ * transparent, and an app leaves it unset. Neither carries a button tier:
+ * `.button-surface` is the labelled utility button, never a glyph.
  *
  * The 34px box is invisible; the ::before extends each target to the 44px
  * floor (34 + 2 x 5). The pair's --gap (12px) is wider than the two 5px
