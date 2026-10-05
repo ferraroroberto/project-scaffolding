@@ -30,10 +30,11 @@ from tests.e2e._color_assertions import contrast as _contrast
 from tests.e2e._color_assertions import rgba as _rgba
 from tests.e2e._color_assertions import set_theme as _set_theme
 from tests.e2e._color_assertions import style as _style
-from tests.e2e._geometry import assert_min_target, assert_no_overlap
+from tests.e2e._geometry import assert_min_target, assert_no_overlap, effective_rect
 from tests.e2e.conftest import STATIC_DIR
 
 _RANGE_ROWS = ("#demoRange2", "#demoRangeTabs", "#demoRange5")
+_TRANSPARENT = "rgba(0, 0, 0, 0)"
 _BOOT_SNIPPET = STATIC_DIR / "_vendored" / "text-size" / "text-size-boot.html"
 
 
@@ -267,6 +268,97 @@ def test_button_contract(gallery: Page) -> None:
     assert _style(gallery, "#demoButtonDanger", "color") == "rgb(164, 14, 38)"  # danger-text
 
 
+_ICON_BUTTONS = "#demoIconButtons .icon-button"
+# Every glyph-only control the gallery ships: the icon buttons, the home-head
+# toggle + gear, and the modal's close (#324, fleet-config#1259).
+_ICON_ONLY = (_ICON_BUTTONS, "#demoHomeHead .home-toggle", "#demoDialogClose")
+_PAINT_JS = """els => els.map(el => {
+  const s = getComputedStyle(el);
+  return { id: el.id, bg: s.backgroundColor, shadow: s.boxShadow,
+           border: [s.borderTopWidth, s.borderRightWidth,
+                    s.borderBottomWidth, s.borderLeftWidth] };
+})"""
+
+
+def _assert_unpainted_at_rest(page: Page) -> None:
+    """Icon-only controls: no fill, border or shadow at rest; >=44px targets.
+
+    The pointer is moved off first so no control is read in its hover state.
+    The modal close only has a box while its dialog is open, so its target
+    check opens it.
+    """
+    page.mouse.move(0, 0)
+    for selector in _ICON_ONLY:
+        rows = page.eval_on_selector_all(selector, _PAINT_JS)
+        assert rows, f"no elements match {selector}"
+        for row in rows:
+            assert row["bg"] == _TRANSPARENT, (selector, row)
+            assert row["border"] == ["0px"] * 4, (selector, row)
+            assert row["shadow"] == "none", (selector, row)
+    assert_min_target(page.locator(f"{_ICON_BUTTONS}, #demoHomeHead .home-toggle"))
+    page.click("#openModalBtn")
+    expect(page.locator("#demoDialog")).to_be_visible()
+    page.mouse.move(0, 0)
+    assert _style(page, "#demoDialogClose", "backgroundColor") == _TRANSPARENT
+    assert_min_target(page.locator("#demoDialogClose"))
+    page.click("#demoDialogClose")
+    expect(page.locator("#demoDialog")).to_be_hidden()
+
+
+def _assert_icon_button_targets(page: Page) -> None:
+    """One 16px glyph whatever the box; a group's targets touch, never overlap."""
+    glyphs = page.eval_on_selector_all(
+        f"{_ICON_BUTTONS} .icon",
+        "els => els.map(el => [getComputedStyle(el).width, getComputedStyle(el).height])",
+    )
+    assert glyphs and all(g == ["16px", "16px"] for g in glyphs), glyphs
+    # The default box is 28px; the second group picks the control height.
+    assert _style(page, "#demoIconButton", "width") == "28px"
+    assert _style(page, "#demoIconButtonWide", "width") == "36px"
+    for group in ("#demoIconButtonGroup", "#demoIconButtonGroupWide"):
+        buttons = page.locator(f"{group} .icon-button")
+        assert buttons.count() >= 2, group
+        assert_no_overlap(buttons)
+        # The gap is hit-min minus box: neighbouring targets touch exactly.
+        rects = [effective_rect(buttons.nth(i)).effective for i in range(buttons.count())]
+        for left, right in zip(rects, rects[1:]):
+            assert abs(right.left - left.right) <= 0.5, (group, left, right)
+
+
+@pytest.mark.parametrize("theme", ["light", "dark"])
+def test_icon_only_controls_unpainted(gallery: Page, theme: str) -> None:
+    """Icon buttons, home-head toggles, modal close: unpainted, 44px targets, both themes."""
+    _set_theme(gallery, theme)
+    _assert_unpainted_at_rest(gallery)
+    _assert_icon_button_targets(gallery)
+
+
+def test_icon_button_contract(gallery: Page) -> None:
+    """icon-button: hover and press change the glyph colour only (fleet-config#1259)."""
+    gallery.mouse.move(0, 0)
+    # Rest: the muted glyph; pressed takes accent-text; disabled is faint.
+    assert _style(gallery, "#demoIconButton", "color") == "rgb(101, 109, 118)"
+    assert _style(gallery, "#demoIconButtonPressed", "color") == "rgb(5, 80, 174)"
+    assert _style(gallery, "#demoIconButtonDanger", "color") == "rgb(101, 109, 118)"
+    assert _style(gallery, "#demoIconButtonDisabled", "color") == "rgb(209, 217, 224)"
+    assert _style(gallery, "#demoIconButtonDisabled", "cursor") == "default"
+    # Hover darkens the glyph to ink, and still paints nothing.
+    gallery.hover("#demoIconButton")
+    assert _style(gallery, "#demoIconButton", "color") == "rgb(31, 35, 40)"
+    assert _style(gallery, "#demoIconButton", "backgroundColor") == _TRANSPARENT
+    # A destructive one is quiet until hovered, then the danger tone.
+    gallery.hover("#demoIconButtonDanger")
+    assert _style(gallery, "#demoIconButtonDanger", "color") == "rgb(164, 14, 38)"
+    assert _style(gallery, "#demoIconButtonDanger", "backgroundColor") == _TRANSPARENT
+    # Dark: the same states re-skin from the dark tokens.
+    _set_theme(gallery, "dark")
+    gallery.mouse.move(0, 0)
+    assert _style(gallery, "#demoIconButton", "color") == "rgb(125, 133, 144)"
+    assert _style(gallery, "#demoIconButtonPressed", "color") == "rgb(88, 166, 255)"
+    gallery.hover("#demoIconButton")
+    assert _style(gallery, "#demoIconButton", "color") == "rgb(230, 237, 243)"
+
+
 def _assert_range_selection_reads_in_greyscale(page: Page) -> None:
     """The selected pill's border clears 3:1 (WCAG non-text) against a resting one.
 
@@ -394,18 +486,18 @@ def test_home_head_contract(gallery: Page) -> None:
     # Status fills the middle and ellipsizes so it can't wrap the row.
     assert _style(gallery, "#demoHomeStatus", "textOverflow") == "ellipsis"
     assert _style(gallery, "#demoHomeStatus", "whiteSpace") == "nowrap"
-    # Icon-only theme toggle: 34px square, subtle-contrast fill, no border, pinned right.
+    # Icon-only theme toggle: an invisible 34px box (an icon button, #324 --
+    # transparent at rest, no border), pinned right.
     assert _style(gallery, "#demoHomeToggle", "width") == "34px"
     assert _style(gallery, "#demoHomeToggle", "height") == "34px"
-    assert _style(gallery, "#demoHomeToggle", "backgroundColor") == "rgb(246, 248, 250)"
+    assert _style(gallery, "#demoHomeToggle", "backgroundColor") == _TRANSPARENT
     assert _style(gallery, "#demoHomeToggle", "borderTopWidth") == "0px"
     # The Settings gear (fleet-config#1200: never a tab) is the second trailing
-    # action: the same 34px square and fill as the toggle, whatever its
-    # `.button-surface` tier would draw on its own.
+    # action: the same unpainted 34px box as the toggle, with no button tier.
     gear = "#demoHomeSettings"
     assert _style(gallery, gear, "width") == "34px"
     assert _style(gallery, gear, "height") == "34px"
-    assert _style(gallery, gear, "backgroundColor") == "rgb(246, 248, 250)"
+    assert _style(gallery, gear, "backgroundColor") == _TRANSPARENT
     assert _style(gallery, gear, "borderTopWidth") == "0px"
     expect(gallery.locator(gear)).to_have_attribute("aria-label", "Settings")
     # The pair is pinned to the right: the gear's right edge sits within ~1px of
@@ -671,11 +763,12 @@ def test_dark_theme_values(gallery: Page) -> None:
     _assert_range_selection_reads_in_greyscale(gallery)
     # page-foot readout re-skins to the dark muted value.
     assert _style(gallery, "#demoBuildReadout", "color") == "rgb(125, 133, 144)"
-    # home-head toggle fill re-skins to the dark --close-bg (var(--line) = #30363d);
+    # home-head toggles stay unpainted in dark too (--close-bg defaults to
+    # transparent, #324; test_icon_only_controls_unpainted sweeps both themes);
     # the 52px row geometry is theme-independent.
     assert _style(gallery, "#demoHomeHead", "minHeight") == "52px"
-    assert _style(gallery, "#demoHomeToggle", "backgroundColor") == "rgb(48, 54, 61)"
-    assert _style(gallery, "#demoHomeSettings", "backgroundColor") == "rgb(48, 54, 61)"
+    assert _style(gallery, "#demoHomeToggle", "backgroundColor") == _TRANSPARENT
+    assert _style(gallery, "#demoHomeSettings", "backgroundColor") == _TRANSPARENT
     # select-native fill re-skins to the dark --input-bg (var(--bg) = #0d1117);
     # the 36px control height is theme-independent.
     assert _style(gallery, "#demoSelectNative", "height") == "36px"
