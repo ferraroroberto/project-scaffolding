@@ -1,8 +1,15 @@
 # .fleet.toml — this repo's card on the fleet architecture map.
 # fleet-config's /system-map aggregates every repo's .fleet.toml (schema +
 # reasoning: fleet-config/architecture/README.md). Keep it current: update this
-# in the same PR as any material change (layer, port, role, one-line description,
+# in the same PR as any material change (layer, port, role, description,
 # exposed services).
+#
+# `description` must fit two lines of its map card, so the cap is per layer:
+# governance 130, enabling 80, working-web 95, working-pipe 70 characters,
+# counted as written (`&amp;` is five). fleet-config's build_data.py refuses a
+# longer one by repo name (fleet-config#1250; measurement: its
+# architecture/README.md "Description cap"). Aim for one clause; extra detail
+# goes in `chips`, `tag` or the README.
 #
 # CLONED A NEW REPO FROM THIS SCAFFOLD? Replace the values below with your repo's
 # own — at minimum `description`, usually `icon`, and `layer` if it is not a
