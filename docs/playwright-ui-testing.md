@@ -1098,7 +1098,7 @@ Moved verbatim from `CLAUDE.md` (`#254`) so the always-on file stays under its s
 
 *Apply only if this project serves a browser UI (Streamlit, FastAPI, Flask, etc.).*
 
-Two loops, kept separate. Full setup/bootstrap recipe: `docs/playwright-ui-testing.md`.
+Two loops, kept separate.
 
 ### Iterative verification (headed, agent-driven)
 - Drive the running app via **Playwright MCP server in `--headed` mode** (Claude Code, Codex CLI); no MCP support → small `playwright` Python script via Bash, `headless=False`.
@@ -1129,5 +1129,5 @@ Optional, lives at `tests/e2e/`. Don't create the folder until the first regress
 *Apply only if the app's primary surface is a phone.*
 
 - Project the regression suite onto **WebKit** with a device-emulation descriptor (Playwright ships iPhone/Android descriptors — viewport, user-agent, touch, scale factor). WebKit shares the iOS Safari rendering + JS engine, reproducing most "Safari is unhappy" bugs on Windows/Linux before a real phone.
-- Make the projection **always-on** — a parametrised `browser_name`/device fixture so every test runs the mobile projection too. An opt-in projection gets forgotten.
+- Run it only where the engine or the viewport changes the outcome (`#290`, see "Mobile projection" above): layout and geometry, touch targets, the nav, the composer and keyboard input, safe-area. Functional tests (routes, polling, payloads, menus, readbacks, dialogs with no geometry and no engine branch) run on **one** engine. Pin qualifying tests with a fixture or marker (app-launcher's `chromium_projection_only`) and keep the projection always-on *there* — never make it opt-in for the whole suite, and never run it on everything.
 - WebKit-on-Windows is *not* real iOS: no iOS shell, no real WKWebView memory limits, no Apple keyboard, no Add-to-Home-Screen container. For residual shell-only bugs, attach PC DevTools to a real phone via `ios-webkit-debug-proxy` (bridges the iOS Web Inspector to a local port Edge/Chrome DevTools can attach to). Playwright cannot drive real iOS Safari — only its bundled WebKit and the iOS Simulator on macOS.
