@@ -97,3 +97,50 @@ def test_send_text_non_json_raises(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(telegram_mod.urllib.request, "urlopen", fake_urlopen)
     with pytest.raises(NotifierError, match="non-JSON"):
         TelegramNotifier("TOKEN", "CHAT").send_text("hi")
+
+
+def _raising_urlopen(exc: BaseException):
+    def fake_urlopen(request: Any, timeout: int = 0):  # noqa: ANN401
+        raise exc
+
+    return fake_urlopen
+
+
+def test_send_text_timeout_raises_notifier_error(monkeypatch: pytest.MonkeyPatch) -> None:
+    # A timeout while waiting for the response escapes urllib as a bare
+    # TimeoutError (an OSError, not a URLError).
+    monkeypatch.setattr(
+        telegram_mod.urllib.request, "urlopen", _raising_urlopen(TimeoutError("timed out"))
+    )
+    with pytest.raises(NotifierError, match="Telegram request failed"):
+        TelegramNotifier("TOKEN", "CHAT").send_text("hi")
+
+
+def test_send_text_non_utf8_body_raises_notifier_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    @contextmanager
+    def _bad_response():
+        class _Resp:
+            def read(self) -> bytes:
+                return b"\xff\xfe not utf-8"
+
+        yield _Resp()
+
+    monkeypatch.setattr(
+        telegram_mod.urllib.request, "urlopen", lambda request, timeout=0: _bad_response()
+    )
+    with pytest.raises(NotifierError, match="non-JSON"):
+        TelegramNotifier("TOKEN", "CHAT").send_text("hi")
+
+
+def test_send_text_non_object_json_raises_notifier_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        telegram_mod.urllib.request,
+        "urlopen",
+        lambda request, timeout=0: _fake_response(["not", "an", "object"]),  # type: ignore[arg-type]
+    )
+    with pytest.raises(NotifierError, match="non-object"):
+        TelegramNotifier("TOKEN", "CHAT").send_text("hi")
