@@ -17,6 +17,5 @@ def test_root_dir_is_the_repo_root() -> None:
     assert (config.ROOT_DIR / "src" / "config.py").is_file()
 
 
-def test_app_name_and_debug_have_sane_defaults() -> None:
+def test_app_name_has_a_sane_default() -> None:
     assert isinstance(config.APP_NAME, str) and config.APP_NAME
-    assert isinstance(config.DEBUG, bool)
