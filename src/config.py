@@ -23,4 +23,3 @@ LOG_DIR = DATA_DIR / "logs"
 # TRAY_APP_NAME and clears an inherited APP_NAME). An adopter cloning this
 # scaffold should rename this key to its own project (e.g. "<PROJECT>_APP_NAME").
 APP_NAME = os.getenv("SCAFFOLD_APP_NAME", "Project Scaffolding")
-DEBUG = os.getenv("DEBUG", "0") == "1"
