@@ -270,8 +270,16 @@ def test_button_contract(gallery: Page) -> None:
 
 _ICON_BUTTONS = "#demoIconButtons .icon-button"
 # Every glyph-only control the gallery ships: the icon buttons, the home-head
-# toggle + gear, and the modal's close (#324, fleet-config#1259).
-_ICON_ONLY = (_ICON_BUTTONS, "#demoHomeHead .home-toggle", "#demoDialogClose")
+# toggle + gear, the modal's close, and the action-row favorite + kebabs (all
+# `.icon-button`s, #324/#329, fleet-config#1259). The row's verb is a tinted
+# button on purpose and is not in the set.
+_ICON_ONLY = (
+    _ICON_BUTTONS,
+    "#demoHomeHead .home-toggle",
+    "#demoDialogClose",
+    "#demoActionList .action-row-fav",
+    "#demoActionList .action-row-kebab",
+)
 _PAINT_JS = """els => els.map(el => {
   const s = getComputedStyle(el);
   return { id: el.id, bg: s.backgroundColor, shadow: s.boxShadow,

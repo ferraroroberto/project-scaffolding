@@ -47,8 +47,6 @@
     --tile-yellow: #bf8700;
     --input-bg: var(--card-off);
     --toggle-knob: #ffffff;
-    /* --close-bg is left unset on purpose: the home-head toggles and the
-       modal close fall back to transparent, unpainted icon buttons (#324). */
     --accent-soft: color-mix(in srgb, var(--accent) 16%, transparent);
     --accent-border-soft: color-mix(in srgb, var(--accent) 24%, transparent);
     --accent-border-strong: color-mix(in srgb, var(--accent) 28%, transparent);
@@ -215,7 +213,7 @@
     <div class="detail-card">
       <div class="detail-header">
         <h2>Edit thing</h2>
-        <button type="button" class="detail-close" id="demoDialogClose" aria-label="Close">
+        <button type="button" class="icon-button detail-close" id="demoDialogClose" aria-label="Close">
           <svg class="icon" aria-hidden="true"><use href="#i-x"></use></svg>
         </button>
       </div>
@@ -332,11 +330,11 @@
       Demo app
     </span>
     <span class="status" id="demoHomeStatus">All systems normal · 4 devices online</span>
-    <button type="button" class="home-toggle" id="demoHomeToggle"
+    <button type="button" class="icon-button home-toggle" id="demoHomeToggle"
             aria-label="Toggle theme" title="Toggle theme">
       <svg class="icon" aria-hidden="true"><use href="#i-moon"></use></svg>
     </button>
-    <button type="button" class="home-toggle home-settings" id="demoHomeSettings"
+    <button type="button" class="icon-button home-toggle home-settings" id="demoHomeSettings"
             aria-label="Settings" title="Settings">
       <svg class="icon" aria-hidden="true"><use href="#i-settings"></use></svg>
     </button>
@@ -362,13 +360,13 @@
         <button type="button" class="action-row-main">
           <span class="action-row-title">meeting-prep</span>
         </button>
-        <button type="button" class="action-row-kebab" aria-label="More actions"
+        <button type="button" class="icon-button action-row-kebab" aria-label="More actions"
                 aria-haspopup="menu" aria-expanded="false">
           <svg class="icon" aria-hidden="true"><use href="#i-ellipsis-vertical"></use></svg>
         </button>
       </li>
       <li class="action-row" id="demoActionTwoLine">
-        <button type="button" class="action-row-fav" id="demoActionFavOn" aria-pressed="true" aria-label="Favorite">
+        <button type="button" class="icon-button action-row-fav" id="demoActionFavOn" aria-pressed="true" aria-label="Favorite">
           <svg class="icon action-row-fav-off" aria-hidden="true"><use href="#i-star"></use></svg>
           <svg class="icon action-row-fav-on" aria-hidden="true"><use href="#i-star-fill"></use></svg>
         </button>
@@ -376,13 +374,13 @@
           <span class="action-row-title">journal-daily</span>
           <span class="action-row-meta">Last run yesterday · 3 conversations</span>
         </button>
-        <button type="button" class="action-row-kebab" aria-label="More actions"
+        <button type="button" class="icon-button action-row-kebab" aria-label="More actions"
                 aria-haspopup="menu" aria-expanded="false">
           <svg class="icon" aria-hidden="true"><use href="#i-ellipsis-vertical"></use></svg>
         </button>
       </li>
       <li class="action-row" id="demoActionLong">
-        <button type="button" class="action-row-fav" id="demoActionFavOff" aria-pressed="false" aria-label="Favorite">
+        <button type="button" class="icon-button action-row-fav" id="demoActionFavOff" aria-pressed="false" aria-label="Favorite">
           <svg class="icon action-row-fav-off" aria-hidden="true"><use href="#i-star"></use></svg>
           <svg class="icon action-row-fav-on" aria-hidden="true"><use href="#i-star-fill"></use></svg>
         </button>
@@ -390,7 +388,7 @@
           <span class="action-row-title" id="demoActionLongTitle">closed-company-accounting-quarterly-reconciliation</span>
           <span class="action-row-meta">Last run 12 Sep · a context line long enough to need its own ellipsis</span>
         </button>
-        <button type="button" class="action-row-kebab" aria-label="More actions"
+        <button type="button" class="icon-button action-row-kebab" aria-label="More actions"
                 aria-haspopup="menu" aria-expanded="false">
           <svg class="icon" aria-hidden="true"><use href="#i-ellipsis-vertical"></use></svg>
         </button>
@@ -400,10 +398,10 @@
           <span class="action-row-title">Nightly backup</span>
           <span class="action-row-meta">Next in 14h · Daily 03:00</span>
         </button>
-        <button type="button" class="action-row-verb" id="demoActionVerb" aria-label="Run">
+        <button type="button" class="icon-button action-row-verb" id="demoActionVerb" aria-label="Run">
           <svg class="icon" aria-hidden="true"><use href="#i-play"></use></svg>
         </button>
-        <button type="button" class="action-row-kebab" id="demoActionKebab" aria-label="More actions"
+        <button type="button" class="icon-button action-row-kebab" id="demoActionKebab" aria-label="More actions"
                 aria-haspopup="menu" aria-expanded="false">
           <svg class="icon" aria-hidden="true"><use href="#i-ellipsis-vertical"></use></svg>
         </button>
@@ -423,7 +421,7 @@
          clip, so an absolutely-placed menu would lose everything below 96px. -->
     <div id="demoRowMenuScroller" style="overflow-x: auto; height: 96px; border: 1px solid var(--line);">
       <div style="display: flex; align-items: flex-start; width: 640px;">
-        <button type="button" class="action-row-kebab" id="demoRowMenuKebab" aria-label="Row actions">
+        <button type="button" class="icon-button action-row-kebab" id="demoRowMenuKebab" aria-label="Row actions">
           <svg class="icon" aria-hidden="true"><use href="#i-ellipsis-vertical"></use></svg>
         </button>
       </div>
