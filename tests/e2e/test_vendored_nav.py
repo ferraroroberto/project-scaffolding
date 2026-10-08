@@ -21,6 +21,7 @@ from collections.abc import Iterator
 import pytest
 from playwright.sync_api import Browser, Page, expect
 
+from tests.e2e._color_assertions import contrast as _contrast
 from tests.e2e._color_assertions import rgba as _rgba
 from tests.e2e._color_assertions import set_theme as _set_theme
 from tests.e2e._color_assertions import style as _style
@@ -317,3 +318,186 @@ def test_mobile_pill_active_tab_is_accent_tint_not_inset_surface(
     # (#010409 -- demo.html's dark `--card-off`, #299).
     assert dark_bg != "rgb(1, 4, 9)"
     assert 0 < _alpha(dark_bg) < 1
+
+
+# --------------------------------------------------------------- count badge
+# project-scaffolding#338. Fictional data only: the tabs are the skeleton's
+# placeholders (Home / Stats / History).
+
+_ATTENTION = "rgb(154, 103, 0)"  # demo.html :root --attention (design.md)
+_ATTENTION_DARK = "rgb(210, 153, 34)"
+
+
+def _init_nav(page: Page) -> None:
+    """Run the real `initNavTabs` on the grafted skeleton (the other tests need only CSS)."""
+    page.evaluate(
+        "async () => { const m = await import('/_vendored/nav/nav-tabs.js');"
+        " window.__nav = m.initNavTabs(); }"
+    )
+
+
+def _set_badge(page: Page, tab: str, count: object, noun: str | None = None) -> None:
+    page.evaluate(
+        "([t, c, n]) => window.__nav.setBadge(t, c, n ?? undefined)", [tab, count, noun]
+    )
+
+
+def _badge_text(page: Page, tab: str) -> str | None:
+    return page.evaluate(
+        "(t) => { const b = document.querySelector(`.tab[data-tab=${t}] .tab-badge`);"
+        " return b ? b.textContent : null; }",
+        tab,
+    )
+
+
+def test_no_set_badge_call_leaves_the_dom_untouched(nav: Page) -> None:
+    """An app that never calls setBadge has no badge nodes, and a round trip restores the DOM."""
+    _init_nav(nav)
+    for cls in (".tab-badge", ".tab-badge-sr", ".tab-icon-wrap"):
+        assert nav.locator(cls).count() == 0, cls
+    before = nav.evaluate("() => document.querySelector('.tabs').outerHTML")
+    _set_badge(nav, "stats", 3, "waiting")
+    assert nav.locator(".tab-badge").count() == 1
+    _set_badge(nav, "stats", 0)
+    assert nav.evaluate("() => document.querySelector('.tabs').outerHTML") == before
+
+
+def test_set_badge_count_rules(nav: Page) -> None:
+    """1-9 show the digit, 10+ show 9+, 0 / null / junk remove it; an unknown tab is a no-op."""
+    _init_nav(nav)
+    for count, shown in ((1, "1"), (9, "9"), (10, "9+"), (250, "9+"), (3.7, "3")):
+        _set_badge(nav, "stats", count)
+        assert _badge_text(nav, "stats") == shown, count
+    for gone in (0, None, "nope", -2):
+        _set_badge(nav, "stats", 4)
+        assert _badge_text(nav, "stats") == "4"
+        _set_badge(nav, "stats", gone)
+        assert _badge_text(nav, "stats") is None, gone
+    _set_badge(nav, "no-such-tab", 5)
+    assert nav.locator(".tab-badge").count() == 0
+    # A repeat call updates the node in place instead of stacking another.
+    _set_badge(nav, "stats", 2)
+    _set_badge(nav, "stats", 5)
+    assert nav.locator("#tabStats .tab-badge").count() == 1
+    assert nav.locator("#tabStats .tab-badge-sr").count() == 1
+
+
+def test_badge_is_in_the_accessible_name_once(nav: Page) -> None:
+    """The tab's name carries the count; the painted digit is aria-hidden so it is not read twice."""
+    _init_nav(nav)
+    _set_badge(nav, "stats", 2, "waiting")
+    expect(nav.locator("#tabStats")).to_have_accessible_name("Stats, 2 waiting")
+    expect(nav.locator("#tabStats .tab-badge")).to_have_attribute("aria-hidden", "true")
+    _set_badge(nav, "stats", 12, "waiting")  # painted 9+, spoken exactly
+    expect(nav.locator("#tabStats")).to_have_accessible_name("Stats, 12 waiting")
+    _set_badge(nav, "stats", 2)  # no noun
+    expect(nav.locator("#tabStats")).to_have_accessible_name("Stats, 2")
+    _set_badge(nav, "stats", 0)
+    expect(nav.locator("#tabStats")).to_have_accessible_name("Stats")
+    # The aria tree shows one name per tab, with no separate badge node.
+    _set_badge(nav, "history", 1, "waiting")
+    expect(nav.locator(".tabs")).to_match_aria_snapshot(
+        """
+        - tablist "Sections":
+          - tab "Home" [selected]
+          - tab "Stats"
+          - tab "History, 1 waiting"
+        """
+    )
+
+
+def test_badge_text_meets_contrast_in_both_themes(nav: Page) -> None:
+    """attention fill + card text clears WCAG AA (4.5:1), measured as rendered, light and dark."""
+    _init_nav(nav)
+    _set_badge(nav, "stats", 2, "waiting")
+    badge = ".tab-badge"
+    assert _style(nav, badge, "backgroundColor") == _ATTENTION
+    fill, text = _style(nav, badge, "backgroundColor"), _style(nav, badge, "color")
+    assert _contrast(text, fill, "rgb(255, 255, 255)") >= 4.5
+
+    _set_theme(nav, "dark")
+    _wait_style(nav, badge, "backgroundColor", _ATTENTION_DARK)
+    fill, text = _style(nav, badge, "backgroundColor"), _style(nav, badge, "color")
+    assert _contrast(text, fill, "rgb(22, 27, 34)") >= 4.5
+
+
+def _geometry(page: Page, tab: str) -> dict[str, float]:
+    return page.evaluate(
+        "(t) => { const q = (s) => document.querySelector(`.tab[data-tab=${t}] ${s}`);"
+        " const r = (s) => { const e = q(s); return e && e.getBoundingClientRect(); };"
+        " const b = r('.tab-badge'), i = r('.tab-icon'), l = r('.tab-label'),"
+        "  tab = q('.tab-label').closest('.tab').getBoundingClientRect(),"
+        "  bar = document.querySelector('.tabs').getBoundingClientRect();"
+        " return { bx: b ? b.x : 0, by: b ? b.y : 0, bw: b ? b.width : 0, bh: b ? b.height : 0,"
+        "  ix: i.x, iy: i.y, iw: i.width, lx: l.x, ly: l.y, lw: l.width,"
+        "  tx: tab.x, tw: tab.width, barTop: bar.top, vw: innerWidth }; }",
+        tab,
+    )
+
+
+def _assert_badge_on_icon_corner(page: Page, tab: str, where: str) -> None:
+    """The badge is 16px tall, straddles the icon's top-right corner, inside its tab, on screen."""
+    g = _geometry(page, tab)
+    assert g["bh"] == 16 and g["bw"] >= 16, (where, g)
+    assert g["bx"] >= g["ix"] + g["iw"] / 2, (where, g)  # right of the icon's centre
+    assert g["bx"] < g["ix"] + g["iw"], (where, g)  # overlapping its right edge
+    assert g["by"] < g["iy"] < g["by"] + g["bh"], (where, g)  # straddling its top
+    assert g["bx"] + g["bw"] <= g["tx"] + g["tw"], (where, g)  # inside its tab
+    assert g["by"] >= 0 and g["bx"] + g["bw"] <= g["vw"], (where, g)  # on screen
+    expect(page.locator(f".tab[data-tab={tab}] .tab-badge")).to_be_visible()
+
+
+def _assert_badge_does_not_move_layout(page: Page, tab: str, where: str) -> None:
+    """Showing the badge leaves the icon and label where they were."""
+    _set_badge(page, tab, 0)
+    before = _geometry(page, tab)
+    _set_badge(page, tab, 3, "waiting")
+    after = _geometry(page, tab)
+    for key in ("ix", "iy", "iw", "lx", "ly", "lw"):
+        assert after[key] == pytest.approx(before[key], abs=0.5), (where, key, before, after)
+
+
+def test_badge_in_inline_desktop_tabs_and_wide_rail(nav: Page) -> None:
+    """Desktop segmented control (icon beside label), the narrow stack, and the 80px rail."""
+    _init_nav(nav)
+    _set_badge(nav, "stats", 3, "waiting")
+    _assert_badge_on_icon_corner(nav, "stats", "inline")
+    _assert_badge_does_not_move_layout(nav, "stats", "inline")
+    # On the active tab the accent-soft tint must not hide it: opaque attention fill.
+    _set_badge(nav, "home", 2, "waiting")
+    _assert_badge_on_icon_corner(nav, "home", "inline active")
+    assert _rgba(_style(nav, "#tabHome .tab-badge", "backgroundColor")) == (154, 103, 0, 1.0)
+
+    nav.set_viewport_size({"width": 400, "height": 800})  # fine pointer, icon over label
+    _assert_badge_on_icon_corner(nav, "stats", "narrow stack")
+
+    nav.set_viewport_size({"width": 1440, "height": 900})
+    _assert_badge_on_icon_corner(nav, "stats", "rail")
+    g = _geometry(nav, "home")
+    assert g["bx"] + g["bw"] <= _RAIL, g  # not clipped by the 80px rail
+    _assert_badge_does_not_move_layout(nav, "stats", "rail")
+
+
+def test_badge_in_mobile_pill(nav_mobile: Page) -> None:
+    """The phone pill (coarse pointer, iPhone-size viewport), on an inactive and the active tab."""
+    _init_nav(nav_mobile)
+    _set_badge(nav_mobile, "stats", 3, "waiting")
+    _assert_badge_on_icon_corner(nav_mobile, "stats", "pill")
+    g = _geometry(nav_mobile, "stats")
+    assert g["by"] >= g["barTop"], g  # inside the bar, not poking out of its top edge
+    _assert_badge_does_not_move_layout(nav_mobile, "stats", "pill")
+    _set_badge(nav_mobile, "home", 12, "waiting")
+    _assert_badge_on_icon_corner(nav_mobile, "home", "pill active")
+    assert _style(nav_mobile, "#tabHome .tab-badge", "backgroundColor") == _ATTENTION
+    # Never animated: no keyframes and no transition on the badge.
+    assert _style(nav_mobile, "#tabHome .tab-badge", "animationName") == "none"
+    assert _style(nav_mobile, "#tabHome .tab-badge", "transitionDuration") == "0s"
+
+
+def test_badge_geometry_does_not_scale_with_text_size(nav: Page) -> None:
+    """px, not rem: the Large text step (a bigger root font size) leaves the badge at 12px / 16px."""
+    _init_nav(nav)
+    _set_badge(nav, "stats", 3, "waiting")
+    nav.evaluate("() => { document.documentElement.style.fontSize = '22px'; }")
+    assert _style(nav, ".tab-badge", "fontSize") == "12px"
+    assert _style(nav, ".tab-badge", "height") == "16px"
