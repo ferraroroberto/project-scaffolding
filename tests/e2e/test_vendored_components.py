@@ -148,6 +148,95 @@ def _assert_action_row(page: Page) -> None:
     expect(page.locator(f"{_ACTION_LIST} .action-row:visible")).to_have_count(4)
 
 
+_ACTION_EXT = "#demoActionListExt"
+_AFTER_JS = "(el, prop) => getComputedStyle(el, '::after')[prop]"
+
+
+def _after(page: Page, selector: str, prop: str) -> str:
+    """A computed property of the `::after` pseudo-element (the avatar badge)."""
+    return page.eval_on_selector(selector, _AFTER_JS, prop)
+
+
+def _assert_action_row_ext_colors(page: Page, *, muted: tuple[int, int, int], ink: str,
+                                  card: str, success: str, danger: str) -> None:
+    """action-row extensions (#341): avatar fill and badge, trailing value, per theme.
+
+    The badge means alive and nothing else: `up` is success, `down` is
+    danger, no attribute paints no dot, and the dot is ringed in the card
+    colour so it reads cut out of the squircle.
+    """
+    r, g, b, a = _rgba(_style(page, "#demoAvatarUp", "backgroundColor"))
+    assert (r, g, b) == muted  # neutral-soft: the muted mix
+    assert 0 < a < 1
+    assert _style(page, "#demoAvatarUp", "color") == ink
+    assert _after(page, "#demoAvatarUp", "backgroundColor") == success
+    assert _after(page, "#demoAvatarDown", "backgroundColor") == danger
+    assert _after(page, "#demoAvatarPlain", "content") == "none"
+    for badge in ("#demoAvatarUp", "#demoAvatarDown"):
+        assert _after(page, badge, "boxShadow") == f"{card} 0px 0px 0px 2px", badge
+        assert _after(page, badge, "width") == "12px", badge
+    assert _style(page, "#demoActionValue", "color") == ink
+
+
+def _assert_action_row_ext(page: Page) -> None:
+    """action-row extensions (#341): one leading slot, one trailing item.
+
+    The avatar is a 36px squircle inside the main button, so a tap on it is a
+    tap on the row; the trailing item (switch, value, segmented verbs) is the
+    main button's sibling, inset to the text column's edge; the check swaps
+    its glyph when pressed; every target is 44px and none overlap.
+    """
+    assert _style(page, "#demoAvatarUp", "width") == "36px"
+    assert _style(page, "#demoAvatarUp", "height") == "36px"
+    assert _style(page, "#demoAvatarUp", "borderRadius") == "12px"
+    assert _style(page, "#demoAvatarUp .icon", "width") == "20px"
+    # The avatar is part of the tap target: a hit test at its centre lands in
+    # the row's main button.
+    assert page.evaluate(
+        "() => { const r = document.getElementById('demoAvatarUp').getBoundingClientRect();"
+        " const hit = document.elementFromPoint((r.left + r.right) / 2, (r.top + r.bottom) / 2);"
+        " return !!hit && !!hit.closest('.action-row-main'); }"
+    )
+    # Rows-scale heights hold with an avatar: a meta row is 60px, title-only 52px.
+    assert _style(page, "#demoActionAvatarRow", "minHeight") == "60px"
+    assert _style(page, "#demoActionSegRow", "minHeight") == "52px"
+    # Each trailing item sits outside the main button, its right edge at the
+    # text column's inset (row 4px + 10px).
+    for trail in ("#demoActionTrailSwitch", "#demoActionValue", "#demoActionSegVerbs"):
+        geo = page.eval_on_selector(
+            trail,
+            "el => { const row = el.closest('.action-row').getBoundingClientRect();"
+            " return { inMain: !!el.closest('.action-row-main'),"
+            " inset: row.right - el.getBoundingClientRect().right }; }",
+        )
+        assert not geo["inMain"], (trail, geo)
+        assert abs(geo["inset"] - 14) <= 0.5, (trail, geo)
+    assert _style(page, "#demoActionValue", "fontVariantNumeric") == "tabular-nums"
+    assert _style(page, "#demoActionValue", "fontWeight") == "600"
+    # A segmented verb cluster in a row: 44px segments on the 44px verbs track.
+    segments = page.locator("#demoActionSegVerbs .segmented-item")
+    assert [_style(page, f"#demoActionSegVerbs .segmented-item:nth-child({i})", "width")
+            for i in (1, 2, 3)] == ["44px"] * 3
+    assert _style(page, "#demoActionSegVerbs", "height") == "44px"
+    assert_min_target(segments)
+    assert_no_overlap(segments)
+    # Check: an empty circle at rest, a checked one when pressed (the shape is
+    # what reads without hue), in icon-button's pressed accent-text.
+    check = "#demoActionCheck"
+    assert _style(page, f"{check} .action-row-check-on", "display") == "none"
+    page.click(check)
+    expect(page.locator(check)).to_have_attribute("aria-pressed", "true")
+    assert _style(page, f"{check} .action-row-check-off", "display") == "none"
+    assert _style(page, f"{check} .action-row-check-on", "display") != "none"
+    assert _style(page, check, "color") == "rgb(5, 80, 174)"
+    page.click(check)
+    # Every control in the list is a >=44px target; none overlap.
+    controls = page.locator(f"{_ACTION_EXT} .action-row > button")
+    assert controls.count() == 6
+    assert_min_target(controls)
+    assert_no_overlap(controls)
+
+
 def test_card_contract(gallery: Page) -> None:
     """card: rounded.lg corners, spacing.md padding, hairline border, title glyph 18px.
 
@@ -164,6 +253,11 @@ def test_card_contract(gallery: Page) -> None:
     _assert_action_row_colors(
         gallery, muted="rgb(101, 109, 118)", accent=(9, 105, 218), accent_text="rgb(5, 80, 174)",
         control_border="rgb(129, 139, 152)", attention="rgb(154, 103, 0)",
+    )
+    _assert_action_row_ext(gallery)
+    _assert_action_row_ext_colors(
+        gallery, muted=(101, 109, 118), ink="rgb(31, 35, 40)", card="rgb(255, 255, 255)",
+        success="rgb(26, 127, 55)", danger="rgb(207, 34, 46)",
     )
 
 
@@ -471,6 +565,91 @@ def test_range_tab_contract(gallery: Page, static_server: str, browser: Browser)
     # The text-size control is a range-tab row (#276), checked here for the
     # same budget reason. It navigates away from the gallery, so it runs last.
     _assert_text_size(gallery, static_server)
+
+
+_SEG_GROUPS = ("#demoSegPicker", "#demoSeg5", "#demoSegVerbs", "#demoActionSegVerbs")
+_AA = 4.5
+
+
+def _assert_segmented_theme(page: Page, *, card: str, ink: str,
+                            muted: tuple[int, int, int]) -> None:
+    """segmented in one theme: the raised selected segment, fg labels at AA.
+
+    The selected segment is the state: card fill plus a shadow, never a hue.
+    Every label (resting, selected, unavailable) is fg; contrast is judged
+    as rendered, the translucent track composited over the card.
+    """
+    page.mouse.move(0, 0)
+    r, g, b, a = _rgba(_style(page, "#demoSegPicker", "backgroundColor"))
+    assert (r, g, b) == muted  # neutral-soft
+    assert 0 < a < 1
+    assert _style(page, "#demoSegPicker", "borderTopWidth") == "0px"
+    track = _style(page, "#demoSegPicker", "backgroundColor")
+    for group in _SEG_GROUPS:
+        selected = f"{group} .segmented-item[aria-pressed='true']"
+        resting = f"{group} .segmented-item[aria-pressed='false']:not(:disabled)"
+        assert _style(page, selected, "backgroundColor") == card, group
+        assert _style(page, selected, "boxShadow") != "none", group
+        assert _style(page, resting, "backgroundColor") == _TRANSPARENT, group
+        assert _style(page, resting, "boxShadow") == "none", group
+        for seg in (selected, resting):
+            assert _style(page, seg, "color") == ink, (group, seg)
+    resting_ratio = _contrast(ink, track, card)
+    selected_ratio = _contrast(ink, card, card)
+    assert resting_ratio >= _AA, f"label on track {resting_ratio:.2f}:1"
+    assert selected_ratio >= _AA, f"selected label {selected_ratio:.2f}:1"
+    # Unavailable: still the fg label, no opacity; the cursor says it.
+    assert _style(page, "#demoSegFull", "color") == ink
+    assert _style(page, "#demoSegFull", "opacity") == "1"
+    assert _style(page, "#demoSegFull", "cursor") == "not-allowed"
+
+
+def test_segmented_contract(gallery: Page, static_server: str, browser: Browser) -> None:
+    """segmented (#341, fleet-config#1334): the selected segment is the state.
+
+    Both themes: card-raised selection, fg labels at AA on the track and on
+    the selected segment, an unavailable segment that keeps its label. Then
+    the caller-owned selection, and 44px vertical-only targets that never
+    overlap on a coarse pointer (picker band, verbs row, the row cluster).
+    """
+    # Picker segments keep the control height; verbs are the real 44px row.
+    assert _style(gallery, "#demoSegPicker", "height") == "36px"
+    assert _style(gallery, "#demoSegMine", "height") == "30px"
+    assert _style(gallery, "#demoSegVerbs", "height") == "44px"
+    assert _style(gallery, "#demoSegOff", "height") == "38px"
+    assert _style(gallery, "#demoSegMine", "whiteSpace") == "nowrap"
+    _assert_segmented_theme(gallery, card="rgb(255, 255, 255)", ink="rgb(31, 35, 40)",
+                            muted=(101, 109, 118))
+    _set_theme(gallery, "dark")
+    _assert_segmented_theme(gallery, card="rgb(22, 27, 34)", ink="rgb(230, 237, 243)",
+                            muted=(125, 133, 144))
+    _set_theme(gallery, "light")
+    # Selection moves with a tap; an unavailable segment ignores one.
+    gallery.click("#demoSegIssues")
+    expect(gallery.locator("#demoSegIssues")).to_have_attribute("aria-pressed", "true")
+    expect(gallery.locator("#demoSegMine")).to_have_attribute("aria-pressed", "false")
+    gallery.click("#demoSegFull", force=True)
+    expect(gallery.locator("#demoSegFull")).to_have_attribute("aria-pressed", "false")
+    expect(gallery.locator("#demoSegPartial")).to_have_attribute("aria-pressed", "true")
+
+    context = browser.new_context(
+        viewport={"width": 390, "height": 844}, has_touch=True, is_mobile=True
+    )
+    try:
+        phone = context.new_page()
+        phone.goto(f"{static_server}/_vendored/demo.html")
+        phone.wait_for_selector("body[data-demo-ready='1']")
+        assert phone.evaluate("matchMedia('(pointer: coarse)').matches"), (
+            "coarse-pointer emulation is not active"
+        )
+        for group in _SEG_GROUPS:
+            segments = phone.locator(f"{group} .segmented-item")
+            assert_min_target(segments)
+            assert_no_overlap(segments)
+        # The band is vertical only: the visual segment keeps its height.
+        assert _style(phone, "#demoSegMine", "height") == "30px"
+    finally:
+        context.close()
 
 
 def test_page_foot_contract(gallery: Page) -> None:
@@ -788,4 +967,9 @@ def test_dark_theme_values(gallery: Page) -> None:
         gallery, muted="rgb(125, 133, 144)", accent=(47, 129, 247),
         accent_text="rgb(88, 166, 255)",
         control_border="rgb(110, 118, 129)", attention="rgb(210, 153, 34)",
+    )
+    # action-row extensions (#341): the avatar and its badge ring re-skin too.
+    _assert_action_row_ext_colors(
+        gallery, muted=(125, 133, 144), ink="rgb(230, 237, 243)", card="rgb(22, 27, 34)",
+        success="rgb(63, 185, 80)", danger="rgb(248, 81, 73)",
     )
