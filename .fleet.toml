@@ -180,6 +180,7 @@ prefixes = [
     "app/webapp/static/_vendored/page-foot/",
     "app/webapp/static/_vendored/range-tab/",
     "app/webapp/static/_vendored/row-menu/",
+    "app/webapp/static/_vendored/segmented/",
     "app/webapp/static/_vendored/select-native/",
     "app/webapp/static/_vendored/switch/",
     "app/webapp/static/_vendored/text-size/",
@@ -243,6 +244,7 @@ select-native   = { src = "app/webapp/static/_vendored/select-native" }
 switch          = { src = "app/webapp/static/_vendored/switch" }
 icon-tile       = { src = "app/webapp/static/_vendored/icon-tile" }
 range-tab       = { src = "app/webapp/static/_vendored/range-tab" }
+segmented       = { src = "app/webapp/static/_vendored/segmented" }
 home-head       = { src = "app/webapp/static/_vendored/home-head" }
 page-foot       = { src = "app/webapp/static/_vendored/page-foot" }
 action-row      = { src = "app/webapp/static/_vendored/action-row" }

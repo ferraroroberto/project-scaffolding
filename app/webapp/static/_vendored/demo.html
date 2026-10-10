@@ -35,6 +35,7 @@
     --accent-text: #0550ae;
     --control-border: #818b98;
     --deficit: #cf222e;
+    --success: #1a7f37;
     --shadow: 0 8px 24px rgba(31, 35, 40, 0.12);
     --tabbar-bg: rgba(255, 255, 255, 0.85);
     --tabbar-border: rgba(31, 35, 40, 0.12);
@@ -52,6 +53,7 @@
     --accent-border-strong: color-mix(in srgb, var(--accent) 28%, transparent);
     --deficit-soft: color-mix(in srgb, var(--deficit) 12%, transparent);
     --deficit-border-soft: color-mix(in srgb, var(--deficit) 30%, transparent);
+    --neutral-soft: color-mix(in srgb, var(--muted) 16%, transparent);
     --radius-md: 12px;
     --radius: 16px;
     --radius-pill: 9999px;
@@ -94,6 +96,7 @@
     --accent-text: #58a6ff;
     --control-border: #6e7681;
     --deficit: #f85149;
+    --success: #3fb950;
     --shadow: 0 8px 24px rgba(1, 4, 9, 0.6);
     --tabbar-bg: rgba(22, 27, 34, 0.86);
     --tabbar-border: rgba(255, 255, 255, 0.13);
@@ -150,6 +153,7 @@
 <link rel="stylesheet" href="button/button.css">
 <link rel="stylesheet" href="icon-button/icon-button.css">
 <link rel="stylesheet" href="range-tab/range-tab.css">
+<link rel="stylesheet" href="segmented/segmented.css">
 <link rel="stylesheet" href="page-foot/page-foot.css">
 <link rel="stylesheet" href="home-head/home-head.css">
 <link rel="stylesheet" href="select-native/select-native.css">
@@ -323,6 +327,28 @@
     <button type="button" class="range-tab" id="demoTextSizeLarge" data-textsize="large">Large</button>
   </nav>
 
+  <h2>segmented (picker 3 and 5 options; verbs with an unavailable segment)</h2>
+  <div class="card" style="display: flex; flex-direction: column; gap: var(--gap);">
+    <div class="segmented" id="demoSegPicker" role="group" aria-label="Scope">
+      <button type="button" class="segmented-item" id="demoSegMine" aria-pressed="true">Mine</button>
+      <button type="button" class="segmented-item" id="demoSegIssues" aria-pressed="false">Issues</button>
+      <button type="button" class="segmented-item" aria-pressed="false">All</button>
+    </div>
+    <div class="segmented" id="demoSeg5" role="group" aria-label="Window">
+      <button type="button" class="segmented-item" aria-pressed="false">1h</button>
+      <button type="button" class="segmented-item" aria-pressed="true">6h</button>
+      <button type="button" class="segmented-item" aria-pressed="false">24h</button>
+      <button type="button" class="segmented-item" aria-pressed="false">7d</button>
+      <button type="button" class="segmented-item" aria-pressed="false">30d</button>
+    </div>
+    <div class="segmented segmented--verbs" id="demoSegVerbs" role="group" aria-label="Alarm mode">
+      <button type="button" class="segmented-item" id="demoSegOff" aria-pressed="false">Off</button>
+      <button type="button" class="segmented-item" id="demoSegPartial" aria-pressed="true">Partial</button>
+      <button type="button" class="segmented-item" id="demoSegFull" aria-pressed="false"
+              disabled title="A door is open">Full</button>
+    </div>
+  </div>
+
   <h2>home-head</h2>
   <div class="card home-head" id="demoHomeHead">
     <span class="home-title">
@@ -409,6 +435,71 @@
     </ul>
   </div>
 
+  <h2>action-row extensions (avatar up / down / plain, check; trailing switch, value, segmented verbs)</h2>
+  <div class="card action-list" id="demoActionListExt">
+    <ul class="action-rows">
+      <li class="action-row" id="demoActionAvatarRow">
+        <button type="button" class="action-row-main" aria-haspopup="dialog">
+          <span class="action-row-avatar" id="demoAvatarUp" data-badge="up" aria-hidden="true">
+            <svg class="icon"><use href="#i-plug"></use></svg>
+          </span>
+          <span class="action-row-text">
+            <span class="action-row-title">Sample plug</span>
+            <span class="action-row-meta">On · 12 W</span>
+          </span>
+        </button>
+        <button type="button" class="toggle on action-row-trail" id="demoActionTrailSwitch" role="switch"
+                aria-checked="true" aria-label="Sample plug">
+          <span class="knob"></span><span class="toggle-label">ON</span>
+        </button>
+      </li>
+      <li class="action-row" id="demoActionValueRow">
+        <button type="button" class="action-row-main" aria-haspopup="dialog">
+          <span class="action-row-avatar" id="demoAvatarDown" data-badge="down" aria-hidden="true">
+            <svg class="icon"><use href="#i-zap"></use></svg>
+          </span>
+          <span class="action-row-text">
+            <span class="action-row-title">Sample meter</span>
+            <span class="action-row-meta">Not answering · last seen 2h ago</span>
+          </span>
+        </button>
+        <span class="action-row-trail action-row-value" id="demoActionValue">1.2 kW</span>
+      </li>
+      <li class="action-row" id="demoActionSegRow">
+        <button type="button" class="action-row-main" aria-haspopup="dialog">
+          <span class="action-row-avatar" id="demoAvatarPlain" aria-hidden="true">
+            <svg class="icon"><use href="#i-snowflake"></use></svg>
+          </span>
+          <span class="action-row-text">
+            <span class="action-row-title">Sample unit</span>
+          </span>
+        </button>
+        <div class="segmented segmented--verbs action-row-trail" id="demoActionSegVerbs" role="group" aria-label="Mode">
+          <button type="button" class="segmented-item" aria-pressed="true" aria-label="Cool">
+            <svg class="icon" aria-hidden="true"><use href="#i-snowflake"></use></svg>
+          </button>
+          <button type="button" class="segmented-item" aria-pressed="false" aria-label="Fan">
+            <svg class="icon" aria-hidden="true"><use href="#i-fan"></use></svg>
+          </button>
+          <button type="button" class="segmented-item" aria-pressed="false" aria-label="Heat">
+            <svg class="icon" aria-hidden="true"><use href="#i-flame"></use></svg>
+          </button>
+        </div>
+      </li>
+      <li class="action-row" id="demoActionCheckRow">
+        <button type="button" class="icon-button action-row-check" id="demoActionCheck" aria-pressed="false" aria-label="Got it">
+          <svg class="icon action-row-check-off" aria-hidden="true"><use href="#i-circle"></use></svg>
+          <svg class="icon action-row-check-on" aria-hidden="true"><use href="#i-circle-check"></use></svg>
+        </button>
+        <button type="button" class="action-row-main" aria-haspopup="dialog">
+          <span class="action-row-title">Olive oil</span>
+          <span class="action-row-meta">Oils · 1 left</span>
+        </button>
+        <span class="action-row-trail action-row-value">2</span>
+      </li>
+    </ul>
+  </div>
+
   <h2>toast (neutral; only an error tints)</h2>
   <div class="card" style="display: flex; gap: var(--space-sm);">
     <button type="button" class="button-tint" id="demoToastShow">Show toast</button>
@@ -479,10 +570,22 @@
     });
   });
 
+  // segmented: click moves aria-pressed onto the chosen segment; a disabled
+  // one does nothing (caller's job — no shared builder, per its README).
+  document.querySelectorAll('.segmented').forEach((group) => {
+    group.addEventListener('click', (e) => {
+      const seg = e.target.closest('.segmented-item');
+      if (!seg || seg.disabled) return;
+      group.querySelectorAll('.segmented-item').forEach((b) => {
+        b.setAttribute('aria-pressed', String(b === seg));
+      });
+    });
+  });
+
   // action-row: the caller owns the behaviour (per the component's README).
-  // The favorite flips aria-pressed, the kebab keeps aria-expanded in step
+  // The favorite and the check flip aria-pressed, the kebab keeps aria-expanded in step
   // with its (app-side) menu, and the filter hides rows that don't match.
-  document.querySelectorAll('.action-row-fav').forEach((btn) => {
+  document.querySelectorAll('.action-row-fav, .action-row-check').forEach((btn) => {
     btn.addEventListener('click', () => {
       btn.setAttribute('aria-pressed', String(btn.getAttribute('aria-pressed') !== 'true'));
     });
