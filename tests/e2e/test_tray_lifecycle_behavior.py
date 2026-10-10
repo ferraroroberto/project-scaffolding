@@ -22,9 +22,11 @@ Windows processes; see `_tray_harness.py` for the shared plumbing.
 from __future__ import annotations
 
 import sys
+import time
 
 import pytest
 
+from tests._port_probe import listening_pids
 from tests.e2e import _tray_harness as harness
 
 pytestmark = [
@@ -158,3 +160,43 @@ def test_https_loopback_self_signed_cert_restart_verifies(env_https: harness.Tra
 
     served = harness.poll_version(env_https.port, https=True, timeout=30)["git_sha"]
     assert served == new_sha
+
+
+def test_plain_start_without_shared_helper_serves_and_does_not_duplicate(
+    env: harness.TrayEnv,
+) -> None:
+    """With no fleet-config helper on the box, a plain `tray.bat` still starts
+    the tray (exit 0, one NOTE line) and a second run adds no process
+    (project-scaffolding#345)."""
+    harness.remove_shared_helper(env.script_dir)
+
+    first = harness.run_tray_bat(env.tray_bat, [])
+    assert first.returncode == 0, first.stdout + first.stderr
+    assert "standalone" in first.stdout, first.stdout
+
+    version = harness.poll_version(env.port, https=False)
+    assert version["git_sha"] == harness.head_sha(env.script_dir)
+    pids_before = harness.wait_for_tray_pids(env.venv_dir, env.tray_match)
+    assert pids_before, "no tray process detected after a standalone start"
+
+    second = harness.run_tray_bat(env.tray_bat, [])
+    assert second.returncode == 0, second.stdout + second.stderr
+    # A duplicate dummy would fail to bind the port and exit; give it time to
+    # appear and die so the set is read after it settles.
+    time.sleep(3)
+    pids_after = harness.wait_for_tray_pids(env.venv_dir, env.tray_match)
+    assert pids_after == pids_before, (
+        f"a second standalone start must not leave a duplicate tray: "
+        f"before={pids_before} after={pids_after}"
+    )
+
+
+def test_restart_without_shared_helper_is_still_a_hard_error(env: harness.TrayEnv) -> None:
+    """`--restart` must not degrade to a plain start when the helper is missing:
+    it exits non-zero, names fleet-config, and starts nothing (#54, #345)."""
+    harness.remove_shared_helper(env.script_dir)
+
+    result = harness.run_tray_bat(env.tray_bat, ["--restart"])
+    assert result.returncode != 0, result.stdout + result.stderr
+    assert "fleet-config" in result.stdout, result.stdout
+    assert not listening_pids(env.port), "--restart must not start a tray"
