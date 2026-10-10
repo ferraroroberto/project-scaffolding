@@ -253,6 +253,19 @@ def fake_home_dir(script_dir: Path) -> Path:
     return script_dir / "_home"
 
 
+def remove_shared_helper(script_dir: Path) -> Path:
+    """Empty the fake home's `.claude/tray/` so the template sees no shared helper.
+
+    Models a PC that has none of the other fleet repos (project-scaffolding#345):
+    `materialize_tray_bat` copied the real helper in; this deletes only that
+    throwaway copy, never the machine's real `%USERPROFILE%/.claude/tray/`.
+    Returns the path that is now absent.
+    """
+    helper = fake_home_dir(script_dir) / ".claude" / "tray" / "tray_lifecycle.ps1"
+    helper.unlink()
+    return helper
+
+
 def run_tray_bat(
     tray_bat: Path, args: list[str], *, nested: bool = False, timeout: float = 90.0,
 ) -> subprocess.CompletedProcess[str]:

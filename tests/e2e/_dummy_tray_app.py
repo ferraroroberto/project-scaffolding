@@ -35,6 +35,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from src.no_window import NO_WINDOW  # noqa: E402 -- needs the sys.path line above
+from app.tray.single_instance import SingleInstance  # noqa: E402 -- same
 
 
 def _git_head(cwd: str) -> str:
@@ -56,6 +57,14 @@ def main() -> None:
     parser.add_argument("--cert")
     parser.add_argument("--key")
     args = parser.parse_args()
+
+    # The same in-process guard every real tray holds (project-scaffolding#39):
+    # a second copy on this port stands down. Without it two dummies can both
+    # bind the port (Windows lets ThreadingHTTPServer share it), so the
+    # "standalone start does not duplicate" test (#345) could not tell them apart.
+    guard = SingleInstance(f"Local\\scaffold-e2e-dummy-tray-{args.port}")
+    if not guard.acquired:
+        raise SystemExit(0)
 
     git_sha = _git_head(".")
 
