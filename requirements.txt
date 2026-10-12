@@ -17,6 +17,14 @@ cryptography>=42.0.0
 # here because this repo's own copy is exercised by tests/test_pooled_http.py.
 requests>=2.31.0
 
+# Usage-log router (src/usage_log.py, #349) — same reasoning as requests above:
+# a real dependency of the FastAPI apps that vendor it, declared here because
+# this repo's own copy is exercised by tests/test_usage_log.py (httpx backs
+# FastAPI's TestClient) and tests/e2e/test_vendored_usage_log.py (uvicorn).
+fastapi>=0.115.0
+httpx>=0.27.0
+uvicorn>=0.30.0
+
 # Testing — unit (pytest) + headless e2e (pytest-playwright).
 # After install: .venv\Scripts\python.exe -m playwright install chromium
 pytest>=8.0.0

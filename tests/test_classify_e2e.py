@@ -403,7 +403,7 @@ def test_real_surfaces_route_representative_paths() -> None:
     """This repo's declared surfaces narrow what they own and nothing shared (#258)."""
     cfg = load_config(REAL_FLEET_TOML)
     assert cfg.surfaces_note == "", cfg.surfaces_note
-    assert {s.name for s in cfg.surfaces} == {"nav", "components", "geometry"}
+    assert {s.name for s in cfg.surfaces} == {"nav", "components", "geometry", "usage-log"}
 
     def route(*paths: str) -> tuple[str, str]:
         r = classify(list(paths), cfg)
@@ -431,6 +431,13 @@ def test_real_surfaces_route_representative_paths() -> None:
         "tests/e2e/test_vendored_nav.py")
     assert route("tests/e2e/_geometry.py") == (
         "surface", "tests/e2e/test_geometry_helper.py tests/e2e/test_vendored_components.py")
+    # The usage log (#349): the client, its router under src/ (a full rule ahead
+    # of src/ -> none) and its harness all run only that harness.
+    assert route("app/webapp/static/_vendored/usage-log/usage-log.js") == (
+        "surface", "tests/e2e/test_vendored_usage_log.py")
+    assert route("src/usage_log.py") == ("surface", "tests/e2e/test_vendored_usage_log.py")
+    assert route("src/usage_log.py", "tests/test_usage_log.py") == (
+        "surface", "tests/e2e/test_vendored_usage_log.py")
 
     # Shared infrastructure belongs to no surface -> whole suite.
     assert route("tests/e2e/conftest.py") == ("full", "tests/e2e")
