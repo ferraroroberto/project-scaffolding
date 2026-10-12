@@ -41,6 +41,39 @@ jobs:
 - **Precondition:** a `workflow_run` watcher can only observe a gate that runs in Actions on pushes to the default branch. A repo whose gate is local-only (`verify-before-ship.ps1`/`pytest` on-machine — *this scaffold included*) gets **zero** coverage — don't install the watcher there. Its red-`main` detection is **unknown**, reported as its own state, never folded into green.
 - **Local-gate repos get a scheduled fleet-side sweep instead, not an advisory Actions gate** (`#222`) — a ported Windows-desktop gate on a hosted runner is a degraded subset, and a green watcher over it is false coverage. So: watcher where Actions runs the real gate; scheduled sweep of the actual local gate elsewhere — both file the same idempotent `ci-red-main` issue; a gate that can't run reports `unknown` with a reason. Sweep belongs in `fleet-config` as its own scheduled skill (not bolted onto `/audit-fleet`, whose bounded weekly cost depends on no per-repo workloads); **unbuilt** — until it exists, local-gate repos have no automated detection and should say so.
 
+## Web-app CI template
+*Apply when a web app (FastAPI, Streamlit, Flask, a static PWA) with a Playwright e2e suite adopts GitHub Actions CI.*
+
+`.github/workflows/ci.yml.template` (`#351`) is the canonical gate, derived from the e2e workflows that run green on the hosted runner (`voice-transcriber`, `whatsapp-radar`, `app-launcher`). It follows every rule in "GitHub Actions CI conventions" above. One job, `gate`, on `windows-2025`:
+
+1. fresh `.venv` from the requirements files (every native call exit-code-checked, since a PowerShell step only fails on its *last* command);
+2. `playwright install chromium webkit`;
+3. seed each gitignored `config/*.sample.*` to its live name when absent;
+4. unit suite (`pytest --ignore=tests/e2e`);
+5. e2e on desktop chromium;
+6. e2e on a phone projection (`webkit` + `--device "iPhone 13"`, only tests marked `phone`; "no test collected" is surfaced as a `::warning::` annotation, never a silent pass);
+7. upload `test-results*` (trace + screenshot, `retention-days: 7`) **only on failure**.
+
+It is quiet by design: `permissions: contents: read`, no secret, no third-party service. `tests/test_ci_template.py` asserts those properties on the template itself.
+
+**Adopt in one PR:**
+
+1. Copy it to `.github/workflows/ci.yml` and change only the `# ADAPT:` lines: Python version, requirements files (add `-r requirements-dev.txt` if test deps are split), the unit command, the e2e directory, the seed directory, and `timeout-minutes` (≈4× the typical green run). Delete the phone step for a repo with no phone-first surface; otherwise register the `phone` marker in the pytest config (`markers = ["phone: needs the phone viewport or WebKit engine"]`).
+2. Add the `## CI expectations` block to the repo's `CLAUDE.md` (template above): workflow `ci.yml`, job `gate`, typical duration, the phone step as the flaky leg, the e2e-surface paths.
+3. Optionally install `main-gate-watch` with `__GATE_WORKFLOW_NAME__` = `ci` (the precondition above holds: this gate runs on pushes to `main`).
+4. Lint it: `actionlint .github/workflows/ci.yml` (PyPI `actionlint-py` ships the binary: `pip install actionlint-py`).
+5. **Done means green on the first PR and on `main` for 5 consecutive runs.** A first-PR red is a CI-safety bug in the repo's tests, fixed in that PR, not worked around in the workflow.
+
+**Making tests CI-safe** (a clean runner has none of your machine's state):
+
+- **Fixtures, not live state.** A test reads committed fixture or demo data, never a developer's real database, token, account or `data/` folder. A gitignored config is replaced by its committed `*.sample.*`; the sample carries no credential, and loopback traffic bypasses auth middleware.
+- **Missing optional state skips, never fails.** `pytest.skip("reason")` with a message that names what was absent, not a bare `assert` on a file a clone does not have. A skip that silently disables a whole authed suite is its own defect: seed the sample so the suite runs.
+- **Wait on conditions, not timeouts.** Playwright auto-waiting and `expect(...)` assertions, `wait_for_response`, `wait_for_function`; never `time.sleep` or a fixed `wait_for_timeout`. The hosted runner is slower than a dev box, so a fixed sleep is a flake waiting for load. Widen budgets through one environment variable (`E2E_DEFAULT_TIMEOUT_MS`), not per test.
+- **Boot a disposable instance on a fixed e2e port** and refuse an occupied one unless the loudly-named opt-in is set (see "End-to-end UI testing"); a boot failure is a hard failure, never `pytest.skip`.
+- **No Windows-desktop dependency in the CI path** (tray, toast, real audio device): mark those tests and exclude them from the CI command rather than porting a degraded gate.
+
+**Out of scope:** CLI and library repos with no web app; fixing a repo's existing reds (tracked in that repo).
+
 ## CI is advisory — `## CI expectations` block + e2e-surface skip rule
 *Apply whenever this project has a `.github/workflows/` file **and** a local verification gate.*
 

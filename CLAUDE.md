@@ -105,6 +105,7 @@ Diff-keyed gate at finish: checks the touched web UI still conforms to the desig
 - Trigger once per commit: `push:[main]` + `pull_request:[main]` — never `push` on feature branches.
 - Install `main-gate-watch` (copied from `.github/workflows/main-gate-watch.yml.template`) only where Actions runs the real gate on pushes to `main`; a local-only-gate repo (this scaffold included) has no automated red-`main` detection — report it **unknown**, never green.
 - Canonical YAML, run-count table, sister-repo tracking and the watcher's issue contract: `docs/ci-conventions.md` → "GitHub Actions CI conventions".
+- A web app gets its gate by copying `.github/workflows/ci.yml.template` (install, unit, Playwright desktop + phone, artifacts only on failure; no secrets); adoption steps and CI-safe test rules: `docs/ci-conventions.md` → "Web-app CI template". (`#351`.)
 
 ## CI is advisory — `## CI expectations` block + e2e-surface skip rule
 *Apply whenever this project has a `.github/workflows/` file **and** a local verification gate.*
