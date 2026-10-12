@@ -520,6 +520,19 @@
     <p id="demoRowMenuChosen" style="margin: 0; color: var(--muted); font-size: var(--font-body-sm);">Chosen: none</p>
   </div>
 
+  <h2>usage-log (view switches + data-track taps, sent to this origin only)</h2>
+  <div class="card" style="display: flex; flex-direction: column; gap: var(--space-sm);">
+    <!-- Stands in for the nav: each segment switch is one trackView(id), the
+         same call initNavTabs's onChange makes in an app. -->
+    <div class="segmented" id="demoUsageViews" role="group" aria-label="Demo views">
+      <button type="button" class="segmented-item" data-view="overview" aria-pressed="true">Overview</button>
+      <button type="button" class="segmented-item" data-view="history" aria-pressed="false">History</button>
+    </div>
+    <div>
+      <button type="button" class="button-tint" id="demoUsageTap" data-track="demo-refresh">Refresh (tracked)</button>
+    </div>
+  </div>
+
   <h2>page-foot</h2>
   <footer class="page-foot" id="demoPageFoot">
     <p id="demoBuildReadout"></p>
@@ -648,6 +661,21 @@
 
   // Signal readiness to the e2e harness.
   document.body.dataset.demoReady = '1';
+</script>
+<script type="module">
+  // usage-log in its own module, so nothing here can stop the gallery script
+  // above. Served by a plain static server the POST fails, silently by
+  // contract; tests/e2e/test_vendored_usage_log.py serves the real router.
+  import { initUsageLog } from './usage-log/usage-log.js';
+
+  const usage = initUsageLog();
+  usage.trackView('overview');
+  document.getElementById('demoUsageViews').addEventListener('click', (e) => {
+    const seg = e.target.closest('[data-view]');
+    if (seg) usage.trackView(seg.dataset.view);
+  });
+  window.demoUsage = usage;
+  document.body.dataset.usageReady = '1';
 </script>
 </body>
 </html>

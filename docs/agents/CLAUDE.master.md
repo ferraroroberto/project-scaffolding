@@ -62,6 +62,12 @@ Diff-keyed gate at finish: checks the touched web UI still conforms to the desig
 
 - Required: copy `home-automation`'s `src/static_versioning.py` + `CachingStaticFiles` rather than re-deriving; one fleet hash over every file's hash, stamped as `?v=` idempotently; `.js`/`.css` `immutable`, manifest/icons `max-age=86400`, shell `no-cache, must-revalidate`; no service workers — otherwise iOS Safari runs stale cached JS/CSS after a deploy. Full text: `docs/webapp-pwa-conventions.md` → "Webapp PWA static-asset cache-busting"; snippet: `docs/app-onboarding.md` §4. (`#78`.)
 
+## Usage log — local-only views, taps, device class *(PWA)*
+
+- Every fleet web app records real usage through one vendored pair, so `/design-review` reads data instead of asking the owner: the client `app/webapp/static/_vendored/usage-log/` (manifest key `usage-log`; `initUsageLog()`, its `trackView` passed as the nav's `onChange`, `data-track="<id>"` on the controls that matter) and the server `src/usage_log.py` (manifest key `usage_log`; `usage_router(runtime_db_path(<app>, "usage.sqlite3", create=True), dependencies=[<the app's auth>])`). Same origin only: no cloud analytics, no third-party host, no cross-device aggregation.
+- **Privacy is the contract.** Never log message contents, document text, transcripts, names, file names, search queries, form values, URLs with query strings, IP addresses, or the raw user-agent. Only: event kind, view id, control id, a random per-visit session id, device class, and timestamps. Control ids are developer-chosen constants in `data-track`, never derived from element text or user data.
+- Instrumentation never breaks the app (client swallows send failures; a locked or full database drops the batch with one info line). `scripts/usage_summary.py --app <slug> --days 30 --json` is the review's reader; exit 2 means no data yet, never zero usage. Full text: `docs/webapp-pwa-conventions.md` → "Usage log". (`#349`.)
+
 ## Windows event-loop pinning (uvicorn) *(PWA)*
 
 - Every uvicorn spawn point (tray subprocess spawn via `manager.py`, a programmatic `uvicorn.run()`, `.bat` launcher scripts, e2e autoboot spawns) must pass a pinned selector-loop factory (`--loop`/`loop=`) — asyncio's default Windows proactor loop wedges the listening socket on any aborted client connection (`app-launcher#388`). Worked shim: `docs/app-onboarding.md` §1; reference implementation: `app-launcher`'s `app/webapp/event_loop.py` (`selector_loop_factory`).

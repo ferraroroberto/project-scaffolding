@@ -104,6 +104,12 @@ path = "tests/_streamlit_lifecycle.py"
 tier = "full"
 path = "tests/_port_probe.py"
 
+# The usage-log router is the server the usage-log e2e drives (#349), so it is
+# a browser surface despite living under src/. Must precede the src/ rule.
+[[e2e.rule]]
+tier = "full"
+path = "src/usage_log.py"
+
 # Backend/tooling with no browser impact -> no browser suite needed.
 [[e2e.rule]]
 tier       = "none"
@@ -198,6 +204,16 @@ prefixes       = ["tests/e2e/_fixtures/geometry/"]
 paths          = ["tests/e2e/_geometry.py", "tests/e2e/test_geometry_helper.py"]
 pytest_targets = ["tests/e2e/test_geometry_helper.py", "tests/e2e/test_vendored_components.py"]
 
+# The usage log (#349): client module + server router, driven end to end by
+# its own harness. The gallery loads the client in a separate module script,
+# so a usage-log edit cannot stop the gallery's own script and needs no other
+# harness; demo.html itself stays shared (whole suite).
+[[e2e.surface]]
+name           = "usage-log"
+prefixes       = ["app/webapp/static/_vendored/usage-log/"]
+paths          = ["src/usage_log.py", "tests/e2e/test_vendored_usage_log.py"]
+pytest_targets = ["tests/e2e/test_vendored_usage_log.py"]
+
 # ---------------------------------------------------------------------------
 # [components] -- the canonical catalog of this scaffold's vendor-verbatim
 # components (#230). ONLY project-scaffolding carries this table; an adopter
@@ -252,6 +268,8 @@ text-size       = { src = "app/webapp/static/_vendored/text-size" }
 toast           = { src = "app/webapp/static/_vendored/toast" }
 row-menu        = { src = "app/webapp/static/_vendored/row-menu" }
 icon-button     = { src = "app/webapp/static/_vendored/icon-button" }
+# The usage log's client half; its server half is `usage_log` below (#349).
+usage-log       = { src = "app/webapp/static/_vendored/usage-log" }
 
 # Windows tray primitives -- docs/windows-tray.md (gotchas #4, #5).
 single_instance = { src = "app/tray/single_instance.py" }
@@ -270,3 +288,4 @@ runtime_data    = { src = "src/runtime_data.py" }
 notify          = { src = "src/notify" }
 doc_capture     = { src = "src/doc_capture" }
 build_info      = { src = "src/build_info.py" }
+usage_log       = { src = "src/usage_log.py" }
