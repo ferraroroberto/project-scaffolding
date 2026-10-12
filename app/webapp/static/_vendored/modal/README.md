@@ -45,7 +45,7 @@ The fleet's canonical **editor modal**: a native `<dialog>` with a `heading-lg` 
 
 - Use the **native** dialog API (`showModal()`/`close()`) — never a hand-rolled overlay (the shadcn Dialog rule in `design.md`).
 - Exactly **one** primary action; it starts `disabled` until something changes.
-- The disabled recipe (card-off/muted/line) is part of the contract, inherited from `button-primary` — opacity-based disabling drops sub-AA in both themes. `.detail-save-btn` only adds the footer's full width.
+- The disabled recipe (control-fill/muted/line) is part of the contract, inherited from `button-primary` — opacity-based disabling drops sub-AA in both themes. `.detail-save-btn` only adds the footer's full width.
 - On mobile the dialog is top-anchored (safe-area aware); on desktop it keeps UA centering. Don't override.
 
 ## Required design tokens
@@ -53,7 +53,6 @@ The fleet's canonical **editor modal**: a native `<dialog>` with a `heading-lg` 
 | Token | Light value | Used for |
 | --- | --- | --- |
 | `--card` | `#ffffff` | dialog card / action bar |
-| `--card-off` | `#f6f8fa` | disabled primary fill |
 | `--ink` | `#1f2328` | text |
 | `--muted` | `#656d76` | disabled text (the close glyph colour comes from `icon-button/`) |
 | `--line` | `#d1d9e0` | row dividers |
@@ -61,7 +60,7 @@ The fleet's canonical **editor modal**: a native `<dialog>` with a `heading-lg` 
 | `--accent-fill` | `#0969da` (dark `#1f6feb`) | primary button fill |
 | `--accent-fg` | `#ffffff` | primary button text |
 | `--accent-border-strong` | `color-mix(in srgb, var(--accent) 28%, transparent)` | primary button border |
-| `--input-bg` | `#f6f8fa` (light) / `#0d1117` (dark) | control fill |
+| `--input-bg` | `#f6f8fa` (light) / `#21262d` (dark, `border-muted`) | control fill and disabled primary fill (fleet-config#1368, project-scaffolding#356) |
 | `--radius` | `16px` | dialog/card corners |
 | `--control-h` | `36px` | inline control height (the primary is a fixed 48px `button-primary`, independent of it) |
 | `--space-lg` | `24px` | mobile top anchor gap |
