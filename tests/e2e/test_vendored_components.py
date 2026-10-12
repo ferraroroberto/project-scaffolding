@@ -46,6 +46,12 @@ def gallery(static_server: str, page: Page) -> Page:
     return page
 
 
+# The dark control fill: border-muted, the closed-palette value the spec fills
+# controls and disabled buttons with (fleet-config#1368). Never #010409 / #0d1117.
+_DARK_CONTROL_FILL = "rgb(33, 38, 45)"
+_DARK_BLACK_WELLS = ("rgb(1, 4, 9)", "rgb(13, 17, 23)")
+
+
 def _wait_bg(page: Page, selector: str, expected: str) -> None:
     """Wait for a background-color to settle on `expected`.
 
@@ -908,6 +914,29 @@ def test_row_menu_contract(gallery: Page) -> None:
 # ---------------------------------------------------------------------- dark
 
 
+def test_dark_control_fill_is_not_true_black(gallery: Page) -> None:
+    """Disabled button, select and empty-state action fill with #21262d in dark (#356, #352).
+
+    Regression for the dark "black well": these fills used `--card-off` /
+    `--bg`, true black (#010409) or near-black (#0d1117) on a #161b22 card.
+    They follow `--input-bg`, which a dark host sets to the control fill.
+    Light is unchanged (card-off, #f6f8fa).
+    """
+    fills = {
+        "#demoButtonDisabled": "backgroundColor",
+        "#demoSelectNative": "backgroundColor",
+        "#demoEmptyHost .empty-state-action": "backgroundColor",
+    }
+    for selector, prop in fills.items():
+        assert _style(gallery, selector, prop) == "rgb(246, 248, 250)", selector
+    _set_theme(gallery, "dark")
+    for selector, prop in fills.items():
+        _wait_bg(gallery, selector, _DARK_CONTROL_FILL)
+        assert _style(gallery, selector, prop) not in _DARK_BLACK_WELLS, selector
+    # ... and the surface they sit on is the card, so the fill reads as a control.
+    assert _style(gallery, "#demoEmptyHost", "backgroundColor") == "rgb(22, 27, 34)"
+
+
 def test_dark_theme_values(gallery: Page) -> None:
     """Every component re-skins from the dark token block — same structure."""
     _set_theme(gallery, "dark")
@@ -927,9 +956,10 @@ def test_dark_theme_values(gallery: Page) -> None:
     # structure is theme-independent: closed height and radii hold.
     assert _style(gallery, "#demoDisclosureClosed .collapse-summary", "height") == "52px"
     assert _style(gallery, "#demoCard", "borderRadius") == "16px"
-    # modal disabled recipe holds AA on the dark surface (dark card-off/muted).
+    # modal disabled recipe holds AA on the dark surface (the dark control
+    # fill #21262d / muted, fleet-config#1368 -- not true black).
     gallery.click("#openModalBtn")
-    assert _style(gallery, "#demoSaveBtn", "backgroundColor") == "rgb(1, 4, 9)"
+    assert _style(gallery, "#demoSaveBtn", "backgroundColor") == _DARK_CONTROL_FILL
     assert _style(gallery, "#demoSaveBtn", "color") == "rgb(125, 133, 144)"
     # Enabled, the modal primary fills with the dark accent-fill (#1f6feb),
     # one step below accent so white text holds AA (fleet-config#963).
@@ -942,7 +972,7 @@ def test_dark_theme_values(gallery: Page) -> None:
     assert _style(gallery, "#demoButtonPrimary", "backgroundColor") == "rgb(31, 111, 235)"
     assert _style(gallery, "#demoButtonTint", "color") == "rgb(88, 166, 255)"
     assert _style(gallery, "#demoButtonDanger", "color") == "rgb(255, 123, 114)"
-    assert _style(gallery, "#demoButtonDisabled", "backgroundColor") == "rgb(1, 4, 9)"
+    assert _style(gallery, "#demoButtonDisabled", "backgroundColor") == _DARK_CONTROL_FILL
     assert _style(gallery, "#demoButtonDisabled", "color") == "rgb(125, 133, 144)"
     # range-tab active pill re-skins to the dark accent-text, and its selection
     # still reads without hue on the dark surfaces.
@@ -956,10 +986,10 @@ def test_dark_theme_values(gallery: Page) -> None:
     assert _style(gallery, "#demoHomeHead", "minHeight") == "52px"
     assert _style(gallery, "#demoHomeToggle", "backgroundColor") == _TRANSPARENT
     assert _style(gallery, "#demoHomeSettings", "backgroundColor") == _TRANSPARENT
-    # select-native fill re-skins to the dark --input-bg (var(--bg) = #0d1117);
+    # select-native fill re-skins to the dark --input-bg (the control fill #21262d);
     # the 36px control height is theme-independent.
     assert _style(gallery, "#demoSelectNative", "height") == "36px"
-    assert _style(gallery, "#demoSelectNative", "backgroundColor") == "rgb(13, 17, 23)"
+    assert _style(gallery, "#demoSelectNative", "backgroundColor") == _DARK_CONTROL_FILL
     assert _style(gallery, "#demoSelectNative", "borderTopColor") == "rgb(110, 118, 129)"
     # action-row re-skins from the dark tokens; its rows-scale heights hold.
     assert _style(gallery, "#demoActionTwoLine", "minHeight") == "60px"
