@@ -790,7 +790,10 @@ def _focused_label(page: Page) -> str:
 def test_row_menu_contract(gallery: Page) -> None:
     """row-menu: opens on the kebab, isn't clipped by a sideways scroller, closes
     on outside tap / Escape / choosing, follows the menu-button keyboard pattern,
-    and re-skins in dark; the items are the caller's data."""
+    and re-skins in dark; the items are the caller's data. The options (#362)
+    ride in the same node (the suite is over its budget): a header line, brand
+    marks, a screen-reader name apart from the caption, and a menu floated to
+    the left of another element than its kebab."""
     kebab = gallery.locator(_ROW_MENU_KEBAB)
     menu = gallery.locator(_ROW_MENU)
     expect(menu).to_have_count(0)
@@ -825,7 +828,7 @@ def test_row_menu_contract(gallery: Page) -> None:
 
     # Light surface and states.
     assert _style(gallery, _ROW_MENU, "position") == "fixed"
-    assert _style(gallery, _ROW_MENU, "backgroundColor") == "rgb(255, 255, 255)"
+    assert _style(gallery, _ROW_MENU, "backgroundColor") == "rgb(246, 248, 250)"  # --card-2
     assert _style(gallery, _ROW_MENU, "borderTopColor") == "rgb(209, 217, 224)"  # --line
     assert _style(gallery, _ROW_MENU, "borderTopLeftRadius") == "12px"
     assert _style(gallery, _ROW_MENU, "boxShadow") != "none"
@@ -902,11 +905,54 @@ def test_row_menu_contract(gallery: Page) -> None:
     # Dark: the same menu on the dark surface.
     kebab.click()
     _set_theme(gallery, "dark")
-    assert _style(gallery, _ROW_MENU, "backgroundColor") == "rgb(22, 27, 34)"
+    assert _style(gallery, _ROW_MENU, "backgroundColor") == "rgb(33, 38, 45)"  # --card-2
     assert _style(gallery, _ROW_MENU, "borderTopColor") == "rgb(48, 54, 61)"
     assert _style(gallery, row, "color") == "rgb(230, 237, 243)"
     assert _style(gallery, ".row-menu-danger", "color") == "rgb(255, 123, 114)"
     assert _style(gallery, '.row-menu-item[aria-disabled="true"]', "color") == "rgb(125, 133, 144)"
+    gallery.keyboard.press("Escape")
+    expect(menu).to_have_count(0)
+    _set_theme(gallery, "")
+    # No header asked for, none drawn, and the caption is the accessible name.
+    kebab.click()
+    expect(gallery.locator(".row-menu-head")).to_have_count(0)
+    assert gallery.get_attribute(_ROW_MENU, "aria-describedby") is None
+    assert gallery.get_attribute(".row-menu-item >> nth=0", "aria-label") is None
+    gallery.keyboard.press("Escape")
+
+    # The options menu: left of the kebab's rail, top-aligned, 4px over it.
+    gallery.click("#demoRowMenuKebab2")
+    expect(menu).to_be_visible()
+    geo = gallery.evaluate(
+        "() => { const r = document.getElementById('demoRowMenuRail').getBoundingClientRect();"
+        " const m = document.querySelector('.row-menu').getBoundingClientRect();"
+        " return { menuTop: m.top, menuRight: m.right, railTop: r.top, railLeft: r.left }; }"
+    )
+    assert abs(geo["menuTop"] - geo["railTop"]) <= 1, geo
+    assert abs(geo["menuRight"] - (geo["railLeft"] + 4)) <= 1, geo
+    # The header: first, muted, not an item (arrow keys and the row count skip it),
+    # and it describes the menu.
+    head = gallery.locator(".row-menu-head")
+    expect(head).to_have_text("Invented row · pid 4242")
+    kinds = gallery.eval_on_selector_all(
+        f"{_ROW_MENU} > *", "els => els.map(e => e.getAttribute('role'))"
+    )
+    assert kinds == ["presentation", "menuitem", "menuitem", "menuitem"], kinds
+    expect(menu).to_have_attribute("aria-describedby", head.get_attribute("id") or "")
+    assert _style(gallery, ".row-menu-head", "color") == "rgb(101, 109, 118)"  # --muted
+    assert _focused_label(gallery) == "Open"
+    gallery.keyboard.press("ArrowUp")
+    assert _focused_label(gallery) == "Other app"
+    # The screen-reader name is the item's own, the caption stays short.
+    expect(gallery.get_by_role("menuitem", name="Open the demo row")).to_have_text("Open")
+    # Brand marks: the caller's symbol at 18px, greyed only while disabled.
+    brand = ".row-menu-brand"
+    assert gallery.eval_on_selector_all(
+        brand, "els => els.map(e => e.querySelector('use').getAttribute('href'))"
+    ) == ["#b-demo", "#b-demo"]
+    assert _style(gallery, brand, "width") == "18px"
+    assert _style(gallery, brand, "filter") == "none"
+    assert _style(gallery, f'.row-menu-item[aria-disabled="true"] {brand}', "filter") == "grayscale(1)"
     gallery.keyboard.press("Escape")
     expect(menu).to_have_count(0)
 

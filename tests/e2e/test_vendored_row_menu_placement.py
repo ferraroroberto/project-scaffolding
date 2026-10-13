@@ -29,8 +29,10 @@ _EDGE = 8
 # Build one kebab inside a fixed full-screen scroller (below the pill in
 # stacking order), at `y` px down its content, and attach a menu of `count`
 # safe rows plus one destructive row. Returns nothing; the kebab is #kebab.
+# With `placement`, the kebab sits inside #box (styled by `boxCss`, at `y`) and
+# the menu floats against that box with the given side/align/offset/inset.
 _BUILD = """
-async ([y, count]) => {
+async ([y, count, placement, boxCss]) => {
   const { createRowMenu } = await import('/_vendored/row-menu/row-menu.js');
   document.getElementById('placementScroller')?.remove();
   const scroller = document.createElement('div');
@@ -44,13 +46,23 @@ async ([y, count]) => {
   kebab.type = 'button';
   kebab.textContent = '⋮';
   kebab.style.cssText = `position:absolute;right:21px;top:${y}px;width:44px;height:44px`;
-  content.appendChild(kebab);
+  if (placement) {
+    const box = document.createElement('div');
+    box.id = 'box';
+    box.style.cssText = `position:absolute;top:${y}px;${boxCss}`;
+    kebab.style.cssText = 'position:absolute;right:4px;top:8px;width:44px;height:44px';
+    box.appendChild(kebab);
+    content.appendChild(box);
+    placement.against = () => box;
+  } else {
+    content.appendChild(kebab);
+  }
   scroller.appendChild(content);
   document.body.appendChild(scroller);
   const items = [];
   for (let i = 0; i < count; i++) items.push({ label: `Action ${i + 1}`, glyph: 'pencil', onTap() {} });
   items.push({ label: 'Delete', glyph: 'trash-2', danger: true, onTap() {} });
-  createRowMenu().attach('demo-row', kebab, items);
+  createRowMenu(placement ? { placement } : undefined).attach('demo-row', kebab, items);
 }
 """
 
@@ -65,7 +77,9 @@ _GEOMETRY = """
   const hits = visible.map((el) => { const b = el.getBoundingClientRect();
     const hit = document.elementFromPoint((b.left + b.right) / 2, (b.top + b.bottom) / 2);
     return !!hit && hit.closest('.row-menu-item') === el; });
-  return { menu: r(menu), anchor: r(document.getElementById('kebab')),
+  const box = document.getElementById('box');
+  return { menu: r(menu), anchor: r(document.getElementById('kebab')), box: box && r(box),
+    width: menu.getBoundingClientRect().width,
     nav: r(document.querySelector('nav.tabs')), vw: innerWidth, vh: innerHeight,
     maxHeight: menu.style.maxHeight, overflowY: menu.style.overflowY,
     scrollable: menu.scrollHeight > menu.clientHeight, allHit: hits.every(Boolean),
@@ -98,11 +112,19 @@ def phone(static_server: str, browser: Browser) -> Iterator[Page]:
         context.close()
 
 
-def _open(page: Page, y: int, count: int = 2, scroll: int = 0) -> dict[str, Any]:
+def _open(
+    page: Page,
+    y: int,
+    count: int = 2,
+    scroll: int = 0,
+    placement: dict[str, Any] | None = None,
+    box_css: str = "",
+) -> dict[str, Any]:
     """Close any open menu, build a kebab at content offset `y` with the
-    scroller at `scroll`, open its menu, and return the geometry."""
+    scroller at `scroll` (inside a `box_css` box the menu floats against, when
+    `placement` is given), open its menu, and return the geometry."""
     page.keyboard.press("Escape")
-    page.evaluate(_BUILD, [y, count])
+    page.evaluate(_BUILD, [y, count, placement, box_css])
     page.evaluate("(t) => { document.getElementById('placementScroller').scrollTop = t; }", scroll)
     page.click("#kebab")
     page.wait_for_selector(".row-menu")
@@ -123,7 +145,9 @@ def test_row_menu_placement_and_size_on_a_phone(phone: Page) -> None:
     """One node for the whole placement rule (the suite is over its budget):
     below when it fits, above the pill when below would run under it, re-fitted
     when an open menu's row scrolls down to the pill, clamped with an internal
-    scroll when neither side fits — and the fleet size, in front of the pill."""
+    scroll when neither side fits — and the fleet size, in front of the pill.
+    Then the same rule for a menu floated against another element on another
+    side (#362): above a composer-like box, and left of a row's button rail."""
     nav_top = int(phone.evaluate(
         "() => document.querySelector('nav.tabs').getBoundingClientRect().top"
     ))
@@ -179,4 +203,34 @@ def test_row_menu_placement_and_size_on_a_phone(phone: Page) -> None:
     geo = _open(phone, 300, count=20)
     assert geo["maxHeight"] != "" and geo["overflowY"] == "auto", geo
     assert geo["scrollable"], geo
+    _assert_in_band(geo)
+
+    # 5. Floated against another element than the kebab (#362), the composer
+    # shape: above a wide box, right edges 10px in, 6px off it, 260px wide.
+    above = {"side": "above", "align": "end", "offset": 6, "inset": 10, "minWidth": 260}
+    composer = "left:16px;right:16px;height:60px"
+    geo = _open(phone, 400, placement=above, box_css=composer)
+    menu, box = geo["menu"], geo["box"]
+    assert abs(menu["bottom"] - (box["top"] - 6)) <= 1, geo
+    assert abs(menu["right"] - (box["right"] - 10)) <= 1, geo
+    assert geo["width"] >= 260, geo
+    _assert_in_band(geo)
+    # No room above it near the top of the screen: mirrored below the box.
+    geo = _open(phone, 20, placement=above, box_css=composer)
+    assert abs(geo["menu"]["top"] - (geo["box"]["bottom"] + 6)) <= 1, geo
+    _assert_in_band(geo)
+
+    # 6. The sessions shape: left of the row's button rail, top-aligned, 4px
+    # over it; on the last visible row, mirrored to bottom-aligned, off the pill.
+    left = {"side": "left", "align": "start", "offset": -4}
+    rail = "right:21px;width:52px;height:88px"
+    geo = _open(phone, 120, placement=left, box_css=rail)
+    menu, box = geo["menu"], geo["box"]
+    assert abs(menu["top"] - box["top"]) <= 1, geo
+    assert abs(menu["right"] - (box["left"] + 4)) <= 1, geo
+    _assert_in_band(geo)
+    geo = _open(phone, nav_top - 100, placement=left, box_css=rail)
+    menu, box = geo["menu"], geo["box"]
+    assert box["top"] + menu["height"] > nav_top - _EDGE, geo  # the precondition
+    assert abs(menu["bottom"] - box["bottom"]) <= 1, geo
     _assert_in_band(geo)
