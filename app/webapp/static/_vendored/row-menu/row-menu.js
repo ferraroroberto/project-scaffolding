@@ -17,6 +17,14 @@
  * role="menu" list of role="menuitem" buttons with a roving tabindex, arrow
  * keys / Home / End to move, Escape to close, focus back on the anchor.
  *
+ * Placement is one rule for every caller (app-launcher#1508, #362): the menu
+ * opens below its anchor, right edges aligned, inside the band it may use —
+ * the viewport minus the floating nav pill while the pill shows. When below
+ * doesn't fit, it flips above the anchor; only when neither side fits is it
+ * clamped, its height capped with an internal scroll. It is re-fitted on every
+ * scroll and resize while open, so a row scrolled down to the pill flips its
+ * open menu.
+ *
  * Labels are written with `textContent`, never as HTML.
  */
 
@@ -24,11 +32,48 @@
 
 import { icon } from '../icons/icons.js';
 
-// Keep the menu this far inside the screen edges, and this far from its anchor.
+// Keep the menu this far inside the screen edges (and off the nav pill), and
+// this far from its anchor.
 const EDGE = 8;
 const GAP = 2;
 
 let nextId = 1;
+
+// The vertical band [lo, hi] (viewport px) an open menu may occupy. The vendored
+// nav's bottom pill (`nav.tabs`, fixed on the phone) caps it from below while
+// it shows. The desktop bar and the wide rail are not fixed to the bottom
+// (`top > 0` skips the rail); the pill hides with `visibility` under an open
+// <dialog> or `body.nav-hidden`, and a menu mounted in a <dialog> sits in the
+// top layer above it anyway, so those keep the whole viewport.
+function usableBand(menu) {
+  const hi = document.documentElement.clientHeight - EDGE;
+  const nav = document.querySelector('nav.tabs');
+  if (!nav || menu.closest('dialog')) return { lo: EDGE, hi: hi };
+  const cs = getComputedStyle(nav);
+  const r = nav.getBoundingClientRect();
+  if (cs.position !== 'fixed' || cs.visibility !== 'visible' || r.height <= 0 || r.top <= 0) {
+    return { lo: EDGE, hi: hi };
+  }
+  return { lo: EDGE, hi: Math.min(hi, r.top - EDGE) };
+}
+
+// Where a menu of `height` whose natural top is `top` should go: there when it
+// fits the band, else mirrored across `ref` (the anchor's rect), else clamped
+// with its height capped to the band.
+function fitVertical(top, height, ref, band) {
+  const fits = function (t) { return t >= band.lo && t + height <= band.hi; };
+  if (fits(top)) return { top: top, maxHeight: null };
+  const flipped = ref.top + ref.bottom - top - height;
+  if (fits(flipped)) return { top: flipped, maxHeight: null };
+  const room = Math.max(0, band.hi - band.lo);
+  if (height > room) return { top: band.lo, maxHeight: room };
+  return { top: Math.min(Math.max(band.lo, top), band.hi - height), maxHeight: null };
+}
+
+function capHeight(menu, maxHeight) {
+  menu.style.maxHeight = maxHeight == null ? '' : Math.floor(maxHeight) + 'px';
+  menu.style.overflowY = maxHeight == null ? '' : 'auto';
+}
 
 // An item property may be a plain value or a function of no arguments,
 // re-evaluated every time the menu opens (a menu whose rows flip with state).
@@ -114,26 +159,30 @@ export function createRowMenu(opts) {
     rows[i].focus();
   }
 
-  // Below the anchor, right edges aligned; above it when there is no room
-  // below; clamped inside the viewport either way.
+  // Below the anchor, right edges aligned, fitted into its band (see the
+  // header); clamped inside the viewport horizontally.
   function place() {
     frame = null;
-    if (!openMenu || !openAnchor) return;
+    const menu = openMenu;
+    if (!menu || !openAnchor) return;
+    // Re-measuring drops the cap for a moment; keep a capped menu's own scroll
+    // position across it.
+    const scrolled = menu.scrollTop;
+    capHeight(menu, null);
     const a = openAnchor.getBoundingClientRect();
-    const m = openMenu.getBoundingClientRect();
+    const m = menu.getBoundingClientRect();
     const vw = document.documentElement.clientWidth;
-    const vh = document.documentElement.clientHeight;
-    let top = a.bottom + GAP;
-    if (top + m.height > vh - EDGE && a.top - GAP - m.height >= EDGE) {
-      top = a.top - GAP - m.height;
-    }
-    top = Math.min(Math.max(EDGE, top), Math.max(EDGE, vh - EDGE - m.height));
+    const fit = fitVertical(a.bottom + GAP, m.height, a, usableBand(menu));
     const left = Math.min(Math.max(EDGE, a.right - m.width), Math.max(EDGE, vw - EDGE - m.width));
-    openMenu.style.top = Math.round(top) + 'px';
-    openMenu.style.left = Math.round(left) + 'px';
+    menu.style.top = Math.round(fit.top) + 'px';
+    menu.style.left = Math.round(left) + 'px';
+    capHeight(menu, fit.maxHeight);
+    menu.scrollTop = scrolled;
   }
 
-  function schedulePlace() {
+  function schedulePlace(ev) {
+    // A capped menu scrolling its own items moves nothing underneath it.
+    if (ev && ev.type === 'scroll' && openMenu && openMenu.contains(ev.target)) return;
     if (frame == null) frame = requestAnimationFrame(place);
   }
 
