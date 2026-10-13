@@ -17,13 +17,16 @@
  * role="menu" list of role="menuitem" buttons with a roving tabindex, arrow
  * keys / Home / End to move, Escape to close, focus back on the anchor.
  *
- * Placement is one rule for every caller (app-launcher#1508, #362): the menu
- * opens below its anchor, right edges aligned, inside the band it may use —
- * the viewport minus the floating nav pill while the pill shows. When below
- * doesn't fit, it flips above the anchor; only when neither side fits is it
- * clamped, its height capped with an internal scroll. It is re-fitted on every
- * scroll and resize while open, so a row scrolled down to the pill flips its
- * open menu.
+ * Placement is one rule for every caller (app-launcher#1508, #362): by default
+ * the menu opens below its anchor, right edges aligned, inside the band it may
+ * use — the viewport minus the floating nav pill while the pill shows. A
+ * controller may float its menus against another element than the anchor and
+ * on another side (above, or to the left), aligned to that element's start or
+ * end; whatever the side, when the menu doesn't fit the band it is mirrored
+ * across the element it floats against, and only when neither fits is it
+ * clamped, its height capped with an internal scroll. Horizontally it is
+ * clamped inside the viewport. It is re-fitted on every scroll and resize
+ * while open, so a row scrolled down to the pill flips its open menu.
  *
  * Labels are written with `textContent`, never as HTML.
  */
@@ -36,6 +39,9 @@ import { icon } from '../icons/icons.js';
 // this far from its anchor.
 const EDGE = 8;
 const GAP = 2;
+const SIDES = ['below', 'above', 'left'];
+const ALIGNS = ['start', 'end'];
+const SVG_NS = 'http://www.w3.org/2000/svg';
 
 let nextId = 1;
 
@@ -83,9 +89,14 @@ function resolve(v) {
 
 /**
  * @typedef {Object} RowMenuItem
- * @property {string|function(): string} label  visible caption AND accessible name.
+ * @property {string|function(): string} label  visible caption, and the accessible
+ *        name unless `ariaLabel` gives another.
  * @property {function(): void} onTap  runs after the menu closes.
+ * @property {string|function(): string} [ariaLabel]  the accessible name, when it
+ *        should say more than the short caption.
  * @property {string|function(): string} [glyph]  a vendored icons/ sprite name (no `i-`).
+ * @property {string|function(): string} [brand]  the id of a caller's own SVG symbol
+ *        (a brand mark), drawn instead of `glyph`; greyed while disabled.
  * @property {boolean|function(): boolean} [danger]  destructive: rendered last, after a
  *        divider, in the danger text colour. A confirm stays the caller's, in onTap.
  * @property {boolean|function(): boolean} [disabled]  stays visible and focusable,
@@ -95,15 +106,32 @@ function resolve(v) {
  * @property {Object<string,string>} [dataset]  data-* attributes for the caller's hooks.
  */
 
+// A caller's own symbol (a brand mark) as the row's glyph, built as DOM so
+// the id is never parsed as markup.
+function brandMark(id) {
+  const svg = document.createElementNS(SVG_NS, 'svg');
+  svg.setAttribute('class', 'row-menu-brand');
+  svg.setAttribute('aria-hidden', 'true');
+  const use = document.createElementNS(SVG_NS, 'use');
+  use.setAttribute('href', '#' + String(id).replace(/^#/, ''));
+  svg.appendChild(use);
+  return svg;
+}
+
 // Paint (or repaint) one row's glyph, caption and state.
 function paintItem(btn, item) {
+  const brand = resolve(item.brand);
   const glyph = resolve(item.glyph);
   btn.textContent = '';
-  if (glyph) btn.insertAdjacentHTML('afterbegin', icon(glyph));
+  if (brand) btn.appendChild(brandMark(brand));
+  else if (glyph) btn.insertAdjacentHTML('afterbegin', icon(glyph));
   const label = document.createElement('span');
   label.className = 'row-menu-label';
   label.textContent = resolve(item.label);
   btn.appendChild(label);
+  const ariaLabel = resolve(item.ariaLabel);
+  if (ariaLabel) btn.setAttribute('aria-label', ariaLabel);
+  else btn.removeAttribute('aria-label');
   const disabled = !!resolve(item.disabled);
   btn.setAttribute('aria-disabled', disabled ? 'true' : 'false');
   const hint = disabled ? resolve(item.hint) : '';
@@ -130,14 +158,41 @@ function menuItem(item, onChoose) {
 }
 
 /**
+ * @typedef {Object} RowMenuPlacement
+ * @property {function(HTMLElement): ?HTMLElement} [against]  given the anchor, the
+ *        element the menu floats against (default, or when it returns null: the
+ *        anchor itself).
+ * @property {'below'|'above'|'left'} [side='below']  which side of that element.
+ * @property {'start'|'end'} [align='end']  which of its edges the menu lines up
+ *        with: left/right for below and above, top/bottom for left.
+ * @property {number} [offset=2]  px between that element and the menu (negative
+ *        overlaps it).
+ * @property {number} [inset=0]  px the menu sits in from the aligned edge.
+ * @property {number} [minWidth]  px; the menu is at least this wide (default 200,
+ *        from the CSS).
+ */
+
+/**
  * Create a row-menu controller. One controller serves a whole list: at most
  * one of its menus is open at a time.
  *
- * @param {{className?: string}} [opts]  `className` is added to every menu this
- *        controller builds, as a hook for the app's own placement-neutral tweaks.
+ * @param {{className?: string, placement?: RowMenuPlacement}} [opts]
+ *        `className` is added to every menu this controller builds, as a hook
+ *        for the app's own placement-neutral tweaks; `placement` says where
+ *        its menus open (default: below the anchor, right edges aligned).
  */
 export function createRowMenu(opts) {
   const extraClass = (opts && opts.className) || '';
+  const placement = Object.assign(
+    { against: null, side: 'below', align: 'end', offset: GAP, inset: 0, minWidth: null },
+    opts && opts.placement
+  );
+  if (SIDES.indexOf(placement.side) < 0) {
+    throw new Error('row-menu: placement.side must be one of ' + SIDES.join(', '));
+  }
+  if (ALIGNS.indexOf(placement.align) < 0) {
+    throw new Error('row-menu: placement.align must be one of ' + ALIGNS.join(', '));
+  }
   let openKey = null;
   let openAnchor = null;
   let openMenu = null;
@@ -159,8 +214,8 @@ export function createRowMenu(opts) {
     rows[i].focus();
   }
 
-  // Below the anchor, right edges aligned, fitted into its band (see the
-  // header); clamped inside the viewport horizontally.
+  // On the placement's side of the element it floats against, fitted into its
+  // band (see the header); clamped inside the viewport horizontally.
   function place() {
     frame = null;
     const menu = openMenu;
@@ -169,11 +224,22 @@ export function createRowMenu(opts) {
     // position across it.
     const scrolled = menu.scrollTop;
     capHeight(menu, null);
-    const a = openAnchor.getBoundingClientRect();
+    const p = placement;
+    const box = (p.against && p.against(openAnchor)) || openAnchor;
+    const r = box.getBoundingClientRect();
     const m = menu.getBoundingClientRect();
     const vw = document.documentElement.clientWidth;
-    const fit = fitVertical(a.bottom + GAP, m.height, a, usableBand(menu));
-    const left = Math.min(Math.max(EDGE, a.right - m.width), Math.max(EDGE, vw - EDGE - m.width));
+    let top;
+    let x;
+    if (p.side === 'left') {
+      x = r.left - p.offset - m.width;
+      top = p.align === 'start' ? r.top + p.inset : r.bottom - p.inset - m.height;
+    } else {
+      top = p.side === 'above' ? r.top - p.offset - m.height : r.bottom + p.offset;
+      x = p.align === 'start' ? r.left + p.inset : r.right - p.inset - m.width;
+    }
+    const fit = fitVertical(top, m.height, r, usableBand(menu));
+    const left = Math.min(Math.max(EDGE, x), Math.max(EDGE, vw - EDGE - m.width));
     menu.style.top = Math.round(fit.top) + 'px';
     menu.style.left = Math.round(left) + 'px';
     capHeight(menu, fit.maxHeight);
@@ -282,14 +348,26 @@ export function createRowMenu(opts) {
      * @param {string} key  the row's stable identity across re-renders.
      * @param {HTMLElement} anchor  the kebab button.
      * @param {RowMenuItem[]} rowItems  the actions, in order.
+     * @param {{header?: string|function(): string}} [attachOpts]  `header`: one
+     *        muted, non-interactive line above the items (a fact worth a glance,
+     *        not worth the row's width), re-evaluated on every open like an
+     *        item property; empty or absent, no line.
      * @returns {HTMLElement} the menu element (mounted only while open).
      */
-    attach: function (key, anchor, rowItems) {
+    attach: function (key, anchor, rowItems, attachOpts) {
       const menu = document.createElement('div');
       menu.className = 'row-menu' + (extraClass ? ' ' + extraClass : '');
       menu.id = 'row-menu-' + nextId++;
       menu.setAttribute('role', 'menu');
+      if (placement.minWidth != null) menu.style.minWidth = placement.minWidth + 'px';
       menu.addEventListener('keydown', onMenuKey);
+      const header = attachOpts && attachOpts.header;
+      // Not a menu item: the arrow keys skip it, and it is read as the menu's
+      // description rather than as a row.
+      const head = document.createElement('div');
+      head.className = 'row-menu-head';
+      head.id = menu.id + '-head';
+      head.setAttribute('role', 'presentation');
       // Every row is built once; a hidden one is *detached* (not [hidden]) so a
       // count of the menu's buttons only ever sees what is offered.
       const rows = rowItems.map(function (item) {
@@ -301,6 +379,16 @@ export function createRowMenu(opts) {
       divider.className = 'row-menu-divider';
       divider.setAttribute('role', 'separator');
       const render = function () {
+        const headText = resolve(header) || '';
+        if (headText) {
+          head.textContent = headText;
+          head.title = headText;
+          menu.insertBefore(head, menu.firstChild);
+          menu.setAttribute('aria-describedby', head.id);
+        } else {
+          if (head.parentNode) head.parentNode.removeChild(head);
+          menu.removeAttribute('aria-describedby');
+        }
         const shown = rows.filter(function (row) {
           if (!resolve(row.item.hidden)) { paintItem(row.btn, row.item); return true; }
           if (row.btn.parentNode) row.btn.parentNode.removeChild(row.btn);

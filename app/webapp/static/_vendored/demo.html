@@ -25,6 +25,7 @@
     --bg: #ffffff;
     --card: #ffffff;
     --card-off: #f6f8fa;
+    --card-2: #f6f8fa;
     --ink: #1f2328;
     --muted: #656d76;
     --line: #d1d9e0;
@@ -86,6 +87,7 @@
     --bg: #0d1117;
     --card: #161b22;
     --card-off: #010409;
+    --card-2: #21262d;
     --ink: #e6edf3;
     --muted: #7d8590;
     --line: #30363d;
@@ -518,6 +520,19 @@
       </div>
     </div>
     <p id="demoRowMenuChosen" style="margin: 0; color: var(--muted); font-size: var(--font-body-sm);">Chosen: none</p>
+    <!-- The options: a header line, brand marks (an invented #b-demo symbol), a
+         screen-reader name apart from the caption, and a menu that opens to the
+         left of the kebab's rail, top-aligned, overlapping it by 4px. -->
+    <svg aria-hidden="true" style="position: absolute; width: 0; height: 0; overflow: hidden;">
+      <symbol id="b-demo" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#8250df"/></symbol>
+    </svg>
+    <div style="display: flex; justify-content: flex-end;">
+      <div id="demoRowMenuRail" style="display: flex; flex-direction: column; justify-content: center; height: 88px;">
+        <button type="button" class="icon-button action-row-kebab" id="demoRowMenuKebab2" aria-label="More row actions">
+          <svg class="icon" aria-hidden="true"><use href="#i-ellipsis-vertical"></use></svg>
+        </button>
+      </div>
+    </div>
   </div>
 
   <h2>usage-log (view switches + data-track taps, sent to this origin only)</h2>
@@ -643,6 +658,16 @@
     { label: 'Delete', glyph: 'trash-2', danger: true, onTap: demoChosen('Delete') },
   ]);
   demoRowMenu.endRender();
+
+  const demoSideMenu = createRowMenu({
+    placement: { against: (a) => a.parentElement, side: 'left', align: 'start', offset: -4 },
+  });
+  demoSideMenu.attach('demo-side', document.getElementById('demoRowMenuKebab2'), [
+    { label: 'Open', ariaLabel: 'Open the demo row', glyph: 'terminal', onTap: demoChosen('Open') },
+    { label: 'Demo app', brand: 'b-demo', onTap: demoChosen('Demo app') },
+    { label: 'Other app', brand: 'b-demo', disabled: true, hint: 'Not installed', onTap: demoChosen('Other app') },
+  ], { header: 'Invented row · pid 4242' });
+  demoSideMenu.endRender();
 
   // Modal wiring.
   const dlg = document.getElementById('demoDialog');
