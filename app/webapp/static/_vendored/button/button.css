@@ -102,7 +102,9 @@
 }
 
 .button-surface {
-  background: var(--card-off);
+  /* The control fill (--input-bg): card-off in light, border-muted (#21262d)
+     in dark, never true black on a dark card (fleet-config#1375). */
+  background: var(--input-bg, var(--card-off));
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
   height: var(--control-h);
@@ -114,6 +116,9 @@
   font-weight: 600;
   cursor: pointer;
 }
+/* Dark label is fg (12.88:1 on the control fill); fg-muted would be 4.08:1
+   (fleet-config#1375). Sits before the disabled rule so that stays muted. */
+[data-theme="dark"] .button-surface { color: var(--ink); }
 
 /* One disabled recipe for every tier, both themes (home-automation#362):
    opacity on a solid fill blends sub-AA either way; the flat card-off/line/
