@@ -429,8 +429,11 @@ def test_real_surfaces_route_representative_paths() -> None:
         "surface",
         "tests/e2e/test_vendored_components.py tests/e2e/test_vendored_font_inherit.py "
         "tests/e2e/test_vendored_nav.py")
+    # The nav harness imports the helper too (#348), so it runs on a helper edit.
     assert route("tests/e2e/_geometry.py") == (
-        "surface", "tests/e2e/test_geometry_helper.py tests/e2e/test_vendored_components.py")
+        "surface",
+        "tests/e2e/test_geometry_helper.py tests/e2e/test_vendored_components.py "
+        "tests/e2e/test_vendored_nav.py")
     # The usage log (#349): the client, its router under src/ (a full rule ahead
     # of src/ -> none) and its harness all run only that harness.
     assert route("app/webapp/static/_vendored/usage-log/usage-log.js") == (
