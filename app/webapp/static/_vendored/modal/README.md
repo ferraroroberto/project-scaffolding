@@ -1,6 +1,6 @@
 # `modal` — the editor `<dialog>` shell
 
-The fleet's canonical **editor modal**: a native `<dialog>` with a `heading-lg` title + an unpainted 34px × close (an icon button, transparent at rest), stacked label/value rows on top-border dividers (value control ≥ 55%), and exactly one full-width primary button whose disabled state clears AA in both themes. home-automation ships this one shell across its plug/zone/net-device/camera/AC editors. Contract: `~/.claude/design.md` → `modal` token block + "Component contracts".
+The fleet's canonical **editor modal**: a native `<dialog>` with a `heading-lg` title + an unpainted 34px × close (an icon button, transparent at rest), stacked label/value rows on top-border dividers (value control ≥ 55%), and exactly one full-width primary button whose disabled state is the shared `button` recipe (muted on control fill: 4.93:1 light, 4.08:1 dark; WCAG 2.2 SC 1.4.3 exempts text in an inactive UI component). home-automation ships this one shell across its plug/zone/net-device/camera/AC editors. Contract: `~/.claude/design.md` → `modal` token block + "Component contracts".
 
 ## Files
 
@@ -12,7 +12,7 @@ The fleet's canonical **editor modal**: a native `<dialog>` with a `heading-lg` 
 ## How to vendor
 
 1. Copy this `modal/` folder **verbatim** into your app's static dir. Do **not** edit `modal.css` per-app — every iOS rule in it is on-device-validated (home-automation #214/#300/#303).
-2. Link the CSS **together with its three companions**, paste the skeleton, and drive it with the native dialog API. `modal.css` does not re-declare the inline control, the primary button or the close — `select-native/select-native.css` owns `.input-native`/`.select-native` (the 36px control), `button/button.css` owns `.button-primary` and its AA disabled recipe, and `icon-button/icon-button.css` owns the close's unpainted box, glyph states and 44px target:
+2. Link the CSS **together with its three companions**, paste the skeleton, and drive it with the native dialog API. `modal.css` does not re-declare the inline control, the primary button or the close — `select-native/select-native.css` owns `.input-native`/`.select-native` (the 36px control), `button/button.css` owns `.button-primary` and its disabled recipe, and `icon-button/icon-button.css` owns the close's unpainted box, glyph states and 44px target:
    ```html
    <link rel="stylesheet" href="/static/_vendored/select-native/select-native.css">
    <link rel="stylesheet" href="/static/_vendored/button/button.css">
