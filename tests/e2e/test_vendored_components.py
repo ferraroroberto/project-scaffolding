@@ -983,6 +983,31 @@ def test_dark_control_fill_is_not_true_black(gallery: Page) -> None:
     assert _style(gallery, "#demoEmptyHost", "backgroundColor") == "rgb(22, 27, 34)"
 
 
+def test_dark_labelled_surfaces_follow_the_control_fill(gallery: Page) -> None:
+    """button-surface and the resting range-tab take the control fill and `fg` in dark (#358).
+
+    Regression for the labelled black well: both filled with `--card-off`, true
+    black (#010409) on a #161b22 card, with a `--muted` label at 4.08:1 on the
+    control fill. They follow `--input-bg` and the label is `--ink` (`fg`,
+    12.88:1). Light is unchanged, and the selected range-tab keeps its accent
+    tint rather than the control fill.
+    """
+    resting = ("#demoButtonSurface", "#demoRangeWeek", "#demoRangeMonth")
+    for selector in resting:
+        assert _style(gallery, selector, "backgroundColor") == "rgb(246, 248, 250)", selector
+        assert _style(gallery, selector, "color") == "rgb(101, 109, 118)", selector
+    _set_theme(gallery, "dark")
+    for selector in resting:
+        _wait_bg(gallery, selector, _DARK_CONTROL_FILL)
+        assert _style(gallery, selector, "color") == "rgb(230, 237, 243)", selector
+    # The shared disabled recipe still wins over the dark label on a disabled tier.
+    gallery.eval_on_selector("#demoButtonSurface", "el => { el.disabled = true; }")
+    assert _style(gallery, "#demoButtonSurface", "color") == "rgb(125, 133, 144)"
+    # The selected pill is unchanged: accent tint and accent-text, not the control fill.
+    assert _style(gallery, "#demoRangeDay", "color") == "rgb(88, 166, 255)"
+    assert _style(gallery, "#demoRangeDay", "backgroundColor") != _DARK_CONTROL_FILL
+
+
 def test_dark_theme_values(gallery: Page) -> None:
     """Every component re-skins from the dark token block — same structure."""
     _set_theme(gallery, "dark")
