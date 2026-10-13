@@ -1,5 +1,7 @@
 # `range-tab` — the ghost segmented control
 
+> **Deprecated: use [`segmented`](../segmented/).** The fleet uses one shape for a choice among 2–5 peers, and that shape is `segmented` (`ferraroroberto/project-scaffolding#353`). `range-tab` is kept only until every adopter has migrated, then it is removed. Do not use it in a new control, and do not vendor it into a new app. Migration recipe: "Migrating to `segmented`" below.
+
 The fleet's canonical **range-tab**: a row of equal-width pills (Day/Week/Month, timer presets, …) — resting is the control fill (`--input-bg`: `card-off` in light, `border-muted` `#21262d` in dark, never a black well) + hairline border + muted text (`--ink` in dark, since muted is 4.08:1 on the dark fill), active is `accent-soft` fill + `accent-text` text + a solid `accent` border. One height everywhere (`--control-h`, 36px — home-automation issue #361's census found 34/32/24px across five call sites before this settled on one canonical height). At most five pills per row, each label on one line. `~/.claude/design.md` has no range-tab entry yet, so this README is the contract. It draws on the spec's `control` height, the `accent-soft` active tint (shared with `nav-tab-active`) and "Touch targets".
 
 ## Files
@@ -54,6 +56,30 @@ The fleet's canonical **range-tab**: a row of equal-width pills (Day/Week/Month,
 | `--radius-md` | `12px` | pill corners |
 | `--control-h` | `36px` | pill height |
 | `--font-label` | `0.875rem` | pill text |
+
+## Migrating to `segmented`
+
+The two controls hold the same thing (2–5 peers, one selected), so a migration swaps the markup and the selection attribute, and leaves the wiring's values alone.
+
+1. Vendor `segmented/` verbatim and link `segmented/segmented.css`. Drop the `range-tab` link once nothing uses it.
+2. Swap the markup. The container is a `div role="group"` (not a `nav`), each pill becomes a `segmented-item`, and `.active` becomes `aria-pressed`:
+   ```html
+   <!-- before -->
+   <nav class="range-tabs" aria-label="History range">
+     <button type="button" class="range-tab active" data-range="day">Day</button>
+     <button type="button" class="range-tab" data-range="week">Week</button>
+   </nav>
+   <!-- after -->
+   <div class="segmented" role="group" aria-label="History range">
+     <button type="button" class="segmented-item" aria-pressed="true" data-range="day">Day</button>
+     <button type="button" class="segmented-item" aria-pressed="false" data-range="week">Week</button>
+   </div>
+   ```
+   Keep every `data-*` attribute and the `aria-label`.
+3. In your click handler, replace `btn.classList.toggle('active', …)` with `btn.setAttribute('aria-pressed', String(…))`, and any `.range-tab.active` selector with `.segmented-item[aria-pressed="true"]`.
+4. **Text size:** the [`text-size`](../text-size/) binder already sets `aria-pressed` on every `[data-textsize]` button, so swapping the markup is the whole change. Keep `data-textsize` and the `bindTextSize` call; there is no binder change.
+5. A `disabled` pill stays `disabled`, but add a `title` saying why: `segmented` keeps the label colour and shows the cursor, where `range-tab` dimmed it.
+6. More than five options stays a `select-native`, as before.
 
 ## Don't diverge
 

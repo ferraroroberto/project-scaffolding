@@ -322,7 +322,7 @@
     </div>
   </div>
 
-  <h2>range-tab (2, 3 and 5 options; five is the cap)</h2>
+  <h2>range-tab (deprecated, use segmented; kept until every adopter has migrated)</h2>
   <nav class="range-tabs" id="demoRange2" aria-label="Demo mode">
     <button type="button" class="range-tab active" data-range="auto">Auto</button>
     <button type="button" class="range-tab" data-range="manual">Manual</button>
@@ -340,12 +340,12 @@
     <button type="button" class="range-tab" id="demoRangeDisabled" data-range="30d" disabled>30d</button>
   </nav>
 
-  <h2>text-size (a range-tab control; scales the rem root, not px geometry)</h2>
-  <nav class="range-tabs" id="demoTextSize" aria-label="Text size">
-    <button type="button" class="range-tab" data-textsize="small">Small</button>
-    <button type="button" class="range-tab" data-textsize="default">Default</button>
-    <button type="button" class="range-tab" id="demoTextSizeLarge" data-textsize="large">Large</button>
-  </nav>
+  <h2>text-size (a segmented control; scales the rem root, not px geometry)</h2>
+  <div class="segmented" id="demoTextSize" role="group" aria-label="Text size">
+    <button type="button" class="segmented-item" aria-pressed="false" data-textsize="small">Small</button>
+    <button type="button" class="segmented-item" aria-pressed="true" data-textsize="default">Default</button>
+    <button type="button" class="segmented-item" id="demoTextSizeLarge" aria-pressed="false" data-textsize="large">Large</button>
+  </div>
 
   <h2>segmented (picker 3 and 5 options; verbs with an unavailable segment)</h2>
   <div class="card" style="display: flex; flex-direction: column; gap: var(--gap);">
@@ -643,13 +643,13 @@
   live.id = 'demoSwitchBuilt';
   document.getElementById('demoSwitchHost').appendChild(live);
 
-  // text-size: the vendored binder owns this row (it stores `demo.textsize`),
-  // so the generic range-tab wiring below skips it.
+  // text-size: the vendored binder owns this group (it stores `demo.textsize`)
+  // and sets aria-pressed on it, the same attribute segmented styles.
   bindTextSize(document.getElementById('demoTextSize'), 'demo');
 
   // range-tab: click swaps which pill carries .active (caller's job — no
   // shared builder, per the component's README).
-  document.querySelectorAll('.range-tabs:not(#demoTextSize)').forEach((row) => {
+  document.querySelectorAll('.range-tabs').forEach((row) => {
     row.addEventListener('click', (e) => {
       const btn = e.target.closest('.range-tab');
       if (!btn || btn.disabled) return;
