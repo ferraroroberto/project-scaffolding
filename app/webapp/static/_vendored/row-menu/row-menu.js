@@ -26,7 +26,9 @@
  * across the element it floats against, and only when neither fits is it
  * clamped, its height capped with an internal scroll. Horizontally it is
  * clamped inside the viewport. It is re-fitted on every scroll and resize
- * while open, so a row scrolled down to the pill flips its open menu.
+ * while open, so a row scrolled down to the pill flips its open menu. A menu
+ * reopened for an anchor that isn't in the document yet (a rebuilt list attaches
+ * its row before inserting it) stays hidden until the anchor lands (#373).
  *
  * Labels are written with `textContent`, never as HTML.
  */
@@ -39,6 +41,8 @@ import { icon } from '../icons/icons.js';
 // this far from its anchor.
 const EDGE = 8;
 const GAP = 2;
+// How many animation frames a menu waits for its anchor to be inserted (~1s).
+const MAX_UNPLACED_FRAMES = 60;
 const SIDES = ['below', 'above', 'left'];
 const ALIGNS = ['start', 'end'];
 const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -198,6 +202,8 @@ export function createRowMenu(opts) {
   let openMenu = null;
   let frame = null;
   let reopened = false;
+  let unplacedFrames = 0;
+  let pendingFocus = null;
   // menu element → its render function (re-evaluates hidden/label/danger/…).
   const renderers = new WeakMap();
 
@@ -220,6 +226,24 @@ export function createRowMenu(opts) {
     frame = null;
     const menu = openMenu;
     if (!menu || !openAnchor) return;
+    // A rebuilt list attaches a row's menu before the row is inserted (the
+    // README's own example): a detached anchor measures as an empty box at
+    // (0,0), which would park the menu in the corner. Hold it hidden and retry
+    // each frame until the anchor lands; if it never does, its row is gone.
+    if (!openAnchor.isConnected) {
+      if (unplacedFrames++ >= MAX_UNPLACED_FRAMES) { close(false); return; }
+      menu.style.visibility = 'hidden';
+      frame = requestAnimationFrame(place);
+      return;
+    }
+    const wasHeld = menu.style.visibility === 'hidden';
+    if (wasHeld) {
+      menu.style.visibility = '';
+      // Mounted while the anchor was detached, so on <body>: move it into the
+      // anchor's open <dialog>, whose top layer would otherwise hide it.
+      const host = openAnchor.closest('dialog[open]') || document.body;
+      if (menu.parentNode !== host) host.appendChild(menu);
+    }
     // Re-measuring drops the cap for a moment; keep a capped menu's own scroll
     // position across it.
     const scrolled = menu.scrollTop;
@@ -244,6 +268,9 @@ export function createRowMenu(opts) {
     menu.style.left = Math.round(left) + 'px';
     capHeight(menu, fit.maxHeight);
     menu.scrollTop = scrolled;
+    // Focus waited for the menu to be placed (a hidden menu can't take it).
+    if (wasHeld && pendingFocus != null) focusItem(pendingFocus);
+    pendingFocus = null;
   }
 
   function schedulePlace(ev) {
@@ -329,6 +356,8 @@ export function createRowMenu(opts) {
     openKey = key;
     openAnchor = anchor;
     openMenu = menu;
+    unplacedFrames = 0;
+    pendingFocus = focusAt;
     const render = renderers.get(menu);
     if (render) render();
     menu.style.top = '0px';
@@ -337,7 +366,10 @@ export function createRowMenu(opts) {
     place();
     anchor.setAttribute('aria-expanded', 'true');
     bindGlobal(true);
-    if (focusAt != null) focusItem(focusAt);
+    if (anchor.isConnected) {
+      pendingFocus = null;
+      if (focusAt != null) focusItem(focusAt);
+    }
   }
 
   return {
