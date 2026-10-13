@@ -1,0 +1,33 @@
+<!-- Fleet day marks — markup skeleton (copy and adapt; see README.md).
+     Link day-marks.css. A day is a button holding its number over ONE mark.
+     The cell's layout (.week, .day-cell, .day-num) is YOUR app's: a strip and a
+     month grid differ. Give the cell a 10px mark row, so a day with no mark
+     keeps the slot and the numbers line up.
+     Only an exception gets `day-ring` + data-ring="danger|attention".
+     The accessible name says what the day IS; the mark is decoration. -->
+
+<div class="week" role="group" aria-label="Next days">
+  <!-- booked -->
+  <button type="button" class="day-cell" aria-label="Monday 14, booked">
+    <span class="day-num">14</span>
+    <span class="day-mark" data-mark="booked" aria-hidden="true"></span>
+  </button>
+  <!-- an exception: the one ringed cell -->
+  <button type="button" class="day-cell day-ring" data-ring="danger" aria-label="Tuesday 15, booked, no spot assigned">
+    <span class="day-num">15</span>
+    <span class="day-mark" data-mark="booked" aria-hidden="true"></span>
+  </button>
+  <!-- nothing planned: keep the slot -->
+  <button type="button" class="day-cell" aria-label="Wednesday 16, nothing planned">
+    <span class="day-num">16</span>
+  </button>
+</div>
+
+<!-- The legend: marks, not swatches. Build it with legendEl(), or write it out. -->
+<ul class="day-legend">
+  <li><span class="day-mark" data-mark="booked" aria-hidden="true"></span>Booked</li>
+  <li><span class="day-mark" data-mark="will" aria-hidden="true"></span>Will book</li>
+  <li><span class="day-mark" data-mark="extra" aria-hidden="true"></span>Extra day</li>
+  <li><span class="day-mark" data-mark="looking" aria-hidden="true"></span>Looking</li>
+  <li><span class="day-mark" data-mark="off" aria-hidden="true"></span>Not booked on purpose</li>
+</ul>

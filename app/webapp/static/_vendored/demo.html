@@ -146,6 +146,15 @@
   /* An app's own muted class, placed inside a modal row (#363). */
   .demo-row-note { color: var(--muted); font-weight: 400; }
   #themeToggle { align-self: flex-end; }
+  /* The day cell of the day-marks demo: the app's own, as in a real strip. */
+  .demo-week { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 2px; }
+  .demo-day-cell {
+    display: grid; grid-template-rows: auto 10px; justify-items: center; align-content: center;
+    gap: 3px; min-height: var(--row-md); padding: 4px 0; border: 0; border-radius: var(--radius-md);
+    background: transparent; color: var(--ink); font: inherit;
+  }
+  .demo-day-cell.today { background: var(--accent-soft); color: var(--accent-text); }
+  .demo-day-num { font-size: var(--font-body-sm); font-weight: 600; font-variant-numeric: tabular-nums; }
 </style>
 <!-- base.css loads FIRST: element-level rules every component builds on. -->
 <link rel="stylesheet" href="base/base.css">
@@ -163,6 +172,8 @@
 <link rel="stylesheet" href="home-head/home-head.css">
 <link rel="stylesheet" href="select-native/select-native.css">
 <link rel="stylesheet" href="action-row/action-row.css">
+<link rel="stylesheet" href="day-row/day-row.css">
+<link rel="stylesheet" href="day-marks/day-marks.css">
 <link rel="stylesheet" href="text-size/text-size.css">
 <link rel="stylesheet" href="toast/toast.css">
 <link rel="stylesheet" href="row-menu/row-menu.css">
@@ -537,6 +548,18 @@
     </ul>
   </div>
 
+  <h2>day-row (date tile leading; today, open, exception tones, read-only, long text)</h2>
+  <div class="card action-list" id="demoDayList">
+    <ul class="action-rows" id="demoDayRows"></ul>
+  </div>
+
+  <h2>day-marks (five marks, a ring only on an exception, the legend)</h2>
+  <div class="card" id="demoDayMarks">
+    <!-- The cell is the app's own: gallery chrome, not part of the component. -->
+    <div class="demo-week" id="demoDayWeek" role="group" aria-label="Sample days"></div>
+    <div id="demoDayLegendHost" style="margin-top: var(--gap);"></div>
+  </div>
+
   <h2>toast (neutral; only an error tints)</h2>
   <div class="card" style="display: flex; gap: var(--space-sm);">
     <button type="button" class="button-tint" id="demoToastShow">Show toast</button>
@@ -597,6 +620,8 @@
   import { showToast } from './toast/toast.js';
   import { renderHeadStatus } from './home-head/home-head.js';
   import { createRowMenu } from './row-menu/row-menu.js';
+  import { dayRow } from './day-row/day-row.js';
+  import { legendEl, markHtml } from './day-marks/day-marks.js';
 
   // Inject the real vendored sprite so <use href="#i-NAME"> resolves.
   const sprite = await fetch('./icons/icons-sprite.html').then((r) => r.text());
@@ -727,6 +752,47 @@
     [{ text: '1 needs you', tone: 'attention' }, { text: '1 stalled', tone: 'danger' }],
     '7 sessions'
   );
+
+  // day-row: the vendored builder, with invented dates and states. `locale` is
+  // pinned so the weekday text is the same on every machine.
+  const dayRows = document.getElementById('demoDayRows');
+  const dayOpened = [];
+  window.__dayOpened = dayOpened;
+  [
+    { day: '2026-09-14', status: 'booked', title: 'Booked', meta: 'Spot 12 · until 18:00', today: true,
+      onOpen: (row) => dayOpened.push(row.dataset.day) },
+    { day: '2026-09-15', status: 'no_spot', title: 'Booked', meta: 'No spot assigned yet',
+      exception: { text: 'No spot', tone: 'danger' }, onOpen: (row) => dayOpened.push(row.dataset.day) },
+    { day: '2026-09-16', status: 'to_cancel', title: 'Not needed', meta: 'Still booked, cancel it elsewhere',
+      exception: { text: 'To cancel', tone: 'attention' }, onOpen: (row) => dayOpened.push(row.dataset.day) },
+    { day: '2026-09-17', status: 'looking', title: 'Looking for a spot', meta: 'Checked 2 min ago',
+      exception: { text: 'Searching', tone: 'accent' }, onOpen: (row) => dayOpened.push(row.dataset.day) },
+    { day: '2026-09-18', status: 'holiday', title: 'Holiday', meta: "Founders' day" },
+    { day: '2026-09-21', status: 'usual', title: 'A title long enough that it has to be cut with an ellipsis on a phone',
+      meta: 'A reason long enough that this one line needs its own ellipsis too, never a second line',
+      onOpen: (row) => dayOpened.push(row.dataset.day) },
+  ].forEach((o) => dayRows.appendChild(dayRow({ ...o, locale: 'en-GB' })));
+
+  // day-marks: one cell per mark, two ringed exceptions and one day with no
+  // mark (its slot is kept), then the legend built by the vendored builder.
+  const dayWeek = document.getElementById('demoDayWeek');
+  [
+    { n: 14, mark: 'booked', today: true },
+    { n: 15, mark: 'booked', ring: 'danger' },
+    { n: 16, mark: 'booked', ring: 'attention' },
+    { n: 17, mark: 'will' },
+    { n: 18, mark: 'extra' },
+    { n: 19, mark: 'looking' },
+    { n: 20, mark: 'off' },
+    { n: 21, mark: '' },
+  ].forEach((c) => {
+    const cell = document.createElement('div');
+    cell.className = 'demo-day-cell' + (c.today ? ' today' : '') + (c.ring ? ' day-ring' : '');
+    if (c.ring) cell.dataset.ring = c.ring;
+    cell.innerHTML = '<span class="demo-day-num">' + c.n + '</span>' + markHtml(c.mark);
+    dayWeek.appendChild(cell);
+  });
+  document.getElementById('demoDayLegendHost').appendChild(legendEl());
 
   document.body.dataset.demoReady = '1';
 </script>

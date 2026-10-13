@@ -1,0 +1,60 @@
+<!-- Fleet day row — markup skeleton (copy and adapt; see README.md).
+     Link, in order:  action-row/action-row.css  then  day-row/day-row.css
+     (action-row.css is itself linked with icon-button/icon-button.css.)
+     Normally dayRow() from day-row.js builds this; write it out only when the
+     page is static. The chevron needs the icons sprite on the page. Invented
+     dates and states throughout. -->
+
+<div class="card action-list">
+  <ul class="action-rows">
+
+    <!-- Today, and it opens something: a <button> with a chevron. -->
+    <li class="action-row day-row" data-day="2026-09-14" data-status="booked">
+      <button type="button" class="action-row-main day-row-main" aria-current="date">
+        <span class="date-tile is-today">
+          <span class="date-tile-sr">Monday 14 September</span>
+          <span class="date-tile-dow" aria-hidden="true">Mon</span>
+          <span class="date-tile-num" aria-hidden="true">14</span>
+        </span>
+        <span class="action-row-text">
+          <span class="action-row-title">Booked</span>
+          <span class="action-row-meta">Spot 12 · until 18:00</span>
+        </span>
+        <svg class="icon day-row-chevron" aria-hidden="true"><use href="#i-chevron-right"></use></svg>
+      </button>
+    </li>
+
+    <!-- An exception: the chip names it, in its tone. Only an exception gets one. -->
+    <li class="action-row day-row" data-day="2026-09-15" data-status="no_spot">
+      <button type="button" class="action-row-main day-row-main">
+        <span class="date-tile">
+          <span class="date-tile-sr">Tuesday 15 September</span>
+          <span class="date-tile-dow" aria-hidden="true">Tue</span>
+          <span class="date-tile-num" aria-hidden="true">15</span>
+        </span>
+        <span class="action-row-text">
+          <span class="action-row-title">Booked</span>
+          <span class="action-row-meta">No spot assigned yet</span>
+        </span>
+        <span class="day-row-chip" data-tone="danger">No spot</span>
+        <svg class="icon day-row-chevron" aria-hidden="true"><use href="#i-chevron-right"></use></svg>
+      </button>
+    </li>
+
+    <!-- Read-only: a <div>, the --static modifier, no chevron. -->
+    <li class="action-row day-row" data-day="2026-09-17" data-status="holiday">
+      <div class="action-row-main day-row-main day-row-main--static">
+        <span class="date-tile">
+          <span class="date-tile-sr">Thursday 17 September</span>
+          <span class="date-tile-dow" aria-hidden="true">Thu</span>
+          <span class="date-tile-num" aria-hidden="true">17</span>
+        </span>
+        <span class="action-row-text">
+          <span class="action-row-title">Holiday</span>
+          <span class="action-row-meta">Founders' day</span>
+        </span>
+      </div>
+    </li>
+
+  </ul>
+</div>
