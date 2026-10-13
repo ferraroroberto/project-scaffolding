@@ -25,6 +25,7 @@ from tests.e2e._color_assertions import contrast as _contrast
 from tests.e2e._color_assertions import rgba as _rgba
 from tests.e2e._color_assertions import set_theme as _set_theme
 from tests.e2e._color_assertions import style as _style
+from tests.e2e._geometry import EFFECTIVE_RECT_JS
 from tests.e2e.conftest import STATIC_DIR
 
 NAV_DIR = STATIC_DIR / "_vendored" / "nav"
@@ -71,6 +72,13 @@ def _wait_style(page: Page, selector: str, prop: str, expected: str) -> None:
         "([sel, prop, want]) => getComputedStyle(document.querySelector(sel))"
         "[prop] === want",
         arg=[selector, prop, expected],
+    )
+
+
+def _pseudo_content(page: Page, selector: str, pseudo: str) -> str:
+    return page.evaluate(
+        "([sel, p]) => getComputedStyle(document.querySelector(sel), p).content",
+        [selector, pseudo],
     )
 
 
@@ -155,10 +163,13 @@ def test_desktop_control_and_wide_rail(nav: Page) -> None:
     label = nav.locator("#tabHome .tab-label").bounding_box()
     assert label is not None
     assert box["x"] + box["width"] <= label["x"]
+    # The pill's square hit layer (#348) is coarse-pointer only.
+    assert _pseudo_content(nav, ".tabs", "::before") == "none"
 
     nav.set_viewport_size({"width": 1440, "height": 900})
     rail = nav.locator(".tabs").bounding_box()
     assert rail == {"x": 0, "y": 0, "width": _RAIL, "height": 900}, rail
+    assert _pseudo_content(nav, ".tabs", "::before") == "none"
     assert _style(nav, ".tabs", "backgroundColor") == "rgb(255, 255, 255)"  # card
     assert _style(nav, ".tabs", "borderRightWidth") == "1px"
     assert _style(nav, ".tabs", "borderRightColor") == "rgb(209, 217, 224)"  # line
@@ -293,6 +304,107 @@ def test_mobile_pill_stacks_icon_over_label(nav_mobile: Page) -> None:
     assert nav_mobile.evaluate(f"matchMedia('(min-width: {_WIDE}px)').matches")
     bar = nav_mobile.locator(".tabs").bounding_box()
     assert bar is not None and bar["width"] > _RAIL and bar["height"] < 100, bar
+
+
+# --------------------------------------------------- pill vs the list beneath
+# project-scaffolding#348 (TOUCH-02). Invented rows; the controls are 24px
+# boxes carrying the `.hit-target` expansion to 44px, at both ends of the row,
+# so they pass under the pill's left and right corners as the list scrolls.
+
+_LIST_ROWS = 24
+_ROW_PX = 56
+_SCROLL_STEP = 7  # coprime with the row height, so rows cross the pill at every offset
+
+_LIST_JS = """([rows, rowPx]) => {
+  document.querySelectorAll('body > :not(.tabs):not(.app)')
+    .forEach((e) => { e.style.display = 'none'; });
+  const style = document.createElement('style');
+  style.textContent = `
+    .demo-row { display: flex; align-items: center; justify-content: space-between;
+      height: ${rowPx}px; margin: 0; padding: 0; }
+    .demo-pick { position: relative; width: 24px; height: 24px; padding: 0;
+      border: 1px solid var(--line); background: transparent; }
+    .demo-pick::before { content: ''; position: absolute; inset: -10px; }`;
+  document.head.appendChild(style);
+  const list = document.createElement('ul');
+  list.style.cssText = 'list-style: none; margin: 0; padding: 0;';
+  for (let i = 1; i <= rows; i++) {
+    list.insertAdjacentHTML('beforeend',
+      `<li class="demo-row"><button class="demo-pick" role="checkbox" aria-checked="false"
+        aria-label="Select item ${i}"></button><span>Item ${i}</span>
+        <button class="demo-pick" aria-label="More for item ${i}"></button></li>`);
+  }
+  document.querySelector('#paneHome').appendChild(list);
+}"""
+
+# At one scroll offset: every pair of a tab's and a row control's effective
+# rects that intersect, and every 1px sample of that intersection that does
+# not hit-test into the nav. A sample landing on the row is the ambiguous tap
+# TOUCH-02 counts; the nav winning the whole intersection is a covered pair.
+_PAIRS_JS = """(effRect) => {
+  const eff = eval(`(${effRect})`);
+  const box = (el) => { const r = eff(el);
+    return { l: r.left - r.expandLeft, t: r.top - r.expandTop,
+             r: r.right + r.expandRight, b: r.bottom + r.expandBottom }; };
+  const nav = document.querySelector('.tabs');
+  const tabs = [...nav.querySelectorAll('.tab')].map((el) => [el.id, box(el)]);
+  const picks = [...document.querySelectorAll('.demo-pick')]
+    .map((el) => [el.getAttribute('aria-label'), box(el)]);
+  const pairs = [], leaks = [];
+  for (const [tab, a] of tabs) for (const [pick, b] of picks) {
+    const l = Math.max(a.l, b.l, 0), r = Math.min(a.r, b.r, innerWidth);
+    const t = Math.max(a.t, b.t, 0), bt = Math.min(a.b, b.b, innerHeight);
+    if (l >= r || t >= bt) continue;
+    pairs.push([tab, pick]);
+    sweep: for (let x = Math.floor(l) + 0.5; x < r; x++) for (let y = Math.floor(t) + 0.5; y < bt; y++) {
+      if (x < l || y < t) continue;
+      const hit = document.elementFromPoint(x, y);
+      if (!hit || !nav.contains(hit)) {
+        leaks.push({ tab, pick, x, y, hit: hit ? hit.getAttribute('aria-label') || hit.tagName : null });
+        break sweep;
+      }
+    }
+  }
+  return { scrollY, pairs, leaks };
+}"""
+
+
+def test_pill_takes_every_tap_where_a_tab_meets_a_list_row(nav_mobile: Page) -> None:
+    """No tab's tap rectangle shares a tappable point with a list row's (#348, TOUCH-02).
+
+    390x844, coarse pointer. Rows scroll under the floating pill by design;
+    the pill must then take every tap over each tab's whole rectangle. The
+    tab is a rectangle and the pill's corners are rounded (radius-nav, 30px),
+    so before the fix the four corner slivers of the outer tabs reached past
+    the painted pill and a tap there landed on the row beneath. Scrolled to
+    the end, the `.app` bottom reserve keeps the last row clear of the pill
+    altogether.
+    """
+    page = nav_mobile
+    page.evaluate(_LIST_JS, [_LIST_ROWS, _ROW_PX])
+    max_scroll = page.evaluate(
+        "() => document.scrollingElement.scrollHeight - innerHeight"
+    )
+    assert max_scroll > 4 * _ROW_PX, max_scroll  # rows really scroll under the pill
+    crossed = 0
+    for offset in [*range(0, max_scroll, _SCROLL_STEP), max_scroll]:
+        page.evaluate("(y) => window.scrollTo({ top: y, behavior: 'instant' })", offset)
+        state = page.evaluate(_PAIRS_JS, EFFECTIVE_RECT_JS)
+        assert not state["leaks"], state
+        crossed += bool(state["pairs"])
+    assert crossed > 0, "no row control ever met a tab: the sweep proved nothing"
+    # The square hit layer is never painted.
+    assert page.evaluate(
+        "() => getComputedStyle(document.querySelector('.tabs'), '::before').backgroundColor"
+    ) == "rgba(0, 0, 0, 0)"
+    # Scrolled to the end: the reserve clears the pill, so no pair meets at all.
+    assert state["scrollY"] == max_scroll and not state["pairs"], state
+    last = page.evaluate(
+        "() => document.querySelector('.demo-row:last-child').getBoundingClientRect().bottom"
+    )
+    bar = page.locator(".tabs").bounding_box()
+    assert bar is not None
+    assert bar["y"] - last >= 21 + 12, (last, bar)  # --bottom-tabs-margin + --gap
 
 
 def test_mobile_pill_active_tab_is_accent_tint_not_inset_surface(
