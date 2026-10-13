@@ -86,14 +86,23 @@ def _assert_base_inherits(page: Page) -> None:
 _ACTION_LIST = "#demoActionList"
 
 
-def _assert_action_row_colors(page: Page, *, muted: str, accent: tuple[int, int, int],
+def _assert_action_row_colors(page: Page, *, muted: str, ink: str, accent: tuple[int, int, int],
                               accent_text: str, control_border: str, attention: str) -> None:
-    """action-row: the theme-dependent colors (meta, verb, filter, favorite)."""
+    """action-row: the theme-dependent colors (meta, verb, stop verb, filter, favorite)."""
     assert _style(page, "#demoActionTwoLine .action-row-meta", "color") == muted
     r, g, b, a = _rgba(_style(page, "#demoActionVerb", "backgroundColor"))
     assert (r, g, b) == accent
     assert 0 < a < 1
     assert _style(page, "#demoActionVerb", "color") == accent_text
+    # A verb that stops or destroys is outlined, never tinted (#361): no fill,
+    # a control-border hairline, the ink glyph, at the same 44px square.
+    stop = "#demoActionStop"
+    assert _style(page, stop, "backgroundColor") == _TRANSPARENT
+    assert _style(page, stop, "borderTopColor") == control_border
+    assert _style(page, stop, "borderTopWidth") == "1px"
+    assert _style(page, stop, "color") == ink
+    assert _style(page, stop, "width") == "44px"
+    assert _style(page, stop, "height") == "44px"
     assert _style(page, "#demoActionFilter", "borderTopColor") == control_border
     assert _style(page, "#demoActionFavOn", "color") == attention
 
@@ -143,6 +152,12 @@ def _assert_action_row(page: Page) -> None:
     assert_no_overlap(buttons)
     assert _style(page, "#demoActionKebab", "width") == "44px"
     assert _style(page, "#demoActionFilter", "height") == "44px"
+    # The stop verb keeps its ink glyph and no fill under hover: the tint's
+    # hover rule (accent-text) must not reach it.
+    page.hover("#demoActionStop")
+    assert _style(page, "#demoActionStop", "color") == _style(page, "#demoActionTwoLine .action-row-title", "color")
+    assert _style(page, "#demoActionStop", "backgroundColor") == _TRANSPARENT
+    page.mouse.move(0, 0)
     # The open kebab takes the accent; the filter hides rows (a flex row
     # must still honour [hidden]).
     page.click("#demoActionKebab")
@@ -151,7 +166,7 @@ def _assert_action_row(page: Page) -> None:
     page.fill("#demoActionFilterInput", "backup")
     expect(page.locator(f"{_ACTION_LIST} .action-row:visible")).to_have_count(1)
     page.fill("#demoActionFilterInput", "")
-    expect(page.locator(f"{_ACTION_LIST} .action-row:visible")).to_have_count(4)
+    expect(page.locator(f"{_ACTION_LIST} .action-row:visible")).to_have_count(5)
 
 
 _ACTION_EXT = "#demoActionListExt"
@@ -257,7 +272,8 @@ def test_card_contract(gallery: Page) -> None:
     _assert_base_inherits(gallery)
     _assert_action_row(gallery)
     _assert_action_row_colors(
-        gallery, muted="rgb(101, 109, 118)", accent=(9, 105, 218), accent_text="rgb(5, 80, 174)",
+        gallery, muted="rgb(101, 109, 118)", ink="rgb(31, 35, 40)", accent=(9, 105, 218),
+        accent_text="rgb(5, 80, 174)",
         control_border="rgb(129, 139, 152)", attention="rgb(154, 103, 0)",
     )
     _assert_action_row_ext(gallery)
@@ -1065,7 +1081,7 @@ def test_dark_theme_values(gallery: Page) -> None:
     # action-row re-skins from the dark tokens; its rows-scale heights hold.
     assert _style(gallery, "#demoActionTwoLine", "minHeight") == "60px"
     _assert_action_row_colors(
-        gallery, muted="rgb(125, 133, 144)", accent=(47, 129, 247),
+        gallery, muted="rgb(125, 133, 144)", ink="rgb(230, 237, 243)", accent=(47, 129, 247),
         accent_text="rgb(88, 166, 255)",
         control_border="rgb(110, 118, 129)", attention="rgb(210, 153, 34)",
     )
