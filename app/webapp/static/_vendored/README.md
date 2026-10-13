@@ -18,7 +18,7 @@ A cloned web app inherits both: design **tokens** (wire your CSS custom properti
 | [`icons/`](icons/) | Inline Lucide icon sprite + `icon()` helper. The fleet's one icon set (24×24, 2px stroke, currentColor). | ✅ |
 | [`card/`](card/) | The base elevated content group: `rounded.lg` surface + hairline border + the one-row header (glyph + bold title + muted meta + right-pinned meta). | ✅ |
 | [`disclosure/`](disclosure/) | Collapsible `<details>`/summary card: 52px closed header, chevron pinned right, the shared `.card--collapsible` padding-zeroing modifier. | ✅ |
-| [`modal/`](modal/) | The editor `<dialog>` shell: title + 34px × close, label/value rows, full-width primary with the AA disabled recipe, on-device-validated iOS anchoring/scroll-lock rules. | ✅ |
+| [`modal/`](modal/) | The editor `<dialog>` shell: title + 34px × close, label/value rows, full-width primary with the shared disabled recipe, on-device-validated iOS anchoring/scroll-lock rules. | ✅ |
 | [`empty-state/`](empty-state/) | Canonical zero-items block: feature-size glyph + one-line reason + optional quiet action; `emptyStateEl()` builder. | ✅ |
 | [`switch/`](switch/) | The one boolean control (shadcn Switch shape, accent on-track, never green); `switchEl()`/`setSwitch()` builders. | ✅ |
 | [`icon-tile/`](icon-tile/) | The Home-screen rounded-square: one `tile-*` fill + centered feature-size glyph. | ✅ |
