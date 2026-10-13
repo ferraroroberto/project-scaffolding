@@ -65,7 +65,7 @@ function renderRows(rows) {
 
 ## Behaviour contract
 
-- **Placement.** The open menu is `position: fixed`, mounted on `<body>` (or on the anchor's open `<dialog>`, whose top layer would hide a body child) and placed from the anchor's rect: below it with the right edges aligned, above it when there is no room below, clamped 8px inside the viewport. It repositions on resize, on any scroll (capture) and on the visual viewport, so it follows an anchor inside a sideways-scrolling column and is never clipped by it.
+- **Placement — one rule for every app.** The open menu is `position: fixed`, mounted on `<body>` (or on the anchor's open `<dialog>`, whose top layer would hide a body child) and placed from the anchor's rect: below it with the right edges aligned, inside the **band** it may use, which is the viewport 8px in from each edge, ending 8px above the vendored nav's floating pill (`nav.tabs`) while the pill shows. When below doesn't fit the band it flips above the anchor; only when neither side fits is it clamped to the band with its height capped and an internal scroll. The desktop bar and the wide rail aren't bottom pills, and a menu in a `<dialog>` (where the pill is hidden and the menu sits in the top layer) keeps the whole viewport. Horizontally it is clamped 8px inside the viewport. It re-fits on resize, on any scroll (capture) and on the visual viewport, so it follows an anchor inside a sideways-scrolling column, is never clipped by it, and a row scrolled down to the pill flips its open menu. It stacks above the pill (`z-index` 200 over the nav's 120).
 - **Dismissal.** Closes on a press outside, on `Escape` (which does not also close a surrounding dialog), on a second tap of the anchor, on choosing an item, and on `Tab`.
 - **Menu-button pattern.** The anchor carries `aria-haspopup="menu"`, `aria-expanded` and `aria-controls`; the list is `role="menu"` of `role="menuitem"` buttons with a roving `tabindex`. `Enter` / `Space` / a tap open it with the first item focused; `ArrowDown` / `ArrowUp` on the anchor open it on the first / last item; inside, `ArrowDown` / `ArrowUp` move (wrapping), `Home` / `End` jump. `Escape`, choosing an item and `Tab` return focus to the anchor, and a press outside leaves focus where the user put it.
 - **Visible focus.** Both the anchor and each row show a 2px `--accent` ring on `:focus-visible`; the row's ring is inset so the menu's border never clips it.
@@ -85,6 +85,23 @@ function renderRows(rows) {
 | `--row-sm`, `--icon-inline`, `--font-body` | `44px`, `16px`, `1rem` | row height, glyph, text |
 
 The design spec has no `row-menu` token block yet; this recipe reuses the toast's `--shadow` and the card tokens (`project-scaffolding#317`).
+
+## The fleet standard (#362)
+
+The owner asked for one ⋮ menu everywhere: same font, same glyph size, same placement. This component is that standard. It reconciles the two apps that had fixed the menu in their own copies:
+
+| | app-launcher (`app-launcher#1508`) | local-llm-hub (`local-llm-hub#767`) | This component |
+| --- | --- | --- | --- |
+| Row text | `--font-body`, weight 500 | `--font-body`, weight 500 | the same |
+| Row layout | 44px, glyph then label, 10px gap, 12px padding | the same | the same (`--row-sm`, `--icon-inline` glyph) |
+| Menu box | min-width 200px, 4px padding | the hub's own surface | min-width 200px, 4px padding |
+| Stacking | above the nav | `z-index` 130 | `z-index` 200: above the pill (120) and a sticky header, below the toast (400) |
+| Placement | band = viewport minus the visible fixed pill; flip across the anchor; clamp + internal scroll last | the same rule, plus: a menu inside a `<dialog>` ignores the pill | both: the band rule, with the `<dialog>` exemption |
+| Anchor gap | from the app's CSS offset | 0 (flush under the kebab) | 2px, mirrored when flipped |
+
+Differences resolved: app-launcher also supported a CSS-placed (`position: absolute`) menu bounded by its clipping ancestors; this component only ever places a `fixed` menu mounted outside every scroller, so that branch is not carried. The hub's "hidden until first placed" CSS isn't needed either: `row-menu.js` places the menu synchronously when it mounts, before the first paint.
+
+The placement rule is pinned by `tests/e2e/test_vendored_row_menu_placement.py` at 390×844 with the real nav pill.
 
 ## Don't diverge
 
