@@ -551,6 +551,13 @@ def _assert_text_size(page: Page, static_server: str) -> None:
     assert page.evaluate("localStorage.getItem('demo.textsize')") == "large"
     expect(page.locator("#demoTextSizeLarge")).to_have_attribute("aria-pressed", "true")
     expect(page.locator("#demoTextSizeLarge")).to_have_class(re.compile(r"\bactive\b"))
+    # The control is the fleet's one choice shape, segmented (#353): the binder's
+    # aria-pressed is what raises the chosen step, and the others rest flat.
+    assert page.evaluate("document.getElementById('demoTextSize').classList.contains('segmented')")
+    assert page.locator("#demoTextSize .range-tab").count() == 0
+    assert _style(page, "#demoTextSizeLarge", "boxShadow") != "none"
+    expect(page.locator("#demoTextSize [data-textsize][aria-pressed='true']")).to_have_count(1)
+    assert _style(page, "#demoTextSize [data-textsize='small']", "boxShadow") == "none"
     # Geometry is px and holds at the Large step.
     assert _style(page, "#demoRangeDay", "height") == "36px"
     assert _style(page, "#demoActionOneLine", "minHeight") == "52px"
@@ -584,7 +591,7 @@ def test_range_tab_contract(gallery: Page, static_server: str, browser: Browser)
     Plus #267: a selected state that survives greyscale, one-line labels, and
     44px effective targets on a coarse pointer (checked here rather than in a
     new node, to hold the suite's ratcheted budget). Plus #276: the text-size
-    control built on it, and its boot snippet.
+    control (segmented since #353) and its boot snippet.
     """
     assert _style(gallery, "#demoRangeDay", "height") == "36px"
     assert _style(gallery, "#demoRangeDay", "whiteSpace") == "nowrap"
@@ -620,8 +627,8 @@ def test_range_tab_contract(gallery: Page, static_server: str, browser: Browser)
     finally:
         context.close()
 
-    # The text-size control is a range-tab row (#276), checked here for the
-    # same budget reason. It navigates away from the gallery, so it runs last.
+    # The text-size control (#276; a segmented group since #353), checked here
+    # for the same budget reason. It navigates away from the gallery, so it runs last.
     _assert_text_size(gallery, static_server)
 
 
