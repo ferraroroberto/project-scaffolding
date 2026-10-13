@@ -17,13 +17,14 @@ import sqlite3
 import threading
 import time
 from collections.abc import Iterator
+from contextlib import contextmanager
 from pathlib import Path
 
 import pytest
 import uvicorn
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI, Header, HTTPException
 from fastapi.staticfiles import StaticFiles
-from playwright.sync_api import Browser, Page
+from playwright.sync_api import Browser, Page, Response
 
 from src.usage_log import usage_router
 from tests.e2e.conftest import STATIC_DIR
@@ -31,14 +32,9 @@ from tests.e2e.conftest import STATIC_DIR
 _BOOT_TIMEOUT_S = 10.0
 
 
-@pytest.fixture(scope="module")
-def usage_app(tmp_path_factory: pytest.TempPathFactory) -> Iterator[tuple[str, Path]]:
-    """Serve the static tree + the usage router on an ephemeral loopback port."""
-    db = tmp_path_factory.mktemp("usage") / "usage.sqlite3"
-    app = FastAPI()
-    app.include_router(usage_router(db))
-    app.mount("/", StaticFiles(directory=STATIC_DIR))
-
+@contextmanager
+def _serve(app: FastAPI) -> Iterator[str]:
+    """Run `app` on an ephemeral loopback port; yields its base URL."""
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     sock.bind(("127.0.0.1", 0))
     port = sock.getsockname()[1]
@@ -55,11 +51,107 @@ def usage_app(tmp_path_factory: pytest.TempPathFactory) -> Iterator[tuple[str, P
             raise RuntimeError(f"usage-log test server did not start within {_BOOT_TIMEOUT_S}s")
         time.sleep(0.05)
     try:
-        yield f"http://127.0.0.1:{port}", db
+        yield f"http://127.0.0.1:{port}"
     finally:
         server.should_exit = True
         thread.join(timeout=10)
         sock.close()
+
+
+@pytest.fixture(scope="module")
+def usage_app(tmp_path_factory: pytest.TempPathFactory) -> Iterator[tuple[str, Path]]:
+    """Serve the static tree + the usage router on an ephemeral loopback port."""
+    db = tmp_path_factory.mktemp("usage") / "usage.sqlite3"
+    app = FastAPI()
+    app.include_router(usage_router(db))
+    app.mount("/", StaticFiles(directory=STATIC_DIR))
+    with _serve(app) as base:
+        yield base, db
+
+
+@pytest.fixture
+def token_app(tmp_path: Path) -> Iterator[tuple[str, list[str]]]:
+    """The router behind a token check (the shape of an app whose API is
+    bearer-gated for off-loopback callers); yields the base URL and every token
+    the server accepted, in order. A request without a `tok-…` header is a 401."""
+    accepted: list[str] = []
+
+    def require_token(x_usage_token: str | None = Header(default=None)) -> None:
+        if not x_usage_token or not x_usage_token.startswith("tok-"):
+            raise HTTPException(status_code=401)
+        accepted.append(x_usage_token)
+
+    app = FastAPI()
+    app.include_router(usage_router(tmp_path / "usage.sqlite3",
+                                    dependencies=[Depends(require_token)]))
+    app.mount("/", StaticFiles(directory=STATIC_DIR))
+    with _serve(app) as base:
+        yield base, accepted
+
+
+# Counts navigator.sendBeacon calls without replacing it, so a test can tell
+# which transport the page-hide send used.
+_COUNT_BEACONS = """
+window.__beacons = 0;
+const realBeacon = navigator.sendBeacon.bind(navigator);
+navigator.sendBeacon = (...args) => { window.__beacons += 1; return realBeacon(...args); };
+"""
+
+
+def _is_events_post(base: str, resp: Response) -> bool:
+    return resp.url == f"{base}/api/usage/events" and resp.request.method == "POST"
+
+
+def _open_with_headers(page: Page, base: str) -> None:
+    """Start a logger whose `headers` function reads `window.token` per send."""
+    page.add_init_script(_COUNT_BEACONS)
+    page.goto(f"{base}/_vendored/usage-log/usage-log.js")
+    page.evaluate("""async () => {
+        const { initUsageLog } = await import('/_vendored/usage-log/usage-log.js');
+        window.token = 'tok-1';
+        window.usage = initUsageLog({ headers: () => ({ 'X-Usage-Token': window.token }) });
+        window.usage.trackView('overview');
+    }""")
+
+
+def test_headers_option_reaches_the_normal_send(
+    token_app: tuple[str, list[str]], page: Page
+) -> None:
+    base, accepted = token_app
+    _open_with_headers(page, base)
+    with page.expect_response(lambda r: _is_events_post(base, r)) as sent:
+        page.evaluate("window.usage.flush()")
+    assert sent.value.status == 200, sent.value.text()
+    assert accepted == ["tok-1"]
+
+
+def test_headers_option_reaches_the_page_hide_send_as_a_keepalive_fetch(
+    token_app: tuple[str, list[str]], page: Page
+) -> None:
+    base, accepted = token_app
+    _open_with_headers(page, base)
+    # Rotated after init: a function is read per send, not once.
+    page.evaluate("window.token = 'tok-2'")
+    with page.expect_response(lambda r: _is_events_post(base, r)) as sent:
+        page.evaluate("window.dispatchEvent(new Event('pagehide'))")
+    assert sent.value.status == 200, sent.value.text()
+    assert accepted == ["tok-2"]
+    assert page.evaluate("window.__beacons") == 0
+
+
+def test_without_headers_the_page_hide_send_is_still_a_beacon(
+    token_app: tuple[str, list[str]], page: Page
+) -> None:
+    base, accepted = token_app
+    page.add_init_script(_COUNT_BEACONS)
+    page.goto(f"{base}/_vendored/usage-log/usage-log.js")
+    page.evaluate("""async () => {
+        const { initUsageLog } = await import('/_vendored/usage-log/usage-log.js');
+        window.usage = initUsageLog();
+        window.usage.trackView('overview');
+        window.dispatchEvent(new Event('pagehide'));
+    }""")
+    assert page.evaluate("window.__beacons") == 1
 
 
 def _drive(page: Page, base: str) -> list[str]:
