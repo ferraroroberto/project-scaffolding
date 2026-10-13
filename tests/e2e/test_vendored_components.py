@@ -356,6 +356,26 @@ def test_modal_row_label_only(gallery: Page) -> None:
         assert _style(gallery, "#demoRowNote", "fontWeight") == "400", theme
 
 
+def test_modal_autofocus_title_has_no_ring(gallery: Page) -> None:
+    """modal: an autofocused `h2[tabindex=-1]` title draws no ring; a tabbed control keeps it (#359)."""
+    # The gallery paints no app-wide ring, so give it the one the fleet apps
+    # ship (`:focus-visible { outline: 2px solid var(--accent) }`).
+    gallery.add_style_tag(content=":focus-visible { outline: 2px solid rgb(9, 105, 218); outline-offset: 2px; }")
+    # Open by keyboard so the focus the dialog moves to the title matches
+    # :focus-visible, as it does on the iOS device that showed the ring.
+    gallery.focus("#openModalBtn")
+    gallery.keyboard.press("Enter")
+    expect(gallery.locator("#demoDialog")).to_be_visible()
+    title = gallery.locator("#demoDialog h2")
+    expect(title).to_be_focused()
+    assert title.evaluate("e => e.matches(':focus-visible')"), "title must be :focus-visible for this test to bite"
+    assert _style(gallery, "#demoDialog h2", "outlineStyle") == "none"
+    gallery.keyboard.press("Tab")
+    expect(gallery.locator("#demoDialogClose")).to_be_focused()
+    assert _style(gallery, "#demoDialogClose", "outlineStyle") == "solid"
+    assert _style(gallery, "#demoDialogClose", "outlineWidth") == "2px"
+
+
 def test_icon_tile_contract(gallery: Page) -> None:
     """icon-tile: rounded.md squircle, tile-blue fill, feature-size glyph."""
     assert _style(gallery, "#demoTileBlue", "borderRadius") == "12px"
