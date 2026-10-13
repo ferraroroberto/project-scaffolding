@@ -87,6 +87,60 @@ _GEOMETRY = """
 }
 """
 
+# Open a menu on a list row, then rebuild the list the way an app's poll does:
+# build the new row and `attach()` it BEFORE it is inserted, swap it in, call
+# `endRender()`. Samples the menu and the new kebab synchronously after the swap
+# and on each of the next frames.
+_REBUILD = """
+async () => {
+  const { createRowMenu } = await import('/_vendored/row-menu/row-menu.js');
+  document.getElementById('placementScroller')?.remove();
+  const scroller = document.createElement('div');
+  scroller.id = 'placementScroller';
+  scroller.style.cssText = 'position:fixed;inset:0;overflow-y:auto;z-index:100;'
+    + 'background:var(--bg)';
+  const list = document.createElement('div');
+  list.style.cssText = 'position:relative;height:3000px;padding:300px 21px 0';
+  scroller.appendChild(list);
+  document.body.appendChild(scroller);
+  const rowMenu = createRowMenu();
+  const build = () => {
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex;justify-content:flex-end';
+    const kebab = document.createElement('button');
+    kebab.type = 'button';
+    kebab.className = 'rebuilt-kebab';
+    kebab.textContent = '⋮';
+    kebab.style.cssText = 'width:44px;height:44px';
+    row.appendChild(kebab);
+    rowMenu.attach('demo-row', kebab, [
+      { label: 'Action 1', glyph: 'pencil', onTap() {} },
+      { label: 'Delete', glyph: 'trash-2', danger: true, onTap() {} },
+    ]);
+    return row;
+  };
+  list.replaceChildren(build());
+  list.querySelector('.rebuilt-kebab').click();
+  const frame = () => new Promise((r) => requestAnimationFrame(r));
+  await frame();
+  list.replaceChildren(build());
+  rowMenu.endRender();
+  const samples = [];
+  const sample = () => {
+    const menu = document.querySelector('.row-menu');
+    const kebab = list.querySelector('.rebuilt-kebab');
+    const rect = (el) => { const b = el.getBoundingClientRect();
+      return { top: b.top, bottom: b.bottom, left: b.left, right: b.right }; };
+    samples.push({ visibility: getComputedStyle(menu).visibility, menu: rect(menu),
+      anchor: rect(kebab), connected: menu.isConnected,
+      focusInMenu: menu.contains(document.activeElement) });
+  };
+  sample();
+  for (let i = 0; i < 4; i++) { await frame(); sample(); }
+  return samples;
+}
+"""
+
 
 @pytest.fixture()
 def phone(static_server: str, browser: Browser) -> Iterator[Page]:
@@ -234,3 +288,18 @@ def test_row_menu_placement_and_size_on_a_phone(phone: Page) -> None:
     assert box["top"] + menu["height"] > nav_top - _EDGE, geo  # the precondition
     assert abs(menu["bottom"] - box["bottom"]) <= 1, geo
     _assert_in_band(geo)
+
+    # 7. A polled list is rebuilt under an open menu (#373): the new row is
+    # attached before it is inserted, as the README's example does. The menu
+    # must never paint at the viewport inset, and settles beside the new kebab.
+    phone.keyboard.press("Escape")  # the step-6 menu is still open
+    samples = phone.evaluate(_REBUILD)
+    assert len(samples) >= 3, samples
+    for s in samples:
+        if s["visibility"] == "hidden":
+            continue
+        assert s["menu"]["top"] >= s["anchor"]["bottom"], samples
+        assert abs(s["menu"]["right"] - s["anchor"]["right"]) <= 1, samples
+    assert samples[-1]["visibility"] == "visible", samples
+    assert samples[-1]["connected"], samples
+    assert samples[-1]["focusInMenu"], samples
