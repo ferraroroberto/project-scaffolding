@@ -101,7 +101,9 @@ body:has(dialog[open]) .app { overflow: hidden; }
    `.icon` whatever the link order. */
 .detail-header .detail-close .icon { width: var(--icon-title); height: var(--icon-title); }
 
-/* Label/value rows: label left, control right (>= 55%), top-border divider. */
+/* Label/value rows: label left, control right (>= 55%), top-border divider.
+   The label is the row's first `span` child; any other span (a muted note,
+   a fix-it line) keeps its own colour and weight (project-scaffolding#363). */
 .detail-card .row {
   display: flex;
   align-items: center;
@@ -110,7 +112,7 @@ body:has(dialog[open]) .app { overflow: hidden; }
   padding: 12px 0;            /* modal.rowPadding */
   border-top: 1px solid var(--line);
 }
-.detail-card .row span { color: var(--ink); font-weight: 600; }
+.detail-card .row > span:first-child { color: var(--ink); font-weight: 600; }
 .detail-card .row .select-native,
 .detail-card .row .input-native { min-width: 55%; }
 

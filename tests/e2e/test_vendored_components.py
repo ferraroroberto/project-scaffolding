@@ -344,6 +344,18 @@ def test_modal_contract(gallery: Page) -> None:
     expect(gallery.locator("#demoDialog")).to_be_hidden()
 
 
+def test_modal_row_label_only(gallery: Page) -> None:
+    """modal: the row label is ink 600; an app's muted span in the row keeps its own style (#363)."""
+    gallery.click("#openModalBtn")
+    for theme, ink, muted in (("light", "rgb(31, 35, 40)", "rgb(101, 109, 118)"),
+                              ("dark", "rgb(230, 237, 243)", "rgb(125, 133, 144)")):
+        _set_theme(gallery, theme)
+        assert _style(gallery, "#demoRowLabel", "color") == ink, theme
+        assert _style(gallery, "#demoRowLabel", "fontWeight") == "600", theme
+        assert _style(gallery, "#demoRowNote", "color") == muted, theme
+        assert _style(gallery, "#demoRowNote", "fontWeight") == "400", theme
+
+
 def test_icon_tile_contract(gallery: Page) -> None:
     """icon-tile: rounded.md squircle, tile-blue fill, feature-size glyph."""
     assert _style(gallery, "#demoTileBlue", "borderRadius") == "12px"

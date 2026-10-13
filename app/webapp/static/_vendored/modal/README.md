@@ -43,6 +43,7 @@ The fleet's canonical **editor modal**: a native `<dialog>` with a `heading-lg` 
 </dialog>
 ```
 
+- The row **label** is the row's first `span` child (`.detail-card .row > span:first-child`): `ink`, weight 600. Any other `span` in the row (a muted note, a fix-it line) is not styled by the modal and keeps your own class's colour and weight. Put the label first and give secondary text its own class.
 - Use the **native** dialog API (`showModal()`/`close()`) — never a hand-rolled overlay (the shadcn Dialog rule in `design.md`).
 - Exactly **one** primary action; it starts `disabled` until something changes.
 - The disabled recipe (control-fill/muted/line) is part of the contract, inherited from `button-primary` — opacity-based disabling drops sub-AA in both themes. `.detail-save-btn` only adds the footer's full width.
