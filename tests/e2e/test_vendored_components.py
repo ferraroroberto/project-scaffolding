@@ -606,12 +606,14 @@ _AA = 4.5
 
 
 def _assert_segmented_theme(page: Page, *, card: str, ink: str,
-                            muted: tuple[int, int, int]) -> None:
+                            muted: tuple[int, int, int],
+                            selected_fill: tuple[int, int, int]) -> None:
     """segmented in one theme: the raised selected segment, fg labels at AA.
 
-    The selected segment is the state: card fill plus a shadow, never a hue.
-    Every label (resting, selected, unavailable) is fg; contrast is judged
-    as rendered, the translucent track composited over the card.
+    The selected segment is the state: a fill lighter than the track plus a
+    shadow, never a hue (#341; dark fill #377). Every label (resting,
+    selected, unavailable) is fg; contrast is judged as rendered, the
+    translucent track composited over the card.
     """
     page.mouse.move(0, 0)
     r, g, b, a = _rgba(_style(page, "#demoSegPicker", "backgroundColor"))
@@ -622,14 +624,20 @@ def _assert_segmented_theme(page: Page, *, card: str, ink: str,
     for group in _SEG_GROUPS:
         selected = f"{group} .segmented-item[aria-pressed='true']"
         resting = f"{group} .segmented-item[aria-pressed='false']:not(:disabled)"
-        assert _style(page, selected, "backgroundColor") == card, group
+        assert _rgba(_style(page, selected, "backgroundColor"))[:3] == selected_fill, group
         assert _style(page, selected, "boxShadow") != "none", group
         assert _style(page, resting, "backgroundColor") == _TRANSPARENT, group
         assert _style(page, resting, "boxShadow") == "none", group
         for seg in (selected, resting):
             assert _style(page, seg, "color") == ink, (group, seg)
+    fill = _style(page, selected, "backgroundColor")
+    # Raised, not pressed in: the selected fill is lighter than its track (the
+    # contrast against black orders luminance; the track composites over card).
+    black = "rgb(0, 0, 0)"
+    assert _contrast(fill, black, card) > _contrast(track, black, card), (
+        "selected segment is not lighter than its track")
     resting_ratio = _contrast(ink, track, card)
-    selected_ratio = _contrast(ink, card, card)
+    selected_ratio = _contrast(ink, fill, card)
     assert resting_ratio >= _AA, f"label on track {resting_ratio:.2f}:1"
     assert selected_ratio >= _AA, f"selected label {selected_ratio:.2f}:1"
     # Unavailable: still the fg label, no opacity; the cursor says it.
@@ -653,10 +661,10 @@ def test_segmented_contract(gallery: Page, static_server: str, browser: Browser)
     assert _style(gallery, "#demoSegOff", "height") == "38px"
     assert _style(gallery, "#demoSegMine", "whiteSpace") == "nowrap"
     _assert_segmented_theme(gallery, card="rgb(255, 255, 255)", ink="rgb(31, 35, 40)",
-                            muted=(101, 109, 118))
+                            muted=(101, 109, 118), selected_fill=(255, 255, 255))
     _set_theme(gallery, "dark")
     _assert_segmented_theme(gallery, card="rgb(22, 27, 34)", ink="rgb(230, 237, 243)",
-                            muted=(125, 133, 144))
+                            muted=(125, 133, 144), selected_fill=(53, 59, 67))
     _set_theme(gallery, "light")
     # Selection moves with a tap; an unavailable segment ignores one.
     gallery.click("#demoSegIssues")
