@@ -438,6 +438,8 @@ def test_mobile_pill_active_tab_is_accent_tint_not_inset_surface(
 
 _ATTENTION = "rgb(154, 103, 0)"  # demo.html :root --attention (design.md)
 _ATTENTION_DARK = "rgb(210, 153, 34)"
+_DANGER = "rgb(207, 34, 46)"  # demo.html :root --deficit (design.md danger)
+_DANGER_DARK = "rgb(248, 81, 73)"
 
 
 def _init_nav(page: Page) -> None:
@@ -448,9 +450,16 @@ def _init_nav(page: Page) -> None:
     )
 
 
-def _set_badge(page: Page, tab: str, count: object, noun: str | None = None) -> None:
+def _set_badge(
+    page: Page,
+    tab: str,
+    count: object,
+    noun: str | None = None,
+    tone: str | None = None,
+) -> None:
     page.evaluate(
-        "([t, c, n]) => window.__nav.setBadge(t, c, n ?? undefined)", [tab, count, noun]
+        "([t, c, n, o]) => window.__nav.setBadge(t, c, n ?? undefined, o ?? undefined)",
+        [tab, count, noun, tone],
     )
 
 
@@ -531,6 +540,38 @@ def test_badge_text_meets_contrast_in_both_themes(nav: Page) -> None:
     _wait_style(nav, badge, "backgroundColor", _ATTENTION_DARK)
     fill, text = _style(nav, badge, "backgroundColor"), _style(nav, badge, "color")
     assert _contrast(text, fill, "rgb(22, 27, 34)") >= 4.5
+
+
+def test_danger_badge_tone_meets_contrast_in_both_themes(nav: Page) -> None:
+    """tone 'danger' paints the danger fill under card text at 4.5:1+, light and dark (#342)."""
+    _init_nav(nav)
+    badge = ".tab-badge"
+    _set_badge(nav, "stats", 2, "triggered", "danger")
+    expect(nav.locator(badge)).to_have_attribute("data-tone", "danger")
+    assert _style(nav, badge, "backgroundColor") == _DANGER
+    fill, text = _style(nav, badge, "backgroundColor"), _style(nav, badge, "color")
+    assert _contrast(text, fill, "rgb(255, 255, 255)") >= 4.5
+
+    _set_theme(nav, "dark")
+    _wait_style(nav, badge, "backgroundColor", _DANGER_DARK)
+    fill, text = _style(nav, badge, "backgroundColor"), _style(nav, badge, "color")
+    assert _contrast(text, fill, "rgb(22, 27, 34)") >= 4.5
+
+
+def test_badge_tone_defaults_to_attention_and_repaints(nav: Page) -> None:
+    """Omitting the tone (or an unknown one) is attention; a later call repaints the same badge."""
+    _init_nav(nav)
+    badge = ".tab-badge"
+    _set_badge(nav, "stats", 2, "waiting")
+    expect(nav.locator(badge)).to_have_attribute("data-tone", "attention")
+    assert _style(nav, badge, "backgroundColor") == _ATTENTION
+    _set_badge(nav, "stats", 2, "waiting", "no-such-tone")
+    assert _style(nav, badge, "backgroundColor") == _ATTENTION
+    _set_badge(nav, "stats", 3, "triggered", "danger")
+    assert nav.locator(badge).count() == 1
+    assert _style(nav, badge, "backgroundColor") == _DANGER
+    _set_badge(nav, "stats", 3, "waiting")
+    assert _style(nav, badge, "backgroundColor") == _ATTENTION
 
 
 def _geometry(page: Page, tab: str) -> dict[str, float]:
