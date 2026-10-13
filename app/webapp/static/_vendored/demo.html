@@ -142,6 +142,8 @@
           stroke: currentColor; stroke-width: 2; stroke-linecap: round;
           stroke-linejoin: round; vertical-align: -0.15em; }
   .tile-row { display: flex; gap: var(--gap); }
+  /* An app's own muted class, placed inside a modal row (#363). */
+  .demo-row-note { color: var(--muted); font-weight: 400; }
   #themeToggle { align-self: flex-end; }
 </style>
 <!-- base.css loads FIRST: element-level rules every component builds on. -->
@@ -230,6 +232,10 @@
       <div class="row">
         <span>Mode</span>
         <select class="select-native"><option>Auto</option><option>Manual</option></select>
+      </div>
+      <div class="row">
+        <span id="demoRowLabel">Hint</span>
+        <span class="demo-row-note" id="demoRowNote">Optional note</span>
       </div>
       <div class="detail-actions">
         <button type="button" class="button-primary detail-save-btn" id="demoSaveBtn" disabled>Save</button>
