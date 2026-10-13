@@ -377,7 +377,7 @@
     </select>
   </div>
 
-  <h2>action-row (filter, one line, two line, favorite, dominant verb)</h2>
+  <h2>action-row (filter, one line, two line, favorite, dominant verb, outlined stop verb)</h2>
   <div class="card action-list" id="demoActionList">
     <label class="action-row-filter" id="demoActionFilter">
       <svg class="icon" aria-hidden="true"><use href="#i-search"></use></svg>
@@ -430,6 +430,19 @@
           <svg class="icon" aria-hidden="true"><use href="#i-play"></use></svg>
         </button>
         <button type="button" class="icon-button action-row-kebab" id="demoActionKebab" aria-label="More actions"
+                aria-haspopup="menu" aria-expanded="false">
+          <svg class="icon" aria-hidden="true"><use href="#i-ellipsis-vertical"></use></svg>
+        </button>
+      </li>
+      <li class="action-row" id="demoActionStopRow">
+        <button type="button" class="action-row-main">
+          <span class="action-row-title">Sync worker</span>
+          <span class="action-row-meta">Running for 2h</span>
+        </button>
+        <button type="button" class="icon-button action-row-verb action-row-verb--stop" id="demoActionStop" aria-label="Stop">
+          <svg class="icon" aria-hidden="true"><use href="#i-square"></use></svg>
+        </button>
+        <button type="button" class="icon-button action-row-kebab" aria-label="More actions"
                 aria-haspopup="menu" aria-expanded="false">
           <svg class="icon" aria-hidden="true"><use href="#i-ellipsis-vertical"></use></svg>
         </button>
