@@ -364,7 +364,7 @@ def test_icon_tile_contract(gallery: Page) -> None:
 
 
 def test_button_contract(gallery: Page) -> None:
-    """button: four tiers + shared disabled recipe + danger tint (fleet-config#296)."""
+    """button: four tiers + shared disabled recipe + outlined danger (fleet-config#296, #1403)."""
     # primary: solid accent fill, accent-fg text, spec's 48px min-height.
     assert _style(gallery, "#demoButtonPrimary", "backgroundColor") == "rgb(9, 105, 218)"
     assert _style(gallery, "#demoButtonPrimary", "color") == "rgb(255, 255, 255)"
@@ -389,11 +389,15 @@ def test_button_contract(gallery: Page) -> None:
     assert _style(gallery, "#demoButtonDisabled", "borderColor") == "rgb(209, 217, 224)"
     assert _style(gallery, "#demoButtonDisabled", "color") == "rgb(101, 109, 118)"
     assert _style(gallery, "#demoButtonDisabled", "opacity") == "1"
-    # danger: the tint recipe restated on --deficit — still non-opaque.
-    dr, dg, db, da = _rgba(_style(gallery, "#demoButtonDanger", "backgroundColor"))
-    assert (dr, dg, db) == (207, 34, 46)
-    assert 0 < da < 1
+    # danger: the OUTLINED destructive recipe (fleet-config#1403, project-scaffolding#379)
+    # — fully transparent fill (no fill, no tint), danger-text label, a 1px --deficit
+    # border. Red on the former --deficit-soft tint.
+    assert _style(gallery, "#demoButtonDanger", "backgroundColor") == "rgba(0, 0, 0, 0)"
     assert _style(gallery, "#demoButtonDanger", "color") == "rgb(164, 14, 38)"  # danger-text
+    assert _style(gallery, "#demoButtonDanger", "borderColor") == "rgb(207, 34, 46)"  # deficit
+    assert _style(gallery, "#demoButtonDanger", "borderWidth") == "1px"
+    assert _contrast(_style(gallery, "#demoButtonDanger", "color"), "rgb(255, 255, 255)",
+                     "rgb(255, 255, 255)") >= 4.5
 
 
 _ICON_BUTTONS = "#demoIconButtons .icon-button"
@@ -1079,6 +1083,9 @@ def test_dark_theme_values(gallery: Page) -> None:
     assert _style(gallery, "#demoButtonPrimary", "backgroundColor") == "rgb(31, 111, 235)"
     assert _style(gallery, "#demoButtonTint", "color") == "rgb(88, 166, 255)"
     assert _style(gallery, "#demoButtonDanger", "color") == "rgb(255, 123, 114)"
+    assert _style(gallery, "#demoButtonDanger", "backgroundColor") == "rgba(0, 0, 0, 0)"
+    assert _style(gallery, "#demoButtonDanger", "borderColor") == "rgb(248, 81, 73)"  # deficit
+    assert _contrast("rgb(255, 123, 114)", "rgb(22, 27, 34)", "rgb(22, 27, 34)") >= 4.5
     assert _style(gallery, "#demoButtonDisabled", "backgroundColor") == _DARK_CONTROL_FILL
     assert _style(gallery, "#demoButtonDisabled", "color") == "rgb(125, 133, 144)"
     # range-tab active pill re-skins to the dark accent-text, and its selection

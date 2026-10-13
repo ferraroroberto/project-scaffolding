@@ -22,7 +22,7 @@ A cloned web app inherits both: design **tokens** (wire your CSS custom properti
 | [`empty-state/`](empty-state/) | Canonical zero-items block: feature-size glyph + one-line reason + optional quiet action; `emptyStateEl()` builder. | ✅ |
 | [`switch/`](switch/) | The one boolean control (shadcn Switch shape, accent on-track, never green); `switchEl()`/`setSwitch()` builders. | ✅ |
 | [`icon-tile/`](icon-tile/) | The Home-screen rounded-square: one `tile-*` fill + centered feature-size glyph. | ✅ |
-| [`button/`](button/) | The four-tier action vocabulary — `button-primary`/`button-tint`/`button-ghost`/`button-surface`, one shared disabled recipe, the `.danger` tint variant. | ✅ |
+| [`button/`](button/) | The four-tier action vocabulary — `button-primary`/`button-tint`/`button-ghost`/`button-surface`, one shared disabled recipe, the outlined `.danger` variant. | ✅ |
 | [`segmented/`](segmented/) | The segmented control (design.md `segmented`): one choice among 2–5 peers on one `neutral-soft` track, where the selected segment, raised on `card`, **is** the state (never a colour, never red for a normal mode). Every label is `fg` at AA, an unavailable segment keeps its label, and targets reach 44px vertically only. A `--verbs` row is used for choices that act on the world, and as an action-row's trailing cluster. New choice controls use this, not `range-tab`. | ✅ |
 | [`range-tab/`](range-tab/) | The ghost segmented control (Day/Week/Month, timer presets): equal-width pills, card-off resting / accent-soft active with a solid accent border, one canonical height (`--control-h`), five options max. | ✅ |
 | [`page-foot/`](page-foot/) | The build-identity footer: `Build: <sha> · YYYY-MM-DD HH:MM` via the one shared `fmtBuildTime`/`buildReadoutText`. | ✅ |
