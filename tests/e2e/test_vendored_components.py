@@ -776,6 +776,87 @@ def test_home_head_contract(gallery: Page) -> None:
     assert_no_overlap(actions)
 
 
+_TONE_STATUS = "#demoHomeStatusTone"
+
+# Render into the gallery's tone-demo status slot through the vendored module,
+# exactly as an adopter's refresh would, and report what the slot now holds.
+_RENDER_STATUS_JS = """async ([exceptions, fallback]) => {
+  const { renderHeadStatus } = await import('./home-head/home-head.js');
+  const el = document.querySelector('#demoHomeStatusTone');
+  renderHeadStatus(el, exceptions, fallback);
+  return {
+    text: el.textContent,
+    tone: el.dataset.tone ?? null,
+    parts: [...el.children].map((c) => ({ text: c.textContent, tone: c.dataset.tone,
+      cls: c.className })),
+  };
+}"""
+
+
+def _render_status(page: Page, exceptions: object, fallback: object) -> dict[str, object]:
+    return page.evaluate(_RENDER_STATUS_JS, [exceptions, fallback])  # type: ignore[no-any-return]
+
+
+def test_home_head_status_colours_exceptions_by_tone(gallery: Page) -> None:
+    """home-head: each exception part sits in its tone's *-text with AA contrast, both themes (#343)."""
+    shown = _render_status(
+        gallery,
+        [{"text": "1 needs you", "tone": "attention"}, {"text": "1 stalled", "tone": "danger"}],
+        "7 sessions",
+    )
+    # Severity order (design.md page-header): danger first, then attention.
+    assert shown["text"] == "1 stalled · 1 needs you", shown
+    assert [p["tone"] for p in shown["parts"]] == ["danger", "attention"]  # type: ignore[attr-defined]
+    danger = f"{_TONE_STATUS} .head-exception[data-tone='danger']"
+    attention = f"{_TONE_STATUS} .head-exception[data-tone='attention']"
+    card = _style(gallery, "#demoHomeHeadTone", "backgroundColor")
+    assert _style(gallery, danger, "color") == "rgb(164, 14, 38)"  # danger-text
+    assert _style(gallery, attention, "color") == "rgb(125, 78, 0)"  # attention-text
+    for sel in (danger, attention):
+        assert _contrast(_style(gallery, sel, "color"), card, card) >= 4.5, sel
+    _set_theme(gallery, "dark")
+    card = _style(gallery, "#demoHomeHeadTone", "backgroundColor")
+    assert _style(gallery, danger, "color") == "rgb(255, 123, 114)"
+    assert _style(gallery, attention, "color") == "rgb(227, 179, 65)"
+    for sel in (danger, attention):
+        assert _contrast(_style(gallery, sel, "color"), card, card) >= 4.5, sel
+
+
+def test_home_head_status_without_exceptions_renders_as_today(gallery: Page) -> None:
+    """home-head: no exceptions = the plain muted fallback text, no spans, no tone; no .status = no-op (#343)."""
+    # Dirty the slot first so the reset is what is measured.
+    _render_status(gallery, [{"text": "1 stalled", "tone": "danger"}], "7 sessions")
+    for none in ([], None, [{"text": "", "tone": "danger"}, None]):
+        shown = _render_status(gallery, none, "7 sessions")
+        assert shown == {"text": "7 sessions", "tone": None, "parts": []}, (none, shown)
+        assert _style(gallery, _TONE_STATUS, "color") == _style(gallery, "#demoHomeStatus", "color")
+    # An omitted fallback blanks the slot rather than printing "undefined".
+    assert _render_status(gallery, [], None)["text"] == ""
+    # A header with no .status slot: the renderer does nothing and does not throw.
+    gallery.evaluate(
+        "async () => { const { renderHeadStatus } = await import('./home-head/home-head.js');"
+        " renderHeadStatus(null, [{ text: 'x', tone: 'danger' }], 'y');"
+        " renderHeadStatus(undefined, [], 'y'); }"
+    )
+
+
+def test_home_head_status_keeps_at_most_two_parts(gallery: Page) -> None:
+    """home-head: two parts max, joined by ' · '; a neutral part keeps the slot's muted colour (#343)."""
+    shown = _render_status(
+        gallery,
+        [{"text": "a", "tone": "attention"}, {"text": "b", "tone": "attention"},
+         {"text": "c", "tone": "danger"}],
+        "fallback",
+    )
+    assert shown["text"] == "c · a", shown  # danger first, caller order within a tone
+    assert all(p["cls"] == "head-exception" for p in shown["parts"])  # type: ignore[attr-defined]
+    shown = _render_status(gallery, [{"text": "n", "tone": "neutral"}], "fallback")
+    assert shown["text"] == "n" and shown["tone"] == "neutral", shown
+    assert _style(gallery, f"{_TONE_STATUS} .head-exception", "color") == _style(
+        gallery, "#demoHomeStatus", "color"
+    )
+
+
 def test_select_native_contract(gallery: Page) -> None:
     """select-native: control-height (36px via explicit height, not min-height), control-border border, input-bg fill."""
     # THE iOS decision: height is an explicit `height` (respected), never

@@ -42,6 +42,7 @@
     --tabbar-border: rgba(31, 35, 40, 0.12);
     --danger-text: #a40e26;
     --attention: #9a6700;
+    --attention-text: #7d4e00;
     --tile-green: #1f883d;
     --tile-blue: #0969da;
     --tile-purple: #8250df;
@@ -103,6 +104,7 @@
     --tabbar-border: rgba(255, 255, 255, 0.13);
     --danger-text: #ff7b72;
     --attention: #d29922;
+    --attention-text: #e3b341;
     --tile-green: #238636;
     --tile-blue: #1f6feb;
     --tile-purple: #8957e5;
@@ -373,6 +375,21 @@
     </button>
   </div>
 
+  <h2>home-head (live context line, exceptions by tone)</h2>
+  <div class="card home-head" id="demoHomeHeadTone">
+    <span class="home-title">
+      <svg class="icon" aria-hidden="true"><use href="#i-house"></use></svg>
+      Sessions
+    </span>
+    <span class="status" id="demoHomeStatusTone" aria-live="off"></span>
+    <button type="button" class="icon-button home-toggle" aria-label="Toggle theme" title="Toggle theme">
+      <svg class="icon" aria-hidden="true"><use href="#i-moon"></use></svg>
+    </button>
+    <button type="button" class="icon-button home-toggle home-settings" aria-label="Settings" title="Settings">
+      <svg class="icon" aria-hidden="true"><use href="#i-settings"></use></svg>
+    </button>
+  </div>
+
   <h2>select-native</h2>
   <div class="card">
     <select class="select-native" id="demoSelectNative" aria-label="Demo select">
@@ -578,6 +595,7 @@
   import { buildReadoutText } from './page-foot/page-foot.js';
   import { bindTextSize } from './text-size/text-size.js';
   import { showToast } from './toast/toast.js';
+  import { renderHeadStatus } from './home-head/home-head.js';
   import { createRowMenu } from './row-menu/row-menu.js';
 
   // Inject the real vendored sprite so <use href="#i-NAME"> resolves.
@@ -703,6 +721,13 @@
   document.getElementById('demoHomeToggle').addEventListener('click', flipTheme);
 
   // Signal readiness to the e2e harness.
+  // home-head: the vendored renderer fills the tone-demo context line.
+  renderHeadStatus(
+    document.getElementById('demoHomeStatusTone'),
+    [{ text: '1 needs you', tone: 'attention' }, { text: '1 stalled', tone: 'danger' }],
+    '7 sessions'
+  );
+
   document.body.dataset.demoReady = '1';
 </script>
 <script type="module">
