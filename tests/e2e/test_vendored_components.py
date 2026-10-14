@@ -86,23 +86,20 @@ def _assert_base_inherits(page: Page) -> None:
 _ACTION_LIST = "#demoActionList"
 
 
-def _assert_action_row_colors(page: Page, *, muted: str, ink: str, accent: tuple[int, int, int],
-                              accent_text: str, control_border: str, attention: str) -> None:
-    """action-row: the theme-dependent colors (meta, verb, stop verb, filter, favorite)."""
+def _assert_action_row_colors(page: Page, *, muted: str, ink: str, control_border: str,
+                              attention: str) -> None:
+    """action-row: the theme-dependent colors (meta, verbs, filter, favorite)."""
     assert _style(page, "#demoActionTwoLine .action-row-meta", "color") == muted
-    r, g, b, a = _rgba(_style(page, "#demoActionVerb", "backgroundColor"))
-    assert (r, g, b) == accent
-    assert 0 < a < 1
-    assert _style(page, "#demoActionVerb", "color") == accent_text
-    # A verb that stops or destroys is outlined, never tinted (#361): no fill,
-    # a control-border hairline, the ink glyph, at the same 44px square.
-    stop = "#demoActionStop"
-    assert _style(page, stop, "backgroundColor") == _TRANSPARENT
-    assert _style(page, stop, "borderTopColor") == control_border
-    assert _style(page, stop, "borderTopWidth") == "1px"
-    assert _style(page, stop, "color") == ink
-    assert _style(page, stop, "width") == "44px"
-    assert _style(page, stop, "height") == "44px"
+    # A row verb is a plain icon-button (#386, fleet-config#1420): no fill, no
+    # border, the muted glyph at rest, at the 44px square. The Stop alias
+    # renders exactly like Run, not outlined (#361 retired).
+    page.mouse.move(0, 0)
+    for verb in ("#demoActionVerb", "#demoActionStop"):
+        assert _style(page, verb, "backgroundColor") == _TRANSPARENT, verb
+        assert _style(page, verb, "borderTopWidth") == "0px", verb
+        assert _style(page, verb, "color") == muted, verb
+        assert _style(page, verb, "width") == "44px", verb
+        assert _style(page, verb, "height") == "44px", verb
     assert _style(page, "#demoActionFilter", "borderTopColor") == control_border
     assert _style(page, "#demoActionFavOn", "color") == attention
 
@@ -152,11 +149,13 @@ def _assert_action_row(page: Page) -> None:
     assert_no_overlap(buttons)
     assert _style(page, "#demoActionKebab", "width") == "44px"
     assert _style(page, "#demoActionFilter", "height") == "44px"
-    # The stop verb keeps its ink glyph and no fill under hover: the tint's
-    # hover rule (accent-text) must not reach it.
-    page.hover("#demoActionStop")
-    assert _style(page, "#demoActionStop", "color") == _style(page, "#demoActionTwoLine .action-row-title", "color")
-    assert _style(page, "#demoActionStop", "backgroundColor") == _TRANSPARENT
+    # A verb under hover changes its glyph colour only (to ink): still no fill,
+    # still no border.
+    for verb in ("#demoActionVerb", "#demoActionStop"):
+        page.hover(verb)
+        assert _style(page, verb, "color") == _style(page, "#demoActionTwoLine .action-row-title", "color"), verb
+        assert _style(page, verb, "backgroundColor") == _TRANSPARENT, verb
+        assert _style(page, verb, "borderTopWidth") == "0px", verb
     page.mouse.move(0, 0)
     # The open kebab takes the accent; the filter hides rows (a flex row
     # must still honour [hidden]).
@@ -223,7 +222,8 @@ def _assert_action_row_ext(page: Page) -> None:
     assert _style(page, "#demoActionSegRow", "minHeight") == "52px"
     # Each trailing item sits outside the main button, its right edge at the
     # text column's inset (row 4px + 10px).
-    for trail in ("#demoActionTrailSwitch", "#demoActionValue", "#demoActionSegVerbs"):
+    for trail in ("#demoActionTrailSwitch", "#demoActionValue", "#demoActionSegVerbs",
+                  "#demoActionVerbCluster"):
         geo = page.eval_on_selector(
             trail,
             "el => { const row = el.closest('.action-row').getBoundingClientRect();"
@@ -253,9 +253,19 @@ def _assert_action_row_ext(page: Page) -> None:
     page.click(check)
     # Every control in the list is a >=44px target; none overlap.
     controls = page.locator(f"{_ACTION_EXT} .action-row > button")
-    assert controls.count() == 6
+    assert controls.count() == 7
     assert_min_target(controls)
     assert_no_overlap(controls)
+    # A verb cluster is an icon-button group with no track: unpainted, 44px
+    # boxes that touch (gap 0) and never overlap (#386, fleet-config#1420).
+    cluster = "#demoActionVerbCluster"
+    assert _style(page, cluster, "backgroundColor") == _TRANSPARENT
+    assert _style(page, cluster, "columnGap") in ("0px", "normal")
+    verbs = page.locator(f"{cluster} .icon-button")
+    assert verbs.count() == 2
+    assert_min_target(verbs)
+    assert_no_overlap(verbs)
+    assert [_style(page, f"{cluster} .icon-button:nth-child({i})", "width") for i in (1, 2)] == ["44px"] * 2
 
 
 def test_card_contract(gallery: Page) -> None:
@@ -272,8 +282,7 @@ def test_card_contract(gallery: Page) -> None:
     _assert_base_inherits(gallery)
     _assert_action_row(gallery)
     _assert_action_row_colors(
-        gallery, muted="rgb(101, 109, 118)", ink="rgb(31, 35, 40)", accent=(9, 105, 218),
-        accent_text="rgb(5, 80, 174)",
+        gallery, muted="rgb(101, 109, 118)", ink="rgb(31, 35, 40)",
         control_border="rgb(129, 139, 152)", attention="rgb(154, 103, 0)",
     )
     _assert_action_row_ext(gallery)
@@ -423,14 +432,18 @@ def test_button_contract(gallery: Page) -> None:
 _ICON_BUTTONS = "#demoIconButtons .icon-button"
 # Every glyph-only control the gallery ships: the icon buttons, the home-head
 # toggle + gear, the modal's close, and the action-row favorite + kebabs (all
-# `.icon-button`s, #324/#329, fleet-config#1259). The row's verb is a tinted
-# button on purpose and is not in the set.
+# `.icon-button`s, #324/#329, fleet-config#1259), and every row verb: a verb on
+# a list row is a plain icon-button too, the Stop alias included, with no fill
+# and no border at rest (#386, fleet-config#1420).
 _ICON_ONLY = (
     _ICON_BUTTONS,
     "#demoHomeHead .home-toggle",
     "#demoDialogClose",
     "#demoActionList .action-row-fav",
     "#demoActionList .action-row-kebab",
+    "#demoActionList .action-row-verb",
+    "#demoActionList .action-row-verb--stop",
+    "#demoActionVerbCluster .icon-button",
 )
 _PAINT_JS = """els => els.map(el => {
   const s = getComputedStyle(el);
@@ -1373,8 +1386,7 @@ def test_dark_theme_values(gallery: Page) -> None:
     # action-row re-skins from the dark tokens; its rows-scale heights hold.
     assert _style(gallery, "#demoActionTwoLine", "minHeight") == "60px"
     _assert_action_row_colors(
-        gallery, muted="rgb(125, 133, 144)", ink="rgb(230, 237, 243)", accent=(47, 129, 247),
-        accent_text="rgb(88, 166, 255)",
+        gallery, muted="rgb(125, 133, 144)", ink="rgb(230, 237, 243)",
         control_border="rgb(110, 118, 129)", attention="rgb(210, 153, 34)",
     )
     # action-row extensions (#341): the avatar and its badge ring re-skin too.

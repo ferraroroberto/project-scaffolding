@@ -472,6 +472,7 @@
           <span class="action-row-title">Sync worker</span>
           <span class="action-row-meta">Running for 2h</span>
         </button>
+        <!-- The deprecated --stop alias: must render exactly like a plain verb (#386). -->
         <button type="button" class="icon-button action-row-verb action-row-verb--stop" id="demoActionStop" aria-label="Stop">
           <svg class="icon" aria-hidden="true"><use href="#i-square"></use></svg>
         </button>
@@ -483,7 +484,7 @@
     </ul>
   </div>
 
-  <h2>action-row extensions (avatar up / down / plain, check; trailing switch, value, segmented verbs)</h2>
+  <h2>action-row extensions (avatar up / down / plain, check; trailing switch, value, segmented modes, verb cluster)</h2>
   <div class="card action-list" id="demoActionListExt">
     <ul class="action-rows">
       <li class="action-row" id="demoActionAvatarRow">
@@ -533,6 +534,20 @@
             <svg class="icon" aria-hidden="true"><use href="#i-flame"></use></svg>
           </button>
         </div>
+      </li>
+      <li class="action-row" id="demoActionClusterRow">
+        <button type="button" class="action-row-main" aria-haspopup="dialog">
+          <span class="action-row-title">Sample camera</span>
+        </button>
+        <!-- A verb cluster: icon-button-group, no track (#386, fleet-config#1420). -->
+        <span class="icon-button-group action-row-trail" id="demoActionVerbCluster" role="group" aria-label="Camera">
+          <button type="button" class="icon-button" aria-label="Live" title="Live">
+            <svg class="icon" aria-hidden="true"><use href="#i-video"></use></svg>
+          </button>
+          <button type="button" class="icon-button" aria-label="Wake" title="Wake">
+            <svg class="icon" aria-hidden="true"><use href="#i-power"></use></svg>
+          </button>
+        </span>
       </li>
       <li class="action-row" id="demoActionCheckRow">
         <button type="button" class="icon-button action-row-check" id="demoActionCheck" aria-pressed="false" aria-label="Got it">
