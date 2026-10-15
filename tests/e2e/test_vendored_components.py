@@ -524,6 +524,32 @@ def test_sprite_open_about_view_control_glyphs(gallery: Page) -> None:
         assert row["symbol"] and row["drawn"], row
 
 
+def test_sprite_app_launcher_glyphs(gallery: Page) -> None:
+    """The sprite carries the 16 glyphs upstreamed from app-launcher, and each draws (#391)."""
+    ids = (
+        "i-arrow-big-up", "i-arrow-down", "i-arrow-left", "i-arrow-right",
+        "i-arrow-up", "i-bell", "i-chevron-down", "i-copy",
+        "i-corner-down-left", "i-corner-down-right", "i-download", "i-eye-off",
+        "i-file-diff", "i-gauge", "i-git-pull-request", "i-messages-square",
+    )
+    drawn = gallery.evaluate(
+        """ids => ids.map(id => {
+          const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+          const use = document.createElementNS('http://www.w3.org/2000/svg', 'use');
+          use.setAttribute('href', '#' + id);
+          svg.appendChild(use);
+          document.body.appendChild(svg);
+          const box = use.getBBox();
+          svg.remove();
+          return { id, symbol: !!document.getElementById(id),
+                   drawn: box.width > 0 && box.height > 0 };
+        })""",
+        list(ids),
+    )
+    for row in drawn:
+        assert row["symbol"] and row["drawn"], row
+
+
 def test_icon_button_contract(gallery: Page) -> None:
     """icon-button: hover and press change the glyph colour only (fleet-config#1259)."""
     gallery.mouse.move(0, 0)
