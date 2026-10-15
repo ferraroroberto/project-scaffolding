@@ -168,8 +168,56 @@ def _assert_action_row(page: Page) -> None:
     expect(page.locator(f"{_ACTION_LIST} .action-row:visible")).to_have_count(5)
 
 
+# The rect of the last character of an element's text, and whether it lies inside
+# the element's own box: a figure an ellipsis cut is laid out past the right edge
+# (or collapsed to nothing), a figure on a wrapped second line stays inside.
+_LAST_CHAR_VISIBLE_JS = """el => {
+  const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+  let last = null;
+  while (walker.nextNode()) last = walker.currentNode;
+  const range = document.createRange();
+  range.setStart(last, last.data.length - 1);
+  range.setEnd(last, last.data.length);
+  const c = range.getBoundingClientRect(), box = el.getBoundingClientRect();
+  return { shown: c.width > 0 && c.right <= box.right + 0.5 && c.bottom <= box.bottom + 0.5,
+           lines: Math.round(box.height / parseFloat(getComputedStyle(el).lineHeight)),
+           overflowX: el.scrollWidth > el.clientWidth + 1,
+           overflowY: el.scrollHeight > el.clientHeight + 1 };
+}"""
+
+
+def _assert_action_row_meta_figures(page: Page) -> None:
+    """action-row meta (#396, LAYOUT-09): wraps to two lines, so its trailing figures stay.
+
+    At the 390px phone width a `<words> · <time> · <count>` status line used to
+    keep one line and lose `12 conversations` behind an ellipsis. It now wraps
+    to at most two lines (a third is clamped), the title keeps one line, and a
+    one-line meta keeps the rows-scale height. Runs in the theme the caller set;
+    the original viewport comes back afterwards.
+    """
+    original = page.viewport_size
+    page.set_viewport_size({"width": 390, "height": 844})
+    try:
+        meta = page.eval_on_selector("#demoActionMetaFiguresText", _LAST_CHAR_VISIBLE_JS)
+        assert meta == {"shown": True, "lines": 2, "overflowX": False, "overflowY": False}, meta
+        clamped = page.eval_on_selector("#demoActionMetaClampedText", _LAST_CHAR_VISIBLE_JS)
+        assert clamped["lines"] == 2 and clamped["overflowY"], clamped
+        for row in ("#demoActionMetaFigures", "#demoActionMetaClamped"):
+            title = f"{row} .action-row-title"
+            assert _style(page, title, "whiteSpace") == "nowrap", row
+            assert page.eval_on_selector(title, "el => el.scrollWidth <= el.clientWidth + 1"), row
+        # A one-line meta keeps the rows-scale height (the wrap only adds height).
+        assert _style(page, "#demoActionTwoLine", "minHeight") == "60px"
+        assert page.eval_on_selector(
+            "#demoActionTwoLine", "el => el.getBoundingClientRect().height"
+        ) == 60
+    finally:
+        if original:
+            page.set_viewport_size(original)
+
+
 _ACTION_EXT = "#demoActionListExt"
-_AFTER_JS = "(el, prop) => getComputedStyle(el, '::after')[prop]"
+_AFTER_JS ="(el, prop) => getComputedStyle(el, '::after')[prop]"
 
 
 def _after(page: Page, selector: str, prop: str) -> str:
@@ -290,6 +338,7 @@ def test_card_contract(gallery: Page) -> None:
         gallery, muted=(101, 109, 118), ink="rgb(31, 35, 40)", card="rgb(255, 255, 255)",
         success="rgb(26, 127, 55)", danger="rgb(207, 34, 46)",
     )
+    _assert_action_row_meta_figures(gallery)
 
 
 def test_disclosure_contract(gallery: Page) -> None:
@@ -1438,3 +1487,4 @@ def test_dark_theme_values(gallery: Page) -> None:
         gallery, muted=(125, 133, 144), ink="rgb(230, 237, 243)", card="rgb(22, 27, 34)",
         success="rgb(63, 185, 80)", danger="rgb(248, 81, 73)",
     )
+    _assert_action_row_meta_figures(gallery)
