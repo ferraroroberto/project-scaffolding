@@ -578,6 +578,37 @@
     </ul>
   </div>
 
+  <h2>action-row meta line (wraps to two lines so the trailing figures stay readable; a third line is clamped)</h2>
+  <div class="card action-list" id="demoActionListMeta">
+    <ul class="action-rows">
+      <!-- Before project-scaffolding#396 this meta kept one line and a phone cut
+           "12 conversations" (a count) behind an ellipsis. -->
+      <li class="action-row" id="demoActionMetaFigures">
+        <button type="button" class="action-row-main">
+          <span class="action-row-title">Nightly sync</span>
+          <span class="action-row-meta" id="demoActionMetaFiguresText">Next run 09:30 · every 15 min · 12 conversations</span>
+        </button>
+        <button type="button" class="icon-button action-row-verb" aria-label="Run">
+          <svg class="icon" aria-hidden="true"><use href="#i-play"></use></svg>
+        </button>
+        <button type="button" class="icon-button action-row-kebab" aria-label="More actions"
+                aria-haspopup="menu" aria-expanded="false">
+          <svg class="icon" aria-hidden="true"><use href="#i-ellipsis-vertical"></use></svg>
+        </button>
+      </li>
+      <li class="action-row" id="demoActionMetaClamped">
+        <button type="button" class="action-row-main">
+          <span class="action-row-title">Weekly digest</span>
+          <span class="action-row-meta" id="demoActionMetaClampedText">Last run Monday 09:30 took 2m10s · every week on Monday and Thursday evening · 128 conversations · 14 attachments · 3 failed</span>
+        </button>
+        <button type="button" class="icon-button action-row-kebab" aria-label="More actions"
+                aria-haspopup="menu" aria-expanded="false">
+          <svg class="icon" aria-hidden="true"><use href="#i-ellipsis-vertical"></use></svg>
+        </button>
+      </li>
+    </ul>
+  </div>
+
   <h2>day-row (date tile leading; today, open, exception tones, read-only, long text)</h2>
   <div class="card action-list" id="demoDayList">
     <ul class="action-rows" id="demoDayRows"></ul>

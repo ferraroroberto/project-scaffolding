@@ -41,6 +41,16 @@
 }
 .action-row .day-row-main--static { cursor: default; }
 .action-row .day-row-main--static:active { background: transparent; }
+/* A day row keeps its context line to one line, as it always has: a day list
+ * shares one rhythm and its pinned one-line contract. action-row's meta now
+ * wraps to two lines (project-scaffolding#396); this restores the one-line
+ * ellipsis for the day row only. */
+.action-row .day-row-main .action-row-meta {
+  display: block;
+  -webkit-line-clamp: none;
+  line-clamp: none;
+  white-space: nowrap;
+}
 
 /* Date tile: weekday over day number. min-width and min-height are the 44px
  * floor (--row-sm); the weekday is body-sm (14px) at 600, the number body at
