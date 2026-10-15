@@ -506,6 +506,24 @@ def test_icon_only_controls_unpainted(gallery: Page, theme: str) -> None:
     _assert_icon_button_targets(gallery)
 
 
+def test_sprite_open_about_view_control_glyphs(gallery: Page) -> None:
+    """The sprite carries Open, About, View and Control, and each draws (#388)."""
+    ids = ("i-external-link", "i-info", "i-eye", "i-mouse-pointer-2")
+    drawn = gallery.eval_on_selector_all(
+        "#demoGlyphRow svg.icon",
+        """els => els.map(el => {
+          const use = el.querySelector('use');
+          const id = use.getAttribute('href').slice(1);
+          const box = use.getBBox();
+          return { id, symbol: !!document.getElementById(id),
+                   drawn: box.width > 0 && box.height > 0 };
+        })""",
+    )
+    assert [row["id"] for row in drawn] == list(ids)
+    for row in drawn:
+        assert row["symbol"] and row["drawn"], row
+
+
 def test_icon_button_contract(gallery: Page) -> None:
     """icon-button: hover and press change the glyph colour only (fleet-config#1259)."""
     gallery.mouse.move(0, 0)

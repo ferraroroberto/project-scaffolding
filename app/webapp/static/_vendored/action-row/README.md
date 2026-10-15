@@ -118,6 +118,8 @@ One glyph per verb, from the vendored [`icons/`](../icons/) sprite, so the same 
 | Start / Run | `i-play` |
 | Stop | `i-square` |
 | Find | `i-search` |
+| Open | `i-external-link` |
+| About | `i-info` |
 
 ## The row menu stays app-side (for now)
 
