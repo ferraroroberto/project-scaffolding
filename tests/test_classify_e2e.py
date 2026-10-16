@@ -15,6 +15,7 @@ Two jobs:
 from __future__ import annotations
 
 import ast
+import re
 from pathlib import Path
 
 from scripts.classify_e2e import (
@@ -399,6 +400,16 @@ def test_load_config_reads_surfaces_relative_to_the_toml(tmp_path: Path) -> None
     assert classify(["app/board/x.js"], cfg).tier == "surface"
 
 
+# The row-menu placement harness loads row-menu.js and the real pill by URL, so
+# both surfaces that own those files run it (#393).
+_NAV_TARGETS = (
+    "tests/e2e/test_vendored_font_inherit.py tests/e2e/test_vendored_nav.py "
+    "tests/e2e/test_vendored_row_menu_placement.py")
+_COMPONENTS_TARGETS = (
+    "tests/e2e/test_vendored_components.py tests/e2e/test_vendored_font_inherit.py "
+    "tests/e2e/test_vendored_nav.py tests/e2e/test_vendored_row_menu_placement.py")
+
+
 def test_real_surfaces_route_representative_paths() -> None:
     """This repo's declared surfaces narrow what they own and nothing shared (#258)."""
     cfg = load_config(REAL_FLEET_TOML)
@@ -410,25 +421,24 @@ def test_real_surfaces_route_representative_paths() -> None:
         return r.tier, r.pytest_target
 
     assert route("app/webapp/static/_vendored/nav/nav-tabs.css") == (
-        "surface", "tests/e2e/test_vendored_font_inherit.py tests/e2e/test_vendored_nav.py")
+        "surface", _NAV_TARGETS)
     assert route("app/webapp/static/_vendored/card/card.css") == (
         "surface",
-        "tests/e2e/test_vendored_components.py tests/e2e/test_vendored_font_inherit.py "
-        "tests/e2e/test_vendored_nav.py")
+        _COMPONENTS_TARGETS)
     # base.css sits under the nav too (the nav harness mounts on the gallery).
     assert route("app/webapp/static/_vendored/base/base.css") == (
         "surface",
-        "tests/e2e/test_vendored_components.py tests/e2e/test_vendored_font_inherit.py "
-        "tests/e2e/test_vendored_nav.py")
+        _COMPONENTS_TARGETS)
+    # A row-menu-only diff reaches the placement harness (#393).
+    assert route("app/webapp/static/_vendored/row-menu/row-menu.js") == (
+        "surface", _COMPONENTS_TARGETS)
     assert route("app/webapp/static/_vendored/action-row/action-row.css") == (
         "surface",
-        "tests/e2e/test_vendored_components.py tests/e2e/test_vendored_font_inherit.py "
-        "tests/e2e/test_vendored_nav.py")
+        _COMPONENTS_TARGETS)
     # The text-size boot snippet is behaviour, not an inert fragment (#276).
     assert route("app/webapp/static/_vendored/text-size/text-size-boot.html") == (
         "surface",
-        "tests/e2e/test_vendored_components.py tests/e2e/test_vendored_font_inherit.py "
-        "tests/e2e/test_vendored_nav.py")
+        _COMPONENTS_TARGETS)
     # The nav harness imports the helper too (#348), so it runs on a helper edit.
     assert route("tests/e2e/_geometry.py") == (
         "surface",
@@ -490,6 +500,26 @@ def test_real_surface_helpers_are_only_imported_by_their_own_targets() -> None:
                 if f != helper and helper.stem in imported_names(f)
             }
             assert importers <= set(surface.pytest_targets), (surface.name, helper.name, importers)
+
+
+def test_real_surface_harnesses_run_on_every_surface_they_load_files_from() -> None:
+    """A browser harness that loads a surface's vendored files by URL is in its targets.
+
+    The helper-import guard above only sees Python imports; a harness reaches
+    `_vendored/<dir>/` through `/_vendored/<dir>/...` URLs or a `"_vendored" /
+    "<dir>"` path, so a harness added after a surface was declared would drop
+    out of that surface's narrowed run without it (#393).
+    """
+    cfg = load_config(REAL_FLEET_TOML)
+    suite = REPO_ROOT / "tests" / "e2e"
+    ref = re.compile(r"""_vendored/([\w-]+)/|["']_vendored["']\s*/\s*["']([\w-]+)["']""")
+    for harness in sorted(suite.glob("test_*.py")):
+        rel = f"tests/e2e/{harness.name}"
+        dirs = {a or b for a, b in ref.findall(harness.read_text(encoding="utf-8"))}
+        for surface in cfg.surfaces:
+            owned = {d for d in dirs if surface.matches(f"app/webapp/static/_vendored/{d}/x")}
+            if owned:
+                assert rel in surface.pytest_targets, (surface.name, rel, sorted(owned))
 
 
 # ------------------------------------------ shared stylesheets (#289)

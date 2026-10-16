@@ -164,12 +164,20 @@ extensions = ["bat"]
 [[e2e.surface]]
 name           = "nav"
 prefixes       = ["app/webapp/static/_vendored/nav/"]
-# The font-inherit harness also mounts the real nav (#319), so a nav edit runs it.
+# The font-inherit harness also mounts the real nav (#319), and the row-menu
+# placement harness lays out the real pill the menu fits against (#362), so a
+# nav edit runs both.
 paths          = ["tests/e2e/test_vendored_nav.py"]
-pytest_targets = ["tests/e2e/test_vendored_font_inherit.py", "tests/e2e/test_vendored_nav.py"]
+pytest_targets = [
+    "tests/e2e/test_vendored_font_inherit.py",
+    "tests/e2e/test_vendored_nav.py",
+    "tests/e2e/test_vendored_row_menu_placement.py",
+]
 
 # The gallery components. test_vendored_nav.py mounts on the same gallery
-# page, so a component stylesheet can reach it -- both harnesses run.
+# page, so a component stylesheet can reach it -- both harnesses run. The
+# row-menu placement harness loads row-menu.js by URL (#362/#373), so every
+# component edit runs it too.
 [[e2e.surface]]
 name     = "components"
 prefixes = [
@@ -195,7 +203,12 @@ prefixes = [
     "app/webapp/static/_vendored/toast/",
 ]
 paths          = ["tests/e2e/test_vendored_components.py", "tests/e2e/test_vendored_font_inherit.py"]
-pytest_targets = ["tests/e2e/test_vendored_components.py", "tests/e2e/test_vendored_font_inherit.py", "tests/e2e/test_vendored_nav.py"]
+pytest_targets = [
+    "tests/e2e/test_vendored_components.py",
+    "tests/e2e/test_vendored_font_inherit.py",
+    "tests/e2e/test_vendored_nav.py",
+    "tests/e2e/test_vendored_row_menu_placement.py",
+]
 
 # The rendered-geometry helper and its hermetic fixtures. The component
 # harness imports the helper for range-tab's touch targets (#267), and the
