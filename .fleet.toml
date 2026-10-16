@@ -156,7 +156,8 @@ extensions = ["bat"]
 # Surfaces (#258): a diff that would route "full" but whose every full- or
 # static-tier path sits in ONE surface below runs only that surface's
 # pytest_targets. Anything shared stays OUT of every surface on purpose --
-# conftest.py, _color_assertions.py, demo.html (both vendored harnesses drive
+# conftest.py, _color_assertions.py, _nav_graft.py (the nav, row-menu and
+# font-inherit harnesses' shared mount), demo.html (both vendored harnesses drive
 # the gallery), icons/ (the nav harness renders the sprite), the Streamlit app
 # -- so a change there keeps the whole suite. A path in two surfaces, or a diff
 # spanning two, also keeps the whole suite. tests/test_classify_e2e.py pins

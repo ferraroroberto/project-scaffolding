@@ -21,9 +21,8 @@ import pytest
 from playwright.sync_api import Browser, Page
 
 from tests.e2e._color_assertions import style as _style
-from tests.e2e.conftest import STATIC_DIR
+from tests.e2e._nav_graft import phone_nav
 
-NAV_DIR = STATIC_DIR / "_vendored" / "nav"
 _EDGE = 8
 
 # Build one kebab inside a fixed full-screen scroller (below the pill in
@@ -145,16 +144,7 @@ async () => {
 @pytest.fixture()
 def phone(static_server: str, browser: Browser) -> Iterator[Page]:
     """The gallery (for its tokens) with the real nav pill, at 390x844, touch."""
-    context = browser.new_context(
-        viewport={"width": 390, "height": 844}, has_touch=True, is_mobile=True
-    )
-    page = context.new_page()
-    try:
-        page.goto(f"{static_server}/_vendored/demo.html")
-        page.wait_for_selector("body[data-demo-ready='1']")
-        page.add_style_tag(url=f"{static_server}/_vendored/nav/nav-tabs.css")
-        skeleton = (NAV_DIR / "nav-tabs.html").read_text(encoding="utf-8")
-        page.evaluate("(html) => document.body.insertAdjacentHTML('afterbegin', html)", skeleton)
+    with phone_nav(browser, static_server) as page:
         # Boot check, not a skip: without the fixed pill every assertion below
         # would pass against a bare viewport and prove nothing.
         assert _style(page, "nav.tabs", "position") == "fixed", (
@@ -162,8 +152,6 @@ def phone(static_server: str, browser: Browser) -> Iterator[Page]:
             "emulation is off, so this harness would assert nothing"
         )
         yield page
-    finally:
-        context.close()
 
 
 def _open(
