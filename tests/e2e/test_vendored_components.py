@@ -1193,7 +1193,13 @@ def test_row_menu_contract(gallery: Page) -> None:
     )
     assert kinds == ["presentation", "menuitem", "menuitem", "menuitem"], kinds
     expect(menu).to_have_attribute("aria-describedby", head.get_attribute("id") or "")
-    assert _style(gallery, ".row-menu-head", "color") == "rgb(101, 109, 118)"  # --muted
+    # The header takes --ink, not --muted (#398): muted is 4.08:1 on the dark menu
+    # surface. It stays the quieter line by weight (400 against the items' 500).
+    assert _style(gallery, ".row-menu-head", "color") == "rgb(31, 35, 40)"  # --ink
+    assert _style(gallery, ".row-menu-head", "fontWeight") == "400"
+    _set_theme(gallery, "dark")
+    assert _style(gallery, ".row-menu-head", "color") == "rgb(230, 237, 243)"  # --ink
+    _set_theme(gallery, "light")
     assert _focused_label(gallery) == "Open"
     gallery.keyboard.press("ArrowUp")
     assert _focused_label(gallery) == "Other app"
