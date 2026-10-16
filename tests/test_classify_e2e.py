@@ -455,6 +455,8 @@ def test_real_surfaces_route_representative_paths() -> None:
     # Shared infrastructure belongs to no surface -> whole suite.
     assert route("tests/e2e/conftest.py") == ("full", "tests/e2e")
     assert route("tests/e2e/_color_assertions.py") == ("full", "tests/e2e")
+    # The nav-graft helper is imported by three harnesses across two surfaces (#394).
+    assert route("tests/e2e/_nav_graft.py") == ("full", "tests/e2e")
     assert route("app/webapp/static/_vendored/demo.html") == ("full", "tests/e2e")
     assert route("app/webapp/static/_vendored/icons/icons-sprite.html") == ("full", "tests/e2e")
     # A shared static path riding along with a surface change keeps the whole suite.

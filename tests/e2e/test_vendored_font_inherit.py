@@ -19,9 +19,8 @@ from __future__ import annotations
 from playwright.sync_api import Page, Route
 
 from tests.e2e._color_assertions import style as _style
-from tests.e2e.conftest import STATIC_DIR
+from tests.e2e._nav_graft import mount_nav
 
-_NAV_DIR = STATIC_DIR / "_vendored" / "nav"
 _CONTROLS = "button, input, select, textarea"
 
 # The floor below which the sweep would be vacuous: the gallery renders well
@@ -84,12 +83,5 @@ def test_gallery_controls_inherit_without_base(static_server: str, page: Page) -
 def test_nav_tabs_inherit_without_base(static_server: str, page: Page) -> None:
     """The nav's `<button class="tab">` takes the body's font with no `base.css`."""
     _drop_base_css(page)
-    page.goto(f"{static_server}/_vendored/demo.html")
-    page.wait_for_selector("body[data-demo-ready='1']")
-    page.add_style_tag(url=f"{static_server}/_vendored/nav/nav-tabs.css")
-    page.evaluate(
-        "(html) => document.body.insertAdjacentHTML('afterbegin', html)",
-        (_NAV_DIR / "nav-tabs.html").read_text(encoding="utf-8"),
-    )
-    page.wait_for_selector(".tabs .tab", state="attached")
+    mount_nav(page, static_server)
     assert _assert_inherit(page, ".tabs") >= 2

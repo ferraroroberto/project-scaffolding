@@ -11,7 +11,8 @@ SVG icons and no emoji span — so the desktop segmented control rendered
 label-only tabs with no icon at all, silently, in five apps.
 
 The computed-style primitives this harness shares with the gallery's
-(`style`, `set_theme`, `rgba`) live once in `_color_assertions.py` (#208).
+(`style`, `set_theme`, `rgba`) live once in `_color_assertions.py` (#208); the
+gallery-plus-nav mount and the phone context live once in `_nav_graft.py` (#394).
 """
 
 from __future__ import annotations
@@ -26,9 +27,7 @@ from tests.e2e._color_assertions import rgba as _rgba
 from tests.e2e._color_assertions import set_theme as _set_theme
 from tests.e2e._color_assertions import style as _style
 from tests.e2e._geometry import EFFECTIVE_RECT_JS
-from tests.e2e.conftest import STATIC_DIR
-
-NAV_DIR = STATIC_DIR / "_vendored" / "nav"
+from tests.e2e._nav_graft import NAV_DIR, mount_nav, phone_nav
 
 # Desktop token values the assertions below key on (from demo.html's :root,
 # which transcribes ~/.claude/design.md). --font-label 0.875rem @ 16px root
@@ -82,48 +81,18 @@ def _pseudo_content(page: Page, selector: str, pseudo: str) -> str:
     )
 
 
-def _mount_nav(page: Page, base_url: str) -> Page:
-    """Load the gallery (for its tokens), then graft on the real nav skeleton."""
-    page.goto(f"{base_url}/_vendored/demo.html")
-    page.wait_for_selector("body[data-demo-ready='1']")
-    page.add_style_tag(url=f"{base_url}/_vendored/nav/nav-tabs.css")
-    skeleton = (NAV_DIR / "nav-tabs.html").read_text(encoding="utf-8")
-    page.evaluate(
-        "(html) => document.body.insertAdjacentHTML('afterbegin', html)", skeleton
-    )
-    # `attached`, not the default `visible`: whether the icon is *visible* is
-    # exactly what the tests below assert, and a hidden one must fail there with
-    # a named locator rather than time out here in the fixture.
-    page.wait_for_selector(".tabs .tab-icon", state="attached")
-    return page
-
-
 @pytest.fixture()
 def nav(static_server: str, page: Page) -> Page:
     """The nav skeleton at a desktop viewport (fine pointer), below the rail."""
     page.set_viewport_size({"width": _WIDE - 1, "height": 800})
-    return _mount_nav(page, static_server)
+    return mount_nav(page, static_server)
 
 
 @pytest.fixture()
 def nav_mobile(static_server: str, browser: Browser) -> Iterator[Page]:
     """The nav skeleton at a phone viewport with a coarse pointer."""
-    context = browser.new_context(
-        viewport={"width": 390, "height": 844}, has_touch=True, is_mobile=True
-    )
-    page = context.new_page()
-    try:
-        _mount_nav(page, static_server)
-        # Boot check, not a skip: if touch emulation stops flipping the pointer
-        # media feature, every assertion below would silently test the desktop
-        # rules instead of the pill.
-        assert page.evaluate("matchMedia('(pointer: coarse)').matches"), (
-            "coarse-pointer emulation is not active — the mobile pill rules "
-            "never matched, so this harness would assert nothing"
-        )
+    with phone_nav(browser, static_server) as page:
         yield page
-    finally:
-        context.close()
 
 
 def test_skeleton_ships_no_emoji_span() -> None:
