@@ -3,9 +3,13 @@
 Reads ``<runtime-data root>/<app>/usage.sqlite3`` (the file the vendored
 ``src/usage_log.py`` router writes) read-only and prints per-view visit
 counts, per-control tap counts, the device/OS split by session, the session
-count and the first/last timestamps over the last ``--days`` days.
+count and the first/last timestamps over the last ``--days`` days. With
+``--time`` it prints foreground minutes per host-local day instead — total,
+per device class and per view, the report ``GET /api/usage/time`` serves
+(rules: the ``src/usage_log.py`` docstring).
 
     python scripts/usage_summary.py --app app-launcher --days 30 --json
+    python scripts/usage_summary.py --app app-launcher --days 7 --time
 
 ``/design-review``'s full-app inventory fills its frequency column from this
 output. A missing database exits 2 with a message on stderr — "no data yet"
@@ -23,13 +27,19 @@ import json
 import sqlite3
 import sys
 from pathlib import Path
+from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from src.runtime_data import runtime_db_path  # noqa: E402
-from src.usage_log import open_read_only, summarize  # noqa: E402
+from src.usage_log import (  # noqa: E402
+    foreground_time,
+    local_window,
+    open_read_only,
+    summarize,
+)
 
 EXIT_NO_DATA = 2
 EXIT_UNREADABLE = 3
@@ -54,11 +64,31 @@ def _render_text(app: str, db_path: Path, summary: dict[str, object]) -> str:
     return "\n".join(lines)
 
 
+def _split(minutes_by_key: dict[str, float]) -> str:
+    return " · ".join(f"{name} {m}" for name, m in minutes_by_key.items()) or "-"
+
+
+def _render_time(app: str, db_path: Path, report: dict[str, Any]) -> str:
+    lines = [
+        f"foreground time: {app} ({db_path})",
+        f"last {report['days']} local days ({report['tz']}) since {report['since']}: "
+        f"{report['total_minutes']} min",
+        f"  by device: {_split(report['by_device'])}",
+        f"  by view:   {_split(report['by_view'])}",
+        "day         minutes  by device",
+    ]
+    for row in report["days_series"]:
+        lines.append(f"{row['day']}  {row['minutes']:>7}  {_split(row['by_device'])}")
+    return "\n".join(lines)
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="Summarize a fleet app's local usage log.")
     ap.add_argument("--app", required=True, help="app slug, e.g. app-launcher (its runtime-data directory name)")
     ap.add_argument("--days", type=int, default=30, help="window in days (default 30)")
     ap.add_argument("--json", action="store_true", help="print JSON instead of text")
+    ap.add_argument("--time", action="store_true",
+                    help="foreground minutes per local day instead of counts")
     ap.add_argument("--db", type=Path, help="explicit usage.sqlite3 path (overrides --app resolution)")
     args = ap.parse_args(argv)
     if args.days < 1:
@@ -76,7 +106,10 @@ def main(argv: list[str] | None = None) -> int:
         )
         return EXIT_NO_DATA
     try:
-        summary = summarize(conn, args.days)
+        if args.time:
+            summary = foreground_time(conn, *local_window(args.days), None)
+        else:
+            summary = summarize(conn, args.days)
     except sqlite3.Error as exc:
         print(f"cannot read usage log {db_path}: {exc}", file=sys.stderr)
         return EXIT_UNREADABLE
@@ -85,6 +118,8 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.json:
         print(json.dumps({"app": args.app, **summary}, indent=2))
+    elif args.time:
+        print(_render_time(args.app, db_path, summary))
     else:
         print(_render_text(args.app, db_path, summary))
     return 0
