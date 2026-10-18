@@ -1,5 +1,5 @@
 """Unit tests for the usage-log convention (#349): validation, retention,
-privacy, the FastAPI router, and the summary CLI.
+privacy, the FastAPI router, the summary CLI, and foreground time (#403).
 
 The privacy contract is asserted here rather than trusted to the client: the
 server drops anything outside the allowlists, stores no field it was not
@@ -12,8 +12,9 @@ import json
 import logging
 import re
 import sqlite3
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime, timedelta, timezone, tzinfo
 from pathlib import Path
+from typing import Any
 
 import pytest
 from fastapi import FastAPI
@@ -23,11 +24,14 @@ from scripts import usage_summary
 from src.usage_log import (
     MAX_BODY_BYTES,
     MAX_EVENTS_PER_BATCH,
+    NO_VIEW,
     Batch,
     Event,
     PayloadError,
     UsageLog,
+    foreground_time,
     format_ts,
+    local_window,
     parse_batch,
     usage_router,
     validate_event,
@@ -258,6 +262,7 @@ def test_router_applies_the_apps_dependencies(tmp_path: Path) -> None:
     app.include_router(usage_router(tmp_path / "usage.sqlite3", dependencies=[Depends(deny)]))
     client = TestClient(app)
     assert client.get("/api/usage/summary").status_code == 401
+    assert client.get("/api/usage/time").status_code == 401
     assert client.post("/api/usage/events", content=_body([])).status_code == 401
 
 
@@ -311,3 +316,258 @@ def test_cli_existing_empty_db_is_zero_usage_not_no_data(
     UsageLog(db).summary(1)  # creates the schema, no rows
     assert usage_summary.main(["--app", "demo", "--db", str(db)]) == 0
     assert "0 sessions" in capsys.readouterr().out
+
+
+def test_cli_time_prints_per_day_minutes(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    db = tmp_path / "usage.sqlite3"
+    now = datetime.now(UTC)  # --days 2 starts at yesterday's local midnight
+    UsageLog(db).insert_rows([
+        (format_ts(now - timedelta(minutes=20)), SESSION, "session_start", None, None,
+         "phone", "ios"),
+        (format_ts(now - timedelta(minutes=10)), SESSION, "session_end", None, None,
+         "phone", "ios"),
+    ])
+    assert usage_summary.main(["--app", "demo", "--db", str(db), "--days", "2",
+                               "--time", "--json"]) == 0
+    out = json.loads(capsys.readouterr().out)
+    assert out["app"] == "demo" and out["days"] == 2
+    assert out["total_minutes"] == 10.0 and out["by_device"] == {"phone": 10.0}
+    assert usage_summary.main(["--app", "demo", "--db", str(db), "--days", "2", "--time"]) == 0
+    text = capsys.readouterr().out
+    assert "foreground time: demo" in text and "phone 10.0" in text
+
+
+# ------------------------------------------------------------ foreground time (#403)
+# Synthetic visits only. Minutes are offsets from 09:00 UTC on DAY; the
+# default window is that one UTC day.
+
+DAY = datetime(2026, 10, 12, tzinfo=UTC)
+OS_FOR = {"phone": "ios", "tablet": "android", "desktop": "windows"}
+Row = tuple[str, str, str, str | None, None, str, str]
+
+
+def _ev(
+    minute: float, kind: str, *, visit: str = "visit-aaaa", device: str = "phone",
+    view: str | None = None,
+) -> Row:
+    ts = format_ts(DAY + timedelta(hours=9, minutes=minute))
+    return (ts, visit, kind, view, None, device, OS_FOR[device])
+
+
+def _time(
+    tmp_path: Path, rows: list[Row], *,
+    since: datetime = DAY, until: datetime = DAY + timedelta(days=1),
+    tz: tzinfo | None = UTC, **rules: timedelta,
+) -> dict[str, Any]:
+    """Insert ``rows`` in list order (so ``id`` follows it) and compute."""
+    db = tmp_path / "usage.sqlite3"
+    UsageLog(db).insert_rows(rows, now=NOW)
+    conn = sqlite3.connect(db)
+    try:
+        return foreground_time(conn, since, until, tz, **rules)
+    finally:
+        conn.close()
+
+
+def test_time_open_close(tmp_path: Path) -> None:
+    out = _time(tmp_path, [_ev(0, "session_start"), _ev(30, "session_end")])
+    assert out["total_minutes"] == 30.0
+    assert out["by_device"] == {"phone": 30.0}
+    assert out["days_series"] == [{"day": "2026-10-12", "minutes": 30.0,
+                                   "by_device": {"phone": 30.0}, "by_view": {NO_VIEW: 30.0}}]
+
+
+def test_time_missing_end_closes_at_last_event(tmp_path: Path) -> None:
+    out = _time(tmp_path, [_ev(0, "session_start"), _ev(5, "view", view="board"),
+                           _ev(20, "tap", view="board")])
+    assert out["total_minutes"] == 20.0, "closed at the last event, never padded"
+
+
+def test_time_double_start_closes_at_last_event_before_it(tmp_path: Path) -> None:
+    out = _time(tmp_path, [
+        _ev(0, "session_start"), _ev(10, "tap"),   # the hide beacon was lost here
+        _ev(40, "session_start"), _ev(50, "session_end"),
+    ])
+    assert out["total_minutes"] == 20.0, "0-10 and 40-50; the 10-40 gap is not counted"
+
+
+def test_time_end_without_start(tmp_path: Path) -> None:
+    only_end = _time(tmp_path, [_ev(10, "session_end")])
+    assert only_end["total_minutes"] == 0.0
+    lost_start = _time(tmp_path / "b", [_ev(0, "view", view="board"), _ev(12, "session_end")])
+    assert lost_start["total_minutes"] == 12.0, "opens at the first event of the visit"
+
+
+def test_time_zero_length_visit_is_zero(tmp_path: Path) -> None:
+    out = _time(tmp_path, [
+        _ev(0, "session_start", visit="visit-phone"),
+        _ev(0, "session_start", visit="visit-desk", device="desktop"),
+        _ev(5, "session_start", visit="visit-both"), _ev(5, "session_end", visit="visit-both"),
+    ])
+    assert out["total_minutes"] == 0.0
+    assert out["by_device"] == {} and out["by_view"] == {}
+
+
+def test_time_desktop_idle_gap_is_clipped(tmp_path: Path) -> None:
+    rows = [_ev(0, "session_start", device="desktop"), _ev(5, "tap", device="desktop"),
+            _ev(65, "session_end", device="desktop")]
+    assert _time(tmp_path, rows)["total_minutes"] == 20.0, "5 active + the 60 min gap as 15"
+    shorter = _time(tmp_path / "b", rows, idle_gap_desktop=timedelta(minutes=5))
+    assert shorter["total_minutes"] == 10.0, "the idle cut is overridable"
+    assert shorter["rules"]["idle_gap_desktop_minutes"] == 5.0
+
+
+def test_time_phone_gap_is_trusted(tmp_path: Path) -> None:
+    out = _time(tmp_path, [_ev(0, "session_start"), _ev(65, "session_end")])
+    assert out["total_minutes"] == 65.0, "auto-lock hides the page, so no idle cut"
+
+
+def test_time_max_interval_caps_phone_and_tablet(tmp_path: Path) -> None:
+    rows = [_ev(0, "session_start", device="tablet"), _ev(300, "session_end", device="tablet")]
+    assert _time(tmp_path, rows)["total_minutes"] == 240.0
+    capped = _time(tmp_path / "b", rows, max_interval=timedelta(hours=1))
+    assert capped["total_minutes"] == 60.0
+    assert capped["rules"]["max_interval_minutes"] == 60.0
+
+
+def test_time_overlapping_tabs_same_device_count_once(tmp_path: Path) -> None:
+    out = _time(tmp_path, [
+        _ev(0, "session_start", visit="visit-tab1"), _ev(10, "session_start", visit="visit-tab2"),
+        _ev(20, "session_end", visit="visit-tab1"), _ev(30, "session_end", visit="visit-tab2"),
+    ])
+    assert out["total_minutes"] == 30.0, "0-20 and 10-30 are 30 min, not 40"
+    assert out["by_device"] == {"phone": 30.0}
+
+
+def test_time_phone_and_desktop_overlap(tmp_path: Path) -> None:
+    out = _time(tmp_path, [
+        _ev(0, "session_start", visit="visit-phone"),
+        _ev(10, "session_start", visit="visit-desk", device="desktop"),
+        _ev(25, "tap", visit="visit-desk", device="desktop"),
+        _ev(30, "session_end", visit="visit-phone"),
+        _ev(40, "session_end", visit="visit-desk", device="desktop"),
+    ])
+    assert out["total_minutes"] == 40.0, "the total is the union"
+    assert out["by_device"] == {"desktop": 30.0, "phone": 30.0}, "each device keeps its own"
+    assert sum(out["by_device"].values()) > out["total_minutes"]
+
+
+def test_time_splits_at_local_midnight_in_tz(tmp_path: Path) -> None:
+    plus2 = timezone(timedelta(hours=2))
+    rows = [  # 21:30-22:30 UTC is 23:30-00:30 at UTC+2
+        _ev(12 * 60 + 30, "session_start"), _ev(13 * 60 + 30, "session_end"),
+    ]
+    since = datetime(2026, 10, 12, tzinfo=plus2)
+    out = _time(tmp_path, rows, since=since, until=since + timedelta(days=2), tz=plus2)
+    assert [(d["day"], d["minutes"]) for d in out["days_series"]] == [
+        ("2026-10-12", 30.0), ("2026-10-13", 30.0)]
+    assert out["tz"] == "UTC+02:00"
+    in_utc = _time(tmp_path / "b", rows)
+    assert [(d["day"], d["minutes"]) for d in in_utc["days_series"]] == [("2026-10-12", 60.0)]
+
+
+def test_time_view_attribution_and_overlap_rule(tmp_path: Path) -> None:
+    out = _time(tmp_path, [
+        _ev(0, "session_start", visit="visit-phone"),
+        _ev(0, "view", visit="visit-phone", view="board"),
+        _ev(10, "view", visit="visit-phone", view="settings"),
+        _ev(20, "session_start", visit="visit-desk", device="desktop"),
+        _ev(20, "view", visit="visit-desk", device="desktop", view="jobs"),
+        _ev(30, "session_end", visit="visit-phone"),
+        _ev(32, "tap", visit="visit-desk", device="desktop", view="jobs"),
+        _ev(40, "session_end", visit="visit-desk", device="desktop"),
+    ])
+    # 20-30 is covered by both visits: the more recently started one wins.
+    assert out["by_view"] == {"jobs": 20.0, "board": 10.0, "settings": 10.0}
+    assert sum(out["by_view"].values()) == out["total_minutes"] == 40.0
+
+
+def test_time_before_first_view_and_view_carried_across_intervals(tmp_path: Path) -> None:
+    out = _time(tmp_path, [
+        _ev(0, "session_start"), _ev(5, "view", view="board"), _ev(10, "session_end"),
+        _ev(30, "session_start"), _ev(40, "session_end"),   # back on the same view
+    ])
+    assert out["by_view"] == {"board": 15.0, NO_VIEW: 5.0}
+
+
+def test_time_same_ts_batch_is_ordered_by_id(tmp_path: Path) -> None:
+    out = _time(tmp_path, [
+        # One batch, one server ts: the last view in id order is the current one.
+        # (Not alphabetical, so a sort on view_id would pick the wrong one.)
+        _ev(0, "session_start"), _ev(0, "view", view="settings"), _ev(0, "view", view="board"),
+        # Hidden and shown again within the same second: end then start at 10.
+        _ev(10, "session_end"), _ev(10, "session_start"), _ev(10, "view", view="jobs"),
+        _ev(20, "session_end"),
+    ])
+    assert out["by_view"] == {"board": 10.0, "jobs": 10.0}
+    assert out["total_minutes"] == 20.0
+
+
+def test_time_window_clips_and_lists_zero_days(tmp_path: Path) -> None:
+    rows = [  # 23:30 UTC the day before DAY until 00:30 UTC on DAY
+        _ev(-9 * 60 - 30, "session_start"), _ev(-8 * 60 - 30, "session_end"),
+    ]
+    out = _time(tmp_path, rows, until=DAY + timedelta(days=3))
+    assert out["days"] == 3
+    assert [(d["day"], d["minutes"]) for d in out["days_series"]] == [
+        ("2026-10-12", 30.0), ("2026-10-13", 0.0), ("2026-10-14", 0.0)]
+    assert out["days_series"][1]["by_device"] == {}
+
+
+def test_time_never_returns_session_ids(tmp_path: Path) -> None:
+    out = _time(tmp_path, [_ev(0, "session_start", visit=SESSION),
+                           _ev(9, "session_end", visit=SESSION)])
+    assert out["total_minutes"] == 9.0
+    assert SESSION not in json.dumps(out)
+
+
+def test_time_rejects_empty_window(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="after since"):
+        _time(tmp_path, [], until=DAY)
+
+
+def test_local_window_starts_at_local_midnight() -> None:
+    plus2 = timezone(timedelta(hours=2))
+    now = datetime(2026, 10, 12, 23, 30, tzinfo=UTC)   # already 10-13 at UTC+2
+    assert local_window(1, plus2, now=now) == (datetime(2026, 10, 12, 22, 0, tzinfo=UTC), now)
+    assert local_window(7, UTC, now=now)[0] == datetime(2026, 10, 6, tzinfo=UTC)
+    with pytest.raises(ValueError):
+        local_window(0, UTC, now=now)
+
+
+# ------------------------------------------------------------ GET /api/usage/time
+
+def test_time_route_shape_and_by_values(tmp_path: Path) -> None:
+    client = _client(tmp_path / "usage.sqlite3")
+    client.post("/api/usage/events", content=_body([{"kind": "view", "id": "board"}]))
+    day = client.get("/api/usage/time", params={"days": 7})
+    assert day.status_code == 200
+    body = day.json()
+    assert body["days"] == 7 and len(body["days_series"]) == 7
+    assert body["by"] == "day" and body["log_exists"] is True
+    assert {"since", "until", "tz", "rules", "total_minutes"} <= body.keys()
+    assert "by_device" not in body and "by_view" not in body
+    assert set(body["days_series"][0]) == {"day", "minutes"}
+
+    device = client.get("/api/usage/time", params={"days": 1, "by": "device"}).json()
+    assert "by_device" in device and "by_view" not in device
+    assert set(device["days_series"][0]) == {"day", "minutes", "by_device"}
+    view = client.get("/api/usage/time", params={"by": "view"}).json()
+    assert view["days"] == 7, "the default window"
+    assert "by_view" in view and "by_device" not in view
+    assert client.get("/api/usage/time", params={"by": "visit"}).status_code == 422
+
+
+@pytest.mark.parametrize(("days", "status"), [(0, 422), (1, 200), (366, 200), (367, 422)])
+def test_time_route_days_bounds(tmp_path: Path, days: int, status: int) -> None:
+    client = _client(tmp_path / "usage.sqlite3")
+    assert client.get("/api/usage/time", params={"days": days}).status_code == status
+
+
+def test_time_route_absent_log_is_not_zero_usage(tmp_path: Path) -> None:
+    db = tmp_path / "usage.sqlite3"
+    body = _client(db).get("/api/usage/time").json()
+    assert body["log_exists"] is False and body["total_minutes"] == 0.0
+    assert not db.exists(), "reading foreground time never creates the log"

@@ -40,7 +40,7 @@ flowchart TB
     DOCCAP["doc_capture/\nengine.py + adapters.py (streamlit | url)\n+ launch.py + __main__.py (CLI)\nvendor-verbatim doc-capture screenshot engine\n(manifest-driven, fail-safe-masked,\ninput-hash-idempotent + README tour regen)"]
     POOLEDHTTP["pooled_http.py (#192)\nbuild_session() / pooled_request()\nvendor-verbatim pooled requests.Session\n+ single-retry-on-ConnectionError"]
     RUNTIMEDATA["runtime_data.py (#243)\nruntime_db_path(app, file, env_var=)\nvendor-verbatim SQLite-location resolver\nFLEET_DATA_ROOT -> C:/sqlite/&lt;app&gt;/\n(off the spinning disk, one dir per app)"]
-    USAGELOG["usage_log.py (#349)\nusage_router(db_path, dependencies=)\nvendor-verbatim local-only usage log\nPOST /api/usage/events + GET /api/usage/summary\nallowlisted kinds, bounded ids, 365d / row cap"]
+    USAGELOG["usage_log.py (#349)\nusage_router(db_path, dependencies=)\nvendor-verbatim local-only usage log\nPOST /api/usage/events + GET /api/usage/summary\nGET /api/usage/time (foreground minutes, #403)\nallowlisted kinds, bounded ids, 365d / row cap"]
     BUILDINFO["build_info.py (#199/#246/#247)\nbuild_identity(): git_sha + built_at\ncaptured once at import, bounded retry inside\nthe capture, never re-resolved later\nvendor-verbatim, self-contained (no local imports)"]
   end
   VIEWS -->|orchestrates, business logic stays here| PIPELINES
@@ -59,7 +59,7 @@ flowchart TB
     CLASSIFY["classify_e2e.py (vendor-verbatim, #180)\ndiff-proportionate e2e routing\nreads .fleet.toml [e2e] rules, fail-safe to full"]
     CATALOG["vendored_catalog.py (#230)\nreads .fleet.toml [components] -- the canonical\nkey -> src map of what this scaffold publishes"]
     TSCERT["gen_tailscale_cert.py\nprovision/renew Tailscale HTTPS leaf"]
-    USAGESUM["usage_summary.py (#349)\n--app slug --days N --json\nreads an app's usage.sqlite3 read-only\nexit 2 = no data yet"]
+    USAGESUM["usage_summary.py (#349)\n--app slug --days N --json\nreads an app's usage.sqlite3 read-only\n--time = per-day foreground minutes\nexit 2 = no data yet"]
     BRANDGEN["brand_gen.py\nrender_set(): Lucide master SVG -> dark-tile\nPWA/tray/Stream Deck icon set (resvg-py)"]
   end
   VERIFY --> srcdir
