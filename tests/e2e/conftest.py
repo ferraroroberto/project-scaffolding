@@ -51,6 +51,7 @@ from tests._streamlit_lifecycle import (
 )
 from tests.e2e._browser_sweep import sweep_browser_helpers
 from tests.e2e._e2e_live_guard import require_disposable_instance
+from tests.e2e._surface import pytest_collection_modifyitems  # noqa: F401 — capture-mode deselect (#408)
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 STATIC_DIR = REPO_ROOT / "app" / "webapp" / "static"

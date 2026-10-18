@@ -992,6 +992,70 @@ that lacks this harness — this helper is what turns that leg
 measurable. Migrating home-automation's original inline assertions to
 the helper is the reference adoption (follow-up per #157).
 
+### Design surface capture
+
+`tests/e2e/_surface.py` (issue #408; fleet-config#1383, Step 2/6) is the
+vendored hook that turns an app's e2e suite into a **design inventory**.
+The `/design-review` walk opens only primary tabs, the Settings gear and
+declared extra steps; the suite already opens the sheets, dialogs, menus
+and error states to test them. A test calls the hook once its surface is
+open, so adding a surface to the design inventory is the same act as
+testing it, with no second declaration anywhere:
+
+```python
+from tests.e2e._surface import surface
+
+def test_sort_sheet(page):
+    ...open the sheet...
+    surface(page, "jobs.sort-sheet")
+```
+
+- **Naming.** Lowercase, dot- or hyphen-separated (`jobs.sort-sheet`),
+  unique per app. Anything else raises `ValueError` in capture mode. The
+  first call for a name wins; later calls with it are skipped.
+- **Takes a bare Playwright `Page`**, so it fits `pytest-playwright`'s
+  `page`, a wrapper such as `authed_page`, and pages built by hand from
+  `browser.new_context(...)` or `sync_playwright`.
+- **The no-op guarantee.** With `DESIGN_SURFACE_CAPTURE` unset (or empty)
+  `surface()` returns after one environment lookup: it does not touch the
+  page, the disk, or even look at the name. The normal gate pays nothing.
+- **Capture mode.** `DESIGN_SURFACE_CAPTURE=<dir>` points at a directory
+  `/design-review` prepared: `script.js` (the in-page measurement),
+  `params.json` (its argument) and an optional `capture.json`
+  (`{"theme_storage_key": "<localStorage key>"}`). For `light` then `dark`
+  the hook flips the theme **in place**, so the surface stays open and the
+  test is not re-run: it emulates the colour scheme, waits two animation
+  frames, screenshots the viewport to `<name>.<theme>.png` and writes
+  `<name>.<theme>.json`, then restores the page's original scheme. With a
+  `theme_storage_key` it also sets that key and the `data-theme` attribute
+  (and restores them), for apps whose theme is an explicit toggle. Each
+  JSON records the context (`engine`, `viewport`, `phone` by user agent),
+  what the page then reported as its theme (`observed`, so a flip the app
+  overwrote is visible), and the script's `metrics`. A script that throws is
+  written as `{"error": ..., "metrics": null}`, never as an empty success.
+  The JSON is byte-stable: sorted keys, no timestamps. Nothing is ever
+  written outside the capture directory.
+- **Collection.** Import the filter into the conftest with one line,
+  `from tests.e2e._surface import pytest_collection_modifyitems  # noqa: F401`.
+  While the env var is set it deselects every test whose own function source
+  never mentions `surface(`, so a capture run executes only the tests that
+  capture. Call `surface(` in the test body itself (a helper's call is
+  invisible to it); a test whose source cannot be read is kept.
+- **Never against a live app.** Capture a suite that boots its own
+  disposable server and throwaway data (the live-instance guard above
+  applies unchanged); never one pointed at the app you use. One process at
+  a time per capture directory. Screenshots and inventories stay local and
+  are never attached to GitHub.
+
+Vendor-verbatim like the other e2e primitives: copy the file byte-identical
+into the app's `tests/e2e/` and record it in the app's `.fleet.toml`
+`[vendored]` table (manifest key `surface_capture`); it imports only the
+stdlib, `pytest` and `playwright.sync_api`, and nothing from fleet-config,
+which supplies the script as a file. It is proven by
+`tests/e2e/test_surface_hook.py` against a static fixture page
+(`tests/e2e/_fixtures/surface/`), including the unset no-op, both themes,
+restore, first-call-wins, name validation and the collection filter.
+
 ---
 
 ## Cost economics
