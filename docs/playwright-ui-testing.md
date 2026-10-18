@@ -787,6 +787,26 @@ distinct from the dev port), and Streamlit itself holds no user state
 worth preserving — but the two rules above are what to reach for the
 day a scaffold-derived project grows its first stateful child process.
 
+### Isolating the runtime-data folder (`<APP>_DATA_DIR`)
+
+An app that persists state through `runtime_db_path(app, filename)` (`src/runtime_data.py`) writes under `<root>/<app>/` — `C:\sqlite\<app>\` on the owner's machine. A harness that boots the app therefore writes its test traffic into the owner's real files unless it redirects that folder. The vendored usage log is the fleet-wide case: every page visit the suite makes becomes a row in the real `usage.sqlite3`, which then feeds `/design-review` and the foreground-time numbers as if a person had used the app (`app-launcher#1685`; `#404`).
+
+**The rule: any harness that spawns the app sets `<APP>_DATA_DIR` to a per-run temp folder, on every spawn.**
+
+- Build the variable name with `app_dir_env_var(<app>)` from `src.runtime_data`, never a literal — the slug-to-name mapping (`-` → `_`, upper-cased) stays in one place.
+- Create the folder fresh per run (`tempfile.mkdtemp`, `tmp_path_factory`) and pass it in the child's `env`; the same goes for the unit-test process (set it in the root `conftest.py` before the app module is imported, because a router built at import time resolves its path then).
+- **A legacy full-path override alone is not enough.** `TELEMETRY_DB_PATH`-style variables name one file; a database added later through `runtime_db_path(app, filename)` without `env_var=` is not covered, and nobody notices because the suite stays green. `<APP>_DATA_DIR` catches every file of the app at once, so keep setting the legacy overrides if the tests read them, and add the directory variable on top.
+- Never clean or rewrite the real folder to undo a past leak — existing test rows stay; this rule only stops new ones.
+
+```python
+from src.runtime_data import app_dir_env_var
+
+env = {**os.environ, app_dir_env_var("my-app"): tempfile.mkdtemp(prefix="my-app-e2e-data-")}
+proc = subprocess.Popen([sys.executable, "-m", "uvicorn", "app.webapp.server:app", ...], env=env)
+```
+
+**This scaffold's own harness complies by spawning nothing that resolves runtime data.** `tests/e2e/test_vendored_usage_log.py` serves the vendored router in-process over an explicit temp path (`usage_router(tmp_path / "usage.sqlite3")`, never `runtime_db_path`), and the Streamlit example app that `ensure_fresh_streamlit` boots persists nothing through `runtime_data`. The day a scaffold harness boots something that calls `runtime_db_path`, it sets `<APP>_DATA_DIR` as above.
+
 ### Mobile projection (phone-first apps only)
 
 If the app's primary surface is a phone, add a second projection:
