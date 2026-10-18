@@ -299,6 +299,8 @@ tray_watchdog   = { src = "app/tray/watchdog.py" }
 geometry        = { src = "tests/e2e/_geometry.py" }
 e2e_live_guard  = { src = "tests/e2e/_e2e_live_guard.py" }
 browser_sweep   = { src = "tests/e2e/_browser_sweep.py" }
+# The design-surface capture hook; conftest imports its collection hook (#408).
+surface_capture = { src = "tests/e2e/_surface.py" }
 
 # Scripts + library modules copied byte-for-byte into adopters.
 classify_e2e    = { src = "scripts/classify_e2e.py" }
