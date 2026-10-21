@@ -184,6 +184,9 @@ def test_real_rules_route_representative_paths() -> None:
     # The static-ratchet baseline is data for a gate script, not a browser surface (#410).
     assert tier(".static-ratchet-baseline.json") == "skip"
     assert tier(".comment-ratchet-baseline.json") == "skip"  # #411
+    # A fixture adopter's dotfile has no extension to match, so its folder is declared inert.
+    assert tier("tests/_fixtures/verify_skill/repo/.fleet.toml") == "skip"
+    assert tier("scripts/verify_skill_templates/SKILL.md.tmpl") == "skip"
 
     # Mixed real diff (static asset + backend) -> static; add a page -> full.
     assert tier("app/webapp/static/icons/foo.svg", "src/x.py") == "static"

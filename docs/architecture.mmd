@@ -59,6 +59,7 @@ flowchart TB
     CLASSIFY["classify_e2e.py (vendor-verbatim, #180)\ndiff-proportionate e2e routing\nreads .fleet.toml [e2e] rules, fail-safe to full"]
     RATCHET["static_ratchet.py (vendor-verbatim, #410)\nfails only on NEW duplicates (jscpd) / unused code\n(ruff F401,F841) vs .static-ratchet-baseline.json\nopt-in via .fleet.toml [static_ratchet]; exit 3 = not confirmed"]
     CRATCHET["comment_ratchet.py (vendor-verbatim, #411)\nfails when a file's count of #NNN refs inside comments\n(py/js/css/ps1) rises vs .comment-ratchet-baseline.json\nopt-in via .fleet.toml [comment_ratchet]; exit 3 = not confirmed"]
+    GENVERIFY["gen_verify_skill.py (#412, not vendored)\nstatic parse of an adopter's surface() calls, extra_steps,\nkey views + [verify] -> .claude/skills/verify-<app>/\nSKILL.md + features/*.md; --check = STATIC / MAINTAIN\n(clean|changed|blocked, exit 0/1/2)"]
     CATALOG["vendored_catalog.py (#230)\nreads .fleet.toml [components] -- the canonical\nkey -> src map of what this scaffold publishes"]
     TSCERT["gen_tailscale_cert.py\nprovision/renew Tailscale HTTPS leaf"]
     USAGESUM["usage_summary.py (#349)\n--app slug --days N --json\nreads an app's usage.sqlite3 read-only\n--time = per-day foreground minutes\nexit 2 = no data yet"]
@@ -73,6 +74,8 @@ flowchart TB
   RATCHET -.->|reads [static_ratchet] from| FLEETTOML
   VERIFY -->|runs, opt-in, after the static ratchet| CRATCHET
   CRATCHET -.->|reads [comment_ratchet] + [vendored] from| FLEETTOML
+  GENVERIFY -.->|reads [verify], [design.review], [e2e] from an adopter's| FLEETTOML
+  GENVERIFY -->|renders from| VERIFYTMPL["verify_skill_templates/\nSKILL.md.tmpl, feature.md.tmpl,\nfeatures_README.md.tmpl"]
   VERIFY -->|derives its mypy --strict list from| CATALOG
   CATALOG -.->|reads [components] from| FLEETTOML
   CATALOG -.->|the same table read by| DRIFT["fleet-config skills/_lib/vendored_drift.py\n/propagate-vendored coverage: declared adopters\n+ undeclared carriers (#230)"]
@@ -86,6 +89,7 @@ flowchart TB
   subgraph testsdir["tests/"]
     UNIT["test_*.py\none file per src/ module, hermetic\n(incl. test_doc_capture.py — browserless\nplan/hash/readme/adapter contract;\ntest_watchdog.py — retry/edge-transition/breadcrumb,\nno sleeping, no threads)"]
     MASTERSYNC["test_claude_master_sync.py\nasserts docs/agents/CLAUDE.master.md's body\nis byte-identical to CLAUDE.md's\n(footer excluded) — #59/#211 drift guard"]
+    GENVERIFYTEST["test_gen_verify_skill.py (#412)\nhermetic: tests/_fixtures/verify_skill/ synthetic adopter,\ngolden feature files, idempotence, --check clean/changed/blocked,\nunreachable port + real pytest junit; tests/conftest.py\nkeeps _fixtures/ out of collection"]
     CITEST["test_ci_template.py (#351)\nasserts the template's contract: windows-2025 runner,\nNode-24 action majors, one run per commit,\nread-only permissions, no secrets"]
     GATEWATCHTEST["test_main_gate_watch_template.py (#222)\nstill-a-template · failure+main-only · idempotency\n+ anti-false-coverage guard: a live watcher\nmust name a workflow that exists"]
     E2E["e2e/conftest.py + test_smoke.py\npytest-playwright, boots a disposable\nStreamlit via _streamlit_lifecycle.py\n(occupied port refused unless STREAMLIT_E2E_LIVE)\n+ test_vendored_components.py\n(drives _vendored/demo.html, light+dark)\n+ test_vendored_nav.py\n(mounts _vendored/nav skeleton, desktop+pill)\nboth via e2e/_color_assertions.py\n(style · set_theme · rgba, #208)\n+ e2e/_nav_graft.py (nav mount +\nphone context, #394)"]

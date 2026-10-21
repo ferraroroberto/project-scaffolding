@@ -119,6 +119,11 @@ extensions = ["py"]
 tier       = "none"
 prefix     = "tests/"
 extensions = ["py"]
+# Synthetic adopter repos the generator tests parse (#412); a dotfile like
+# .fleet.toml has no extension to match, so the whole folder is declared inert.
+[[e2e.rule]]
+tier   = "none"
+prefix = "tests/_fixtures/"
 [[e2e.rule]]
 tier   = "none"
 prefix = "scripts/"
