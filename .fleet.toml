@@ -140,6 +140,11 @@ path = ".fleet.toml"
 [[e2e.rule]]
 tier = "none"
 path = ".gitignore"
+# The static-ratchet baseline is data for scripts/static_ratchet.py, not a browser
+# surface; unlisted it would fail safe to the full suite (#410).
+[[e2e.rule]]
+tier = "none"
+path = ".static-ratchet-baseline.json"
 [[e2e.rule]]
 tier = "none"
 path = "LICENSE"
@@ -232,6 +237,18 @@ paths          = ["src/usage_log.py", "tests/e2e/test_vendored_usage_log.py"]
 pytest_targets = ["tests/e2e/test_vendored_usage_log.py"]
 
 # ---------------------------------------------------------------------------
+# Static-analysis ratchet (project-scaffolding#410). scripts/verify-before-ship.ps1
+# runs scripts/static_ratchet.py, which fails only on a duplicated block (jscpd,
+# Python + JS) or an unused import/variable (ruff F401/F841) that is NEW relative
+# to the committed baseline. Opt-in per repo through this table: absent or
+# `enabled = false` is the declared "not enabled" skip, so re-vendoring the
+# script never breaks an adopter. Procedure + limits: docs/static-ratchet.md.
+# This scaffold owns the vendored copies, so it does not exclude `_vendored/`
+# (an adopter does: its copies are duplicates by design).
+[static_ratchet]
+enabled = true
+
+# ---------------------------------------------------------------------------
 # [components] -- the canonical catalog of this scaffold's vendor-verbatim
 # components (#230). ONLY project-scaffolding carries this table; an adopter
 # repo records what it copied in its own `[vendored]` table instead.
@@ -304,6 +321,7 @@ surface_capture = { src = "tests/e2e/_surface.py" }
 
 # Scripts + library modules copied byte-for-byte into adopters.
 classify_e2e    = { src = "scripts/classify_e2e.py" }
+static_ratchet = { src = "scripts/static_ratchet.py" }
 pooled_http     = { src = "src/pooled_http.py" }
 no_window       = { src = "src/no_window.py" }
 runtime_data    = { src = "src/runtime_data.py" }
