@@ -145,6 +145,10 @@ path = ".gitignore"
 [[e2e.rule]]
 tier = "none"
 path = ".static-ratchet-baseline.json"
+# Likewise the comment-ratchet baseline (#411).
+[[e2e.rule]]
+tier = "none"
+path = ".comment-ratchet-baseline.json"
 [[e2e.rule]]
 tier = "none"
 path = "LICENSE"
@@ -249,6 +253,17 @@ pytest_targets = ["tests/e2e/test_vendored_usage_log.py"]
 enabled = true
 
 # ---------------------------------------------------------------------------
+# Comment ratchet (project-scaffolding#411). scripts/verify-before-ship.ps1 runs
+# scripts/comment_ratchet.py, which fails when a file's count of `#NNN` issue
+# references inside comments (Python, JS, CSS, PowerShell) rises above the
+# committed baseline. Opt-in per repo through this table, like [static_ratchet].
+# The rule text is fleet-config#1517; procedure + limits: docs/comment-ratchet.md.
+# This scaffold owns the vendored copies, so it does not exclude `_vendored/`
+# (an adopter's `[vendored]` table excludes its copies automatically).
+[comment_ratchet]
+enabled = true
+
+# ---------------------------------------------------------------------------
 # [components] -- the canonical catalog of this scaffold's vendor-verbatim
 # components (#230). ONLY project-scaffolding carries this table; an adopter
 # repo records what it copied in its own `[vendored]` table instead.
@@ -322,6 +337,7 @@ surface_capture = { src = "tests/e2e/_surface.py" }
 # Scripts + library modules copied byte-for-byte into adopters.
 classify_e2e    = { src = "scripts/classify_e2e.py" }
 static_ratchet = { src = "scripts/static_ratchet.py" }
+comment_ratchet = { src = "scripts/comment_ratchet.py" }
 pooled_http     = { src = "src/pooled_http.py" }
 no_window       = { src = "src/no_window.py" }
 runtime_data    = { src = "src/runtime_data.py" }

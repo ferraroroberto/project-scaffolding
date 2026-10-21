@@ -183,6 +183,7 @@ def test_real_rules_route_representative_paths() -> None:
     assert tier(".github/workflows/main-gate-watch.yml.template") == "skip"
     # The static-ratchet baseline is data for a gate script, not a browser surface (#410).
     assert tier(".static-ratchet-baseline.json") == "skip"
+    assert tier(".comment-ratchet-baseline.json") == "skip"  # #411
 
     # Mixed real diff (static asset + backend) -> static; add a page -> full.
     assert tier("app/webapp/static/icons/foo.svg", "src/x.py") == "static"
