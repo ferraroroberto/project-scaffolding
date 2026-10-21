@@ -1,0 +1,22 @@
+# Synthetic adopter for tests/test_gen_verify_skill.py. Public-safe, not a real app.
+layer       = "working-web"
+port        = ":8123"
+description = "fixture"
+
+[e2e]
+static_browsers = ["chromium"]
+
+[[e2e.surface]]
+name           = "jobs"
+pytest_targets = ["tests/e2e/test_jobs.py"]
+
+[verify]
+boot           = "tests/e2e/conftest.py::boot_instance"
+live_optin_env = "JOBS_E2E_LIVE"
+ready_path     = "/healthz"
+data_dir_env   = "JOBS_DATA_DIR"
+
+[[design.review.extra_steps]]
+tab   = "jobs"
+id    = "filters"
+click = "[data-open-filters]"
