@@ -132,6 +132,13 @@ Diff-keyed gate at finish: checks the touched web UI still conforms to the desig
 - Two loops, kept separate — read `docs/playwright-ui-testing.md` → "End-to-end UI testing" before driving or testing the UI. **Iterative verification:** headed Playwright MCP (else a `headless=False` script), app booted once on a fixed port, a11y snapshot over screenshot, ≤5 actions per cycle, never new files under `tests/e2e/`.
 - **Regression suite** (`tests/e2e/`, created only once a test is justified): boot a disposable instance and **refuse** an occupied port unless the project's loudly-named opt-in env var is set (vendored `tests/e2e/_e2e_live_guard.py`, manifest key `e2e_live_guard`); always isolate stateful hosts; boot failure is a hard failure, never `pytest.skip`; under 15 tests, no Page Object Model, not gated in pre-commit; remove a feature's test with the feature.
 - **Phone-first apps:** a WebKit device-emulation projection, only for tests where the engine or viewport matters (layout, touch targets, nav, composer, safe-area); functional tests run on one engine (`#290`); residual iOS-shell bugs via `ios-webkit-debug-proxy` and the device itself.
+## Static-analysis ratchet (duplicates + unused code, baseline-and-ratchet)
+*Apply only if this project's `.fleet.toml` has `[static_ratchet] enabled = true` (opt-in per repo; the scaffold itself is the first adopter).*
+
+- `scripts/static_ratchet.py` (vendor-verbatim, manifest key `static_ratchet`) fails the gate only on a **new** duplicate block (`jscpd`, pinned, via `npx`; Python + JS) or unused import/variable (`ruff` `F401`/`F841`; Python) relative to a committed `.static-ratchet-baseline.json`. Existing debt does not block; it cannot grow. Run as a gate stage after `ruff`, never path-routed.
+- **Exit 3 is "not confirmed"** (no Node, no network, ruff missing): its own failing state, never a pass. A vanished baselined hit passes with a hint; shrink with `--update-baseline`. **Adding to the baseline needs `--allow-additions`** and shows in review: never re-baseline to get green without saying so.
+- Adopt, tune, key design and limits (no JS unused-code check): `docs/static-ratchet.md`. (`#410`.)
+
 ## Verification (before declaring a task done)
 Examples — adapt to the project's actual tooling.
 
