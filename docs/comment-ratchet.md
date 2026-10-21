@@ -90,6 +90,8 @@ Re-vendoring the script never breaks a repo that has not opted in: an absent `[c
 
 The script spawns `git` with `CREATE_NO_WINDOW`, derived locally (it is vendor-verbatim, so it cannot import `src/no_window.py`).
 
+An adopter that also vendors `static_ratchet.py` will see its duplicate check flag the config-loading and glob helpers the two scripts share, because each vendored file must be self-contained. Baseline that one pair with `--allow-additions` (this scaffold's `.static-ratchet-baseline.json` carries it).
+
 ## Cost
 
 A read-only dry run over a ~280-file Python/JS/CSS/PowerShell adopter (24 vendored destinations excluded) scanned every file without a "not confirmed" and took about **0.5 s**, so there is nothing to tune. It counted roughly 2,400 references (about 660 in Python, 1,330 in JS, 350 in CSS, 40 in PowerShell), which is what that adopter's first `--init` will record. This scaffold's own baseline is 31 files and 149 references, nearly all in its vendored components.
