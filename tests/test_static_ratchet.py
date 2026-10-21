@@ -26,6 +26,7 @@ from pathlib import Path
 import pytest
 
 from scripts import static_ratchet as sr
+from src.no_window import NO_WINDOW
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 ROOT = REPO_ROOT  # parse_* only use it to relativise absolute paths
@@ -386,7 +387,7 @@ def ratchet(root: Path, *args: str) -> subprocess.CompletedProcess[str]:
     """The real CLI as the gate runs it: a subprocess, real jscpd + ruff."""
     return subprocess.run(
         [sys.executable, str(REPO_ROOT / "scripts" / "static_ratchet.py"), "--root", str(root), *args],
-        capture_output=True, text=True, encoding="utf-8", stdin=subprocess.DEVNULL, check=False,
+        capture_output=True, text=True, encoding="utf-8", stdin=subprocess.DEVNULL, check=False, creationflags=NO_WINDOW,
         env={**os.environ, "PYTHONUTF8": "1"},
     )
 
@@ -394,7 +395,7 @@ def ratchet(root: Path, *args: str) -> subprocess.CompletedProcess[str]:
 def test_real_tool_prerequisites_are_present() -> None:
     """Hard failure, not a skip: without these the ratchet proves nothing."""
     assert shutil.which("npx"), "Node/npx is required by the duplication check (see docs/static-ratchet.md)"
-    out = subprocess.run([sys.executable, "-m", "ruff", "--version"], capture_output=True, text=True, check=False)
+    out = subprocess.run([sys.executable, "-m", "ruff", "--version"], capture_output=True, text=True, check=False, creationflags=NO_WINDOW)
     assert out.returncode == 0, "ruff must be installed in the venv"
 
 
