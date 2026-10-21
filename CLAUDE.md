@@ -186,7 +186,7 @@ POSIX:
 *Apply only if this project has more than one long-lived runtime component, or a runtime that lives outside the checkout, such that the project's restart or deploy recipe does not necessarily reach every live thing it owns.*
 
 - **Invariant:** a change is never reportable as shipped while merely merged — observe the actual target running the new code, or say plainly it did not; unresolvable liveness is **unknown**, never fine.
-- **Declare every not-fully-covered runtime component** (out-of-tree, or excluded from the standard restart) in this repo's own `CLAUDE.md` "This repository" section, and report a per-component `{reachable, git_sha, captured_at, stale}` sub-block in `/api/version` (`stale` is `None`, not `false`, when unresolvable).
+- **Declare every not-fully-covered runtime component** (out-of-tree, or excluded from the standard restart) in this repo's own `CLAUDE.md` "This repository" section, and report a per-component `{reachable, git_sha, built_at, stale}` sub-block in `/api/version` (`stale` is `None`, not `false`, when unresolvable).
 - Capture identity once at process start with a bounded retry *inside* the capture (vendored `src/build_info.py`, manifest key `build_info`), never re-resolved later; give every detached child a real log file; warn (advisory) at verify time when the diff touches a declared component.
 - Declaration template, finish-flow obligation and reference implementation: `docs/long-lived-process-conventions.md` → "Restart/deploy coverage". (`#199`, `#246`.)
 ## Multi-repo agent fanout — a dispatched agent works in a worktree, never the primary checkout

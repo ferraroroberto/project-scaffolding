@@ -34,9 +34,9 @@ def test_resolve_git_sha_unknown_when_git_missing(monkeypatch, tmp_path):
 
 def test_build_identity_shape():
     identity = build_info.build_identity()
-    assert set(identity.keys()) == {"git_sha", "captured_at"}
+    assert set(identity.keys()) == {"git_sha", "built_at"}
     assert isinstance(identity["git_sha"], str) and identity["git_sha"]
-    assert isinstance(identity["captured_at"], str) and identity["captured_at"]
+    assert isinstance(identity["built_at"], str) and identity["built_at"]
 
 
 def test_build_identity_retries_a_transient_failure(monkeypatch):
