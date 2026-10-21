@@ -12,11 +12,17 @@
     Stages:
       1. byte-compile  — every .py under app/ src/ tests/ parses
       2. ruff          — lint the whole repo (ruff defaults + pyupgrade)
-      3. mypy --strict — the vendor-verbatim primitives only; the list is
+      3. static ratchet — scripts/static_ratchet.py: fails only on a duplicate
+                         block (jscpd, Python + JS) or unused import/variable
+                         (ruff F401/F841) NEW relative to the committed baseline;
+                         opt-in via .fleet.toml [static_ratchet]; exit 3 =
+                         "not confirmed" (Node/ruff unusable), a failure, never
+                         a pass (project-scaffolding#410, docs/static-ratchet.md)
+      4. mypy --strict — the vendor-verbatim primitives only; the list is
                          derived from .fleet.toml's [components] catalog via
                          scripts/vendored_catalog.py, never hand-maintained here
-      4. pytest (non-e2e) — unit suite, tests/e2e excluded
-      5. pytest (e2e)  — diff-proportionate: the browser slice is routed by
+      5. pytest (non-e2e) — unit suite, tests/e2e excluded
+      6. pytest (e2e)  — diff-proportionate: the browser slice is routed by
                          scripts/classify_e2e.py against the .fleet.toml [e2e]
                          rules (skip / static / full), fail-safe to full
                          (project-scaffolding#180). Auto-boots Streamlit per
@@ -71,6 +77,7 @@ function Invoke-Stage {
 
 Invoke-Stage "byte-compile"                       { & $py -m compileall -q app src tests }
 Invoke-Stage "ruff"                               { & $py -m ruff check . }
+Invoke-Stage "static ratchet"                     { & $py "scripts/static_ratchet.py" }
 Invoke-Stage "mypy --strict (vendored)"           { & $py -m mypy @VendoredModules }
 Invoke-Stage "pytest (unit, non-e2e)"             { & $py -m pytest --ignore=tests/e2e }
 
