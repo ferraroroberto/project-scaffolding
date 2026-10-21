@@ -139,6 +139,13 @@ Diff-keyed gate at finish: checks the touched web UI still conforms to the desig
 - **Exit 3 is "not confirmed"** (no Node, no network, ruff missing): its own failing state, never a pass. A vanished baselined hit passes with a hint; shrink with `--update-baseline`. **Adding to the baseline needs `--allow-additions`** and shows in review: never re-baseline to get green without saying so.
 - Adopt, tune, key design and limits (no JS unused-code check): `docs/static-ratchet.md`. (`#410`.)
 
+## Comment ratchet (`#NNN` references in comments, per-file baseline-and-ratchet)
+*Apply only if this project's `.fleet.toml` has `[comment_ratchet] enabled = true` (opt-in per repo; the scaffold itself is the first adopter).*
+
+- `scripts/comment_ratchet.py` (vendor-verbatim, manifest key `comment_ratchet`) fails the gate when a file's count of `#NNN` issue references **inside comments** (Python, JS, CSS, PowerShell; real scanners, not grep) rises above a committed `.comment-ratchet-baseline.json`. The rule it enforces is owned by the global instructions (`fleet-config#1517`), not restated here. Existing debt does not block; it cannot grow. Run as a gate stage after the static ratchet, never path-routed.
+- **Exit 3 is "not confirmed"** (git unusable, or a file the scanner cannot finish, named in the message): its own failing state, never a pass. **Raising the baseline needs `--allow-additions`** and shows in review: never re-baseline to get green without saying so. Vendored `dest`s from the adopter's `[vendored]` table are excluded automatically.
+- Adopt, counting rules, known false positive (digit-only CSS hex in a comment) and limits: `docs/comment-ratchet.md`. (`#411`.)
+
 ## Verification (before declaring a task done)
 Examples — adapt to the project's actual tooling.
 

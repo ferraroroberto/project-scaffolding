@@ -55,9 +55,10 @@ flowchart TB
   DATALOGS["data/\nlogs/app.log, input/, output/\n(gitignored)"]
 
   subgraph scriptsdir["scripts/"]
-    VERIFY["verify-before-ship.ps1\nbyte-compile -> ruff -> static ratchet\n-> mypy --strict (vendored primitives) -> pytest (non-e2e)\n-> routed e2e (skip/static/full)"]
+    VERIFY["verify-before-ship.ps1\nbyte-compile -> ruff -> static ratchet\n-> comment ratchet -> mypy --strict (vendored primitives) -> pytest (non-e2e)\n-> routed e2e (skip/static/full)"]
     CLASSIFY["classify_e2e.py (vendor-verbatim, #180)\ndiff-proportionate e2e routing\nreads .fleet.toml [e2e] rules, fail-safe to full"]
     RATCHET["static_ratchet.py (vendor-verbatim, #410)\nfails only on NEW duplicates (jscpd) / unused code\n(ruff F401,F841) vs .static-ratchet-baseline.json\nopt-in via .fleet.toml [static_ratchet]; exit 3 = not confirmed"]
+    CRATCHET["comment_ratchet.py (vendor-verbatim, #411)\nfails when a file's count of #NNN refs inside comments\n(py/js/css/ps1) rises vs .comment-ratchet-baseline.json\nopt-in via .fleet.toml [comment_ratchet]; exit 3 = not confirmed"]
     CATALOG["vendored_catalog.py (#230)\nreads .fleet.toml [components] -- the canonical\nkey -> src map of what this scaffold publishes"]
     TSCERT["gen_tailscale_cert.py\nprovision/renew Tailscale HTTPS leaf"]
     USAGESUM["usage_summary.py (#349)\n--app slug --days N --json\nreads an app's usage.sqlite3 read-only\n--time = per-day foreground minutes\nexit 2 = no data yet"]
@@ -70,6 +71,8 @@ flowchart TB
   CLASSIFY -.->|reads [e2e] rules from| FLEETTOML
   VERIFY -->|runs, opt-in, before mypy| RATCHET
   RATCHET -.->|reads [static_ratchet] from| FLEETTOML
+  VERIFY -->|runs, opt-in, after the static ratchet| CRATCHET
+  CRATCHET -.->|reads [comment_ratchet] + [vendored] from| FLEETTOML
   VERIFY -->|derives its mypy --strict list from| CATALOG
   CATALOG -.->|reads [components] from| FLEETTOML
   CATALOG -.->|the same table read by| DRIFT["fleet-config skills/_lib/vendored_drift.py\n/propagate-vendored coverage: declared adopters\n+ undeclared carriers (#230)"]
