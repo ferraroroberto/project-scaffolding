@@ -501,6 +501,55 @@ def test_exclude_glob_silences_a_path(tree: Path) -> None:
     assert ratchet(tree).returncode == 0
 
 
+def test_a_vendored_duplicate_is_not_reported_but_a_native_one_still_is(tree: Path) -> None:
+    (tree / ".fleet.toml").write_text(
+        '[static_ratchet]\nenabled = true\n\n[vendored.copy]\nsrc = "scripts/x.py"\ndest = "three.py"\n',
+        encoding="utf-8",
+    )
+    assert ratchet(tree, "--init").returncode == 0
+    (tree / "three.py").write_text(py_module("three", py_block("alpha")), encoding="utf-8")  # clones one.py
+    result = ratchet(tree)
+    assert result.returncode == 0, result.stdout
+    (tree / "four.py").write_text(py_module("four", py_block("alpha")), encoding="utf-8")  # same clone, not vendored
+    result = ratchet(tree)
+    assert result.returncode == sr.EXIT_NEW, result.stdout
+    assert "four.py" in result.stdout
+    assert "three.py" not in result.stdout
+
+
+def test_a_vendored_folder_is_left_out_of_duplicates_and_unused_code(tree: Path) -> None:
+    (tree / ".fleet.toml").write_text(
+        '[static_ratchet]\nenabled = true\n\n[vendored.pkg]\nsrc = "pkg"\ndest = "vendor/pkg/"\n',
+        encoding="utf-8",
+    )
+    assert ratchet(tree, "--init").returncode == 0
+    (tree / "vendor" / "pkg").mkdir(parents=True)
+    (tree / "vendor" / "pkg" / "dup.py").write_text(py_module("dup", py_block("alpha"), "import json"), encoding="utf-8")
+    result = ratchet(tree)
+    assert result.returncode == 0, result.stdout
+
+
+def test_vendored_dests_extend_the_exclusions_of_the_loaded_config(tmp_path: Path) -> None:
+    (tmp_path / ".fleet.toml").write_text(
+        '[static_ratchet]\nenabled = true\nexclude = ["gen/**"]\n\n'
+        '[vendored.a]\ndest = "scripts\\\\a.py"\n[vendored.b]\ndest = "app/vendor/"\n[vendored.c]\nsrc = "no-dest"\n',
+        encoding="utf-8",
+    )
+    cfg = sr.load_config(tmp_path)
+    assert cfg is not None
+    assert sr.is_excluded("gen/x.py", cfg.exclude)
+    assert sr.is_excluded("scripts/a.py", cfg.exclude)
+    assert sr.is_excluded("app/vendor/deep/x.js", cfg.exclude)
+    assert not sr.is_excluded("scripts/a.pyc", cfg.exclude)
+    assert not sr.is_excluded("app/vendor_other/x.js", cfg.exclude)
+
+
+def test_an_unreadable_fleet_toml_is_a_config_error_never_a_pass(tmp_path: Path) -> None:
+    assert run_mode(tmp_path) == sr.EXIT_CONFIG  # no .fleet.toml at all
+    (tmp_path / ".fleet.toml").write_text("[vendored\n", encoding="utf-8")
+    assert run_mode(tmp_path) == sr.EXIT_CONFIG
+
+
 # ------------------------------------------------------------ self-adoption
 
 def test_scaffold_adopts_the_stage_and_commits_a_parseable_baseline() -> None:
