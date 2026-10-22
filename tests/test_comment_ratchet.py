@@ -13,13 +13,12 @@ Three layers, mirroring `test_static_ratchet.py`:
 
 from __future__ import annotations
 
-import subprocess
 from pathlib import Path
 
 import pytest
 
 from scripts import comment_ratchet as cr
-from src.no_window import NO_WINDOW
+from tests._git_repo import git, write
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
@@ -294,10 +293,6 @@ def test_generated_marker_in_the_first_lines() -> None:
 
 # ------------------------------------------------------- ratchet on a git repo
 
-def git(root: Path, *args: str) -> None:
-    subprocess.run(["git", *args], cwd=root, check=True, capture_output=True, creationflags=NO_WINDOW)
-
-
 @pytest.fixture
 def repo(tmp_path: Path) -> Path:
     """A throwaway git repo with the stage enabled and one reference in `src/a.py`."""
@@ -305,14 +300,6 @@ def repo(tmp_path: Path) -> Path:
     (tmp_path / ".fleet.toml").write_text("[comment_ratchet]\nenabled = true\n", encoding="utf-8")
     write(tmp_path, "src/a.py", "x = 1  # since #1\n")
     return tmp_path
-
-
-def write(root: Path, rel: str, text: str, *, track: bool = True) -> None:
-    path = root / rel
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(text, encoding="utf-8", newline="\n")
-    if track:
-        git(root, "add", "-f", rel)
 
 
 def run_mode(root: Path, *, init: bool = False, update: bool = False, allow: bool = False) -> int:
