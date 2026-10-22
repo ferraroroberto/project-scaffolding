@@ -18,6 +18,13 @@ layer       = "governance"
 icon        = "📐"
 description = "Canonical master — the scaffold &amp; CLAUDE.md every project derives from."
 
+# Which canonical tree the root layout is held to (docs/repo-layout.md). A root
+# folder the shape does not list goes in `extra_roots = [...]`, with its reason in
+# docs/layout.md. Read by scripts/structure_ratchet.py; ids and presets:
+# docs/structure-ratchet.md. The scaffold is a streamlit repo with no extra roots.
+shape       = "streamlit"
+extra_roots = []
+
 # Wide views (fleet-config#1113, design.md Layout): page width follows the shape of a
 # view's content, per view. A one-dimensional view (settings, a form, one list, a
 # detail) keeps the 772px measure; a two-dimensional one (board lanes, a many-field

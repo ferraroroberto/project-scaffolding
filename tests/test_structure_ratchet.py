@@ -17,8 +17,9 @@ Three layers, mirroring `test_docs_ratchet.py`:
 from __future__ import annotations
 
 import ast
+import json
 import re
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from pathlib import Path
 
 import pytest
@@ -589,6 +590,199 @@ def test_main_rejects_allow_additions_without_update(capsys: pytest.CaptureFixtu
     assert "--allow-additions" in capsys.readouterr().err
 
 
+# ------------------------------------------------------------- root layout
+
+#: shape id -> (required root folders, other allowed root folders); pinned here on purpose, so a
+#: change to a preset in the script is a deliberate edit in two places (and the doc table).
+EXPECTED_SHAPES: dict[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
+    "webapp-tray": (("app", "src", "tests", "docs"), ("scripts", "data", "brand")),
+    "streamlit": (("app", "src", "tests"), ("scripts", "data", "brand")),
+    "pipeline-cli": (("tests",), ("src", "common", "scripts", "config", "data")),
+    "skills-governance": (("skills", "tests"), ("hooks", "scripts", "architecture")),
+    "node": (("src",), ("test", "scripts")),
+    "static-site": ((), ("css", "js", "assets", "games")),
+}
+SHAPE_IDS = list(EXPECTED_SHAPES)
+SHAPES_WITH_REQUIRED = [(s, f) for s, (required, _allowed) in EXPECTED_SHAPES.items() for f in required]
+
+
+def assert_layout_passes(root: Path, shape: str, capsys: pytest.CaptureFixture[str]) -> None:
+    """The check passes AND says it checked the layout, so a stage that ignores `shape` cannot pass this."""
+    capsys.readouterr()
+    assert run_mode(root) == sr.EXIT_PASS
+    assert f"layout matches {shape}" in capsys.readouterr().out
+
+
+def shape_repo(root: Path, shape: str | None, folders: Iterable[str], extra_roots: Iterable[str] | None = None) -> Path:
+    """A git repo declaring `shape` (and `extra_roots`), one tracked file in each folder, baseline initialised."""
+    git(root, "init", "-q")
+    head = f'shape = "{shape}"\n' if shape else ""
+    if extra_roots is not None:
+        head += f"extra_roots = {json.dumps(list(extra_roots))}\n"
+    (root / ".fleet.toml").write_text(head + CONFIG, encoding="utf-8")
+    for folder in folders:
+        write(root, f"{folder}/keep.txt", "x\n")
+    assert run_mode(root, init=True) == sr.EXIT_PASS
+    return root
+
+
+def test_the_script_carries_exactly_the_expected_presets() -> None:
+    assert {s: (p.required, p.allowed) for s, p in sr.SHAPES.items()} == EXPECTED_SHAPES
+
+
+@pytest.mark.parametrize("shape", SHAPE_IDS)
+def test_a_repo_with_exactly_its_required_folders_passes_and_names_the_shape(
+    tmp_path: Path, shape: str, capsys: pytest.CaptureFixture[str]
+) -> None:
+    shape_repo(tmp_path, shape, EXPECTED_SHAPES[shape][0])
+    assert_layout_passes(tmp_path, shape, capsys)
+
+
+@pytest.mark.parametrize("shape", SHAPE_IDS)
+def test_every_allowed_folder_and_the_always_allowed_ones_pass(
+    tmp_path: Path, shape: str, capsys: pytest.CaptureFixture[str]
+) -> None:
+    required, allowed = EXPECTED_SHAPES[shape]
+    shape_repo(tmp_path, shape, (*required, *allowed, "docs", ".github", ".claude"))
+    assert_layout_passes(tmp_path, shape, capsys)
+
+
+@pytest.mark.parametrize(("shape", "missing"), SHAPES_WITH_REQUIRED)
+def test_a_missing_required_folder_fails_by_name(
+    tmp_path: Path, shape: str, missing: str, capsys: pytest.CaptureFixture[str]
+) -> None:
+    shape_repo(tmp_path, shape, [f for f in EXPECTED_SHAPES[shape][0] if f != missing])
+    capsys.readouterr()
+    assert run_mode(tmp_path) == sr.EXIT_RISE
+    out = capsys.readouterr().out
+    assert f"shape {shape}: required folder {missing}/" in out
+    assert f"repo-layout.md#{shape}" in out
+
+
+@pytest.mark.parametrize("shape", SHAPE_IDS)
+def test_an_undeclared_root_fails_naming_the_shape_the_folder_and_both_fixes(
+    tmp_path: Path, shape: str, capsys: pytest.CaptureFixture[str]
+) -> None:
+    shape_repo(tmp_path, shape, (*EXPECTED_SHAPES[shape][0], "utils2"))
+    capsys.readouterr()
+    assert run_mode(tmp_path) == sr.EXIT_RISE
+    out = capsys.readouterr().out
+    assert f"shape {shape}: utils2/ is not a folder this shape lists" in out
+    assert "move its code into one of" in out
+    assert "declare 'utils2' in `extra_roots`" in out
+
+
+@pytest.mark.parametrize("shape", SHAPE_IDS)
+def test_the_same_folder_declared_in_extra_roots_passes(
+    tmp_path: Path, shape: str, capsys: pytest.CaptureFixture[str]
+) -> None:
+    shape_repo(tmp_path, shape, (*EXPECTED_SHAPES[shape][0], "utils2"), extra_roots=["utils2"])
+    assert_layout_passes(tmp_path, shape, capsys)
+
+
+def test_extra_roots_never_waive_a_required_folder(tmp_path: Path) -> None:
+    shape_repo(tmp_path, "streamlit", ("app", "src"), extra_roots=["tests"])
+    assert run_mode(tmp_path) == sr.EXIT_RISE
+
+
+def test_layout_findings_are_never_baselined(tmp_path: Path) -> None:
+    shape_repo(tmp_path, "streamlit", ("app", "src", "tests", "utils2"))
+    assert not any(k.startswith("layout") for k in baseline(tmp_path)), "layout is not a baseline kind"
+    assert run_mode(tmp_path) == sr.EXIT_RISE
+    assert run_mode(tmp_path, update=True, allow=True) == sr.EXIT_PASS
+    assert run_mode(tmp_path) == sr.EXIT_RISE, "--allow-additions raises the baseline, never the layout"
+
+
+def test_layout_and_baseline_findings_are_both_reported(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    shape_repo(tmp_path, "streamlit", ("app", "src", "tests", "utils2"))
+    write(tmp_path, "src/big.py", "x = 1\n" * 11)
+    capsys.readouterr()
+    assert run_mode(tmp_path) == sr.EXIT_RISE
+    out = capsys.readouterr().out
+    assert "[file size]" in out
+    assert "[root layout]" in out
+
+
+def test_untracked_folders_and_root_files_are_not_roots(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    shape_repo(tmp_path, "streamlit", ("app", "src", "tests"))
+    write(tmp_path, "scratch/x.txt", "x\n", track=False)
+    write(tmp_path, "main.py", "x = 1\n")
+    assert_layout_passes(tmp_path, "streamlit", capsys)
+
+
+def test_no_shape_skips_the_layout_check_with_a_stated_reason(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    shape_repo(tmp_path, None, ("anything", "goes"))
+    capsys.readouterr()
+    assert run_mode(tmp_path) == sr.EXIT_PASS
+    out = capsys.readouterr().out
+    assert "layout check not applicable (no `shape` in .fleet.toml)" in out
+    assert "layout matches" not in out, "a skip is never reported as a pass"
+
+
+def test_no_shape_still_runs_the_other_four_checks(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    shape_repo(tmp_path, None, ("anything",))
+    write(tmp_path, "anything/big.py", "x = 1\n" * 11)
+    capsys.readouterr()
+    assert run_mode(tmp_path) == sr.EXIT_RISE
+    out = capsys.readouterr().out
+    assert "[file size]" in out
+    assert "not applicable" in out
+
+
+@pytest.mark.parametrize("mode", ["check", "init"])
+def test_an_unknown_shape_is_not_confirmed_never_a_skip(
+    tmp_path: Path, mode: str, capsys: pytest.CaptureFixture[str]
+) -> None:
+    git(tmp_path, "init", "-q")
+    (tmp_path / ".fleet.toml").write_text('shape = "monolith"\n' + CONFIG, encoding="utf-8")
+    write(tmp_path, "src/ok.py", "x = 1\n")
+    assert run_mode(tmp_path, init=mode == "init") == sr.EXIT_NOT_CONFIRMED
+    out = capsys.readouterr().out
+    assert "NOT CONFIRMED" in out
+    assert "'monolith'" in out
+    assert "webapp-tray" in out, "the message lists the allowed ids"
+
+
+@pytest.mark.parametrize(
+    "head",
+    [
+        pytest.param("shape = 3\n", id="shape-not-a-string"),
+        pytest.param('extra_roots = "docs"\n', id="extra-roots-a-string"),
+        pytest.param("extra_roots = [3]\n", id="extra-root-not-a-string"),
+        pytest.param('extra_roots = [""]\n', id="extra-root-empty"),
+        pytest.param('extra_roots = ["a/b"]\n', id="extra-root-nested"),
+    ],
+)
+def test_a_malformed_shape_or_extra_roots_fails_loud(head: str) -> None:
+    with pytest.raises(sr.ConfigError):
+        sr.parse_config(head + CONFIG)
+
+
+def test_shape_and_extra_roots_are_read_from_the_top_level() -> None:
+    cfg = sr.parse_config('shape = "node"\nextra_roots = ["dist/", "web\\\\"]\n' + CONFIG)
+    assert cfg is not None
+    assert (cfg.shape, cfg.extra_roots) == ("node", ("dist", "web"))
+    plain = sr.parse_config(CONFIG)
+    assert plain is not None
+    assert (plain.shape, plain.extra_roots) == (None, ())
+
+
+def test_the_shape_fills_the_layer_pair_only_when_the_table_does_not_set_one() -> None:
+    def layers(head: str, extra: str = "") -> tuple[tuple[str, str], ...]:
+        cfg = sr.parse_config(head + CONFIG + extra)
+        assert cfg is not None
+        return cfg.layers
+
+    assert layers('shape = "webapp-tray"\n') == (("src", "app"),)
+    assert layers('shape = "streamlit"\n') == (("src", "app"),)
+    for shape in ("pipeline-cli", "skills-governance", "node", "static-site"):
+        assert layers(f'shape = "{shape}"\n') == ()
+    assert layers('shape = "pipeline-cli"\n', 'layers = [["lib", "ui"]]\n') == (("lib", "ui"),)
+    assert layers("") == sr.DEFAULT_LAYERS, "a repo with no shape keeps the default pair"
+
+
 # ------------------------------------------------------------ self-adoption
 
 def test_scaffold_adopts_the_stage_and_commits_a_parseable_baseline() -> None:
@@ -611,6 +805,42 @@ def test_the_script_is_catalogued_so_it_is_mypy_gated_and_drift_checked() -> Non
     from scripts.vendored_catalog import load_catalog
 
     assert load_catalog(REPO_ROOT)["structure_ratchet"] == {"src": "scripts/structure_ratchet.py"}
+
+
+def test_the_scaffold_declares_its_shape_and_its_layout_passes() -> None:
+    cfg, _ = sr.load_config(REPO_ROOT)
+    assert cfg is not None
+    assert (cfg.shape, cfg.extra_roots) == ("streamlit", ())
+    assert sr.layout_findings(sr.tracked_files(REPO_ROOT), cfg) == []
+
+
+def _doc_shape_table() -> dict[str, tuple[set[str], set[str], str]]:
+    """The shape table of docs/structure-ratchet.md: id -> (required, allowed, layers cell)."""
+    text = (REPO_ROOT / "docs" / "structure-ratchet.md").read_text(encoding="utf-8")
+    rows = {}
+    for line in text.splitlines():
+        cells = [c.strip() for c in line.strip().strip("|").split("|")]
+        if len(cells) == 4 and re.fullmatch(r"`[a-z-]+`", cells[0]) and cells[0].strip("`") in sr.SHAPES:
+            required, allowed = (set(re.findall(r"`(\w+)`", cell)) for cell in cells[1:3])
+            rows[cells[0].strip("`")] = (required, allowed, cells[3])
+    return rows
+
+
+def test_the_doc_table_matches_the_presets_in_the_script() -> None:
+    rows = _doc_shape_table()
+    assert set(rows) == set(sr.SHAPES), "every shape has a row in docs/structure-ratchet.md"
+    for shape, preset in sr.SHAPES.items():
+        required, allowed, layers = rows[shape]
+        assert required == set(preset.required), shape
+        assert allowed == set(preset.allowed), shape
+        want = "`" + json.dumps([list(p) for p in preset.layers]) + "`" if preset.layers else "none"
+        assert layers == want, shape
+
+
+def test_every_shape_id_is_a_section_of_the_layout_doc() -> None:
+    text = (REPO_ROOT / "docs" / "repo-layout.md").read_text(encoding="utf-8")
+    headings = {m.group(1).strip() for m in re.finditer(r"^## (.+)$", text, re.MULTILINE)}
+    assert set(sr.SHAPES) <= headings, "the failure message links docs/repo-layout.md#<shape>"
 
 
 def test_every_anchor_a_failure_message_names_exists_in_the_layout_doc() -> None:

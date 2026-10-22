@@ -1,4 +1,4 @@
-"""Ratchet on file size, function length, flat directories and the layer contract.
+"""Ratchet on file size, function length, flat directories, the layer contract and the root layout.
 
 A file, a function or a directory that only ever grows is how a repo ends up with
 a 20,000-line module that every agent then imitates. This stage stops that growth
@@ -7,7 +7,7 @@ work, but they cannot grow, and a new offender fails by name. Where code goes
 instead is the canonical layout in project-scaffolding's docs/repo-layout.md;
 every failure message points at the section it breaks.
 
-Four checks, each a baseline key:
+Five checks; the first four are baseline keys:
 
   * File size (`size:<path>` -> lines). Code, stylesheets, markup and tests
     alike (py, js, mjs, ts, css, html, ps1, sql). A new file over
@@ -29,6 +29,13 @@ Four checks, each a baseline key:
 A JS function whose end the matcher cannot find is `unmeasured:<path>` ->
 functions: recorded, never a silent pass, so a new one fails like any finding.
 
+  * Root layout (not baselined). The repo's top-level folders, from `git ls-files`,
+    against the `shape` it declares: a required folder with no tracked file fails
+    by name, and so does a tracked root folder that neither the shape's preset
+    (`SHAPES`) nor the repo's `extra_roots` lists. `docs`, `.github` and every
+    hidden folder are always allowed. A declared exception is data, not debt. No
+    `shape` -> the check reports "not applicable" and the other four still run.
+
 Opt-in, per adopter, in its own `.fleet.toml` -- re-vendoring never breaks a repo
 that has not opted in:
 
@@ -41,6 +48,11 @@ that has not opted in:
     layers             = [["src", "app"]]                     # default; [] turns the check off
     exclude            = ["tests/fixtures/**"]                # globs; default none
 
+and, at the top level of the same file, for the layout check (ids: `SHAPES`):
+
+    shape       = "streamlit"
+    extra_roots = ["custom_components"]                           # default none
+
 Scope is `git ls-files` minus `node_modules`, `.venv` and `venv`, files whose first
 lines say `DO NOT EDIT` or `@generated`, `exclude` globs, and every `dest` in the
 adopter's own `[vendored]` table.
@@ -51,8 +63,9 @@ Exit codes (a state is never folded into a pass):
   1  a finding is new or above its baseline, or the baseline is missing / a mode
      was refused
   2  bad configuration, baseline or arguments -- fail loud
-  3  NOT CONFIRMED: `git` unusable, a file that cannot be read, or a Python file
-     that does not parse. The gate fails on it.
+  3  NOT CONFIRMED: `git` unusable, a file that cannot be read, a Python file
+     that does not parse, or a `shape` that is not one of `SHAPES`. The gate
+     fails on it.
 
 Modes: `check` (default; what the gate runs), `--init` (write the first
 baseline, refuses to overwrite), `--update-baseline` (lower or drop entries;
@@ -95,6 +108,8 @@ GENERATED_MARKERS = (b"DO NOT EDIT", b"@generated")  # case-sensitive, like the 
 GENERATED_HEAD_LINES = 5
 GIT_TIMEOUT_S = 120
 LAYOUT_DOC = "project-scaffolding docs/repo-layout.md"
+#: Root folders every shape allows, besides hidden ones (`.github`, `.claude`, ...).
+ALWAYS_ALLOWED = ("docs",)
 
 EXIT_PASS, EXIT_RISE, EXIT_CONFIG, EXIT_NOT_CONFIRMED = 0, 1, 2, 3
 
@@ -116,6 +131,28 @@ KINDS = {
 }
 
 
+@dataclass(frozen=True)
+class Shape:
+    """One repo shape's root layout: folders it must have, folders it may have, and its layer pairs."""
+
+    required: tuple[str, ...]
+    allowed: tuple[str, ...]
+    layers: tuple[tuple[str, str], ...] = ()
+
+
+#: The `.fleet.toml` `shape` ids, mirroring the trees in docs/repo-layout.md. A required folder
+#: cannot be waived (`extra_roots` only adds), so a set is required only where every repo of the
+#: shape has it. docs/structure-ratchet.md carries the same table; a test compares the two.
+SHAPES = {
+    "webapp-tray": Shape(("app", "src", "tests", "docs"), ("scripts", "data", "brand"), DEFAULT_LAYERS),
+    "streamlit": Shape(("app", "src", "tests"), ("scripts", "data", "brand"), DEFAULT_LAYERS),
+    "pipeline-cli": Shape(("tests",), ("src", "common", "scripts", "config", "data")),
+    "skills-governance": Shape(("skills", "tests"), ("hooks", "scripts", "architecture")),
+    "node": Shape(("src",), ("test", "scripts")),
+    "static-site": Shape((), ("css", "js", "assets", "games")),
+}
+
+
 class ConfigError(RuntimeError):
     """The `[structure_ratchet]` table or the baseline file is unusable."""
 
@@ -132,6 +169,8 @@ class Config:
     max_dir_modules: int
     layers: tuple[tuple[str, str], ...]
     exclude: tuple[str, ...]
+    shape: str | None = None  # top-level `shape` in .fleet.toml; validated against SHAPES in run()
+    extra_roots: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -159,9 +198,9 @@ def _positive_int(table: dict[str, object], name: str, default: int) -> int:
     return value
 
 
-def _layers(table: dict[str, object]) -> tuple[tuple[str, str], ...]:
+def _layers(table: dict[str, object], shape: str | None) -> tuple[tuple[str, str], ...]:
     if "layers" not in table:
-        return DEFAULT_LAYERS
+        return SHAPES[shape].layers if shape in SHAPES else DEFAULT_LAYERS
     value = table["layers"]
     error = ConfigError('[structure_ratchet] layers must be a list of ["lower", "upper"] root pairs')
     if not isinstance(value, list):
@@ -174,6 +213,27 @@ def _layers(table: dict[str, object]) -> tuple[tuple[str, str], ...]:
     return tuple(pairs)
 
 
+def _shape(data: dict[str, object]) -> str | None:
+    value = data.get("shape")
+    if value is not None and not isinstance(value, str):
+        raise ConfigError("shape in .fleet.toml must be a string")
+    return value
+
+
+def _extra_roots(data: dict[str, object]) -> tuple[str, ...]:
+    value = data.get("extra_roots", [])
+    error = ConfigError("extra_roots in .fleet.toml must be a list of top-level folder names")
+    if not isinstance(value, list):
+        raise error
+    names = set()
+    for item in value:
+        name = item.replace("\\", "/").strip("/") if isinstance(item, str) else ""
+        if not name or "/" in name:
+            raise error
+        names.add(name)
+    return tuple(sorted(names))
+
+
 def parse_config(toml_text: str) -> Config | None:
     """`[structure_ratchet]` -> `Config`, or None when the stage is not enabled.
 
@@ -181,7 +241,8 @@ def parse_config(toml_text: str) -> Config | None:
     declared it. Anything malformed raises `ConfigError` -- a typo'd key must not
     quietly run with defaults.
     """
-    table = tomllib.loads(toml_text).get("structure_ratchet")
+    data = tomllib.loads(toml_text)
+    table = data.get("structure_ratchet")
     if table is None:
         return None
     if not isinstance(table, dict):
@@ -200,13 +261,16 @@ def parse_config(toml_text: str) -> Config | None:
     exclude = table.get("exclude", [])
     if not isinstance(exclude, list) or not all(isinstance(g, str) and g for g in exclude):
         raise ConfigError("[structure_ratchet] exclude must be a list of non-empty strings")
+    shape = _shape(data)
     return Config(
         baseline,
         _positive_int(table, "max_file_lines", DEFAULT_MAX_FILE_LINES),
         _positive_int(table, "max_function_lines", DEFAULT_MAX_FUNCTION_LINES),
         _positive_int(table, "max_dir_modules", DEFAULT_MAX_DIR_MODULES),
-        _layers(table),
+        _layers(table, shape),
         tuple(exclude),
+        shape,
+        _extra_roots(data),
     )
 
 
@@ -657,6 +721,33 @@ def dir_findings(paths: list[str], limit: int) -> list[Finding]:
     ]
 
 
+def layout_findings(paths: list[str], cfg: Config) -> list[str]:
+    """Root-layout problems for the declared shape, one message each (none when there is no shape).
+
+    Not baselined: a declared exception is data in `extra_roots`, and an undeclared one fails.
+    """
+    if cfg.shape is None:
+        return []
+    shape = SHAPES[cfg.shape]
+    roots = {path.split("/", 1)[0] for path in paths if "/" in path}
+    listed = set(shape.required) | set(shape.allowed) | set(ALWAYS_ALLOWED) | set(cfg.extra_roots)
+    see = f"See {LAYOUT_DOC}#{cfg.shape}"
+    problems = [
+        f"shape {cfg.shape}: required folder {name}/ has no tracked file; add it, or correct `shape` in "
+        f".fleet.toml. {see}"
+        for name in shape.required
+        if name not in roots
+    ]
+    problems += [
+        f"shape {cfg.shape}: {name}/ is not a folder this shape lists; move its code into one of "
+        f"{', '.join(f'{n}/' for n in sorted(listed))}, or declare {name!r} in `extra_roots` in .fleet.toml "
+        f"with a line in docs/layout.md. {see}"
+        for name in sorted(roots)
+        if not name.startswith(".") and name not in listed
+    ]
+    return problems
+
+
 def measure_file(path: str, raw: bytes, cfg: Config) -> list[Finding]:
     """File-size, function-length and layer findings for one in-scope file."""
     findings = []
@@ -676,11 +767,11 @@ def measure_file(path: str, raw: bytes, cfg: Config) -> list[Finding]:
     return findings
 
 
-def measure_tree(root: Path, cfg: Config, vendored: tuple[str, ...]) -> dict[str, Finding]:
-    """Every finding in the tree, keyed by its baseline key."""
+def measure_tree(root: Path, paths: list[str], cfg: Config, vendored: tuple[str, ...]) -> dict[str, Finding]:
+    """Every finding among the tracked `paths`, keyed by its baseline key."""
     found: dict[str, Finding] = {}
     measured: list[str] = []
-    for path in tracked_files(root):
+    for path in paths:
         if not in_scope(path, cfg, vendored):
             continue
         try:
@@ -777,6 +868,11 @@ def run(root: Path, *, init: bool, update: bool, allow_additions: bool) -> int:
             return EXIT_CONFIG
         print("structure ratchet: not enabled (no [structure_ratchet] enabled = true in .fleet.toml)")
         return EXIT_PASS
+    if cfg.shape is not None and cfg.shape not in SHAPES:
+        print(f"structure ratchet: NOT CONFIRMED: shape {cfg.shape!r} in .fleet.toml is not one of "
+              f"{', '.join(SHAPES)}")
+        print("  (the layout cannot be held to a tree that does not exist, so it is neither a pass nor a skip)")
+        return EXIT_NOT_CONFIRMED
     baseline_path = root / cfg.baseline
 
     baseline: dict[str, int] = {}
@@ -796,7 +892,8 @@ def run(root: Path, *, init: bool, update: bool, allow_additions: bool) -> int:
         return EXIT_RISE
 
     try:
-        found = measure_tree(root, cfg, vendored)
+        paths = tracked_files(root)
+        found = measure_tree(root, paths, cfg, vendored)
     except NotConfirmed as exc:
         print(f"structure ratchet: NOT CONFIRMED: {exc}")
         print("  (the tree could not be measured, so it is neither a pass nor a clean tree)")
@@ -820,12 +917,21 @@ def run(root: Path, *, init: bool, update: bool, allow_additions: bool) -> int:
               f"({len(shrank)} lowered or dropped, {len(rose)} raised or added)")
         return EXIT_PASS
 
+    layout = layout_findings(paths, cfg)
+    if cfg.shape is None:
+        print("structure ratchet: layout check not applicable (no `shape` in .fleet.toml)")
+    if layout:
+        print(f"structure ratchet: {len(layout)} layout finding(s):")
+        for message in layout:
+            print(f"  [root layout] {message}")
     if rose:
         _report_rose(rose, found, baseline)
         print("  Existing offenders may not grow and new ones may not appear. Move the code where the layout "
               "puts it; or (reviewed) raise the baseline with `--update-baseline --allow-additions`.")
+    if rose or layout:
         return EXIT_RISE
-    print(f"structure ratchet: PASS ({summarize(current)} baselined, none above the baseline)")
+    matched = f"; layout matches {cfg.shape}" if cfg.shape else ""
+    print(f"structure ratchet: PASS ({summarize(current)} baselined, none above the baseline{matched})")
     if shrank:
         print(f"  {len(shrank)} finding(s) are below the baseline -- run "
               "`python scripts/structure_ratchet.py --update-baseline` to lower it")

@@ -1,6 +1,6 @@
 # Structure ratchet
 
-`scripts/structure_ratchet.py` is a baseline-and-ratchet stage for the pre-ship gate. It enforces the [repo layout](repo-layout.md) with four checks: **file size**, **function length**, **flat directories** and the **layer contract**. It fails when a new offender appears, or when a baselined one grows. Existing offenders never block work; they cannot grow either.
+`scripts/structure_ratchet.py` is a baseline-and-ratchet stage for the pre-ship gate. It enforces the [repo layout](repo-layout.md) with five checks: **file size**, **function length**, **flat directories**, the **layer contract** and the **root layout**. The first four fail when a new offender appears, or when a baselined one grows; existing offenders never block work, and they cannot grow either. The root layout is never baselined.
 
 It reuses the shape of the [docs ratchet](docs-ratchet.md) and the [comment ratchet](comment-ratchet.md): an opt-in `.fleet.toml` table, a committed baseline, the same flags, and exit 3 for "not confirmed". It is its own script, and not a check inside the [static-analysis ratchet](static-ratchet.md), because that one needs Node and ruff; this one is stdlib-only and runs anywhere Python 3.11 does.
 
@@ -13,6 +13,7 @@ It reuses the shape of the [docs ratchet](docs-ratchet.md) and the [comment ratc
 | Flat directory | A directory holding more than **40 modules** fails when new; a baselined one may not gain a module | `dir:<path>` → `modules` |
 | Layer contract | A Python file under `src/` that imports the `app` package fails | `layer:<path>:<module>` → `imports` |
 | Unmeasured | A JS function whose end the scanner cannot find is recorded, never passed | `unmeasured:<path>` → `functions` |
+| Root layout | A required root folder with no tracked file fails; so does a tracked root folder the declared `shape` and `extra_roots` do not list | none: not baselined |
 
 Tests get the same limits as code. Each failure message names the rule, the limit, where the code goes instead, and the section of `docs/repo-layout.md` that says so:
 
@@ -22,7 +23,7 @@ structure ratchet: 1 finding(s) above the baseline:
       put the new module in a domain subpackage, src/<domain>/. See project-scaffolding docs/repo-layout.md#flat-directory
 ```
 
-The anchors (`#file-size`, `#function-length`, `#flat-directory`, `#layer-contract`) are pinned by a test, so renaming a heading in `repo-layout.md` fails until the script follows.
+The anchors (`#file-size`, `#function-length`, `#flat-directory`, `#layer-contract`, and one per shape id for the root layout) are pinned by a test, so renaming a heading in `repo-layout.md` fails until the script follows.
 
 ## What is measured
 
@@ -44,6 +45,28 @@ A function expression takes the name it is bound to (`const mountHome = async ()
 
 **The layer contract** reads `import` and `from ... import` statements anywhere in a file (a deferred import inside a function counts). `import app`, `import app.web` and `from app.x import y` match the `app` package; `import application`, `from src.app import x` and relative imports do not. Each pair in `layers` is a lower and an upper root: files under the lower root may not import the package at the upper root (`app/web` is the package `app.web`). The default is `[["src", "app"]]`; `layers = []` turns the check off.
 
+### Root layout
+
+The check reads the top-level `shape` and `extra_roots` keys of the repo's own `.fleet.toml` (not the `[structure_ratchet]` table) and the root folders from `git ls-files`, so an untracked folder is ignored. A shape's preset lives in the script (`SHAPES`), which keeps the script vendor-verbatim; this table is the same data, and a test compares the two.
+
+| `shape` | Required root folders | Also allowed | `layers` default |
+|---|---|---|---|
+| `webapp-tray` | `app`, `src`, `tests`, `docs` | `scripts`, `data`, `brand` | `[["src", "app"]]` |
+| `streamlit` | `app`, `src`, `tests` | `scripts`, `data`, `brand` | `[["src", "app"]]` |
+| `pipeline-cli` | `tests` | `src`, `common`, `scripts`, `config`, `data` | none |
+| `skills-governance` | `skills`, `tests` | `hooks`, `scripts`, `architecture` | none |
+| `node` | `src` | `test`, `scripts` | none |
+| `static-site` | none | `css`, `js`, `assets`, `games` | none |
+
+`docs`, `.github` and every hidden folder are allowed in every shape. A set is required only where every repo of the shape has the folder, because `extra_roots` can add a folder but never waive one. A multi-tool `pipeline-cli` repo declares each tool package in `extra_roots`.
+
+- **A required folder with no tracked file** fails by name; the fix is to add it, or to correct `shape`.
+- **A tracked root folder** that is in neither the preset nor `extra_roots` fails by name. The message names the shape, the folder and both fixes: move the code into a listed folder, or declare the folder in `extra_roots` with a line in the repo's `docs/layout.md`.
+- **A declared exception is data**, not debt: nothing about the layout enters the baseline, `--init` and `--update-baseline` never touch it, and removing a folder from `extra_roots` fails the next run if the folder is still tracked.
+- **No `shape`** prints `layout check not applicable` and skips that one check; the other four still run, so re-vendoring never breaks a repo that has not declared one. This is a declared skip, never a pass: the PASS line names the shape only when the layout was checked.
+- **An unknown `shape`** is exit 3, not a skip: the layout cannot be checked against a tree that does not exist. A `shape` that is not a string, or an `extra_roots` that is not a list of single folder names, is exit 2.
+- **`layers`**: when the table does not set it, a shape with a layer pair supplies it (`src` never imports `app` for `webapp-tray` and `streamlit`); a repo with no `shape` keeps the default pair.
+
 ### Limits
 
 - **JS only, among the script languages.** TypeScript files are measured for size but not for function length; type annotations would mislead the brace matcher. Inline `<script>` blocks in HTML are not measured.
@@ -63,7 +86,7 @@ Files come from `git ls-files`, spawned with `GIT_OPTIONAL_LOCKS=0`. Always excl
 | `0` | Pass (nothing new and nothing above its baseline), or the stage is **not enabled** | continues |
 | `1` | A new offender, a baselined one that grew, or the baseline file is missing | fails |
 | `2` | Bad `[structure_ratchet]` table, unreadable baseline, bad arguments | fails |
-| `3` | **NOT CONFIRMED**: `git` unusable, a file that cannot be read, or a Python file that does not parse. The message names the file | fails |
+| `3` | **NOT CONFIRMED**: `git` unusable, a file that cannot be read, a Python file that does not parse, or a `shape` that is not in the table above. The message names the file or the value | fails |
 
 Exit 3 is its own state and never folded into a pass: a file that cannot be measured might hold any finding.
 
@@ -113,7 +136,14 @@ Re-vendoring the script never breaks a repo that has not opted in: an absent `[s
    exclude            = ["tests/fixtures/**"]                # globs; default none
    ```
 
-3. Run `python scripts/structure_ratchet.py --init` and commit the baseline. Review it: the first baseline records every existing offender. **Adoption never requires the split first.**
+   and, at the top level of the same file, the layout check's two keys (leave `shape` out to skip that check until the repo is ready):
+
+   ```toml
+   shape       = "streamlit"                                     # one id from the table above
+   extra_roots = ["custom_components"]                           # root folders the shape does not list; default none
+   ```
+
+3. Run `python scripts/structure_ratchet.py --init` and commit the baseline. Review it: the first baseline records every existing offender. **Adoption never requires the split first.** Then declare `shape` and run the check once: a root folder it lists as drift is either moved or declared in `extra_roots`.
 4. Add a gate stage that runs `python scripts/structure_ratchet.py` and fails on any non-zero exit. The scaffold's `scripts/verify-before-ship.ps1` places it after the docs ratchet and before `mypy`. **Do not path-route it**: a directory count needs the whole tree.
 5. If the repo uses diff-proportionate e2e routing, add a `tier = "none"` rule for the baseline file to `.fleet.toml` `[e2e]` and a matching assertion in `tests/test_classify_e2e.py`.
 
@@ -125,4 +155,4 @@ One pass reads every in-scope file once and parses each Python file once; the AS
 
 ## Tests
 
-`tests/test_structure_ratchet.py`: Python and JS spans on fixture strings (nesting, methods, arrows, a closure of several hundred lines, braces inside strings, templates, comments and regexes, an unterminated function), the layer match and what it must not match, directory counts, and the full ratchet matrix per check on throwaway git repos (a new offender fails, a baselined one passes at its size, growth fails, a shrink lowers the entry, `--update-baseline` never adds, `--allow-additions` adds), the failure message per rule, scope and vendored exclusion, and every exit code. A missing prerequisite is a hard failure, never `pytest.skip`. The self-adoption tests pin the gate order, the catalog entry, and the anchors and limits in `docs/repo-layout.md`.
+`tests/test_structure_ratchet.py`: Python and JS spans on fixture strings (nesting, methods, arrows, a closure of several hundred lines, braces inside strings, templates, comments and regexes, an unterminated function), the layer match and what it must not match, directory counts, and the full ratchet matrix per check on throwaway git repos (a new offender fails, a baselined one passes at its size, growth fails, a shrink lowers the entry, `--update-baseline` never adds, `--allow-additions` adds), the failure message per rule, scope and vendored exclusion, and every exit code. A missing prerequisite is a hard failure, never `pytest.skip`. Root-layout tests cover each shape's required set, an undeclared root, a declared extra root, no `shape` and an unknown `shape`. The self-adoption tests pin the gate order, the catalog entry, the anchors and limits in `docs/repo-layout.md`, and that the presets in the script match the table above.

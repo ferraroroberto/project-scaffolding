@@ -170,12 +170,12 @@ Diff-keyed gate at finish: checks the touched web UI still conforms to the desig
 - **Exit 3 is "not confirmed"** (git unusable, a non-UTF-8 file, an unclosed fence or HTML comment): its own failing state, never a pass. **Raising the baseline needs `--allow-additions`** and shows in review: never re-baseline to get green without saying so.
 - Adopt, counting rules, `allow_refs`, limits: `docs/docs-ratchet.md`. (`#420`.)
 
-## Structure ratchet (file size, function length, flat directories, layer contract)
+## Structure ratchet (file size, function length, flat directories, layer contract, root layout)
 *Apply only if this project's `.fleet.toml` has `[structure_ratchet] enabled = true` (opt-in per repo; the scaffold itself is the first adopter).*
 
-- `scripts/structure_ratchet.py` (vendor-verbatim, manifest key `structure_ratchet`, stdlib only) fails the gate when a file passes 1,000 lines, a Python or JS function passes 100 lines, a directory passes 40 modules, or a `src/` module imports `app/`, beyond a committed `.structure-ratchet-baseline.json`. Tests get the same limits. A baselined offender may not grow; a new one fails. Run as a gate stage after the docs ratchet, never path-routed.
+- `scripts/structure_ratchet.py` (vendor-verbatim, manifest key `structure_ratchet`, stdlib only) fails the gate when a file passes 1,000 lines, a Python or JS function passes 100 lines, a directory passes 40 modules, or a `src/` module imports `app/`, beyond a committed `.structure-ratchet-baseline.json`. Tests get the same limits. A baselined offender may not grow; a new one fails. The root-layout check is not baselined: with `shape` (and `extra_roots`) declared in `.fleet.toml`, a missing required root folder or an undeclared tracked root folder fails; no `shape` skips that one check, stated. Run as a gate stage after the docs ratchet, never path-routed.
 - **Where the code goes instead** is `docs/repo-layout.md`: every failure message names the rule, the limit and that doc's section. Read it before adding to a large file or a full directory.
-- **Exit 3 is "not confirmed"** (git unusable, an unreadable file, a Python file that does not parse): its own failing state, never a pass. A JS function whose end cannot be found is recorded as unmeasured, never passed silently. **Raising the baseline needs `--allow-additions`** and shows in review: never re-baseline to get green without saying so.
+- **Exit 3 is "not confirmed"** (git unusable, an unreadable file, a Python file that does not parse, an unknown `shape`): its own failing state, never a pass. A JS function whose end cannot be found is recorded as unmeasured, never passed silently. **Raising the baseline needs `--allow-additions`** and shows in review: never re-baseline to get green without saying so.
 - Adopt, counting rules, baseline keys, limits: `docs/structure-ratchet.md`.
 
 ## Verification (before declaring a task done)
