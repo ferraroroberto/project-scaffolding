@@ -55,10 +55,11 @@ flowchart TB
   DATALOGS["data/\nlogs/app.log, input/, output/\n(gitignored)"]
 
   subgraph scriptsdir["scripts/"]
-    VERIFY["verify-before-ship.ps1\nbyte-compile -> ruff -> static ratchet\n-> comment ratchet -> mypy --strict (vendored primitives) -> pytest (non-e2e)\n-> routed e2e (skip/static/full)"]
+    VERIFY["verify-before-ship.ps1\nbyte-compile -> ruff -> static ratchet\n-> comment ratchet -> docs ratchet -> mypy --strict (vendored primitives) -> pytest (non-e2e)\n-> routed e2e (skip/static/full)"]
     CLASSIFY["classify_e2e.py (vendor-verbatim, #180)\ndiff-proportionate e2e routing\nreads .fleet.toml [e2e] rules, fail-safe to full"]
     RATCHET["static_ratchet.py (vendor-verbatim, #410)\nfails only on NEW duplicates (jscpd) / unused code\n(ruff F401,F841) vs .static-ratchet-baseline.json\nopt-in via .fleet.toml [static_ratchet]; exit 3 = not confirmed"]
     CRATCHET["comment_ratchet.py (vendor-verbatim, #411)\nfails when a file's count of #NNN refs inside comments\n(py/js/css/ps1) rises vs .comment-ratchet-baseline.json\nopt-in via .fleet.toml [comment_ratchet]; exit 3 = not confirmed"]
+    DRATCHET["docs_ratchet.py (vendor-verbatim)\nfails when the root README passes its byte budget or a file's\ncount of history markers (#NNN refs, dated/changelog headings)\nin README.md + docs/ rises vs .docs-ratchet-baseline.json\nopt-in via .fleet.toml [docs_ratchet]; exit 3 = not confirmed"]
     GENVERIFY["gen_verify_skill.py (#412, not vendored)\nstatic parse of an adopter's surface() calls, extra_steps,\nkey views + [verify] -> .claude/skills/verify-<app>/\nSKILL.md + features/*.md; --check = STATIC / MAINTAIN\n(clean|changed|blocked, exit 0/1/2)"]
     CATALOG["vendored_catalog.py (#230)\nreads .fleet.toml [components] -- the canonical\nkey -> src map of what this scaffold publishes"]
     TSCERT["gen_tailscale_cert.py\nprovision/renew Tailscale HTTPS leaf"]
@@ -74,6 +75,8 @@ flowchart TB
   RATCHET -.->|reads [static_ratchet] from| FLEETTOML
   VERIFY -->|runs, opt-in, after the static ratchet| CRATCHET
   CRATCHET -.->|reads [comment_ratchet] + [vendored] from| FLEETTOML
+  VERIFY -->|runs, opt-in, after the comment ratchet| DRATCHET
+  DRATCHET -.->|reads [docs_ratchet] + [vendored] from| FLEETTOML
   GENVERIFY -.->|reads [verify], [design.review], [e2e] from an adopter's| FLEETTOML
   GENVERIFY -->|renders from| VERIFYTMPL["verify_skill_templates/\nSKILL.md.tmpl, feature.md.tmpl,\nfeatures_README.md.tmpl"]
   VERIFY -->|derives its mypy --strict list from| CATALOG

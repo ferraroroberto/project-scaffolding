@@ -154,6 +154,10 @@ path = ".static-ratchet-baseline.json"
 [[e2e.rule]]
 tier = "none"
 path = ".comment-ratchet-baseline.json"
+# Likewise the docs-ratchet baseline.
+[[e2e.rule]]
+tier = "none"
+path = ".docs-ratchet-baseline.json"
 [[e2e.rule]]
 tier = "none"
 path = "LICENSE"
@@ -269,6 +273,17 @@ enabled = true
 enabled = true
 
 # ---------------------------------------------------------------------------
+# Docs ratchet. scripts/verify-before-ship.ps1 runs scripts/docs_ratchet.py,
+# which fails when the root README grows past its byte budget (40 KiB unless
+# `readme_max_bytes` says otherwise) or when a file's count of history markers
+# (issue references, dated headings, changelog headings) in README.md and
+# docs/**/*.md rises above the committed baseline. Opt-in per repo through this
+# table, like [comment_ratchet]. Convention: docs/readme-and-docs.md;
+# mechanism + limits: docs/docs-ratchet.md.
+[docs_ratchet]
+enabled = true
+
+# ---------------------------------------------------------------------------
 # [components] -- the canonical catalog of this scaffold's vendor-verbatim
 # components (#230). ONLY project-scaffolding carries this table; an adopter
 # repo records what it copied in its own `[vendored]` table instead.
@@ -343,6 +358,7 @@ surface_capture = { src = "tests/e2e/_surface.py" }
 classify_e2e    = { src = "scripts/classify_e2e.py" }
 static_ratchet = { src = "scripts/static_ratchet.py" }
 comment_ratchet = { src = "scripts/comment_ratchet.py" }
+docs_ratchet    = { src = "scripts/docs_ratchet.py" }
 pooled_http     = { src = "src/pooled_http.py" }
 no_window       = { src = "src/no_window.py" }
 runtime_data    = { src = "src/runtime_data.py" }

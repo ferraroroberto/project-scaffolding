@@ -154,6 +154,14 @@ Diff-keyed gate at finish: checks the touched web UI still conforms to the desig
 - **Exit 3 is "not confirmed"** (git unusable, or a file the scanner cannot finish, named in the message): its own failing state, never a pass. **Raising the baseline needs `--allow-additions`** and shows in review: never re-baseline to get green without saying so. Vendored `dest`s from the adopter's `[vendored]` table are excluded automatically.
 - Adopt, counting rules, known false positive (digit-only CSS hex in a comment) and limits: `docs/comment-ratchet.md`. (`#411`.)
 
+## Docs ratchet (README size + history markers in docs, per-file baseline-and-ratchet)
+*Apply only if this project's `.fleet.toml` has `[docs_ratchet] enabled = true` (opt-in per repo; the scaffold itself is the first adopter).*
+
+- `scripts/docs_ratchet.py` (vendor-verbatim, manifest key `docs_ratchet`) fails the gate when the root `README.md` grows past its byte budget (40,960 unless `readme_max_bytes`; an over-budget README is baselined at today's size and may only shrink), or when a file's count of history markers (`#NNN` references, dated headings, changelog headings; fences, URLs and link targets excluded, inline code counted) in `README.md` and `docs/**/*.md` rises above a committed `.docs-ratchet-baseline.json`. Existing debt does not block; it cannot grow. Run as a gate stage after the comment ratchet, never path-routed.
+- **The convention it enforces:** the README is what the repo is, install, run, the gate command and a one-line index per feature linking `docs/<topic>.md`; `docs/` is durable present-tense reference, never dated narrative or a changelog. Read `docs/readme-and-docs.md` before writing or splitting a README.
+- **Exit 3 is "not confirmed"** (git unusable, a non-UTF-8 file, an unclosed fence or HTML comment): its own failing state, never a pass. **Raising the baseline needs `--allow-additions`** and shows in review: never re-baseline to get green without saying so.
+- Adopt, counting rules, `allow_refs`, limits: `docs/docs-ratchet.md`. (`#420`.)
+
 ## Verification (before declaring a task done)
 Examples — adapt to the project's actual tooling.
 

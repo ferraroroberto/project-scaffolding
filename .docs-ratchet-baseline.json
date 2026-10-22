@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "entries": [
+    {"key": "README.md", "markers": 52},
+    {"key": "docs/agents/CLAUDE.master.md", "markers": 38},
+    {"key": "docs/agents/README.md", "markers": 2},
+    {"key": "docs/agents/project-skills.md", "markers": 2},
+    {"key": "docs/app-onboarding.md", "markers": 7},
+    {"key": "docs/brand-icons.md", "markers": 1},
+    {"key": "docs/ci-conventions.md", "markers": 6},
+    {"key": "docs/comment-ratchet.md", "markers": 9},
+    {"key": "docs/e2e-routing.md", "markers": 17},
+    {"key": "docs/long-lived-process-conventions.md", "markers": 39},
+    {"key": "docs/multi-repo-fanout.md", "markers": 9},
+    {"key": "docs/playwright-ui-testing.md", "markers": 40},
+    {"key": "docs/static-ratchet.md", "markers": 3},
+    {"key": "docs/streamlit-conventions.md", "markers": 3},
+    {"key": "docs/streamlit-css-hooking-gotchas.md", "markers": 2},
+    {"key": "docs/verify-skill.md", "markers": 1},
+    {"key": "docs/webapp-pwa-conventions.md", "markers": 12},
+    {"key": "docs/windows-tray.md", "markers": 42}
+  ]
+}

@@ -2,6 +2,9 @@
   "version": 1,
   "tools": {"jscpd": "5.4.0", "ruff": "0.15.21"},
   "entries": [
-    {"key": "dup:4306bb086600:scripts/comment_ratchet.py|scripts/static_ratchet.py", "files": ["scripts/comment_ratchet.py", "scripts/static_ratchet.py"]}
+    {"key": "dup:07fcaabb3e6c:scripts/comment_ratchet.py|scripts/docs_ratchet.py", "files": ["scripts/comment_ratchet.py", "scripts/docs_ratchet.py"]},
+    {"key": "dup:4306bb086600:scripts/comment_ratchet.py|scripts/static_ratchet.py", "files": ["scripts/comment_ratchet.py", "scripts/static_ratchet.py"]},
+    {"key": "dup:43c71551fa4e:scripts/comment_ratchet.py|scripts/docs_ratchet.py", "files": ["scripts/comment_ratchet.py", "scripts/docs_ratchet.py"]},
+    {"key": "dup:e0488eb40987:scripts/comment_ratchet.py|scripts/docs_ratchet.py", "files": ["scripts/comment_ratchet.py", "scripts/docs_ratchet.py"]}
   ]
 }
