@@ -231,6 +231,40 @@ def test_router_round_trip(tmp_path: Path) -> None:
     assert summary["controls"] == {"refresh": 1}
 
 
+def test_router_summary_absent_log_is_not_zero_usage(tmp_path: Path) -> None:
+    db = tmp_path / "usage.sqlite3"
+    body = _client(db).get("/api/usage/summary", params={"days": 7}).json()
+    assert body["log_exists"] is False and body["events"] == 0
+    assert not db.exists(), "reading the summary never creates the log"
+
+
+def test_router_summary_unavailable_on_unreadable_db(tmp_path: Path) -> None:
+    db = tmp_path / "usage.sqlite3"
+    db.write_text("not a database")
+    r = _client(db).get("/api/usage/summary", params={"days": 7})
+    assert r.status_code == 503
+
+
+def test_every_usage_get_route_is_read_only_and_reports_log_exists(tmp_path: Path) -> None:
+    """Structural check (audit#439, recurring bucket): every ``GET`` route on
+    the usage router must follow the read-only-and-report-``log_exists``
+    contract documented on :func:`usage_router` and already followed by
+    ``/time`` — not just the route a past fix happened to touch. Catches a
+    future read route (or a regression in an existing one) that reintroduces
+    "no data yet" reading as zero usage."""
+    db = tmp_path / "usage.sqlite3"
+    client = _client(db)
+    spec = client.get("/openapi.json").json()["paths"]
+    get_paths = [path for path, methods in spec.items()
+                 if path.startswith("/api/usage/") and "get" in methods]
+    assert len(get_paths) >= 2, "sanity: summary and time are both routed"
+    for path in get_paths:
+        resp = client.get(path)
+        assert resp.status_code == 200, path
+        assert resp.json().get("log_exists") is False, f"{path} must report log_exists"
+        assert not db.exists(), f"{path} must never create the log file on read"
+
+
 def test_router_rejects_bad_envelope_and_oversize(tmp_path: Path) -> None:
     client = _client(tmp_path / "usage.sqlite3")
     assert client.post("/api/usage/events", content=b"nope").status_code == 400
