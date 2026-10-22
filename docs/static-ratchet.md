@@ -80,6 +80,8 @@ Re-vendoring the script never breaks a repo that has not opted in: an absent `[s
    ```
 
    Always excluded: `node_modules`, `.venv`, `venv`, `.git`, `__pycache__`, `*.min.js`. `exclude` globs are anchored at the repo root; `**/` means "any depth". An adopter excludes `**/_vendored/**` because vendor-verbatim copies are duplicates by design and cannot be fixed downstream; the scaffold itself does not, since it owns them. `jscpd` also honours `.gitignore`.
+
+   **Vendored files are left out automatically.** Every `dest` in the repo's own `[vendored]` table (a file or a folder) is excluded from both detectors on top of `exclude`, so the vendored ratchet scripts never report against each other or against the adopter's code and nothing about them is baselined. Vendored code is checked once, in this scaffold where it is owned; a future vendored component is covered the day it is declared. The scaffold has no `[vendored]` table, so its own copies stay in scope. A `[vendored]` entry without a `dest` excludes nothing.
 4. Run `python scripts/static_ratchet.py --init` and commit the baseline.
 5. Add a gate stage that runs `python scripts/static_ratchet.py` and fails on any non-zero exit. The scaffold's `scripts/verify-before-ship.ps1` places it after `ruff` and before `mypy`; a Python acceptance runner calls the same script. **Do not path-route it**: duplication needs the whole tree.
 6. If the repo uses diff-proportionate e2e routing, add a `tier = "none"` rule for the baseline file to `.fleet.toml` `[e2e]` (the file at the repo root otherwise fails safe to the full browser suite) and a matching assertion in `tests/test_classify_e2e.py`.
