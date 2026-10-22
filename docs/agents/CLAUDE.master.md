@@ -17,6 +17,14 @@ Conventions:
 - **Agent directories are ignored by default, not disposable noise.** `.claude/`, `.agents/`, `.codex/`, `.pi/`, `.grok/` may hold private context or owned discovery artifacts. Only deliberately shared skill sources get narrow ignore exceptions; generated links, local settings, conversations stay ignored. Fresh clones/worktrees recreate own links to own sources.
 - **Adoption/proof:** follow [portable project skills](https://github.com/ferraroroberto/project-scaffolding/blob/main/docs/agents/project-skills.md) contract — scope, helper exclusions, collisions, ignore allowlists, native discovery checks. Installer mechanics belong to `fleet-config`, not a per-project fork. (`#28`, `#250`.)
 
+## Where code goes
+
+- Read the repo's `docs/layout.md` first; the tree for its shape is in `docs/repo-layout.md`.
+- Four rules: a file over 1,000 lines does not grow (new code goes in a new module beside it); a directory past 40 modules takes no new module (use a domain subpackage); `src/` never imports `app/`; tests mirror what they test.
+- Streamlit views: `app/views/<name>.py` exposing `render()`, registered in `app.py`; never `tab_x.py`, `x_tab.py` or `main()`.
+- A justified exception is declared in `extra_roots` in `.fleet.toml` and in `docs/layout.md`, never improvised.
+- With `[structure_ratchet]` enabled the gate enforces the first three rules: `docs/structure-ratchet.md`.
+
 ## Streamlit conventions
 *Apply only if this project uses Streamlit.*
 
