@@ -136,7 +136,7 @@ just below the header instead of underneath it.
 ## Single source of truth
 
 Reference implementation combining all three gotchas: `content-management`'s
-`app/app.py` (`ferraroroberto/content-management#207`) — a sticky
+`app/app.py` — a sticky
 `segmented_control` nav bar with an inline theme toggle. That specific
 nav/theme *pattern* is not vendored here: this scaffold's own Streamlit
 starter (`app/app.py`) uses a structurally different navigation
@@ -144,7 +144,7 @@ starter (`app/app.py`) uses a structurally different navigation
 theme toggle (a sidebar `st.toggle()` injecting a `light.css` overlay, no
 private API needed) — content-management's approach exists specifically to
 work around `st.tabs()` losing state on rerun
-(`ferraroroberto/content-management#157`) and a locked custom theme in that
+and a locked custom theme in that
 repo's `config.toml`, neither of which applies to this scaffold's starter.
 The three gotchas above are the generalizable lesson; the nav pattern itself
 is not.

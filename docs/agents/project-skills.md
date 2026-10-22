@@ -1,6 +1,6 @@
 # Portable project skills
 
-This is the project layout and onboarding contract for [project-scaffolding#250](https://github.com/ferraroroberto/project-scaffolding/issues/250). Fleet-wide discovery, link installation, ownership records and repair belong to [fleet-config#748](https://github.com/ferraroroberto/fleet-config/issues/748); this scaffold does not ship that installer. Machine-wide instructions remain owned by `fleet-config`.
+This is the project layout and onboarding contract for portable project skills. Fleet-wide discovery, link installation, ownership records and repair belong to `fleet-config`; this scaffold does not ship that installer. Machine-wide instructions remain owned by `fleet-config`.
 
 ## Instruction chain
 

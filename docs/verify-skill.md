@@ -1,6 +1,6 @@
 # Project verify skill (`gen_verify_skill.py`)
 
-The scaffold generates a web app's own `verify-<app>` skill instead of asking each project to hand-write one. It is written for an agent that has never seen the app: how to launch it from an empty data directory, check its health, drive each feature in a real browser, record evidence, clean up, and keep the feature map true to the source. (`project-scaffolding#412`; the shape follows the "create / maintain a verification skill" pattern.)
+The scaffold generates a web app's own `verify-<app>` skill instead of asking each project to hand-write one. It is written for an agent that has never seen the app: how to launch it from an empty data directory, check its health, drive each feature in a real browser, record evidence, clean up, and keep the feature map true to the source. (The shape follows the "create / maintain a verification skill" pattern.)
 
 `CLAUDE.md` keeps the one-line rules; this file is the full procedure, the `[verify]` schema, and the limits.
 

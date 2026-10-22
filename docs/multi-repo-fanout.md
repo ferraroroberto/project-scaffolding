@@ -1,6 +1,6 @@
 # Multi-repo agent fanout
 
-Moved verbatim from `CLAUDE.md` (`#254`) so the always-on file stays under its size cap. `CLAUDE.md` keeps each section's heading, its *apply only if* gate and one-line rules, and points here for the full procedure, reasoning, snippets and decision records. Headings match `CLAUDE.md`'s, so a reference to a section by name resolves in either file.
+Moved verbatim from `CLAUDE.md` so the always-on file stays under its size cap. `CLAUDE.md` keeps each section's heading, its *apply only if* gate and one-line rules, and points here for the full procedure, reasoning, snippets and decision records. Headings match `CLAUDE.md`'s, so a reference to a section by name resolves in either file.
 
 ## Multi-repo agent fanout — a dispatched agent works in a worktree, never the primary checkout
 *Apply only if this project ships tooling that fans work out across several repos — a scatter-gather skill, a batch runner, a board/scheduler that spawns per-repo agent sessions.*
@@ -14,4 +14,4 @@ Global `CLAUDE.md`'s concurrent same-repo rule (first come owns `main`, worktree
 - **A live-e2e guard refusal is a hard stop for a dispatched agent.** The opt-in env var represents an attended human decision about a live app; an unattended fanout agent hitting the refusal reports and stops — never sets the flag to get past it.
 - **Pin the mandate with an executable guard.** Load-bearing prose spread across dispatch paths can be silently dropped by a purge/rewrite. An acceptance test asserting the mandate's presence in each dispatch path and in the claim helper's implementation keeps it from evaporating.
 
-**Ref:** convention here; implementation (claim/worktree helper + dispatch paths) in `fleet-config` (`skills/_lib/worktree_claim.py`'s `acquire --force-worktree`, `APP_LAUNCHER_SESSION_ID` trigger, `WORKTREE_CLAIM_ALLOW_PRIMARY` escape hatch). (`#202`; source instances `fleet-config#515`/`#518`/`#522`/`#525`/`#526`/`#527`/`#528`.)
+**Ref:** convention here; implementation (claim/worktree helper + dispatch paths) in `fleet-config` (`skills/_lib/worktree_claim.py`'s `acquire --force-worktree`, `APP_LAUNCHER_SESSION_ID` trigger, `WORKTREE_CLAIM_ALLOW_PRIMARY` escape hatch).

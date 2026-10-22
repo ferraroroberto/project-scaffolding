@@ -4,7 +4,7 @@ The pre-ship gate (`scripts/verify-before-ship.ps1`) used to run the whole `test
 
 **Diff-proportionate routing** fixes that: the gate's browser phase classifies the branch's changed files against a per-project rule table and runs a browser slice *proportionate* to the diff. It is **fail-safe** — any uncertainty escalates to the full suite, never narrows it — and **automatic**, driven by `git diff`, with no manual `--fast` flag.
 
-This was proven first in `app-launcher` (its `scripts/classify_e2e.py`, issue #568 / PR #574) and promoted here as a parameterized fleet convention (`project-scaffolding#180`). The difference: app-launcher hardcoded *its* layout into the classifier; the scaffold version reads the rules from each repo's own `.fleet.toml`, so the **mechanism** is shared and the **rules** are declared per-project.
+This was proven first in `app-launcher` (its `scripts/classify_e2e.py`) and promoted here as a parameterized fleet convention. The difference: app-launcher hardcoded *its* layout into the classifier; the scaffold version reads the rules from each repo's own `.fleet.toml`, so the **mechanism** is shared and the **rules** are declared per-project.
 
 ## Who this applies to
 
@@ -76,7 +76,7 @@ See this repo's own `.fleet.toml` for the complete worked example the scaffold s
 
 ## Surfaces — narrowing `full` to one slice of the suite
 
-A repo whose suite has grown past a handful of tests pays for the whole of it on every `full` diff, even when the change sits squarely inside one view. `[[e2e.surface]]` entries let the repo say which tests cover which paths (`project-scaffolding#258`, measured cost in `fleet-config#849`). They are optional: with none declared, routing is exactly the three tiers above.
+A repo whose suite has grown past a handful of tests pays for the whole of it on every `full` diff, even when the change sits squarely inside one view. `[[e2e.surface]]` entries let the repo say which tests cover which paths. They are optional: with none declared, routing is exactly the three tiers above.
 
 ```toml
 [[e2e.surface]]
@@ -100,7 +100,7 @@ Paths routed `none` ride along silently; a `static` path inside the surface adds
 
 ## Shared stylesheets — narrowing by the rules a diff changes
 
-A shared stylesheet sits outside every surface, and nearly every UI change touches it. In app-launcher's 60 merged PRs before 2026-09-24, `styles.css` rode along in 36, and every one routed `full` (`project-scaffolding#289`, measured in `app-launcher#1220`). A repo can declare the stylesheet shared and give each surface the CSS selector prefixes it owns:
+A shared stylesheet sits outside every surface, and nearly every UI change touches it. In app-launcher's 60 merged PRs before 2026-09-24, `styles.css` rode along in 36, and every one routed `full`. A repo can declare the stylesheet shared and give each surface the CSS selector prefixes it owns:
 
 ```toml
 [e2e]
@@ -124,11 +124,11 @@ The classifier reads the sheet at the merge-base and in the working tree, and at
 
 A `selectors` entry starting with `:root` disables every surface, like any other malformed entry.
 
-**Counterfactual (app-launcher, PRs #1082–#1184, the 60 merged before 2026-09-24).** The baseline is `main`'s classifier: 48 full, 2 surface, 10 skip. With `styles.css` declared shared, `board` owning `.board-`/`#tabBoard`/`#paneBoard` and `lifeos` owning `.lifeos-`/`#lifeOs`/`#tabLifeOS`/`#paneLifeOS`, it is **44 full, 6 surface, 10 skip**. Two PRs narrowed through the sheet and two as self-only test modules (next section). Of the 36 PRs touching `styles.css`, 4 were owned by one surface, 17 changed a selector no surface claims (mostly `.app-item …` and other tabs with no surface yet), and 15 changed a token, `:root` or a rule inside `@media`. A repo gets more out of this by declaring surfaces for its other tabs than by loosening the fail-safes.
+**Counterfactual (app-launcher, the 60 PRs merged before 2026-09-24).** The baseline is `main`'s classifier: 48 full, 2 surface, 10 skip. With `styles.css` declared shared, `board` owning `.board-`/`#tabBoard`/`#paneBoard` and `lifeos` owning `.lifeos-`/`#lifeOs`/`#tabLifeOS`/`#paneLifeOS`, it is **44 full, 6 surface, 10 skip**. Two PRs narrowed through the sheet and two as self-only test modules (next section). Of the 36 PRs touching `styles.css`, 4 were owned by one surface, 17 changed a selector no surface claims (mostly `.app-item …` and other tabs with no surface yet), and 15 changed a token, `:root` or a rule inside `@media`. A repo gets more out of this by declaring surfaces for its other tabs than by loosening the fail-safes.
 
 ## Self-only e2e test modules
 
-An edited test module that no surface owns (`test_*.py` or `*_test.py` under `full_pytest_target`) runs only itself, on the suite-default projections, when it exists on disk and no other file in the suite imports it. With nothing else to narrow, the verdict is `surface` named `self`; beside one surface's paths, the module joins that surface's targets. Shared helpers (`conftest.py`, `_*.py`, fixtures), a deleted module and a module another test imports keep the whole suite. Before this, 3 of app-launcher's 54 full PRs in `app-launcher#1220` (b) ran the whole suite for a lone test-module edit.
+An edited test module that no surface owns (`test_*.py` or `*_test.py` under `full_pytest_target`) runs only itself, on the suite-default projections, when it exists on disk and no other file in the suite imports it. With nothing else to narrow, the verdict is `surface` named `self`; beside one surface's paths, the module joins that surface's targets. Shared helpers (`conftest.py`, `_*.py`, fixtures), a deleted module and a module another test imports keep the whole suite. Without this rule a lone test-module edit runs the whole suite (3 of app-launcher's 54 full PRs did).
 
 ## How the gate consumes it
 
@@ -176,15 +176,15 @@ Keep both. When you add a new e2e-relevant directory, add its `full` rule to `.f
 
 ## Diff-proportionate e2e routing (`.fleet.toml` `[e2e]` + `classify_e2e.py`)
 
-Moved verbatim from `CLAUDE.md` (`#254`) so the always-on file stays under its size cap. `CLAUDE.md` keeps each section's heading, its *apply only if* gate and one-line rules, and points here for the full procedure, reasoning, snippets and decision records. Headings match `CLAUDE.md`'s, so a reference to a section by name resolves in either file.
+Moved verbatim from `CLAUDE.md` so the always-on file stays under its size cap. `CLAUDE.md` keeps each section's heading, its *apply only if* gate and one-line rules, and points here for the full procedure, reasoning, snippets and decision records. Headings match `CLAUDE.md`'s, so a reference to a section by name resolves in either file.
 
 *Apply only if this project has a browser e2e suite (`tests/e2e/`) wired into `verify-before-ship.*`.*
 
-Makes the local gate's browser phase proportionate to the diff instead of running all of `tests/e2e` every change. Proven in `app-launcher` (`scripts/classify_e2e.py`, `#568`/PR `#574`), promoted here parameterized.
+Makes the local gate's browser phase proportionate to the diff instead of running all of `tests/e2e` every change. Proven in `app-launcher` (`scripts/classify_e2e.py`), promoted here parameterized.
 
 - **Mechanism shared, rules declared per-project.** `scripts/classify_e2e.py` reads an `[e2e]` table from the repo's own `.fleet.toml` (paths→tier map). TOML so stdlib `tomllib` loads it with zero custom parsing, rules versioned beside the code they classify. `.fleet.toml` is the single auditable home for the routing table.
-- **Three tiers, worst-wins across the diff, plus an optional `surface` narrowing of `full` (#258):** `skip` (every changed path declared `none` — backend/docs/tooling) — no browser suite runs; `static` (worst path declared `static` inert asset) → narrow `static_pytest_target`; `full` (any `full` path, any unmatched path, empty diff, or no usable `[e2e]` table) → whole `full_pytest_target`.
-- **Fail-safe is the point — uncertainty escalates, never narrows.** Unrecognized path, mixed diff, malformed/absent table all route to `full`. The table can only shrink an already-recognized-narrow diff, never a matched change further. CSS/JS route to `full` (no curated "layout subset" — drift-prone, under-testing risk), except a declared shared stylesheet whose changed rules one surface's `selectors` own, and a self-only e2e module that runs just itself (#289); `static` stays to genuinely inert types (images, fonts, inert vendored HTML fragments). Rules are first-match-wins — declare specific `static` rules before the broader `full` prefix they sit under.
+- **Three tiers, worst-wins across the diff, plus an optional `surface` narrowing of `full`:** `skip` (every changed path declared `none` — backend/docs/tooling) — no browser suite runs; `static` (worst path declared `static` inert asset) → narrow `static_pytest_target`; `full` (any `full` path, any unmatched path, empty diff, or no usable `[e2e]` table) → whole `full_pytest_target`.
+- **Fail-safe is the point — uncertainty escalates, never narrows.** Unrecognized path, mixed diff, malformed/absent table all route to `full`. The table can only shrink an already-recognized-narrow diff, never a matched change further. CSS/JS route to `full` (no curated "layout subset" — drift-prone, under-testing risk), except a declared shared stylesheet whose changed rules one surface's `selectors` own, and a self-only e2e module that runs just itself; `static` stays to genuinely inert types (images, fonts, inert vendored HTML fragments). Rules are first-match-wins — declare specific `static` rules before the broader `full` prefix they sit under.
 - **Wiring:** `verify-before-ship.*` runs byte-compile + non-e2e pytest **unconditionally**, then routes **only** the browser phase on the classifier's `E2E_TIER`. On CI (`$env:CI`) routing is bypassed, full suite always runs.
 - **Anti-drift guard mandatory — two required:** the `unclassified→full` fail-safe, **and** `tests/test_classify_e2e.py` loading the real `.fleet.toml` and asserting representative paths land in their intended tier. New e2e-relevant directory → add its `full` rule to `.fleet.toml` **and** a representative assertion to that test **in the same PR** (same anti-staleness contract as `.fleet.toml` `description` and `docs/architecture.mmd`).
-- **Ref:** full schema/rule-writing: `docs/e2e-routing.md`. Web-app-shaped adopters (grocery, whatsapp-radar, family-accounting, mathgamesforkids, life-os, website, home-automation) get one-line pointer issues for follow-on adoption — not scoped here. (`#180`; source instance `app-launcher#568`.)
+- **Ref:** full schema/rule-writing: `docs/e2e-routing.md`. Web-app-shaped adopters (grocery, whatsapp-radar, family-accounting, mathgamesforkids, life-os, website, home-automation) get one-line pointer issues for follow-on adoption — not scoped here.
