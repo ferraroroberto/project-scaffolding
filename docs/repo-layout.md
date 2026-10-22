@@ -6,7 +6,7 @@ Shape ids (the exact `.fleet.toml` `shape` values): [`webapp-tray`](#webapp-tray
 
 ## Rules for every shape
 
-Five rules hold in every shape. The structure ratchet enforces the first four; the fifth is a convention. Existing offenders are baselined and may not grow; a new offender fails the gate.
+Five rules hold in every shape. The structure ratchet enforces the first four; the fifth is a convention. Existing offenders are baselined and may not grow; a new offender fails the gate. It also holds the root folders to the shape's tree, with no baseline (see the end of this page).
 
 ### File size
 
@@ -201,7 +201,7 @@ Exceptions
 custom_components/   required at the root by Home Assistant
 ```
 
-A justified exception (a root a framework requires, a vendored tool) is declared once, in `docs/layout.md` and in `.fleet.toml` `extra_roots`, never improvised. `docs/`, `.github/` and hidden folders are allowed in every shape; any other root not in the shape's tree, its allowed extra roots or `extra_roots` is drift.
+A justified exception (a root a framework requires, a vendored tool) is declared once, in `docs/layout.md` and in `.fleet.toml` `extra_roots`, never improvised. `docs/`, `.github/` and hidden folders are allowed in every shape; any other root not in the shape's tree, its allowed extra roots or `extra_roots` fails the structure ratchet's root-layout check.
 
 ## Migration
 

@@ -34,7 +34,8 @@
       6. structure ratchet — scripts/structure_ratchet.py: fails when a file
                          passes 1,000 lines, a Python/JS function 100 lines, a
                          directory 40 modules, or a src/ module imports app/,
-                         beyond the committed baseline; opt-in via .fleet.toml
+                         beyond the committed baseline, or a root folder falls
+                         outside the declared shape; opt-in via .fleet.toml
                          [structure_ratchet]; exit 3 = "not confirmed", a
                          failure, never a pass (docs/structure-ratchet.md)
       7. mypy --strict — the vendor-verbatim primitives only; the list is
