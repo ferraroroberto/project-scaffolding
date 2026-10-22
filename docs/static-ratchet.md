@@ -1,6 +1,6 @@
 # Static-analysis ratchet
 
-`scripts/static_ratchet.py` is a baseline-and-ratchet stage for the pre-ship gate (`project-scaffolding#410`). It computes the current duplicated-code and unused-code findings, compares them with a committed baseline, and **fails only on a finding that is new**. Existing debt never blocks work; it cannot grow either.
+`scripts/static_ratchet.py` is a baseline-and-ratchet stage for the pre-ship gate. It computes the current duplicated-code and unused-code findings, compares them with a committed baseline, and **fails only on a finding that is new**. Existing debt never blocks work; it cannot grow either.
 
 Why a ratchet rather than a weekly audit: an audit re-finds the same duplication every run, and the fix lives in someone's head. A gate stage encodes the lesson in structure (the pstack principle "encode lessons in structure").
 
@@ -34,7 +34,7 @@ Keys carry no line numbers, so inserting code above a baselined finding does not
 
 - **Duplicate:** `dup:<12 hex of sha1 of the whitespace-normalised fragment>:<fileA>|<fileB>` (paths sorted). The key is **strict**: editing the cloned block reads as one hit gone plus one new, so the author either removes the duplication or re-baselines it with the explicit flag, visible in review. A tolerant key (file pair only) would let a clone grow unnoticed. jscpd reports a clone as an ordered pair and the fragment hashed is the first file's; that order is deterministic for an unchanged tree.
 - **Unused:** `unused:<rule>:<file>:<symbol>`, the symbol being the backtick-quoted name in ruff's message (falling back to the stripped source line).
-- **Repeats** of one key (the same name unused twice in a file, the same block cloned twice between two files) get `#2`, `#3`... in source-line order.
+- **Repeats** of one key (the same name unused twice in a file, the same block cloned twice between two files) get a `#<n>` suffix counting up from 2, in source-line order.
 
 The baseline is committed, sorted JSON, one entry per line so diffs review cleanly:
 

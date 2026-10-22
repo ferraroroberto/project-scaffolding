@@ -1,8 +1,8 @@
 # Comment ratchet
 
-`scripts/comment_ratchet.py` is a baseline-and-ratchet stage for the pre-ship gate (`project-scaffolding#411`). It counts `#NNN` issue references inside product-code **comments**, per file, compares them with a committed baseline, and **fails when a file's count rises**. Existing history comments never block work; they cannot grow either.
+`scripts/comment_ratchet.py` is a baseline-and-ratchet stage for the pre-ship gate. It counts `#NNN` issue references inside product-code **comments**, per file, compares them with a committed baseline, and **fails when a file's count rises**. Existing history comments never block work; they cannot grow either.
 
-The convention it enforces (a comment states why the code is the way it is now; how it got there lives in the issue, the PR and `git log`) is owned by the fleet-wide global instructions and tracked in `fleet-config#1517`. This page does not restate the rule text; it documents the mechanism. It reuses the shape of the [static-analysis ratchet](static-ratchet.md) (`#410`): an opt-in `.fleet.toml` table, a committed baseline, the same flags, and exit 3 for "not confirmed".
+The convention it enforces (a comment states why the code is the way it is now; how it got there lives in the issue, the PR and `git log`) is owned by the fleet-wide global instructions. This page does not restate the rule text; it documents the mechanism. It reuses the shape of the [static-analysis ratchet](static-ratchet.md): an opt-in `.fleet.toml` table, a committed baseline, the same flags, and exit 3 for "not confirmed".
 
 ## What is counted
 
@@ -13,15 +13,15 @@ Only comment text, extracted by a real scanner for each language. A regex over r
 | `.py` | stdlib `tokenize`, `COMMENT` tokens | string, f-string and docstring content |
 | `.js` `.mjs` `.cjs` | `//` and `/* */` | single/double-quoted strings, template literals (including inside `${}`), regex literals |
 | `.css` | `/* */` | strings, unquoted `url(...)` |
-| `.ps1` `.psm1` | `#` line comments (at a token start), `<# #>` blocks, including inside `$( )` | single- and double-quoted strings, here-strings, a mid-word `#` such as `$x#1` |
+| `.ps1` `.psm1` | `#` line comments (at a token start), `<# #>` blocks, including inside `$( )` | single- and double-quoted strings, here-strings, a mid-word `#` (a variable name followed straight away by `#` and digits) |
 
-A **reference** is `#` plus one to five digits, not preceded by `&` or `#`, ending on a word boundary. `repo#123` and `owner/repo#123` count (the same smell). `https://...` URLs inside a comment are blanked first, so an anchor never counts. Several references on one line count separately. Counting is per **reference**, not per comment line, and per **file**: a new reference in one file cannot hide behind a removal in another.
+A **reference** is `#` plus one to five digits, not preceded by `&` or `#`, ending on a word boundary. A reference to another repo's issue (`repo#<number>`, `owner/repo#<number>`) counts too (the same smell). `https://...` URLs inside a comment are blanked first, so an anchor never counts. Several references on one line count separately. Counting is per **reference**, not per comment line, and per **file**: a new reference in one file cannot hide behind a removal in another.
 
 Docstrings are string tokens, not comments, and HTML (`<script>`, `<!-- -->`) is not scanned. Both are out of scope.
 
 ### Known false positive and blind spot
 
-- **Digit-only hex colour in a CSS comment.** `/* grey #333 */` counts as a reference, because `#333` has the same shape as an issue reference. A colour with a letter (`#21262d`, `#fff`) never matches, and a declaration (`color: #333`) is not a comment. Write the token name in the comment instead. A test pins this.
+- **Digit-only hex colour in a CSS comment.** A grey written as `#` plus three digits inside a comment counts as a reference, because it has the same shape as an issue reference. A colour with a letter (`#21262d`, `#fff`) never matches, and the same value in a declaration (outside a comment) is not counted. Write the token name in the comment instead. A test pins this.
 - **A JS regex literal directly after `)`** (`if (x) /re/.test(y)`) is read as a division, because the scanner decides regex-versus-divide from the previous token. It cannot hide a comment; the realistic failure (a quote inside the regex opening a string that never closes) is exit 3, not a wrong count. A test pins both.
 
 ## Scope

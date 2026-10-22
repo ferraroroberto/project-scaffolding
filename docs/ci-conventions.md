@@ -1,6 +1,6 @@
 # CI conventions
 
-Moved verbatim from `CLAUDE.md` (`#254`) so the always-on file stays under its size cap. `CLAUDE.md` keeps each section's heading, its *apply only if* gate and one-line rules, and points here for the full procedure, reasoning, snippets and decision records. Headings match `CLAUDE.md`'s, so a reference to a section by name resolves in either file.
+Moved verbatim from `CLAUDE.md` so the always-on file stays under its size cap. `CLAUDE.md` keeps each section's heading, its *apply only if* gate and one-line rules, and points here for the full procedure, reasoning, snippets and decision records. Headings match `CLAUDE.md`'s, so a reference to a section by name resolves in either file.
 
 ## GitHub Actions CI conventions
 *Apply whenever this project adds a `.github/workflows/` file.*
@@ -34,17 +34,17 @@ jobs:
           path: <path>
 ```
 
-**Sister-repo tracking:** a repo still on the old runner/actions (`#25`) or duplicate `push`-on-branches trigger (`#38`) gets a pointer issue back to `project-scaffolding`'s canonical record. Fix before the deprecation deadline.
+**Sister-repo tracking:** a repo still on the old runner/actions or duplicate `push`-on-branches trigger gets a pointer issue back to `project-scaffolding`'s canonical record. Fix before the deprecation deadline.
 
-**A red default branch files its own tracking issue — `main-gate-watch`.** Copy `.github/workflows/main-gate-watch.yml.template` → `.github/workflows/main-gate-watch.yml`, replace `__GATE_WORKFLOW_NAME__` with the gate workflow's `name:`. On `workflow_run` completion for that workflow (filtered `branches:[main]`, PR runs excluded, gated on `conclusion=='failure'`): creates label `ci-red-main` (`--force`, idempotent), comments `Still red on main at <sha>: <run-url>` on the open `ci-red-main` issue, or files `main's <gate> gate is red` (`bug`+`ci-red-main`, assigned to `github.repository_owner`) if none open. Issue stays open until `main` is green; discounting a red gate for an unrelated PR does not close it. Without this, a red `main` is nobody's finding (`whatsapp-radar#258`; three repos found red same day, 2026-08-15).
+**A red default branch files its own tracking issue — `main-gate-watch`.** Copy `.github/workflows/main-gate-watch.yml.template` → `.github/workflows/main-gate-watch.yml`, replace `__GATE_WORKFLOW_NAME__` with the gate workflow's `name:`. On `workflow_run` completion for that workflow (filtered `branches:[main]`, PR runs excluded, gated on `conclusion=='failure'`): creates label `ci-red-main` (`--force`, idempotent), comments `Still red on main at <sha>: <run-url>` on the open `ci-red-main` issue, or files `main's <gate> gate is red` (`bug`+`ci-red-main`, assigned to `github.repository_owner`) if none open. Issue stays open until `main` is green; discounting a red gate for an unrelated PR does not close it. Without this, a red `main` is nobody's finding.
 
 - **Precondition:** a `workflow_run` watcher can only observe a gate that runs in Actions on pushes to the default branch. A repo whose gate is local-only (`verify-before-ship.ps1`/`pytest` on-machine — *this scaffold included*) gets **zero** coverage — don't install the watcher there. Its red-`main` detection is **unknown**, reported as its own state, never folded into green.
-- **Local-gate repos get a scheduled fleet-side sweep instead, not an advisory Actions gate** (`#222`) — a ported Windows-desktop gate on a hosted runner is a degraded subset, and a green watcher over it is false coverage. So: watcher where Actions runs the real gate; scheduled sweep of the actual local gate elsewhere — both file the same idempotent `ci-red-main` issue; a gate that can't run reports `unknown` with a reason. Sweep belongs in `fleet-config` as its own scheduled skill (not bolted onto `/audit-fleet`, whose bounded weekly cost depends on no per-repo workloads); **unbuilt** — until it exists, local-gate repos have no automated detection and should say so.
+- **Local-gate repos get a scheduled fleet-side sweep instead, not an advisory Actions gate** — a ported Windows-desktop gate on a hosted runner is a degraded subset, and a green watcher over it is false coverage. So: watcher where Actions runs the real gate; scheduled sweep of the actual local gate elsewhere — both file the same idempotent `ci-red-main` issue; a gate that can't run reports `unknown` with a reason. Sweep belongs in `fleet-config` as its own scheduled skill (not bolted onto `/audit-fleet`, whose bounded weekly cost depends on no per-repo workloads); **unbuilt** — until it exists, local-gate repos have no automated detection and should say so.
 
 ## Web-app CI template
 *Apply when a web app (FastAPI, Streamlit, Flask, a static PWA) with a Playwright e2e suite adopts GitHub Actions CI.*
 
-`.github/workflows/ci.yml.template` (`#351`) is the canonical gate, derived from the e2e workflows that run green on the hosted runner (`voice-transcriber`, `whatsapp-radar`, `app-launcher`). It follows every rule in "GitHub Actions CI conventions" above. One job, `gate`, on `windows-2025`:
+`.github/workflows/ci.yml.template` is the canonical gate, derived from the e2e workflows that run green on the hosted runner (`voice-transcriber`, `whatsapp-radar`, `app-launcher`). It follows every rule in "GitHub Actions CI conventions" above. One job, `gate`, on `windows-2025`:
 
 1. fresh `.venv` from the requirements files (every native call exit-code-checked, since a PowerShell step only fails on its *last* command);
 2. `playwright install chromium webkit`;

@@ -288,7 +288,7 @@ def _bound_default_timeouts(context) -> None:
 
 `expect()` web-first assertions carry their own 5 s default — leave them alone. An explicit `timeout=` on any single call still overrides. Widen for a slow hosted CI runner without a code change: set `E2E_DEFAULT_TIMEOUT_MS=20000` in the workflow env.
 
-**Origin:** app-launcher#186 (a ~120 s CI e2e hang, opaque, never named) surfaced the cost of the implicit 30 s default; the convention landed in app-launcher PR #189. whatsapp-radar already sets an explicit `page.set_default_timeout` with a 30 s × scale-factor variant (`_scaled_page_timeouts`) — satisfies the spirit. The **15 s bounded base is the fleet standard** across all sister repos.
+**Why:** the implicit 30 s default hid a ~120 s CI e2e hang that was opaque and never named. whatsapp-radar already sets an explicit `page.set_default_timeout` with a 30 s × scale-factor variant (`_scaled_page_timeouts`) — satisfies the spirit. The **15 s bounded base is the fleet standard** across all sister repos.
 
 ### Bounded WebKit driver teardown
 
@@ -393,7 +393,7 @@ def browser(playwright: Playwright) -> Iterator[Browser]:
 This overrides pytest-playwright's own session-scoped `playwright`/`browser`
 fixtures — same fixture names, so the override is picked up automatically
 without changing any test. Worst case on a wedge is a leaked driver process,
-not a hung suite. Reference implementation: `home-automation` PR #443
+not a hung suite. Reference implementation: `home-automation`
 (`tests/e2e/conftest.py`).
 
 ### Post-run sweep for leaked browser helpers
@@ -403,14 +403,14 @@ The watchdog above protects the *current* run's exit path from a
 processes — `WebKitNetworkProcess.exe`, `WebKitWebProcess.exe`,
 `WebKitGPUProcess.exe` — which the driver spawns per context and which can
 outlive the run. That gap let 31 stray `WebKitNetworkProcess` entries pile
-up on the fleet host over a single week (`project-scaffolding#203`), three of
+up on the fleet host over a single week, three of
 them holding a worktree directory as their working directory and blocking
 `git worktree remove` with a "busy" error nobody could explain.
 
 **Measure before you sweep — but measure the right thing.** Probing those
 strays with `OpenProcess` + `GetExitCodeProcess` returns **exit code 0**.
-`#203` read that as "they had already exited cleanly" and stopped there, and
-that inference is the single most expensive mistake in this document's history
+Reading that as "they had already exited cleanly" and stopping there is
+the single most expensive mistake available here
 — see "An exit code is not an exit" below.
 
 The half that is true: Windows really does keep a genuinely-exited process's
@@ -438,7 +438,7 @@ helpers exit when their browser-main process dies:
 | `taskkill /F /PID <browser main>` (no `/T`) | none | none |
 | `taskkill /F /T /PID <driver pid>` (the watchdog's own kill) | none | **yes — see below** |
 
-The second column is `#236`'s correction. "No live helper" was measured
+The second column is the correction. "No live helper" was measured
 correctly and is not the same claim as "no residue": tree-killing the driver
 kills each browser out from under its own helpers, and a helper killed that
 way can wedge *inside* termination — permanent, unkillable, and still holding
@@ -451,11 +451,11 @@ stack; it is to reclaim whatever a *future* stack, a hard host kill, or an
 older pinned browser build leaves behind — and to say plainly which residue
 is unkillable rather than failing the gate over it.
 
-#### An exit code is not an exit (`#236`)
+#### An exit code is not an exit
 
 `GetExitCodeProcess` returning a real code does **not** mean the process has
 finished dying. Measured on the fleet host against 53 live
-`WebKitNetworkProcess.exe` entries, every one of which the pre-`#236` sweep
+`WebKitNetworkProcess.exe` entries, every one of which a naive exit-code sweep
 classified as a harmless `zombie`:
 
 | probe | reports |
@@ -652,7 +652,7 @@ opposite ends of the same fixture and neither replaces the other. In fact the
 watchdog is what makes this fix load-bearing: force-killing the driver tree is
 precisely what leaves a helper wedged.
 
-Verified in `home-automation#681`: a full 302-execution run in a worktree
+Verified in `home-automation`: a full 302-execution run in a worktree
 produced 5 fresh wedged `WebKitNetworkProcess` helpers; all five rooted in
 `%TEMP%`, and the worktree tore down clean. The same run pre-fix left 4 helpers
 rooted in the worktree and `remove-worktree` returned `rc=1 Worktree NOT
@@ -709,7 +709,7 @@ POSIX:
 ### Rules
 
 - **Keep it small.** Target < 15 tests total. If I'm tempted to add
-  #20, delete two first. **Count collected pytest nodes, not `def`s** —
+  a 20th, delete two first. **Count collected pytest nodes, not `def`s** —
   a parametrized matrix multiplies, and `/e2e-audit` measures the ratio
   in nodes. Corollary: when a fixture is swept across a viewport/theme
   matrix, assert **all** of its contracts in one test node per leg
@@ -717,7 +717,7 @@ POSIX:
   re-loads the same page N times to re-prove facts that are fixed-pixel
   or static-config — collect the outcomes in a list and assert once, so
   every contract is still reported by name (`tests/e2e/test_geometry_helper.py`
-  is the worked example; project-scaffolding#209).
+  is the worked example).
 - **No Page Object Model.** Too much ceremony at this scale.
 - **One shared fixture.** Don't build a framework until I have three
   tests that need the same helper.
@@ -726,7 +726,7 @@ POSIX:
   separate API process, a worker, a PTY host) — on a free port, and
   **refuse** (`pytest.exit`, naming the opt-in flag) rather than
   adopting an already-listening one; a bare `pytest tests/e2e` must
-  never silently drive a live app the harness didn't start (`#191`).
+  never silently drive a live app the harness didn't start.
   Boot failure is a **hard failure** (never `pytest.skip`) — a suite
   that skips on a missing server reports green on a build it never
   tested. The real `tests/e2e/conftest.py` + the vendored
@@ -752,7 +752,7 @@ project grows a long-lived, **stateful** child process that owns the
 user's real work: a worker with in-flight jobs, a PTY host, a
 session-host holding live shells.
 
-This bit app-launcher for real (`app-launcher#260`): its pre-ship e2e
+This bit app-launcher for real: its pre-ship e2e
 gate adopted the live tray's session-host on its fixed port — the same
 one holding the user's actual Coding sessions — instead of spawning its
 own throwaway instance. Its destructive kill-tests then targeted "the
@@ -789,7 +789,7 @@ day a scaffold-derived project grows its first stateful child process.
 
 ### Isolating the runtime-data folder (`<APP>_DATA_DIR`)
 
-An app that persists state through `runtime_db_path(app, filename)` (`src/runtime_data.py`) writes under `<root>/<app>/` — `C:\sqlite\<app>\` on the owner's machine. A harness that boots the app therefore writes its test traffic into the owner's real files unless it redirects that folder. The vendored usage log is the fleet-wide case: every page visit the suite makes becomes a row in the real `usage.sqlite3`, which then feeds `/design-review` and the foreground-time numbers as if a person had used the app (`app-launcher#1685`; `#404`).
+An app that persists state through `runtime_db_path(app, filename)` (`src/runtime_data.py`) writes under `<root>/<app>/` — `C:\sqlite\<app>\` on the owner's machine. A harness that boots the app therefore writes its test traffic into the owner's real files unless it redirects that folder. The vendored usage log is the fleet-wide case: every page visit the suite makes becomes a row in the real `usage.sqlite3`, which then feeds `/design-review` and the foreground-time numbers as if a person had used the app.
 
 **The rule: any harness that spawns the app sets `<APP>_DATA_DIR` to a per-run temp folder, on every spawn.**
 
@@ -814,8 +814,8 @@ If the app's primary surface is a phone, add a second projection:
 viewport, user-agent, touch, scale). WebKit shares the iOS Safari
 rendering + JS engine, and the descriptor gives the phone's viewport.
 
-**Run it only where the engine or the viewport changes the outcome**
-(`#290`, fleet-config#1026): layout and geometry, touch targets, the
+**Run it only where the engine or the viewport changes the outcome**:
+layout and geometry, touch targets, the
 nav, the composer and keyboard input, safe-area. Functional tests
 (routes, polling, payloads, menus, readbacks, dialogs with no geometry
 and no engine branch) run on **one** engine. Pin them with a fixture or
@@ -823,16 +823,16 @@ marker (app-launcher's `chromium_projection_only`), and keep the
 projection always-on for the tests that qualify, so it can't be
 forgotten there.
 
-Why not the whole suite. app-launcher measured it (app-launcher#1220):
+Why not the whole suite. app-launcher measured it:
 
 - 0 WebKit-engine product bugs in 400 merged PRs. Of 32 WebKit-only
   reds, one was an engine-independent race that the slower engine
-  showed first (#732); the rest were test bugs, flakes or load.
+  showed first; the rest were test bugs, flakes or load.
 - WebKit was 61% of browser time (1212 s against 762 s for Chromium
   over 310 nodes each).
 - iOS-specific bugs don't reproduce in desktop WebKit anyway: the
   headless projection can't see `env(safe-area-inset-*)` or
-  installed-PWA geometry (app-launcher#1099), and the phone-visible bugs
+  installed-PWA geometry, and the phone-visible bugs
   of that window were found on the device. The real iPhone check stays
   on-device.
 
@@ -851,7 +851,7 @@ iOS Simulator.
 
 ### Page-width (horizontal-overflow) assert (phone-first apps only)
 
-A real-device bug (grocery-shopping-automation#63, PR #64) shipped a
+A real-device bug (grocery-shopping-automation) shipped a
 page-wide horizontal scroll that **every other check missed**: token
 lint was clean, component contracts passed, the phone-viewport
 screenshot sweep "looked fine", and the full pytest+Playwright e2e
@@ -860,7 +860,7 @@ suite was green. Root cause was a `display: grid` stack container
 no-wrap or scrollable child's min-content propagated up through the
 chain of grids, so the page grew past the viewport (fix: pin the
 track to `grid-template-columns: minmax(0, 1fr)`, the design.md
-convention landed via fleet-config#294).
+convention).
 
 **Why the screenshot sweep missed it:** `full_page=True` captures the
 entire scrollable area — an overflowing page just renders as a
@@ -868,7 +868,7 @@ entire scrollable area — an overflowing page just renders as a
 measured assert, not a look.
 
 The reusable check — run it per key view, at ≥2 phone widths, on both
-engines (both reproduced the real bug in PR #64):
+engines (both reproduced the real bug):
 
 ```python
 import pytest
@@ -920,10 +920,10 @@ snippet; the war story above stays as the *why*.
 
 ### Rendered-geometry design-conformance helper
 
-`tests/e2e/_geometry.py` (issue #157) is the canonical implementation
+`tests/e2e/_geometry.py` is the canonical implementation
 of the fleet design contracts that are **rendered-DOM facts no static
 scan can prove** — the rendered leg of the `design.md` canon that
-fleet-config#342 codified statically in `design_lint.py`. A clean
+fleet-config codified statically in `design_lint.py`. A clean
 static lint proves authored tokens and markup; these five checks prove
 what the browser actually laid out:
 
@@ -935,7 +935,7 @@ what the browser actually laid out:
   The in-page measurement behind them is the public
   `EFFECTIVE_RECT_JS` (`_EFFECTIVE_RECT_JS` stays as an alias).
   fleet-config's `/design-review` imports it from this checkout,
-  so keep the name and its returned keys stable (#269).
+  so keep the name and its returned keys stable.
 - `assert_min_target(locator, min_px=44)` — every match's *effective*
   width AND height meet the spec's `components.hit-target.min`.
 - `assert_no_overlap(locators)` — O(n²) pairwise sweep over effective
@@ -985,16 +985,16 @@ shipping channel). Two-engine run:
 (One-time prereq beyond the README's Chromium install:
 `playwright install webkit`.)
 
-Altitude split (fleet-config#342): `~/.claude/design.md` owns the
+Altitude split: `~/.claude/design.md` owns the
 normative contract, `design_lint.py` proves the static half,
 `/design-sync` reports the rendered leg as **unmeasured** for a repo
 that lacks this harness — this helper is what turns that leg
 measurable. Migrating home-automation's original inline assertions to
-the helper is the reference adoption (follow-up per #157).
+the helper is the reference adoption.
 
 ### Design surface capture
 
-`tests/e2e/_surface.py` (issue #408; fleet-config#1383, Step 2/6) is the
+`tests/e2e/_surface.py` is the
 vendored hook that turns an app's e2e suite into a **design inventory**.
 The `/design-review` walk opens only primary tabs, the Settings gear and
 declared extra steps; the suite already opens the sheets, dialogs, menus
@@ -1178,7 +1178,7 @@ This doc is the *teaching* layer: it tells *me* why those rules exist.
 
 ## End-to-end UI testing
 
-Moved verbatim from `CLAUDE.md` (`#254`) so the always-on file stays under its size cap. `CLAUDE.md` keeps each section's heading, its *apply only if* gate and one-line rules, and points here for the full procedure, reasoning, snippets and decision records. Headings match `CLAUDE.md`'s, so a reference to a section by name resolves in either file.
+Moved verbatim from `CLAUDE.md` so the always-on file stays under its size cap. `CLAUDE.md` keeps each section's heading, its *apply only if* gate and one-line rules, and points here for the full procedure, reasoning, snippets and decision records. Headings match `CLAUDE.md`'s, so a reference to a section by name resolves in either file.
 
 *Apply only if this project serves a browser UI (Streamlit, FastAPI, Flask, etc.).*
 
@@ -1198,13 +1198,13 @@ Optional, lives at `tests/e2e/`. Don't create the folder until the first regress
 - Add a test only when all three hold: (1) silent breakage would hurt, (2) can't be caught by a unit test under `tests/`, (3) behavior has stabilized.
 - Run via `& .\.venv\Scripts\python.exe -m pytest tests/e2e/` (Windows) / `./.venv/bin/python -m pytest tests/e2e/` (POSIX). No LLM in the loop, zero per-run cost.
 - One shared session fixture boots the app plus any service dependencies (API process, worker, PTY host, …) once per pytest run. Engine-agnostic: `streamlit run`, `uvicorn`, `flask run` are all just the launch command.
-- Default to isolation: boot a disposable instance; if target port occupied with no opt-in, **refuse** (`pytest.exit`, naming the flag) rather than killing/reusing what's there. Bare `pytest tests/e2e` must never silently drive a live app the harness didn't start (`#191`).
+- Default to isolation: boot a disposable instance; if target port occupied with no opt-in, **refuse** (`pytest.exit`, naming the flag) rather than killing/reusing what's there. Bare `pytest tests/e2e` must never silently drive a live app the harness didn't start.
 - Opt-in to *acting on* an occupied port = one loudly-named env var per project (`LAUNCHER_E2E_LIVE`; scaffold's `STREAMLIT_E2E_LIVE`) — never an opt-**out** flag (e.g. `E2E_FORCE_AUTOBOOT=1` has backwards polarity: forgetting to set it silently re-enables adoption).
-- What the flag permits differs per repo — don't conflate: `app-launcher`'s `LAUNCHER_E2E_LIVE` = read-only assertions against the live tray, never a kill (`_require_live_tray` guard; `--e2e-autoboot` never adopts the live session-host on `:8446`, always spawns its own on a free port). This scaffold's `STREAMLIT_E2E_LIVE` = kill-and-restart via `ensure_fresh_streamlit`, legitimate only because the target is a stateless, cheap-to-restart dev server *and* goes through this repo's own canonical restart helper, never a by-hand kill (`#197`). A repo adopting the vendored guard picks its own meaning, documented in the guard's exit message pointing at that repo's CLAUDE.md. **Log** which instance (disposable vs acted-on-live) the suite is driving and why, so a hung run is diagnosable from its own output.
-- Isolate anything stateful — never adopt-and-mutate a host holding the user's live work, even under the live opt-in. The reclaim-on-opt-in rule is safe only for a stateless, cheap-to-restart webapp. A host owning user state or child processes (session-host, worker with in-flight jobs, PTY host) must **always** get the harness's own disposable instance on a free port, injected via env override — never the live fixed port, opt-in or not. Litmus test: is the thing I'd be touching holding work the user would be upset to lose? If yes, isolate unconditionally. Same bar — a destructive test scopes to what it created: snapshot pre-existing ids before acting, kill only the delta, never `.first`/"whatever's in the list" (`app-launcher#260`).
-- Is a `/propagate-vendored` component: `tests/e2e/_e2e_live_guard.py` (manifest key `e2e_live_guard`). The policy — check target port, refuse (`pytest.exit`, naming the flag) if occupied with no opt-in, else log the decision — is shape-independent; only the port number, flag name, and how the disposable instance boots are call-site parameters (`#191` shipped it prose-only; `#194` reversed that). Same vendoring pattern as `app/tray/single_instance.py` and `tests/e2e/_geometry.py`: copy the file byte-identical into an app's `tests/e2e/`, call `require_disposable_instance(port, flag_env_name)` from the fixture, let `/propagate-vendored e2e_live_guard` hash-verify and re-vendor fleet-wide. (`tray_lifecycle.ps1` is NOT a valid precedent — de-vendored in `#153`.) Adopter records the entry in its own `.fleet.toml`'s `[vendored]` table — never here.
+- What the flag permits differs per repo — don't conflate: `app-launcher`'s `LAUNCHER_E2E_LIVE` = read-only assertions against the live tray, never a kill (`_require_live_tray` guard; `--e2e-autoboot` never adopts the live session-host on `:8446`, always spawns its own on a free port). This scaffold's `STREAMLIT_E2E_LIVE` = kill-and-restart via `ensure_fresh_streamlit`, legitimate only because the target is a stateless, cheap-to-restart dev server *and* goes through this repo's own canonical restart helper, never a by-hand kill. A repo adopting the vendored guard picks its own meaning, documented in the guard's exit message pointing at that repo's CLAUDE.md. **Log** which instance (disposable vs acted-on-live) the suite is driving and why, so a hung run is diagnosable from its own output.
+- Isolate anything stateful — never adopt-and-mutate a host holding the user's live work, even under the live opt-in. The reclaim-on-opt-in rule is safe only for a stateless, cheap-to-restart webapp. A host owning user state or child processes (session-host, worker with in-flight jobs, PTY host) must **always** get the harness's own disposable instance on a free port, injected via env override — never the live fixed port, opt-in or not. Litmus test: is the thing I'd be touching holding work the user would be upset to lose? If yes, isolate unconditionally. Same bar — a destructive test scopes to what it created: snapshot pre-existing ids before acting, kill only the delta, never `.first`/"whatever's in the list".
+- Is a `/propagate-vendored` component: `tests/e2e/_e2e_live_guard.py` (manifest key `e2e_live_guard`). The policy — check target port, refuse (`pytest.exit`, naming the flag) if occupied with no opt-in, else log the decision — is shape-independent; only the port number, flag name, and how the disposable instance boots are call-site parameters. Same vendoring pattern as `app/tray/single_instance.py` and `tests/e2e/_geometry.py`: copy the file byte-identical into an app's `tests/e2e/`, call `require_disposable_instance(port, flag_env_name)` from the fixture, let `/propagate-vendored e2e_live_guard` hash-verify and re-vendor fleet-wide. (`tray_lifecycle.ps1` is NOT a valid precedent — it is one shared machine-local copy, not vendored.) Adopter records the entry in its own `.fleet.toml`'s `[vendored]` table — never here.
 - Boot failure is a hard failure — never `pytest.skip`. A suite that skips when the app isn't up reports green on a build it never tested. Skip is fine for the ad-hoc "use whatever tray I have running" path; the pre-ship path must fail loud.
-- Keep the suite small — target < 15 tests total. Tempted to add #20 → delete two first.
+- Keep the suite small — target < 15 tests total. Tempted to add a 20th → delete two first.
 - No Page Object Model. Too much ceremony for this size.
 - Don't gate commits on e2e. Run on push or in CI, not in pre-commit.
 - When you remove a feature, remove its e2e test in the same commit.
@@ -1213,5 +1213,5 @@ Optional, lives at `tests/e2e/`. Don't create the folder until the first regress
 *Apply only if the app's primary surface is a phone.*
 
 - Project the regression suite onto **WebKit** with a device-emulation descriptor (Playwright ships iPhone/Android descriptors — viewport, user-agent, touch, scale factor). WebKit shares the iOS Safari rendering + JS engine, reproducing most "Safari is unhappy" bugs on Windows/Linux before a real phone.
-- Run it only where the engine or the viewport changes the outcome (`#290`, see "Mobile projection" above): layout and geometry, touch targets, the nav, the composer and keyboard input, safe-area. Functional tests (routes, polling, payloads, menus, readbacks, dialogs with no geometry and no engine branch) run on **one** engine. Pin qualifying tests with a fixture or marker (app-launcher's `chromium_projection_only`) and keep the projection always-on *there* — never make it opt-in for the whole suite, and never run it on everything.
+- Run it only where the engine or the viewport changes the outcome (see "Mobile projection" above): layout and geometry, touch targets, the nav, the composer and keyboard input, safe-area. Functional tests (routes, polling, payloads, menus, readbacks, dialogs with no geometry and no engine branch) run on **one** engine. Pin qualifying tests with a fixture or marker (app-launcher's `chromium_projection_only`) and keep the projection always-on *there* — never make it opt-in for the whole suite, and never run it on everything.
 - WebKit-on-Windows is *not* real iOS: no iOS shell, no real WKWebView memory limits, no Apple keyboard, no Add-to-Home-Screen container. For residual shell-only bugs, attach PC DevTools to a real phone via `ios-webkit-debug-proxy` (bridges the iOS Web Inspector to a local port Edge/Chrome DevTools can attach to). Playwright cannot drive real iOS Safari — only its bundled WebKit and the iOS Simulator on macOS.
