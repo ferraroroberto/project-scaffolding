@@ -55,11 +55,12 @@ flowchart TB
   DATALOGS["data/\nlogs/app.log, input/, output/\n(gitignored)"]
 
   subgraph scriptsdir["scripts/"]
-    VERIFY["verify-before-ship.ps1\nbyte-compile -> ruff -> static ratchet\n-> comment ratchet -> docs ratchet -> mypy --strict (vendored primitives) -> pytest (non-e2e)\n-> routed e2e (skip/static/full)"]
+    VERIFY["verify-before-ship.ps1\nbyte-compile -> ruff -> static ratchet\n-> comment ratchet -> docs ratchet -> structure ratchet -> mypy --strict (vendored primitives) -> pytest (non-e2e)\n-> routed e2e (skip/static/full)"]
     CLASSIFY["classify_e2e.py (vendor-verbatim, #180)\ndiff-proportionate e2e routing\nreads .fleet.toml [e2e] rules, fail-safe to full"]
     RATCHET["static_ratchet.py (vendor-verbatim, #410)\nfails only on NEW duplicates (jscpd) / unused code\n(ruff F401,F841) vs .static-ratchet-baseline.json\nopt-in via .fleet.toml [static_ratchet]; exit 3 = not confirmed"]
     CRATCHET["comment_ratchet.py (vendor-verbatim, #411)\nfails when a file's count of #NNN refs inside comments\n(py/js/css/ps1) rises vs .comment-ratchet-baseline.json\nopt-in via .fleet.toml [comment_ratchet]; exit 3 = not confirmed"]
     DRATCHET["docs_ratchet.py (vendor-verbatim)\nfails when the root README passes its byte budget or a file's\ncount of history markers (#NNN refs, dated/changelog headings)\nin README.md + docs/ rises vs .docs-ratchet-baseline.json\nopt-in via .fleet.toml [docs_ratchet]; exit 3 = not confirmed"]
+    SRATCHET["structure_ratchet.py (vendor-verbatim, stdlib)\nfails when a file passes 1,000 lines, a py/js function 100,\na directory 40 modules, or src/ imports app/,\nbeyond .structure-ratchet-baseline.json\nopt-in via .fleet.toml [structure_ratchet]; exit 3 = not confirmed"]
     GENVERIFY["gen_verify_skill.py (#412, not vendored)\nstatic parse of an adopter's surface() calls, extra_steps,\nkey views + [verify] -> .claude/skills/verify-<app>/\nSKILL.md + features/*.md; --check = STATIC / MAINTAIN\n(clean|changed|blocked, exit 0/1/2)"]
     CATALOG["vendored_catalog.py (#230)\nreads .fleet.toml [components] -- the canonical\nkey -> src map of what this scaffold publishes"]
     TSCERT["gen_tailscale_cert.py\nprovision/renew Tailscale HTTPS leaf"]
@@ -77,6 +78,8 @@ flowchart TB
   CRATCHET -.->|reads [comment_ratchet] + [vendored] from| FLEETTOML
   VERIFY -->|runs, opt-in, after the comment ratchet| DRATCHET
   DRATCHET -.->|reads [docs_ratchet] + [vendored] from| FLEETTOML
+  VERIFY -->|runs, opt-in, after the docs ratchet| SRATCHET
+  SRATCHET -.->|reads [structure_ratchet] + [vendored] from| FLEETTOML
   GENVERIFY -.->|reads [verify], [design.review], [e2e] from an adopter's| FLEETTOML
   GENVERIFY -->|renders from| VERIFYTMPL["verify_skill_templates/\nSKILL.md.tmpl, feature.md.tmpl,\nfeatures_README.md.tmpl"]
   VERIFY -->|derives its mypy --strict list from| CATALOG
@@ -97,6 +100,7 @@ flowchart TB
     GATEWATCHTEST["test_main_gate_watch_template.py (#222)\nstill-a-template · failure+main-only · idempotency\n+ anti-false-coverage guard: a live watcher\nmust name a workflow that exists"]
     E2E["e2e/conftest.py + test_smoke.py\npytest-playwright, boots a disposable\nStreamlit via _streamlit_lifecycle.py\n(occupied port refused unless STREAMLIT_E2E_LIVE)\n+ test_vendored_components.py\n(drives _vendored/demo.html, light+dark)\n+ test_vendored_nav.py\n(mounts _vendored/nav skeleton, desktop+pill)\nboth via e2e/_color_assertions.py\n(style · set_theme · rgba, #208)\n+ e2e/_nav_graft.py (nav mount +\nphone context, #394)"]
     PORTPROBE["_port_probe.py (#208)\nlistening_pids(port): netstat / lsof\nthe ONE port-to-PID parse both\nlifecycle harnesses import"]
+    GITREPO["_git_repo.py\ngit() + write(): the throwaway-repo helpers\nthe comment, docs and structure ratchet tests import"]
     GEOM["e2e/_geometry.py (vendor-verbatim, #157)\neffective 44px targets · overlap · overflow\nChart.js config reads · viewport x theme matrix\n+ test_geometry_helper.py\n+ _fixtures/geometry/ (hermetic twins + Chart.js)"]
     SURF["e2e/_surface.py (vendor-verbatim, #408)\nsurface(page, name): no-op unless DESIGN_SURFACE_CAPTURE\nlight+dark flipped in place → png + json per surface\ncollection hook deselects tests that never call it\n+ test_surface_hook.py + _fixtures/surface/"]
     SWEEP["e2e/_browser_sweep.py (vendor-verbatim, #203/#236)\npytest_sessionfinish + standalone CLI\nliveness = running · exited · wedged · unknown\n(an exit code is NOT an exit — GetProcessTimes\nexit time is the discriminator, #236)\nkill only running · orphaned · cwd-in-scope;\nzombies AND wedges reported, never killed\n+ test_browser_sweep.py"]

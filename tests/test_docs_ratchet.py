@@ -13,13 +13,12 @@ Three layers, mirroring `test_comment_ratchet.py`:
 
 from __future__ import annotations
 
-import subprocess
 from pathlib import Path
 
 import pytest
 
 from scripts import docs_ratchet as dr
-from src.no_window import NO_WINDOW
+from tests._git_repo import git, write
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
@@ -290,18 +289,6 @@ def test_generated_marker_in_the_first_lines() -> None:
 
 
 # ------------------------------------------------------- ratchet on a git repo
-
-def git(root: Path, *args: str) -> None:
-    subprocess.run(["git", *args], cwd=root, check=True, capture_output=True, creationflags=NO_WINDOW)
-
-
-def write(root: Path, rel: str, text: str, *, track: bool = True) -> None:
-    path = root / rel
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(text, encoding="utf-8", newline="\n")
-    if track:
-        git(root, "add", "-f", rel)
-
 
 @pytest.fixture
 def repo(tmp_path: Path) -> Path:

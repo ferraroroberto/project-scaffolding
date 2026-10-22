@@ -31,11 +31,17 @@
                          committed baseline; opt-in via .fleet.toml
                          [docs_ratchet]; exit 3 = "not confirmed", a failure,
                          never a pass (docs/docs-ratchet.md)
-      6. mypy --strict — the vendor-verbatim primitives only; the list is
+      6. structure ratchet — scripts/structure_ratchet.py: fails when a file
+                         passes 1,000 lines, a Python/JS function 100 lines, a
+                         directory 40 modules, or a src/ module imports app/,
+                         beyond the committed baseline; opt-in via .fleet.toml
+                         [structure_ratchet]; exit 3 = "not confirmed", a
+                         failure, never a pass (docs/structure-ratchet.md)
+      7. mypy --strict — the vendor-verbatim primitives only; the list is
                          derived from .fleet.toml's [components] catalog via
                          scripts/vendored_catalog.py, never hand-maintained here
-      7. pytest (non-e2e) — unit suite, tests/e2e excluded
-      8. pytest (e2e)  — diff-proportionate: the browser slice is routed by
+      8. pytest (non-e2e) — unit suite, tests/e2e excluded
+      9. pytest (e2e)  — diff-proportionate: the browser slice is routed by
                          scripts/classify_e2e.py against the .fleet.toml [e2e]
                          rules (skip / static / full), fail-safe to full
                          (project-scaffolding#180). Auto-boots Streamlit per
@@ -93,6 +99,7 @@ Invoke-Stage "ruff"                               { & $py -m ruff check . }
 Invoke-Stage "static ratchet"                     { & $py "scripts/static_ratchet.py" }
 Invoke-Stage "comment ratchet"                    { & $py "scripts/comment_ratchet.py" }
 Invoke-Stage "docs ratchet"                       { & $py "scripts/docs_ratchet.py" }
+Invoke-Stage "structure ratchet"                  { & $py "scripts/structure_ratchet.py" }
 Invoke-Stage "mypy --strict (vendored)"           { & $py -m mypy @VendoredModules }
 Invoke-Stage "pytest (unit, non-e2e)"             { & $py -m pytest --ignore=tests/e2e }
 

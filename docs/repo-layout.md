@@ -6,15 +6,19 @@ Shape ids (the exact `.fleet.toml` `shape` values): [`webapp-tray`](#webapp-tray
 
 ## Rules for every shape
 
-Four rules hold in every shape. The structure ratchet enforces the first three; the fourth is a convention. Existing offenders are baselined and may not grow; a new offender fails the gate.
+Five rules hold in every shape. The structure ratchet enforces the first four; the fifth is a convention. Existing offenders are baselined and may not grow; a new offender fails the gate.
 
 ### File size
 
 *Enforced.* A file over **1,000 lines** does not grow. New code goes in a new module beside it, named for what it does. Applies to code, stylesheets, markup and tests alike.
 
+### Function length
+
+*Enforced.* A Python or JS function over **100 lines** does not grow. Split it into named helpers, in the same module or a new one beside it. A nested function counts inside its outer function, so a view's `mount<View>()` closure is held as a whole: its helpers move out of the closure into the view's folder. Tests get the same limit.
+
 ### Flat directory
 
-*Enforced.* A directory past **40 modules** takes no new module. New code goes in a domain subpackage (`src/<domain>/`, `tests/unit/<domain>/`), which is the only path once a directory is full.
+*Enforced.* A directory past **40 modules** (its own `.py`, `.js`, `.mjs` and `.css` files, `__init__.py` aside) takes no new module. New code goes in a domain subpackage (`src/<domain>/`, `tests/unit/<domain>/`), which is the only path once a directory is full.
 
 ### Layer contract
 

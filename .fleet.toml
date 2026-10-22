@@ -158,6 +158,10 @@ path = ".comment-ratchet-baseline.json"
 [[e2e.rule]]
 tier = "none"
 path = ".docs-ratchet-baseline.json"
+# Likewise the structure-ratchet baseline.
+[[e2e.rule]]
+tier = "none"
+path = ".structure-ratchet-baseline.json"
 [[e2e.rule]]
 tier = "none"
 path = "LICENSE"
@@ -284,6 +288,16 @@ enabled = true
 enabled = true
 
 # ---------------------------------------------------------------------------
+# Structure ratchet. scripts/verify-before-ship.ps1 runs
+# scripts/structure_ratchet.py, which fails when a file passes 1,000 lines, a
+# Python or JS function passes 100 lines, a directory passes 40 modules, or a
+# src/ module imports app/, beyond the committed baseline. Opt-in per repo
+# through this table, like [docs_ratchet]; the defaults are the limits in
+# docs/repo-layout.md. Mechanism + limits: docs/structure-ratchet.md.
+[structure_ratchet]
+enabled = true
+
+# ---------------------------------------------------------------------------
 # [components] -- the canonical catalog of this scaffold's vendor-verbatim
 # components (#230). ONLY project-scaffolding carries this table; an adopter
 # repo records what it copied in its own `[vendored]` table instead.
@@ -359,6 +373,7 @@ classify_e2e    = { src = "scripts/classify_e2e.py" }
 static_ratchet = { src = "scripts/static_ratchet.py" }
 comment_ratchet = { src = "scripts/comment_ratchet.py" }
 docs_ratchet    = { src = "scripts/docs_ratchet.py" }
+structure_ratchet = { src = "scripts/structure_ratchet.py" }
 pooled_http     = { src = "src/pooled_http.py" }
 no_window       = { src = "src/no_window.py" }
 runtime_data    = { src = "src/runtime_data.py" }
