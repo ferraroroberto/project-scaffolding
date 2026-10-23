@@ -54,6 +54,8 @@ src/
   <domain>/                 one subpackage per domain
   config.py  no_window.py  build_info.py
 scripts/                    ops CLIs, never imported by app/
+assets/                     static files the app reads or ships: logos, icons, fixtures
+config/                     tracked config files and samples, never secrets
 tests/
   unit/<domain>/            mirrors src/
   api/                      TestClient, mirrors routers/
