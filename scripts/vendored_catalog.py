@@ -1,14 +1,10 @@
-"""Reader for this scaffold's `[components]` catalog in `.fleet.toml` (#230).
+"""Reader for this scaffold's `[components]` catalog in `.fleet.toml`.
 
 `project-scaffolding` publishes N vendor-verbatim components; each adopter repo
-records what it copied in its own `.fleet.toml`'s `[vendored]` table. Until #230
-there was no machine-readable list of what the scaffold *publishes* -- only three
-partial, hand-maintained restatements of it (this script's former hardcoded twin
-inside `scripts/verify-before-ship.ps1`, the union of whatever adopters happened
-to declare, and prose in `README.md`). That gap is what let
-`/propagate-vendored tailscale_cert` cover one repo out of seven and report
-success: with no catalog, a repo carrying an undeclared component is
-indistinguishable from a repo that never adopted it.
+records what it copied in its own `.fleet.toml`'s `[vendored]` table. This
+module is the single machine-readable source of what the scaffold *publishes*
+-- without it, a repo carrying an undeclared component is indistinguishable
+from a repo that never adopted it.
 
 This module is the single reader for that table. Two consumers:
 
@@ -29,8 +25,8 @@ CLI:
                     component as-is, a package component with a trailing `/`
 
 Both subcommands exit non-zero on a missing/unreadable/absent catalog rather
-than printing an empty list: an empty `mypy --strict` stage would pass the gate
-while checking nothing, which is exactly the silent-partial shape #230 is about.
+than printing an empty list: an empty `mypy --strict` stage would pass the
+gate while checking nothing, which a silently-empty list would mask.
 """
 
 from __future__ import annotations

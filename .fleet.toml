@@ -306,17 +306,16 @@ enabled = true
 
 # ---------------------------------------------------------------------------
 # [components] -- the canonical catalog of this scaffold's vendor-verbatim
-# components (#230). ONLY project-scaffolding carries this table; an adopter
+# components. ONLY project-scaffolding carries this table; an adopter
 # repo records what it copied in its own `[vendored]` table instead.
 #
 # Why it exists: `/propagate-vendored <component>` builds its adopter list from
 # the adopters' `[vendored]` entries, so a repo that carries a component on disk
 # but never declared it is invisible to the wave -- the fan-out re-vendors the
 # repos that declared it, reports success, and leaves the undeclared carriers on
-# the stale bytes with nobody told (#228 shipped a fix to one repo out of seven
-# exactly that way). This table is the missing half: the key -> source-path map
-# that lets `vendored_drift.py` hash every fleet repo's copy of a KNOWN component
-# path and name the repos carrying one they don't declare.
+# the stale bytes with nobody told. This table is the missing half: the key ->
+# source-path map that lets `vendored_drift.py` hash every fleet repo's copy of
+# a KNOWN component path and name the repos carrying one they don't declare.
 #
 # Contract:
 #   * `src` is the path in THIS repo. An adopter's default destination is the
@@ -332,10 +331,7 @@ enabled = true
 #     `.github/workflows/main-gate-watch.yml.template`, `scripts/gen_tailscale_cert.py`)
 #     are deliberately ABSENT: they are edited on arrival, so byte-identity
 #     never holds and an "undeclared carrier" finding over them would be pure
-#     noise. `gen_tailscale_cert.py` was reclassified out of this table in #232:
-#     every real adopter had already adapted it (its own `NO_WINDOW` import,
-#     `grocery-shopping-automation`'s different `CERT_DIR`), so "verbatim" never
-#     held in practice.
+#     noise.
 [components]
 # Web-app UI components (app/webapp/static/_vendored/) -- see that dir's README.
 base            = { src = "app/webapp/static/_vendored/base" }
