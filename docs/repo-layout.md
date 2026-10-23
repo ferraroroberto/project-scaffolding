@@ -2,7 +2,7 @@
 
 Where code goes in a fleet repo. Every repo has one **shape**, declared as `shape` in its `.fleet.toml`; this page gives each shape a canonical tree, a placement rule for new code, and the extra roots it allows. The structure ratchet (`scripts/structure_ratchet.py`) points its failure messages at the section anchors below, so the headings are stable: rename one only together with the ratchet.
 
-Shape ids (the exact `.fleet.toml` `shape` values): [`webapp-tray`](#webapp-tray), [`streamlit`](#streamlit), [`pipeline-cli`](#pipeline-cli), [`skills-governance`](#skills-governance), [`node`](#node), [`static-site`](#static-site).
+Shape ids (the exact `.fleet.toml` `shape` values): [`webapp-tray`](#webapp-tray), [`streamlit`](#streamlit), [`pipeline-cli`](#pipeline-cli), [`skills-governance`](#skills-governance), [`node`](#node), [`static-site`](#static-site), [`agent-workspace`](#agent-workspace), [`service`](#service).
 
 ## Rules for every shape
 
@@ -188,6 +188,45 @@ docs/layout.md
 Where new code goes: a new page is a root `<page>.html` (or `games/<name>.html` for a self-contained game); its styles and scripts go in `css/` and `js/`, never inline beyond a few lines.
 
 Allowed extra roots: none beyond the tree.
+
+## agent-workspace
+
+A repo an agent works in rather than code it ships: instructions, and skills under the agent's hidden folder, plus the gate's scripts. Tests live beside the code they test.
+
+```
+CLAUDE.md  AGENTS.md         instructions; AGENTS.md points at CLAUDE.md
+.claude/skills/<name>/       one folder per skill, loaded by the repo's own sessions
+.claude/skills/_shared/      code shared by two or more skills
+scripts/                     the gate and its checks
+docs/layout.md
+```
+
+Where new code goes:
+
+- A new skill is a new `.claude/skills/<name>/` folder; its helpers and tests stay in that folder.
+- Sessions load a skill by its path, so a skill folder keeps its path. Code a second skill needs moves to `.claude/skills/_shared/`.
+
+Allowed extra roots: none beyond the tree. No folder is required: hidden folders are always allowed, and `scripts/` is optional.
+
+## service
+
+A long-lived local service: the service itself in `src/`, the admin web app it mounts in `app_web/`, and the Windows tray that owns it.
+
+```
+src/                        the service: server, routing, backends
+app_web/                    the admin web app the service mounts
+  routers/  static/
+tray/                       the tray that starts and watches the service
+launchers/                  per-platform start scripts (.bat and .sh)
+config/                     checked-in config and *.example files
+scripts/
+tests/                      top level
+docs/layout.md
+```
+
+Where new code goes: service logic goes in `src/`, an admin page or endpoint in `app_web/`, tray behaviour in `tray/`. `src/` mounts `app_web/`, so this shape sets no layer pair.
+
+Allowed extra roots: `assets/`. A repo that ships per-platform deploy trees (`linux/`, `mac/`, `docker/`) declares each in `extra_roots`.
 
 ## Every repo's `docs/layout.md`
 

@@ -57,6 +57,8 @@ The check reads the top-level `shape` and `extra_roots` keys of the repo's own `
 | `skills-governance` | `skills`, `tests` | `hooks`, `scripts`, `architecture` | none |
 | `node` | `src` | `test`, `scripts` | none |
 | `static-site` | none | `css`, `js`, `assets`, `games` | none |
+| `agent-workspace` | none | `scripts` | none |
+| `service` | `src`, `tests`, `app_web`, `tray` | `scripts`, `config`, `launchers`, `assets` | none |
 
 `docs`, `.github` and every hidden folder are allowed in every shape. A set is required only where every repo of the shape has the folder, because `extra_roots` can add a folder but never waive one. A multi-tool `pipeline-cli` repo declares each tool package in `extra_roots`.
 
