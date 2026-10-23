@@ -27,6 +27,32 @@ from .launch import DOC_CAPTURE_SETTLE_CSS
 
 logger = logging.getLogger(__name__)
 
+# Playwright waits, in milliseconds. None were re-measured for this component;
+# they are inherited from the pilot adapter and sized by guess. A capture that
+# times out on a slow app should raise the matching constant here (and be
+# re-vendored), not pad a call site.
+
+# A caller-named selector/text or the Streamlit section router must appear:
+# generous because a cold Streamlit rerun or a lazy-loaded view can take
+# several seconds, yet short enough that a wrong selector fails the run quickly.
+SELECTOR_TIMEOUT_MS = 30_000
+# page.goto(wait_until="load"): twice the selector budget, since this also
+# covers the app's first cold render of every static asset.
+NAV_TIMEOUT_MS = 60_000
+# "networkidle" is best effort: a page that polls or autorefreshes never goes
+# quiet, so this bounds the wait before capturing anyway.
+NETWORK_IDLE_TIMEOUT_MS = 15_000
+# Streamlit's "Running..." widget should clear once a rerun finishes; same
+# best-effort budget as network idle.
+STATUS_WIDGET_TIMEOUT_MS = 15_000
+# Fixed beat after the page looks idle, for late paints (charts, fonts) that no
+# event signals.
+SETTLE_MS = 1_200
+# Streamlit animates the sidebar closed; capture only after it has finished.
+SIDEBAR_COLLAPSE_MS = 600
+# Streamlit animates an expander open; same reason.
+EXPANDER_OPEN_MS = 800
+
 
 class ReachAdapter:
     """Drives a fresh page to one feature's capturable state.
@@ -47,9 +73,18 @@ def _wait_common(page: Any, entry: dict[str, Any]) -> None:
     """The adapter-independent half of the ``wait`` contract."""
     wait = entry.get("wait") or {}
     if wait.get("selector"):
-        page.wait_for_selector(wait["selector"], timeout=30_000)
+        page.wait_for_selector(wait["selector"], timeout=SELECTOR_TIMEOUT_MS)
     if wait.get("text"):
-        page.get_by_text(wait["text"]).first.wait_for(timeout=30_000)
+        page.get_by_text(wait["text"]).first.wait_for(timeout=SELECTOR_TIMEOUT_MS)
+
+
+def _wait_network_quiet(page: Any) -> None:
+    """Best-effort network idle, then the fixed settle beat."""
+    try:
+        page.wait_for_load_state("networkidle", timeout=NETWORK_IDLE_TIMEOUT_MS)
+    except Exception:  # noqa: BLE001 — a polling or autorefreshing page keeps the wire warm
+        pass
+    page.wait_for_timeout(SETTLE_MS)
 
 
 class UrlAdapter(ReachAdapter):
@@ -60,14 +95,10 @@ class UrlAdapter(ReachAdapter):
         path = reach.get("path") or "/"
         if not path.startswith("/"):
             path = "/" + path
-        page.goto(base_url.rstrip("/") + path, wait_until="load", timeout=60_000)
+        page.goto(base_url.rstrip("/") + path, wait_until="load", timeout=NAV_TIMEOUT_MS)
         page.add_style_tag(content=DOC_CAPTURE_SETTLE_CSS)
         _wait_common(page, entry)
-        try:
-            page.wait_for_load_state("networkidle", timeout=15_000)
-        except Exception:  # noqa: BLE001 — a polling page keeps the wire warm
-            pass
-        page.wait_for_timeout(1_200)
+        _wait_network_quiet(page)
         return []
 
 
@@ -86,8 +117,8 @@ class StreamlitAdapter(ReachAdapter):
     """The pilot's proven Streamlit adapter (content-management#110)."""
 
     def open(self, page: Any, base_url: str, name: str, entry: dict[str, Any]) -> list[str]:
-        page.goto(base_url, wait_until="load", timeout=60_000)
-        page.wait_for_selector(_APP_SHELL, timeout=30_000)
+        page.goto(base_url, wait_until="load", timeout=NAV_TIMEOUT_MS)
+        page.wait_for_selector(_APP_SHELL, timeout=SELECTOR_TIMEOUT_MS)
         page.add_style_tag(content=DOC_CAPTURE_SETTLE_CSS)
         # Settle BEFORE touching the sidebar: mid-hydration the sidebar can
         # transiently report collapsed (aria-expanded="false") and then expand,
@@ -111,14 +142,12 @@ class StreamlitAdapter(ReachAdapter):
         """Wait for Streamlit to finish its rerun: the status widget
         ("Running…") goes away, the wire goes quiet, plus a settle beat."""
         try:
-            page.locator('[data-testid="stStatusWidget"]').first.wait_for(state="hidden", timeout=15_000)
+            page.locator('[data-testid="stStatusWidget"]').first.wait_for(
+                state="hidden", timeout=STATUS_WIDGET_TIMEOUT_MS
+            )
         except Exception:  # noqa: BLE001 — widget may never have appeared; that's settled too
             pass
-        try:
-            page.wait_for_load_state("networkidle", timeout=15_000)
-        except Exception:  # noqa: BLE001 — an autorefreshing log panel keeps the wire warm
-            pass
-        page.wait_for_timeout(1_200)
+        _wait_network_quiet(page)
 
     @staticmethod
     def _sidebar_visible(page: Any) -> bool:
@@ -147,7 +176,7 @@ class StreamlitAdapter(ReachAdapter):
             # dispatches but doesn't collapse. Hover first, click for real.
             page.locator('[data-testid="stSidebarHeader"]').hover()
             btn.first.click()
-            page.wait_for_timeout(600)
+            page.wait_for_timeout(SIDEBAR_COLLAPSE_MS)
             return not self._sidebar_visible(page)
         except Exception:  # noqa: BLE001 — any uncertainty falls back to masking
             return False
@@ -158,7 +187,7 @@ class StreamlitAdapter(ReachAdapter):
         # click: false → the app's default section; clicking the already-selected
         # segmented-control option would deselect it (blank pill in the shot).
         if label and reach.get("click", True):
-            page.wait_for_selector(_SECTION_ROUTER, timeout=30_000)
+            page.wait_for_selector(_SECTION_ROUTER, timeout=SELECTOR_TIMEOUT_MS)
             # .first = the top-level section router (a tab may render its own
             # nested segmented control below it).
             page.locator(_SECTION_ROUTER).first.locator(_SECTION_BUTTON).filter(
@@ -172,7 +201,7 @@ class StreamlitAdapter(ReachAdapter):
             page.locator('[data-testid="stExpander"]').filter(has_text=exp_label).first.locator(
                 "summary"
             ).click()
-            page.wait_for_timeout(800)
+            page.wait_for_timeout(EXPANDER_OPEN_MS)
         self._wait_settled(page)
 
 
