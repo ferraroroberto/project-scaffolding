@@ -1,12 +1,10 @@
-"""Diff-proportionate e2e routing for the pre-ship gate (project-scaffolding#180).
+"""Diff-proportionate e2e routing for the pre-ship gate.
 
-`scripts/verify-before-ship.ps1` used to run the whole `tests/e2e` suite
-unconditionally, regardless of what the diff touched. Proven first in
-`app-launcher` (issue #568, PR #574): map the changed-file set of the current
-branch to a coverage tier so the gate's browser phase runs a slice
-proportionate to the diff -- never weaker for real UI/behaviour changes, and
-fail-safe to the full suite whenever the diff is ambiguous, mixed, or touches
-anything not confidently narrow.
+Maps the changed-file set of the current branch to a coverage tier so
+`scripts/verify-before-ship.ps1`'s browser phase runs a slice proportionate
+to the diff -- never weaker for real UI/behaviour changes, and fail-safe to
+the full suite whenever the diff is ambiguous, mixed, or touches anything not
+confidently narrow.
 
 Unlike app-launcher's classifier, the path -> tier rules here are NOT
 hardcoded in this module -- every consumer's layout differs. They are

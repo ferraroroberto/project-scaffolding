@@ -6,8 +6,7 @@
 .DESCRIPTION
     Runs, fail-fast, the checks every consumer enforces — so a vendor-verbatim
     primitive (e.g. app/tray/single_instance.py) can never ship lint- or
-    type-dirty and turn the CI of every repo that copies it red (the exact
-    avoidable round-trips behind project-scaffolding#48/#49/#50).
+    type-dirty and turn the CI of every repo that copies it red.
 
     Stages:
       1. byte-compile  — every .py under app/ src/ tests/ parses

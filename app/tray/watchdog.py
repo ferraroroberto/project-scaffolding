@@ -34,8 +34,7 @@ field, and this module supplies one primitive for each:
 auto-kill anything: ``on_wedge`` receives the failure count and the *app* decides,
 because "not listening at all" (safe to respawn) and "listening but not answering
 ``/healthz``" (auto-killing could mask the real fault) warrant different actions.
-app-launcher#386 shipped alert-only for exactly that reason; photo-ocr#110 split
-the two. :meth:`HealthWatchdog.rearm` exists for the respawn branch: a handler
+:meth:`HealthWatchdog.rearm` exists for the respawn branch: a handler
 that already acted asks to be re-evaluated next tick instead of waiting forever
 for a recovery a genuinely-dead process will never produce on its own.
 """

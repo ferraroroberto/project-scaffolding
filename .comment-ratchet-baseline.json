@@ -30,7 +30,6 @@
     {"key": "app/webapp/static/_vendored/text-size/text-size.js", "count": 1},
     {"key": "app/webapp/static/_vendored/toast/toast.css", "count": 1},
     {"key": "scripts/classify_e2e.py", "count": 4},
-    {"key": "scripts/verify-before-ship.ps1", "count": 9},
-    {"key": "src/config.py", "count": 2}
+    {"key": "scripts/verify-before-ship.ps1", "count": 6}
   ]
 }
