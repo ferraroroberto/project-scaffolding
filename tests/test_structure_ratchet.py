@@ -595,7 +595,7 @@ def test_main_rejects_allow_additions_without_update(capsys: pytest.CaptureFixtu
 #: shape id -> (required root folders, other allowed root folders); pinned here on purpose, so a
 #: change to a preset in the script is a deliberate edit in two places (and the doc table).
 EXPECTED_SHAPES: dict[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
-    "webapp-tray": (("app", "src", "tests", "docs"), ("scripts", "data", "brand")),
+    "webapp-tray": (("app", "src", "tests", "docs"), ("scripts", "data", "brand", "assets", "config")),
     "streamlit": (("app", "src", "tests"), ("scripts", "data", "brand")),
     "pipeline-cli": (("tests",), ("src", "common", "scripts", "config", "data")),
     "skills-governance": (("skills", "tests"), ("hooks", "scripts", "architecture")),

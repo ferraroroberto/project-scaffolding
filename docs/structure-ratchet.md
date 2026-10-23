@@ -51,7 +51,7 @@ The check reads the top-level `shape` and `extra_roots` keys of the repo's own `
 
 | `shape` | Required root folders | Also allowed | `layers` default |
 |---|---|---|---|
-| `webapp-tray` | `app`, `src`, `tests`, `docs` | `scripts`, `data`, `brand` | `[["src", "app"]]` |
+| `webapp-tray` | `app`, `src`, `tests`, `docs` | `scripts`, `data`, `brand`, `assets`, `config` | `[["src", "app"]]` |
 | `streamlit` | `app`, `src`, `tests` | `scripts`, `data`, `brand` | `[["src", "app"]]` |
 | `pipeline-cli` | `tests` | `src`, `common`, `scripts`, `config`, `data` | none |
 | `skills-governance` | `skills`, `tests` | `hooks`, `scripts`, `architecture` | none |
