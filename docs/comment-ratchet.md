@@ -90,7 +90,7 @@ Re-vendoring the script never breaks a repo that has not opted in: an absent `[c
 
 The script spawns `git` with `CREATE_NO_WINDOW`, derived locally (it is vendor-verbatim, so it cannot import `src/no_window.py`).
 
-An adopter that also vendors `static_ratchet.py` will see its duplicate check flag the config-loading and glob helpers the two scripts share, because each vendored file must be self-contained. Baseline that one pair with `--allow-additions` (this scaffold's `.static-ratchet-baseline.json` carries it).
+The vendored ratchets share config-loading and glob helpers, because each vendored file must be self-contained. `static_ratchet.py` leaves every `[vendored]` destination out of its duplicate check, so an adopter has nothing to baseline for them. The scaffold has no `[vendored]` table, and its `.static-ratchet-baseline.json` still carries those pairs because it owns the sources.
 
 ## Cost
 
