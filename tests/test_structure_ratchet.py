@@ -601,6 +601,8 @@ EXPECTED_SHAPES: dict[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
     "skills-governance": (("skills", "tests"), ("hooks", "scripts", "architecture")),
     "node": (("src",), ("test", "scripts")),
     "static-site": ((), ("css", "js", "assets", "games")),
+    "agent-workspace": ((), ("scripts",)),
+    "service": (("src", "tests", "app_web", "tray"), ("scripts", "config", "launchers", "assets")),
 }
 SHAPE_IDS = list(EXPECTED_SHAPES)
 SHAPES_WITH_REQUIRED = [(s, f) for s, (required, _allowed) in EXPECTED_SHAPES.items() for f in required]
@@ -777,7 +779,7 @@ def test_the_shape_fills_the_layer_pair_only_when_the_table_does_not_set_one() -
 
     assert layers('shape = "webapp-tray"\n') == (("src", "app"),)
     assert layers('shape = "streamlit"\n') == (("src", "app"),)
-    for shape in ("pipeline-cli", "skills-governance", "node", "static-site"):
+    for shape in ("pipeline-cli", "skills-governance", "node", "static-site", "agent-workspace", "service"):
         assert layers(f'shape = "{shape}"\n') == ()
     assert layers('shape = "pipeline-cli"\n', 'layers = [["lib", "ui"]]\n') == (("lib", "ui"),)
     assert layers("") == sr.DEFAULT_LAYERS, "a repo with no shape keeps the default pair"
