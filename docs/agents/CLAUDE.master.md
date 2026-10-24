@@ -82,19 +82,15 @@ Diff-keyed gate at finish: checks the touched web UI still conforms to the desig
 ## Windows console-subprocess suppression (`CREATE_NO_WINDOW`)
 *Apply only if this project runs a long-lived Windows process (tray, daemon, GUI) without its own console — e.g. launched via `pythonw` — that shells out to a console-based CLI tool (`docker`, `nvidia-smi`, `git`, `taskkill`, …).*
 
-- Every console-tool subprocess call (`subprocess.run`/`subprocess.Popen`, `asyncio.create_subprocess_exec`) must pass `creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0` — else Windows flashes a fresh console per child (`#13`). Centralize behind one helper, not inline literals; `asyncio.create_subprocess_exec` takes the same flag and is easy to miss. Helper lives in the project's non-UI package; this scaffold ships `src/no_window.py`, imported as `from src.no_window import NO_WINDOW` (`#209`).
-- **Vendor-verbatim modules are the one exception, not drift.** Files copied byte-identical into adopters (any `src` catalogued in `.fleet.toml`'s `[components]` table, read via `scripts/vendored_catalog.py`) can't import the shared helper (wouldn't resolve in consumer tree; hash-verified bytes must stay self-contained) — they derive the flag locally on purpose with a comment saying so. Don't "fix" into an import; don't count in audits.
-- A standalone entry point (`scripts/` CLI, subprocess-launched test helper) has its own dir as `sys.path[0]`, not repo root — needs `sys.path.insert(0, <repo root>)` before the import. Keep the shared helper stdlib-only, side-effect-free, safe under a stripped venv.
-- **Never add `DETACHED_PROCESS` on top — it neither suppresses the window nor escapes a subtree kill.** Measured from a console-less `pythonw` parent (`#221`): bare `CREATE_NO_WINDOW` suppressed every run; `DETACHED_PROCESS` alone, `DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP`, and `CREATE_NO_WINDOW | DETACHED_PROCESS` **each** showed a visible window. Mutually exclusive per `global-CLAUDE.md`/`local-llm-hub#282` — defer to it. Keeping a long-lived child alive across tray teardown is a **re-parenting** problem, not a creation-flag one: `taskkill /T` walks the PID tree regardless — use `cmd /c start` re-parenting.
+- Every console-tool subprocess call (`subprocess.run`/`subprocess.Popen`, `asyncio.create_subprocess_exec`) passes `creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0` through one helper — this scaffold's `src/no_window.py`, imported as `from src.no_window import NO_WINDOW` — and never adds `DETACHED_PROCESS` on top. (`#13`, `#209`, `#221`.)
 - Trap: a `pythonw` child launched without redirected `stdout`/`stderr` crashes on its first log write — always give it a real target.
-- Worked helper: `docs/app-onboarding.md` §1.
+- Read `docs/long-lived-process-conventions.md` → "Windows console-subprocess suppression" before adding a spawn, a standalone entry point or a vendor-verbatim module: the vendor-verbatim exception, the `sys.path` rule, the `DETACHED_PROCESS` measurements and re-parenting live there. Worked helper: `docs/app-onboarding.md` §1.
 
 ## FastAPI + SQLite connection lifecycle (one `get_db` `Depends` dependency)
 *Apply only if this project is a FastAPI app backed by SQLite.*
 
 - **One dependency owns the connection.** `get_db()` connects, sets `row_factory = sqlite3.Row` + `PRAGMA journal_mode=WAL`, then `try: yield / finally: conn.close()`. Handlers take `db: sqlite3.Connection = Depends(get_db)` rather than opening their own — closes even on handler raise, and setup (pragmas, row factory, timeout) can't drift between handlers. Acceptance: zero per-handler `sqlite3.connect(...)` calls in routers.
-- **SQLite + stdlib `sqlite3` stays the fleet default.** Convention covers only the *lifecycle dependency* — no ORM, no async driver, no connection pooling. (Apps legitimately needing a long-lived single connection are the documented exception.)
-- **Ref:** canonical `get_db` + `Depends` snippet: `docs/app-onboarding.md` §4. (`#96`; source instance `whatsapp-radar#100`.)
+- **SQLite + stdlib `sqlite3` stays the fleet default.** Convention covers only the *lifecycle dependency* — no ORM, no async driver, no connection pooling. (Apps legitimately needing a long-lived single connection are the documented exception.) Canonical `get_db` + `Depends` snippet: `docs/app-onboarding.md` §4. (`#96`; source instance `whatsapp-radar#100`.)
 
 ## Outbound-connection discipline (pooled sessions, backoff, bounded fan-out, no leaked children)
 *Apply only if this project runs a long-lived process (tray, daemon, webapp, poll loop) that makes outbound HTTP/TCP calls — to another local app, an external API, or hardware.*
@@ -107,12 +103,9 @@ Diff-keyed gate at finish: checks the touched web UI still conforms to the desig
 ## Runtime data lives on a fast drive, not wherever the repo was cloned
 *Apply only if this project persists SQLite (or similar fsync-heavy state) from a long-lived process.*
 
-- **Resolve the path — `/propagate-vendored` component: `src/runtime_data.py` (manifest key `runtime_data`).** `runtime_db_path(app, filename, env_var=...)` returns `<root>/<app>/<filename>`; root = `FLEET_DATA_ROOT` → else `C:\sqlite` (Windows) / `$XDG_DATA_HOME/sqlite`. One subdirectory **per app**, so two apps can both own a `telemetry.sqlite3`. A repo-relative `Path(__file__).parent.parent / "webapp" / "x.sqlite3"` is a **defect** — it ties the physical drive to where someone cloned.
-- **Change the path; never junction it.** A junction migrates data with no code change and records nothing — undrivable by tests, invisible to a reader, walked by any recursive delete.
-- **Keep the app's existing full-path override** (`TELEMETRY_DB_PATH`, `WR_DB_PATH`, …) as highest precedence — pass as `env_var=`; outrank it and a test run writes into the live store. It covers only the file it names: a database added later through `runtime_db_path(app, filename)` with no `env_var=` (the vendored usage log is the fleet-wide one) has no override of its own.
-- **A harness that spawns the app sets `<APP>_DATA_DIR` to a per-run temp folder.** Name it with `app_dir_env_var(<app>)`, never a literal, and set it on every spawn (disposable e2e instance, unit-test process, design-review synthetic instance). One variable redirects every file of that app at once, so a database added next year is isolated the day it lands; legacy full-path overrides alone are not enough. Recipe and reasoning: `docs/playwright-ui-testing.md` → "Isolating the runtime-data folder". (`#404`.)
-- **Outside the git tree is outside git-derived backup.** `fleet-config`'s `backup_private.py` backs up the `C:\sqlite` root as an explicit source; an app inventing its own root elsewhere is unbacked.
-- **Why:** seven always-on services `fsync`ing to the drive their checkouts sat on kept a spinning HDD audibly clicking around the clock (`#243`, diagnosed on `tower`; drive itself measured healthy).
+- **Resolve the path through the vendored `src/runtime_data.py` (manifest key `runtime_data`):** `runtime_db_path(app, filename, env_var=...)` returns `<root>/<app>/<filename>`, root `FLEET_DATA_ROOT` → else `C:\sqlite` (Windows) / `$XDG_DATA_HOME/sqlite`. A repo-relative database path is a **defect**; change the path, never junction it; the app's existing full-path override stays highest precedence via `env_var=`. (`#243`.)
+- **A harness that spawns the app sets `<APP>_DATA_DIR` to a per-run temp folder**, named with `app_dir_env_var(<app>)`, on every spawn. (`#404`.)
+- Read `docs/long-lived-process-conventions.md` → "Runtime data lives on a fast drive" before adding or moving a store: the override's scope, the per-app layout, backup coverage and the reason live there.
 ## GitHub Actions CI conventions
 *Apply whenever this project adds a `.github/workflows/` file.*
 
@@ -148,48 +141,18 @@ Diff-keyed gate at finish: checks the touched web UI still conforms to the desig
 - **Maintain is `--check`.** Static half alone ends `STATIC=clean|changed|blocked`; with `--live-url` and `--junit` it ends `MAINTAIN=clean|changed|blocked` (exit 0 / 1 / 2). An unreachable app, a mapped node that did not pass, or a placeholder is `blocked`, never `clean`. `changed` is one PR touching only the skill's files, never a test edited, a journey deleted or a selector loosened to make a drive pass.
 - The skill counts as delivered only once executed end to end against a **disposable** instance, evidence in the PR (node list, pass output, build line; no screenshots). The generator is a per-project instance, not a `[components]` entry, and prints the narrow `.gitignore` allowlist instead of editing it. Full text and limits: `docs/verify-skill.md`. (`#412`.)
 
-## Static-analysis ratchet (duplicates + unused code, baseline-and-ratchet)
-*Apply only if this project's `.fleet.toml` has `[static_ratchet] enabled = true` (opt-in per repo; the scaffold itself is the first adopter).*
+## Gate ratchets (static, comment, docs, structure — baseline-and-ratchet)
+*Apply each only if this project's `.fleet.toml` enables its table with `enabled = true` (`[static_ratchet]`, `[comment_ratchet]`, `[docs_ratchet]`, `[structure_ratchet]`; opt-in per repo, the scaffold itself is the first adopter).*
 
-- `scripts/static_ratchet.py` (vendor-verbatim, manifest key `static_ratchet`) fails the gate only on a **new** duplicate block (`jscpd`, pinned, via `npx`; Python + JS) or unused import/variable (`ruff` `F401`/`F841`; Python) relative to a committed `.static-ratchet-baseline.json`. Existing debt does not block; it cannot grow. Run as a gate stage after `ruff`, never path-routed.
-- **Exit 3 is "not confirmed"** (no Node, no network, ruff missing): its own failing state, never a pass. A vanished baselined hit passes with a hint; shrink with `--update-baseline`. **Adding to the baseline needs `--allow-additions`** and shows in review: never re-baseline to get green without saying so.
-- Adopt, tune, key design and limits (no JS unused-code check): `docs/static-ratchet.md`. (`#410`.)
-
-## Comment ratchet (`#NNN` references in comments, per-file baseline-and-ratchet)
-*Apply only if this project's `.fleet.toml` has `[comment_ratchet] enabled = true` (opt-in per repo; the scaffold itself is the first adopter).*
-
-- `scripts/comment_ratchet.py` (vendor-verbatim, manifest key `comment_ratchet`) fails the gate when a file's count of `#NNN` issue references **inside comments** (Python, JS, CSS, PowerShell; real scanners, not grep) rises above a committed `.comment-ratchet-baseline.json`. The rule it enforces is owned by the global instructions (`fleet-config#1517`), not restated here. Existing debt does not block; it cannot grow. Run as a gate stage after the static ratchet, never path-routed.
-- **Exit 3 is "not confirmed"** (git unusable, or a file the scanner cannot finish, named in the message): its own failing state, never a pass. **Raising the baseline needs `--allow-additions`** and shows in review: never re-baseline to get green without saying so. Vendored `dest`s from the adopter's `[vendored]` table are excluded automatically.
-- Adopt, counting rules, known false positive (digit-only CSS hex in a comment) and limits: `docs/comment-ratchet.md`. (`#411`.)
-
-## Docs ratchet (README size + history markers in docs, per-file baseline-and-ratchet)
-*Apply only if this project's `.fleet.toml` has `[docs_ratchet] enabled = true` (opt-in per repo; the scaffold itself is the first adopter).*
-
-- `scripts/docs_ratchet.py` (vendor-verbatim, manifest key `docs_ratchet`) fails the gate when the root `README.md` grows past its byte budget (40,960 unless `readme_max_bytes`; an over-budget README is baselined at today's size and may only shrink), or when a file's count of history markers (`#NNN` references, dated headings, changelog headings; fences, URLs and link targets excluded, inline code counted) in `README.md` and `docs/**/*.md` rises above a committed `.docs-ratchet-baseline.json`. Existing debt does not block; it cannot grow. Run as a gate stage after the comment ratchet, never path-routed.
-- **The convention it enforces:** the README is what the repo is, install, run, the gate command and a one-line index per feature linking `docs/<topic>.md`; `docs/` is durable present-tense reference, never dated narrative or a changelog. Read `docs/readme-and-docs.md` before writing or splitting a README.
-- **Exit 3 is "not confirmed"** (git unusable, a non-UTF-8 file, an unclosed fence or HTML comment): its own failing state, never a pass. **Raising the baseline needs `--allow-additions`** and shows in review: never re-baseline to get green without saying so.
-- Adopt, counting rules, `allow_refs`, limits: `docs/docs-ratchet.md`. (`#420`.)
-
-## Structure ratchet (file size, function length, flat directories, layer contract, root layout)
-*Apply only if this project's `.fleet.toml` has `[structure_ratchet] enabled = true` (opt-in per repo; the scaffold itself is the first adopter).*
-
-- `scripts/structure_ratchet.py` (vendor-verbatim, manifest key `structure_ratchet`, stdlib only) fails the gate when a file passes 1,000 lines, a Python or JS function passes 100 lines, a directory passes 40 modules, or a `src/` module imports `app/`, beyond a committed `.structure-ratchet-baseline.json`. Tests get the same limits. A baselined offender may not grow; a new one fails. The root-layout check is not baselined: with `shape` (and `extra_roots`) declared in `.fleet.toml`, a missing required root folder or an undeclared tracked root folder fails; no `shape` skips that one check, stated. Run as a gate stage after the docs ratchet, never path-routed.
-- **Where the code goes instead** is `docs/repo-layout.md`: every failure message names the rule, the limit and that doc's section. Read it before adding to a large file or a full directory.
-- **Exit 3 is "not confirmed"** (git unusable, an unreadable file, a Python file that does not parse, an unknown `shape`): its own failing state, never a pass. A JS function whose end cannot be found is recorded as unmeasured, never passed silently. **Raising the baseline needs `--allow-additions`** and shows in review: never re-baseline to get green without saying so.
-- Adopt, counting rules, baseline keys, limits: `docs/structure-ratchet.md`.
+- Each is a vendor-verbatim script (manifest key = its table name) that fails the gate only when a measure rises above its committed `.<name>-ratchet-baseline.json`. Existing debt does not block; it cannot grow. They run as gate stages after `ruff` in the order static → comment → docs → structure, never path-routed.
+- **Exit 3 is "not confirmed"** (a prerequisite missing, git unusable, a file the scanner cannot finish; each doc's "Exit codes" lists its causes): its own failing state, never a pass. A vanished baselined hit passes with a hint; shrink with `--update-baseline`. **Raising the baseline needs `--allow-additions`** and shows in review: never re-baseline to get green without saying so.
+- **Static** (`scripts/static_ratchet.py`): a **new** duplicate block (`jscpd`, pinned, via `npx`; Python + JS) or unused import/variable (`ruff` `F401`/`F841`; Python, no JS unused-code check). Read `docs/static-ratchet.md`. (`#410`.)
+- **Comment** (`scripts/comment_ratchet.py`): a file's count of `#NNN` issue references **inside comments** (Python, JS, CSS, PowerShell; real scanners, not grep). The rule is owned by the global instructions (`fleet-config#1517`); an adopter's `[vendored]` `dest`s are excluded automatically. Read `docs/comment-ratchet.md`. (`#411`.)
+- **Docs** (`scripts/docs_ratchet.py`): the root `README.md` past its byte budget (40,960 unless `readme_max_bytes`; an over-budget README is baselined at today's size and may only shrink), or a file's history markers (`#NNN` references, dated headings, changelog headings; fences, URLs and link targets excluded, inline code counted) in `README.md` and `docs/**/*.md`. It enforces the README-as-index, present-tense-`docs/` convention: read `docs/readme-and-docs.md` before writing or splitting a README, and `docs/docs-ratchet.md` for the mechanism. (`#420`.)
+- **Structure** (`scripts/structure_ratchet.py`, stdlib only): a file past 1,000 lines, a Python or JS function past 100 lines (an unfindable JS function end is unmeasured, never passed), a directory past 40 modules, or a `src/` module importing `app/`; tests get the same limits. The root-layout check is never baselined: with `shape` (and `extra_roots`) declared, a missing required or undeclared tracked root folder fails; no `shape` skips it, stated. Failures name the `docs/repo-layout.md` section saying where the code goes instead: read it before adding to a large file or a full directory, and `docs/structure-ratchet.md` for the mechanism.
 
 ## Verification (before declaring a task done)
-Examples — adapt to the project's actual tooling.
-
-Windows / PowerShell:
-- Syntax: `& .\.venv\Scripts\python.exe -m py_compile <file>`
-- Lint (if configured): `ruff check .`
-- Tests (if any exist): `& .\.venv\Scripts\python.exe -m pytest`
-- Streamlit boot check (UI changes): `& .\.venv\Scripts\python.exe -m streamlit run app/app.py --server.headless true`
-
-POSIX:
-- Syntax: `./.venv/bin/python -m py_compile <file>`
-- Tests: `./.venv/bin/python -m pytest`
+Examples — adapt to the project's actual tooling. Windows / PowerShell: syntax `& .\.venv\Scripts\python.exe -m py_compile <file>`; lint (if configured) `ruff check .`; tests (if any exist) `& .\.venv\Scripts\python.exe -m pytest`; Streamlit boot check (UI changes) `& .\.venv\Scripts\python.exe -m streamlit run app/app.py --server.headless true`. POSIX: syntax `./.venv/bin/python -m py_compile <file>`; tests `./.venv/bin/python -m pytest`.
 
 **Pre-ship gate (projects with an e2e suite).** Wire a single project-specific command — e.g. `scripts/verify-before-ship.ps1` — running the whole pipeline as one pass/fail: byte-compile → unit `pytest` → e2e suite (auto-booting the app per the harness rule in "End-to-end UI testing"). Mandatory before any UI-touching change is declared done. One command, can't half-skip. Do **not** substitute a bare `pytest` run that silently skips e2e when no server is up — that is how a regression ships looking green.
 ## Restart and verify before hand-off
@@ -197,8 +160,7 @@ POSIX:
 
 - After verification (unless told otherwise), restart and confirm the running process serves the new code via a version/build endpoint — a health check passes on a stale process; report the build identifier.
 - Kill only *this* app's process, identified precisely (port / PID / window title) — never a blanket process-name kill. A start script is not a restart script: kill-then-start, with the recipe documented under `## This repository`.
-- **Tray apps: `tray.bat --restart` is the one canonical restart — call it, don't hand-roll the kill.** It runs the shared `fleet-config`-owned `%USERPROFILE%/.claude/tray/tray_lifecycle.ps1`: orphan-proof subtree kill, per-`.venv` port reclaim by CommandLine (mutex-shared ports excluded), start, served-`git_sha`-vs-`HEAD` verify. Agents run it fire-and-forget, then poll `GET /api/version` with a hard timeout, failing loud.
-- Single-instance is a named mutex held in the tray process and adopt-or-spawn is serialized by a port-keyed mutex, both from the vendored `app/tray/single_instance.py`. Linked-but-independent children are re-parented out of the tray subtree (`cmd /c start`) and re-adopted; until a tray is detach-compliant, the agent confirms before `--restart`.
+- **Tray apps: `tray.bat --restart` is the one canonical restart — call it, don't hand-roll the kill.** It runs the shared `fleet-config`-owned `%USERPROFILE%/.claude/tray/tray_lifecycle.ps1`: orphan-proof subtree kill, per-`.venv` port reclaim by CommandLine (mutex-shared ports excluded), start, served-`git_sha`-vs-`HEAD` verify. Agents run it fire-and-forget, then poll `GET /api/version` with a hard timeout, failing loud. Single-instance is a named mutex held in the tray process and adopt-or-spawn is serialized by a port-keyed mutex, both from the vendored `app/tray/single_instance.py`. Linked-but-independent children are re-parented out of the tray subtree (`cmd /c start`) and re-adopted; until a tray is detach-compliant, the agent confirms before `--restart`.
 - **Propagation freeze:** a vendored-component fix propagates only once this scaffold's gate is green; a second same-day bug in the same component freezes propagation entirely.
 - Full text (reasons, `tray.bat.template` placeholders, adopt/reclaim/spawn model): `docs/long-lived-process-conventions.md` → "Restart and verify before hand-off"; lifecycle: `docs/windows-tray.md`.
 ## Tray webapp self-heal (retry-with-backoff spawn + dead/wedged watchdog + breadcrumb log)
