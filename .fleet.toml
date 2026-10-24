@@ -187,6 +187,10 @@ path = ".doc-refs-ratchet-baseline.json"
 [[e2e.rule]]
 tier = "none"
 path = ".dead-code-ratchet-baseline.json"
+# Likewise the conventions-ratchet baseline.
+[[e2e.rule]]
+tier = "none"
+path = ".conventions-ratchet-baseline.json"
 [[e2e.rule]]
 tier = "none"
 path = "LICENSE"
@@ -378,6 +382,20 @@ allow   = [
 ]
 
 # ---------------------------------------------------------------------------
+# Conventions ratchet. scripts/verify-before-ship.ps1 runs
+# scripts/conventions_ratchet.py, which fails when a tracked Python file gains a
+# hit of one of the listed fleet-convention rules (a spawn without the no-window
+# flag, a print in app code, a hardcoded drive path, a raw secret compare outside
+# `secret_helpers`, a raw git spawn outside `git_wrappers`), beyond the committed
+# baseline. Opt-in per repo and per rule through this table, like
+# [dead_code_ratchet]. The scaffold has no secret-compare helper or git wrapper,
+# so it enforces the three rules that need none.
+# Mechanism + limits: docs/conventions-ratchet.md.
+[conventions_ratchet]
+enabled = true
+rules   = ["no-window", "logging-not-print", "no-drive-path"]
+
+# ---------------------------------------------------------------------------
 # Screenshot baseline. scripts/verify-before-ship.ps1 runs
 # scripts/shot_baseline.py after the e2e stage: it compares the screenshots the
 # run recaptured (tests/e2e/_shot.py: phone + desktop, light + dark) with the
@@ -469,6 +487,7 @@ structure_ratchet = { src = "scripts/structure_ratchet.py" }
 instruction_ratchet = { src = "scripts/instruction_ratchet.py" }
 doc_refs_ratchet = { src = "scripts/doc_refs_ratchet.py" }
 dead_code_ratchet = { src = "scripts/dead_code_ratchet.py" }
+conventions_ratchet = { src = "scripts/conventions_ratchet.py" }
 shot_baseline   = { src = "scripts/shot_baseline.py" }
 pooled_http     = { src = "src/pooled_http.py" }
 no_window       = { src = "src/no_window.py" }
