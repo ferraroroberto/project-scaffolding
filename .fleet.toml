@@ -290,8 +290,9 @@ pytest_targets = ["tests/e2e/test_shot_baseline.py"]
 # ---------------------------------------------------------------------------
 # Static-analysis ratchet (project-scaffolding#410). scripts/verify-before-ship.ps1
 # runs scripts/static_ratchet.py, which fails only on a duplicated block (jscpd,
-# Python + JS) or an unused import/variable (ruff F401/F841) that is NEW relative
-# to the committed baseline. Opt-in per repo through this table: absent or
+# Python + JS), an unused import/variable (ruff F401/F841) or a curated ruff
+# bug/security pattern (B/S, `ruff_rules`) that is NEW relative to the committed
+# baseline. Opt-in per repo through this table: absent or
 # `enabled = false` is the declared "not enabled" skip, so re-vendoring the
 # script never breaks an adopter. Procedure + limits: docs/static-ratchet.md.
 # This scaffold owns the vendored copies, so it does not exclude `_vendored/`
