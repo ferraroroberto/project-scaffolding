@@ -43,7 +43,7 @@ A function expression takes the name it is bound to (`const mountHome = async ()
 
 **A directory's modules** are the `.py`, `.js`, `.mjs` and `.css` files directly in it, `__init__.py` aside. Subfolders are counted as their own directories. The repo root is `dir:.`.
 
-**The layer contract** reads `import` and `from ... import` statements anywhere in a file (a deferred import inside a function counts). `import app`, `import app.web` and `from app.x import y` match the `app` package; `import application`, `from src.app import x` and relative imports do not. Each pair in `layers` is a lower and an upper root: files under the lower root may not import the package at the upper root (`app/web` is the package `app.web`). The default is `[["src", "app"]]`; `layers = []` turns the check off.
+**The layer contract** reads `import` and `from ... import` statements anywhere in a file (a deferred import inside a function counts). `import app`, `import app.web` and `from app.x import y` match the `app` package; `import application`, `from src.app import x` and relative imports do not. Each pair in `layers` is a lower and an upper root: files under the lower root may not import the package at the upper root (a root with a subfolder is the dotted package, so `app.web` for the `web` folder under `app`). The default is `[["src", "app"]]`; `layers = []` turns the check off.
 
 ### Root layout
 

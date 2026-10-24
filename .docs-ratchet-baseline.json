@@ -1,9 +1,4 @@
 {
   "version": 1,
-  "entries": [
-    {"key": "docs/agents/CLAUDE.master.md", "markers": 37},
-    {"key": "docs/brand-icons.md", "markers": 1},
-    {"key": "docs/long-lived-process-conventions.md", "markers": 1},
-    {"key": "docs/windows-tray.md", "markers": 2}
-  ]
+  "entries": []
 }

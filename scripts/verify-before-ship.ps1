@@ -17,7 +17,7 @@
                          (ruff B/S) NEW relative to the committed baseline;
                          opt-in via .fleet.toml [static_ratchet]; exit 3 =
                          "not confirmed" (Node/ruff unusable), a failure, never
-                         a pass (project-scaffolding#410, docs/static-ratchet.md)
+                         a pass (docs/static-ratchet.md)
       4. comment ratchet — scripts/comment_ratchet.py: fails only when a file's
                          count of #NNN issue references inside comments (py, js,
                          css, ps1) rises above the committed baseline; opt-in via
@@ -71,7 +71,7 @@
      13. pytest (e2e)  — diff-proportionate: the browser slice is routed by
                          scripts/classify_e2e.py against the .fleet.toml [e2e]
                          rules (skip / static / full), fail-safe to full
-                         (project-scaffolding#180). Auto-boots Streamlit per
+                         (docs/e2e-routing.md). Auto-boots Streamlit per
                          its fixture.
      14. shot baseline — scripts/shot_baseline.py: compares the screenshots the
                          e2e slice recaptured (phone + desktop, light + dark)
@@ -102,7 +102,7 @@ if (-not (Test-Path $py)) {
 # is gated with mypy --strict here so it passes what consumers enforce BEFORE it
 # ships. The list is NOT maintained here: it is derived from .fleet.toml's
 # [components] catalog, the one canonical answer to "what does this scaffold
-# publish" (#230). A second hand-kept list is how a component ends up gated in
+# publish". A second hand-kept list is how a component ends up gated in
 # one place and invisible in another — add the component to [components] and it
 # is gated, catalogued and drift-checked from that single declaration.
 $catalogLines = & $py "scripts/vendored_catalog.py" "mypy-targets"
@@ -142,12 +142,12 @@ Invoke-Stage "mypy --strict (vendored)"           { & $py -m mypy @VendoredModul
 Invoke-Stage "pytest (unit, non-e2e)"             { & $py -m pytest --ignore=tests/e2e }
 
 # ---------------------------------------------------------------- e2e routing
-# Diff-proportionate e2e routing (project-scaffolding#180). Instead of always
+# Diff-proportionate e2e routing (docs/e2e-routing.md). Instead of always
 # running the whole tests/e2e suite, classify the branch's changed files vs
 # main and run a browser slice proportionate to the diff: backend/docs-only ->
 # skip the browser suite, static assets -> the narrow smoke target, real
 # UI/behaviour -> the full suite, or only its declared surface's targets when
-# every full-tier path sits in one [[e2e.surface]] (#258). Fail-safe: a
+# every full-tier path sits in one [[e2e.surface]]. Fail-safe: a
 # mixed/ambiguous/unrecognized diff (or no [e2e] table declared) runs the full
 # suite. The path->tier rules
 # live in .fleet.toml [e2e] (one auditable place); scripts/classify_e2e.py is
@@ -181,7 +181,7 @@ if ($tier -eq "skip") {
     Write-Host ""
     Write-Host ">> e2e routing: $tier" -ForegroundColor Cyan
     Write-Host "   reason: $routeReason" -ForegroundColor DarkGray
-    # A `surface` tier (#258) names several targets, space-separated -- split
+    # A `surface` tier names several targets, space-separated -- split
     # them into separate pytest args (one arg "a.py b.py" is a missing path).
     $e2eArgs = @($e2eTarget -split '\s+' | Where-Object { $_ })
     foreach ($b in ($e2eBrowsers -split ',' | Where-Object { $_ })) {

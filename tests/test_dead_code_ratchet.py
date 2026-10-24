@@ -20,6 +20,11 @@ import pytest
 
 from scripts import dead_code_ratchet as dc
 from tests._git_repo import git, write
+from tests._ratchet_not_confirmed import (
+    GIT_FAILURES,
+    assert_unlistable_git_not_confirmed,
+    assert_unreadable_file_not_confirmed,
+)
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 ENABLED = dc.Config(dc.DEFAULT_BASELINE, (), (), dc.DEFAULT_MIN_CONFIDENCE, (), ())
@@ -333,9 +338,6 @@ def test_a_reference_from_an_excluded_file_still_counts(repo: Path) -> None:
 
 # ------------------------------------------------------- not confirmed
 
-MODES = ({}, {"update": True}, {"update": True, "allow": True})
-
-
 @pytest.mark.parametrize(
     ("body", "says"),
     [
@@ -346,29 +348,18 @@ MODES = ({}, {"update": True}, {"update": True, "allow": True})
 def test_a_module_that_does_not_parse_is_not_confirmed_in_every_mode(
     repo: Path, body: bytes, says: str, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    run_mode(repo, init=True)
-    (repo / "src" / "bad.py").write_bytes(body)
-    git(repo, "add", "src/bad.py")
-    for kwargs in MODES:
-        assert run_mode(repo, **kwargs) == dc.EXIT_NOT_CONFIRMED
-        out = capsys.readouterr().out
-        assert "NOT CONFIRMED: src/bad.py" in out and says in out
-    (repo / dc.DEFAULT_BASELINE).unlink()
-    assert run_mode(repo, init=True) == dc.EXIT_NOT_CONFIRMED
-    assert not (repo / dc.DEFAULT_BASELINE).exists(), "--init writes nothing it could not confirm"
+    assert_unreadable_file_not_confirmed(
+        dc, run_mode, repo, "src/bad.py", body, says, capsys
+    )
 
 
-@pytest.mark.parametrize(
-    ("var", "value", "says"),
-    [("GIT_DIR", "no-such-git-dir", "git ls-files"), ("PATH", "empty", "git could not start")],
-)
+@pytest.mark.parametrize(("var", "value", "says"), GIT_FAILURES)
 def test_git_that_cannot_list_the_tree_is_not_confirmed(
     repo: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], var: str, value: str, says: str
 ) -> None:
-    run_mode(repo, init=True)
-    monkeypatch.setenv(var, str(repo / value))
-    assert run_mode(repo) == dc.EXIT_NOT_CONFIRMED
-    assert says in capsys.readouterr().out
+    assert_unlistable_git_not_confirmed(
+        dc, run_mode, repo, monkeypatch, capsys, var, value, says
+    )
 
 
 def test_main_rejects_allow_additions_without_update(capsys: pytest.CaptureFixture[str]) -> None:

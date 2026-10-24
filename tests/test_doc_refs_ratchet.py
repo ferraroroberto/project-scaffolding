@@ -20,6 +20,11 @@ import pytest
 
 from scripts import doc_refs_ratchet as dr
 from tests._git_repo import git, write
+from tests._ratchet_not_confirmed import (
+    GIT_FAILURES,
+    assert_unlistable_git_not_confirmed,
+    assert_unreadable_file_not_confirmed,
+)
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 TOP = frozenset({"scripts", "docs", "src", "tests"})
@@ -439,9 +444,6 @@ def test_ports_are_unchecked_without_a_declared_port(repo: Path, capsys: pytest.
 
 # ------------------------------------------------------- not confirmed
 
-MODES = ({}, {"update": True}, {"update": True, "allow": True})
-
-
 @pytest.mark.parametrize(
     ("rel", "body", "says"),
     [
@@ -453,30 +455,18 @@ MODES = ({}, {"update": True}, {"update": True, "allow": True})
 def test_a_doc_that_cannot_be_read_through_is_not_confirmed_in_every_mode(
     repo: Path, rel: str, body: bytes, says: str, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    run_mode(repo, init=True)
-    (repo / rel).parent.mkdir(parents=True, exist_ok=True)
-    (repo / rel).write_bytes(body)
-    git(repo, "add", rel)
-    for kwargs in MODES:
-        assert run_mode(repo, **kwargs) == dr.EXIT_NOT_CONFIRMED
-        out = capsys.readouterr().out
-        assert f"NOT CONFIRMED: {rel}" in out and says in out
-    (repo / dr.DEFAULT_BASELINE).unlink()
-    assert run_mode(repo, init=True) == dr.EXIT_NOT_CONFIRMED
-    assert not (repo / dr.DEFAULT_BASELINE).exists(), "--init writes nothing it could not confirm"
+    assert_unreadable_file_not_confirmed(
+        dr, run_mode, repo, rel, body, says, capsys
+    )
 
 
-@pytest.mark.parametrize(
-    ("var", "value", "says"),
-    [("GIT_DIR", "no-such-git-dir", "git ls-files"), ("PATH", "empty", "git could not start")],
-)
+@pytest.mark.parametrize(("var", "value", "says"), GIT_FAILURES)
 def test_git_that_cannot_list_the_tree_is_not_confirmed(
     repo: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], var: str, value: str, says: str
 ) -> None:
-    run_mode(repo, init=True)
-    monkeypatch.setenv(var, str(repo / value))
-    assert run_mode(repo) == dr.EXIT_NOT_CONFIRMED
-    assert says in capsys.readouterr().out
+    assert_unlistable_git_not_confirmed(
+        dr, run_mode, repo, monkeypatch, capsys, var, value, says
+    )
 
 
 def test_git_that_cannot_answer_check_ignore_is_not_confirmed(repo: Path, monkeypatch: pytest.MonkeyPatch) -> None:

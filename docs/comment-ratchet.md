@@ -94,7 +94,7 @@ The vendored ratchets share config-loading and glob helpers, because each vendor
 
 ## Cost
 
-A read-only dry run over a ~280-file Python/JS/CSS/PowerShell adopter (24 vendored destinations excluded) scanned every file without a "not confirmed" and took about **0.5 s**, so there is nothing to tune. It counted roughly 2,400 references (about 660 in Python, 1,330 in JS, 350 in CSS, 40 in PowerShell), which is what that adopter's first `--init` will record. This scaffold's own baseline is 31 files and 149 references, nearly all in its vendored components.
+A read-only dry run over a ~280-file Python/JS/CSS/PowerShell adopter (24 vendored destinations excluded) scanned every file without a "not confirmed" and took about **0.5 s**, so there is nothing to tune. It counted roughly 2,400 references (about 660 in Python, 1,330 in JS, 350 in CSS, 40 in PowerShell), which is what that adopter's first `--init` will record. This scaffold's own baseline is empty, vendored components included.
 
 ## Tests
 

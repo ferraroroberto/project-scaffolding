@@ -114,7 +114,7 @@ class Surface:
     pytest_targets: tuple[str, ...]
     prefixes: tuple[str, ...] = ()
     paths: tuple[str, ...] = ()
-    # CSS selector prefixes this surface owns in a shared stylesheet (#289).
+    # CSS selector prefixes this surface owns in a shared stylesheet.
     selectors: tuple[str, ...] = ()
 
     def matches(self, path: str) -> bool:
@@ -136,9 +136,9 @@ class E2EConfig:
     surfaces: list[Surface] = field(default_factory=list)
     # Why declared surfaces were disabled ("" when none declared or all usable).
     surfaces_note: str = ""
-    # Stylesheets shared across surfaces, narrowed by the rules a diff changes (#289).
+    # Stylesheets shared across surfaces, narrowed by the rules a diff changes.
     shared_stylesheets: tuple[str, ...] = ()
-    # Where the suite lives on disk; a self-only e2e module must exist there (#289).
+    # Where the suite lives on disk; a self-only e2e module must exist there.
     repo_root: Path = REPO_ROOT
 
 
@@ -289,7 +289,7 @@ def _classify_one(path: str, rules: list[Rule]) -> tuple[Category, str]:
     return Category.FULL, "unclassified"
 
 
-# ------------------------------------------------------ shared stylesheets (#289)
+# ------------------------------------------------------ shared stylesheets
 # A changed line is attributed to the CSS rule whose selector or declarations
 # it holds. Anything that can reach past one rule's selectors -- a token
 # (`--x:`), `:root`, an at-rule and everything inside one, a nested rule, text
