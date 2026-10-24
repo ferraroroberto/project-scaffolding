@@ -311,6 +311,18 @@ def test_untracked_and_vendored_files_are_not_reported(repo: Path) -> None:
     assert run_mode(repo) == dc.EXIT_PASS
 
 
+def test_a_tracked_baseline_does_not_count_as_a_reference_to_its_entries(
+    repo: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    run_mode(repo, init=True)
+    git(repo, "add", "-f", dc.DEFAULT_BASELINE)
+    capsys.readouterr()
+    assert run_mode(repo) == dc.EXIT_PASS
+    assert "PASS (1 baselined dead definition(s) in 1 file(s), none new" in capsys.readouterr().out
+    assert run_mode(repo, update=True) == dc.EXIT_PASS
+    assert '{"key": "src/a.py", "names": ["old_helper"]}' in baseline_text(repo)
+
+
 def test_a_reference_from_an_excluded_file_still_counts(repo: Path) -> None:
     (repo / ".fleet.toml").write_text('[dead_code_ratchet]\nenabled = true\nexclude = ["tools/**"]\n', encoding="utf-8")
     write(repo, "tools/use.py", "from src.a import old_helper\n")
