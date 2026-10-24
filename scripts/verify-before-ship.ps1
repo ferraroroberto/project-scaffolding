@@ -50,16 +50,22 @@
                          committed baseline; opt-in via .fleet.toml
                          [doc_refs_ratchet]; exit 3 = "not confirmed", a
                          failure, never a pass (docs/doc-refs-ratchet.md)
-      9. mypy --strict — the vendor-verbatim primitives only; the list is
+      9. dead code ratchet — scripts/dead_code_ratchet.py: fails when a tracked
+                         Python file gains a function, class or method nothing
+                         references (entry points excepted), beyond the
+                         committed baseline; opt-in via .fleet.toml
+                         [dead_code_ratchet]; exit 3 = "not confirmed", a
+                         failure, never a pass (docs/dead-code-ratchet.md)
+     10. mypy --strict — the vendor-verbatim primitives only; the list is
                          derived from .fleet.toml's [components] catalog via
                          scripts/vendored_catalog.py, never hand-maintained here
-     10. pytest (non-e2e) — unit suite, tests/e2e excluded
-     11. pytest (e2e)  — diff-proportionate: the browser slice is routed by
+     11. pytest (non-e2e) — unit suite, tests/e2e excluded
+     12. pytest (e2e)  — diff-proportionate: the browser slice is routed by
                          scripts/classify_e2e.py against the .fleet.toml [e2e]
                          rules (skip / static / full), fail-safe to full
                          (project-scaffolding#180). Auto-boots Streamlit per
                          its fixture.
-     12. shot baseline — scripts/shot_baseline.py: compares the screenshots the
+     13. shot baseline — scripts/shot_baseline.py: compares the screenshots the
                          e2e slice recaptured (phone + desktop, light + dark)
                          with the committed baseline, fails on a visible change,
                          restores the tree; runs the capture itself when the
@@ -122,6 +128,7 @@ Invoke-Stage "docs ratchet"                       { & $py "scripts/docs_ratchet.
 Invoke-Stage "structure ratchet"                  { & $py "scripts/structure_ratchet.py" }
 Invoke-Stage "instruction ratchet"                { & $py "scripts/instruction_ratchet.py" }
 Invoke-Stage "doc refs ratchet"                   { & $py "scripts/doc_refs_ratchet.py" }
+Invoke-Stage "dead code ratchet"                  { & $py "scripts/dead_code_ratchet.py" }
 Invoke-Stage "mypy --strict (vendored)"           { & $py -m mypy @VendoredModules }
 Invoke-Stage "pytest (unit, non-e2e)"             { & $py -m pytest --ignore=tests/e2e }
 

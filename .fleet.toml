@@ -183,6 +183,10 @@ path = ".instruction-ratchet-baseline.json"
 [[e2e.rule]]
 tier = "none"
 path = ".doc-refs-ratchet-baseline.json"
+# Likewise the dead-code-ratchet baseline.
+[[e2e.rule]]
+tier = "none"
+path = ".dead-code-ratchet-baseline.json"
 [[e2e.rule]]
 tier = "none"
 path = "LICENSE"
@@ -357,6 +361,22 @@ allow_refs = [
 ]
 
 # ---------------------------------------------------------------------------
+# Dead code ratchet. scripts/verify-before-ship.ps1 runs
+# scripts/dead_code_ratchet.py, which fails when a tracked Python file gains a
+# function, class or method nothing references (route handlers, `__all__`,
+# tests, hooks and the published API of [components] below are entry points),
+# beyond the committed baseline. Opt-in per repo through this table, like
+# [doc_refs_ratchet]. `allow` names the two functions adopters call from their
+# own tree: the scaffold never calls them itself.
+# Mechanism + limits: docs/dead-code-ratchet.md.
+[dead_code_ratchet]
+enabled = true
+allow   = [
+    "app/log_panel.py:render_log_panel",
+    "scripts/brand_gen.py:render_set",
+]
+
+# ---------------------------------------------------------------------------
 # Screenshot baseline. scripts/verify-before-ship.ps1 runs
 # scripts/shot_baseline.py after the e2e stage: it compares the screenshots the
 # run recaptured (tests/e2e/_shot.py: phone + desktop, light + dark) with the
@@ -447,6 +467,7 @@ docs_ratchet    = { src = "scripts/docs_ratchet.py" }
 structure_ratchet = { src = "scripts/structure_ratchet.py" }
 instruction_ratchet = { src = "scripts/instruction_ratchet.py" }
 doc_refs_ratchet = { src = "scripts/doc_refs_ratchet.py" }
+dead_code_ratchet = { src = "scripts/dead_code_ratchet.py" }
 shot_baseline   = { src = "scripts/shot_baseline.py" }
 pooled_http     = { src = "src/pooled_http.py" }
 no_window       = { src = "src/no_window.py" }
