@@ -2,6 +2,16 @@
 
 Moved verbatim from `CLAUDE.md` so the always-on file stays under its size cap. `CLAUDE.md` keeps each section's heading, its *apply only if* gate and one-line rules, and points here for the full procedure, reasoning, snippets and decision records. Headings match `CLAUDE.md`'s, so a reference to a section by name resolves in either file.
 
+## Windows console-subprocess suppression (`CREATE_NO_WINDOW`)
+*Apply only if this project runs a long-lived Windows process (tray, daemon, GUI) without its own console — e.g. launched via `pythonw` — that shells out to a console-based CLI tool (`docker`, `nvidia-smi`, `git`, `taskkill`, …).*
+
+- Every console-tool subprocess call (`subprocess.run`/`subprocess.Popen`, `asyncio.create_subprocess_exec`) must pass `creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0` — else Windows flashes a fresh console per child. Centralize behind one helper, not inline literals; `asyncio.create_subprocess_exec` takes the same flag and is easy to miss. Helper lives in the project's non-UI package; this scaffold ships `src/no_window.py`, imported as `from src.no_window import NO_WINDOW`.
+- **Vendor-verbatim modules are the one exception, not drift.** Files copied byte-identical into adopters (any `src` catalogued in `.fleet.toml`'s `[components]` table, read via `scripts/vendored_catalog.py`) can't import the shared helper (wouldn't resolve in consumer tree; hash-verified bytes must stay self-contained) — they derive the flag locally on purpose with a comment saying so. Don't "fix" into an import; don't count in audits.
+- A standalone entry point (`scripts/` CLI, subprocess-launched test helper) has its own dir as `sys.path[0]`, not repo root — needs `sys.path.insert(0, <repo root>)` before the import. Keep the shared helper stdlib-only, side-effect-free, safe under a stripped venv.
+- **Never add `DETACHED_PROCESS` on top — it neither suppresses the window nor escapes a subtree kill.** Measured from a console-less `pythonw` parent: bare `CREATE_NO_WINDOW` suppressed every run; `DETACHED_PROCESS` alone, `DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP`, and `CREATE_NO_WINDOW | DETACHED_PROCESS` **each** showed a visible window. Mutually exclusive per `global-CLAUDE.md` — defer to it. Keeping a long-lived child alive across tray teardown is a **re-parenting** problem, not a creation-flag one: `taskkill /T` walks the PID tree regardless — use `cmd /c start` re-parenting.
+- Trap: a `pythonw` child launched without redirected `stdout`/`stderr` crashes on its first log write — always give it a real target.
+- Worked helper: `docs/app-onboarding.md` §1.
+
 ## Outbound-connection discipline (pooled sessions, backoff, bounded fan-out, no leaked children)
 *Apply only if this project runs a long-lived process (tray, daemon, webapp, poll loop) that makes outbound HTTP/TCP calls — to another local app, an external API, or hardware.*
 
@@ -15,6 +25,16 @@ Windows ephemeral-port exhaustion (global `CLAUDE.md`) makes a fresh-connection-
   - **Anything the sweep can't establish** (unreadable cwd, unresolvable liveness, non-Windows host) reports its own **unknown** verdict, never folded into "clean".
   - **Reclassifying is not fixing.** Nothing can reap a wedge, so the e2e conftest starts the Playwright driver from a neutral cwd (`gettempdir()`, never `mkdtemp()`) and every spawned helper roots in `%TEMP%` instead of the checkout; a pinned directory is freed by closing the holder's cwd handle remotely, never by rebooting the host.
   - Full pattern, abort-cascade matrix, liveness discriminator, PEB cwd-attribution trick: `docs/playwright-ui-testing.md` → "Post-run sweep for leaked browser helpers".
+
+## Runtime data lives on a fast drive, not wherever the repo was cloned
+*Apply only if this project persists SQLite (or similar fsync-heavy state) from a long-lived process.*
+
+- **Resolve the path — `/propagate-vendored` component: `src/runtime_data.py` (manifest key `runtime_data`).** `runtime_db_path(app, filename, env_var=...)` returns `<root>/<app>/<filename>`; root = `FLEET_DATA_ROOT` → else `C:\sqlite` (Windows) / `$XDG_DATA_HOME/sqlite`. One subdirectory **per app**, so two apps can both own a `telemetry.sqlite3`. A repo-relative `Path(__file__).parent.parent / "webapp" / "x.sqlite3"` is a **defect** — it ties the physical drive to where someone cloned.
+- **Change the path; never junction it.** A junction migrates data with no code change and records nothing — undrivable by tests, invisible to a reader, walked by any recursive delete.
+- **Keep the app's existing full-path override** (`TELEMETRY_DB_PATH`, `WR_DB_PATH`, …) as highest precedence — pass as `env_var=`; outrank it and a test run writes into the live store. It covers only the file it names: a database added later through `runtime_db_path(app, filename)` with no `env_var=` (the vendored usage log is the fleet-wide one) has no override of its own.
+- **A harness that spawns the app sets `<APP>_DATA_DIR` to a per-run temp folder.** Name it with `app_dir_env_var(<app>)`, never a literal, and set it on every spawn (disposable e2e instance, unit-test process, design-review synthetic instance). One variable redirects every file of that app at once, so a database added next year is isolated the day it lands; legacy full-path overrides alone are not enough. Recipe and reasoning: `docs/playwright-ui-testing.md` → "Isolating the runtime-data folder".
+- **Outside the git tree is outside git-derived backup.** `fleet-config`'s `backup_private.py` backs up the `C:\sqlite` root as an explicit source; an app inventing its own root elsewhere is unbacked.
+- **Why:** seven always-on services `fsync`ing to the drive their checkouts sat on kept a spinning HDD audibly clicking around the clock (drive itself measured healthy).
 
 ## Restart and verify before hand-off
 *Apply only if this project runs a long-lived process (dev server, webapp, daemon, tray) without hot-reload.*
