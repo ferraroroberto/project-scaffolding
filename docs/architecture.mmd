@@ -55,12 +55,13 @@ flowchart TB
   DATALOGS["data/\nlogs/app.log, input/, output/\n(gitignored)"]
 
   subgraph scriptsdir["scripts/"]
-    VERIFY["verify-before-ship.ps1\nbyte-compile -> ruff -> static ratchet\n-> comment ratchet -> docs ratchet -> structure ratchet -> mypy --strict (vendored primitives) -> pytest (non-e2e)\n-> routed e2e (skip/static/full) -> shot baseline"]
+    VERIFY["verify-before-ship.ps1\nbyte-compile -> ruff -> static ratchet\n-> comment ratchet -> docs ratchet -> structure ratchet -> instruction ratchet -> mypy --strict (vendored primitives) -> pytest (non-e2e)\n-> routed e2e (skip/static/full) -> shot baseline"]
     CLASSIFY["classify_e2e.py (vendor-verbatim, #180)\ndiff-proportionate e2e routing\nreads .fleet.toml [e2e] rules, fail-safe to full"]
     RATCHET["static_ratchet.py (vendor-verbatim, #410)\nfails only on NEW duplicates (jscpd) / unused code\n(ruff F401,F841) vs .static-ratchet-baseline.json\nopt-in via .fleet.toml [static_ratchet]; exit 3 = not confirmed"]
     CRATCHET["comment_ratchet.py (vendor-verbatim, #411)\nfails when a file's count of #NNN refs inside comments\n(py/js/css/ps1) rises vs .comment-ratchet-baseline.json\nopt-in via .fleet.toml [comment_ratchet]; exit 3 = not confirmed"]
     DRATCHET["docs_ratchet.py (vendor-verbatim)\nfails when the root README passes its byte budget or a file's\ncount of history markers (#NNN refs, dated/changelog headings)\nin README.md + docs/ rises vs .docs-ratchet-baseline.json\nopt-in via .fleet.toml [docs_ratchet]; exit 3 = not confirmed"]
     SRATCHET["structure_ratchet.py (vendor-verbatim, stdlib)\nfails when a file passes 1,000 lines, a py/js function 100,\na directory 40 modules, or src/ imports app/,\nbeyond .structure-ratchet-baseline.json\nopt-in via .fleet.toml [structure_ratchet]; exit 3 = not confirmed"]
+    IRATCHET["instruction_ratchet.py (vendor-verbatim, stdlib)\nprompt-audit lint rules (violation cap for the file's reader)\n+ size caps over CLAUDE.md, AGENTS.md, rules, SKILL.md, skill refs\nmay not rise vs .instruction-ratchet-baseline.json\nopt-in via .fleet.toml [instruction_ratchet]; exit 3 = not confirmed"]
     SHOTBASE["shot_baseline.py (vendor-verbatim, Pillow)\ncompares recaptured screenshots with the committed\nbaseline (git index), raster + glyph jitter bands,\nrestores the tree; opt-in via .fleet.toml [shot_baseline]\nexit 1 = drift, exit 3 = not confirmed"]
     GENVERIFY["gen_verify_skill.py (#412, not vendored)\nstatic parse of an adopter's surface() calls, extra_steps,\nkey views + [verify] -> .claude/skills/verify-<app>/\nSKILL.md + features/*.md; --check = STATIC / MAINTAIN\n(clean|changed|blocked, exit 0/1/2)"]
     CATALOG["vendored_catalog.py (#230)\nreads .fleet.toml [components] -- the canonical\nkey -> src map of what this scaffold publishes"]
@@ -81,6 +82,8 @@ flowchart TB
   DRATCHET -.->|reads [docs_ratchet] + [vendored] from| FLEETTOML
   VERIFY -->|runs, opt-in, after the docs ratchet| SRATCHET
   SRATCHET -.->|reads [structure_ratchet] + [vendored] from| FLEETTOML
+  VERIFY -->|runs, opt-in, after the structure ratchet| IRATCHET
+  IRATCHET -.->|reads [instruction_ratchet] from| FLEETTOML
   VERIFY -->|runs after the e2e stage| SHOTBASE
   SHOTBASE -.->|reads [shot_baseline] from| FLEETTOML
   SHOTBASE -.->|compares the PNGs written by| SHOT

@@ -6,7 +6,10 @@
     {"key": "dup:1f292fe64cc3:scripts/comment_ratchet.py|scripts/structure_ratchet.py", "files": ["scripts/comment_ratchet.py", "scripts/structure_ratchet.py"]},
     {"key": "dup:4306bb086600:scripts/comment_ratchet.py|scripts/static_ratchet.py", "files": ["scripts/comment_ratchet.py", "scripts/static_ratchet.py"]},
     {"key": "dup:43c71551fa4e:scripts/comment_ratchet.py|scripts/docs_ratchet.py", "files": ["scripts/comment_ratchet.py", "scripts/docs_ratchet.py"]},
+    {"key": "dup:a689eb28877c:scripts/docs_ratchet.py|scripts/instruction_ratchet.py", "files": ["scripts/docs_ratchet.py", "scripts/instruction_ratchet.py"]},
+    {"key": "dup:a6e4d047f2d2:scripts/comment_ratchet.py|scripts/instruction_ratchet.py", "files": ["scripts/comment_ratchet.py", "scripts/instruction_ratchet.py"]},
     {"key": "dup:e0488eb40987:scripts/comment_ratchet.py|scripts/docs_ratchet.py", "files": ["scripts/comment_ratchet.py", "scripts/docs_ratchet.py"]},
+    {"key": "dup:e0488eb40987:scripts/comment_ratchet.py|scripts/instruction_ratchet.py", "files": ["scripts/comment_ratchet.py", "scripts/instruction_ratchet.py"]},
     {"key": "dup:e0488eb40987:scripts/comment_ratchet.py|scripts/structure_ratchet.py", "files": ["scripts/comment_ratchet.py", "scripts/structure_ratchet.py"]}
   ]
 }
