@@ -422,7 +422,7 @@ def test_real_surfaces_route_representative_paths() -> None:
     """This repo's declared surfaces narrow what they own and nothing shared (#258)."""
     cfg = load_config(REAL_FLEET_TOML)
     assert cfg.surfaces_note == "", cfg.surfaces_note
-    assert {s.name for s in cfg.surfaces} == {"nav", "components", "geometry", "usage-log"}
+    assert {s.name for s in cfg.surfaces} == {"nav", "components", "geometry", "usage-log", "shot-baseline"}
 
     def route(*paths: str) -> tuple[str, str]:
         r = classify(list(paths), cfg)
@@ -459,6 +459,13 @@ def test_real_surfaces_route_representative_paths() -> None:
     assert route("src/usage_log.py") == ("surface", "tests/e2e/test_vendored_usage_log.py")
     assert route("src/usage_log.py", "tests/test_usage_log.py") == (
         "surface", "tests/e2e/test_vendored_usage_log.py")
+
+    # The screenshot baseline: the comparison (a full rule ahead of scripts/ ->
+    # none), its proof and a re-baselined PNG all run only that proof.
+    assert route("scripts/shot_baseline.py") == ("surface", "tests/e2e/test_shot_baseline.py")
+    assert route("tests/e2e/shots/gallery-phone-light.png") == ("surface", "tests/e2e/test_shot_baseline.py")
+    # conftest imports the capture helper's launch args, so it is shared.
+    assert route("tests/e2e/_shot.py") == ("full", "tests/e2e")
 
     # Shared infrastructure belongs to no surface -> whole suite.
     assert route("tests/e2e/conftest.py") == ("full", "tests/e2e")

@@ -51,6 +51,7 @@ from tests._streamlit_lifecycle import (
 )
 from tests.e2e._browser_sweep import sweep_browser_helpers
 from tests.e2e._e2e_live_guard import require_disposable_instance
+from tests.e2e._shot import CHROMIUM_CAPTURE_ARGS
 from tests.e2e._surface import pytest_collection_modifyitems  # noqa: F401 — capture-mode deselect (#408)
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -193,6 +194,15 @@ def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
         print(f"  reclaimed leaked helper: {entry}")
     for entry in result.pinning_scope:
         print(f"  UNREAPABLE, pins this checkout: {entry}")
+
+
+@pytest.fixture(scope="session")
+def browser_type_launch_args(browser_type_launch_args: dict, browser_name: str) -> dict:
+    """Chromium rasterises every frame whole, so the screenshot baseline sees one DOM as one set of pixels."""
+    if browser_name != "chromium":
+        return browser_type_launch_args
+    args = [*browser_type_launch_args.get("args", []), *CHROMIUM_CAPTURE_ARGS]
+    return {**browser_type_launch_args, "args": args}
 
 
 @pytest.fixture(autouse=True)

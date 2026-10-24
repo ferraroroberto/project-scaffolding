@@ -1056,6 +1056,100 @@ which supplies the script as a file. It is proven by
 (`tests/e2e/_fixtures/surface/`), including the unset no-op, both themes,
 restore, first-call-wins, name validation and the collection filter.
 
+### Screenshot baseline
+
+A move-only refactor (a stylesheet split, a markup move, a script broken
+into modules) should not change a single pixel, and the agent that ships it
+proves that from the gate rather than asking anyone to look at a phone. Two
+vendored files do it:
+
+- `tests/e2e/_shot.py` (manifest key `shot_capture`) captures.
+  `capture_screen(browser, url, "home", SHOTS_DIR)` writes
+  `home-phone-light.png`, `home-phone-dark.png`, `home-desktop-light.png`
+  and `home-desktop-dark.png`: phone (390x844 at device scale 3, touch) and
+  desktop (1280x900), light and dark, by default. Each variant gets its own
+  context with the page's `Date` frozen at one fixed instant (timers still
+  run), a fixed time zone and locale, and the colour scheme emulated; an
+  app whose theme is an explicit toggle sets it in `prepare(page, variant)`.
+  `shot()` waits for the network, fonts, images, every finite animation and
+  three still frames before it captures, and refuses a page whose clock is
+  not pinned or whose text shows this machine's home folder. A screen that
+  needs driving first opens `variant_page(browser, variant)` and calls
+  `shot()` itself. Add `CHROMIUM_CAPTURE_ARGS` to the suite's
+  `browser_type_launch_args` (this repo's `tests/e2e/conftest.py` shows
+  how): with partial raster on, one DOM can paint two sets of pixels.
+- `scripts/shot_baseline.py` (manifest key `shot_baseline`) compares, with
+  its config in the adopter's `.fleet.toml` `[shot_baseline]` table
+  (`enabled`, `shots_dir`, `capture`, the four band limits and an
+  `allowed_to_differ` table of file name to reason). The script's docstring
+  lists every key and default.
+
+**The contract.**
+
+- The baseline PNGs under `shots_dir` are committed. The comparison is
+  against the git index, which is `HEAD` in a clean tree and lets a staged
+  re-baseline be what is compared.
+- `--check-tree --since <epoch>` compares every committed shot written at or
+  after the instant the capture started; one written earlier was not
+  recaptured (a routed slice that did not reach it) and is counted, never
+  passed as identical. `--baseline` runs the configured `capture` command
+  first. With no mode flag the capture runs twice and the runs are compared
+  with each other, which proves the capture itself is reproducible.
+- A verification run never leaves rewritten PNGs behind: every mode restores
+  the shots it rewrote from the index. A modified shot that the run did not
+  rewrite (an unstaged re-baseline from before it) is left alone.
+- A shot passes when it is byte-identical, or differs only as the
+  rasteriser differs from itself: at most 500 pixels off by at most 2/255,
+  or at most 64 pixels off by at most 24/255 (one antialiased glyph edge at
+  device scale 3). Real UI movement is hundreds of levels on whole glyphs
+  and edges. Every pass inside a band is listed by name.
+- Exit 0 is no visible change; 1 is drift; 2 is bad configuration; 3 is
+  NOT CONFIRMED: git unusable, Pillow missing, no committed baseline, no
+  shot recaptured, an unreadable image, or the capture command failed. The
+  gate fails on 3; it is never a pass.
+
+**In the gate.** `scripts/verify-before-ship.ps1` records the time before
+its e2e stage. When the routed slice ran the capture it runs
+`--check-tree --since <that time>`, otherwise `--baseline`; when routing
+skipped the browser suite it prints that the baseline was skipped too.
+
+**A drift has two causes, never a third.** Either the UI changed on purpose
+and the baseline owes a re-baseline, or something on screen is unpinned (a
+clock, a path, an animation still in flight), and the fix belongs in the
+capture. Widening a band or allowlisting a shot to get green is the one
+move that makes the gate worthless; `allowed_to_differ` is only for content
+that genuinely cannot be pinned, with the reason written next to it.
+
+**Re-baselining a deliberate UI change, in the same PR:**
+
+1. Run the capture (`python -m pytest <the capture target>`); it rewrites
+   the PNGs under `shots_dir`.
+2. Look at what moved (`git diff --stat -- <shots_dir>`, then open the
+   files) and confirm only the intended screens changed.
+3. `git add <shots_dir>` and commit the PNGs with the change. Review sees
+   the image diff; the gate now compares against the staged copy.
+
+**The refactor-lane rule.** A move-only PR changes no shot. Its PR body
+quotes the gate's final line, `shot baseline: PASS -- N of N committed
+shot(s) recaptured, 0 drifted`, and touches nothing under `shots_dir`.
+
+**Limits.** The baseline belongs to the machine that captured it: fonts and
+the rasteriser differ between hosts, so the comparison runs in the local
+gate, not on a CI runner with a different image. Behaviour a desktop
+browser engine cannot reproduce (an installed home-screen PWA's repaint,
+the microphone, the on-screen keyboard) still needs a device check. Commit
+only screens rendered from fixture data: the baseline is public wherever
+the repo is.
+
+**Adopting.** Copy both files byte-identical and record them in the app's
+`[vendored]` table; add `[shot_baseline]` with `enabled = true` and a
+`capture` argv that runs only the capture tests; write one test that calls
+`capture_screen` per screen; run it, review the PNGs, commit them; add the
+gate stage. Proven here by `tests/test_shot_baseline.py` (the bands, every
+exit state, restore, the capture modes) and `tests/e2e/test_shot_baseline.py`
+on the component gallery: two captures of the same commit compare clean, and
+a deliberate one-rule change fails and is restored.
+
 ---
 
 ## Cost economics
