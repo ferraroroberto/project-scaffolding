@@ -12,8 +12,9 @@
       1. byte-compile  — every .py under app/ src/ tests/ parses
       2. ruff          — lint the whole repo (ruff defaults + pyupgrade)
       3. static ratchet — scripts/static_ratchet.py: fails only on a duplicate
-                         block (jscpd, Python + JS) or unused import/variable
-                         (ruff F401/F841) NEW relative to the committed baseline;
+                         block (jscpd, Python + JS), unused import/variable
+                         (ruff F401/F841) or curated bug/security pattern
+                         (ruff B/S) NEW relative to the committed baseline;
                          opt-in via .fleet.toml [static_ratchet]; exit 3 =
                          "not confirmed" (Node/ruff unusable), a failure, never
                          a pass (project-scaffolding#410, docs/static-ratchet.md)

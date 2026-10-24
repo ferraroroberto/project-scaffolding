@@ -67,9 +67,22 @@ def test_enabled_table_gets_the_documented_defaults() -> None:
 def test_enabled_table_honours_every_key() -> None:
     cfg = sr.parse_config(
         '[static_ratchet]\nenabled = true\nbaseline = "b.json"\nmin_lines = 7\n'
-        'min_tokens = 55\nexclude = ["**/_vendored/**"]\n'
+        'min_tokens = 55\nexclude = ["**/_vendored/**"]\nruff_rules = ["S113"]\n'
     )
-    assert cfg == sr.Config("b.json", 7, 55, ("**/_vendored/**",))
+    assert cfg == sr.Config("b.json", 7, 55, ("**/_vendored/**",), ("S113",))
+
+
+def test_ruff_rules_default_to_the_curated_set_and_may_be_emptied() -> None:
+    cfg = sr.parse_config("[static_ratchet]\nenabled = true\n")
+    assert cfg is not None and cfg.ruff_rules == sr.DEFAULT_RULES
+    cfg = sr.parse_config("[static_ratchet]\nenabled = true\nruff_rules = []\n")
+    assert cfg is not None and cfg.ruff_rules == ()
+
+
+def test_every_curated_code_is_a_bug_or_security_code_and_listed_once() -> None:
+    assert all(code[0] in "BS" for code in sr.DEFAULT_RULES)
+    assert len(set(sr.DEFAULT_RULES)) == len(sr.DEFAULT_RULES)
+    assert sr.TEST_IGNORED_RULES <= set(sr.DEFAULT_RULES)
 
 
 @pytest.mark.parametrize(
@@ -81,6 +94,8 @@ def test_enabled_table_honours_every_key() -> None:
         pytest.param("enabled = true\nmin_tokens = true\n", id="bool-as-int"),
         pytest.param('enabled = true\nexclude = "x"\n', id="exclude-not-list"),
         pytest.param('enabled = true\nbaseline = ""\n', id="empty-baseline"),
+        pytest.param('enabled = true\nruff_rules = "S113"\n', id="rules-not-list"),
+        pytest.param('enabled = true\nruff_rules = ["s113"]\n', id="rule-not-a-code"),
     ],
 )
 def test_malformed_table_fails_loud(body: str) -> None:
@@ -182,6 +197,30 @@ def test_message_without_a_backticked_name_falls_back_to_the_source_line(tmp_pat
 def test_unused_in_an_excluded_path_is_dropped() -> None:
     items = [ruff_item("F401", "web/node_modules/m.py", "`os` imported but unused")]
     assert sr.parse_ruff(items, ROOT, sr.BUILTIN_EXCLUDES) == []
+
+
+def test_bug_or_security_key_is_the_source_line_and_survives_a_line_shift(tmp_path: Path) -> None:
+    (tmp_path / "m.py").write_text("x = 1\n    r = requests.get(url)  \n", encoding="utf-8")
+    msg = "Probable use of `requests` call without timeout"
+    (f,) = sr.parse_ruff([ruff_item("S113", "m.py", msg, row=2)], tmp_path, ())
+    assert f.key == "lint:S113:m.py:r = requests.get(url)"
+    assert f.kind == "lint"
+    (tmp_path / "m.py").write_text("x = 1\n\n\n    r = requests.get(url)  \n", encoding="utf-8")
+    (g,) = sr.parse_ruff([ruff_item("S113", "m.py", msg, row=4)], tmp_path, ())
+    assert g.key == f.key
+
+
+def test_shell_and_exec_codes_are_not_reported_in_tests_but_bug_codes_are(tmp_path: Path) -> None:
+    for name in ("tests/test_a.py", "app/test_b.py", "app/run.py"):
+        (tmp_path / name).parent.mkdir(parents=True, exist_ok=True)
+        (tmp_path / name).write_text("subprocess.run(cmd, shell=True)\n", encoding="utf-8")
+    items = [ruff_item("S602", n, "`subprocess` call with `shell=True`") for n in ("tests/test_a.py", "app/test_b.py", "app/run.py")]
+    items.append(ruff_item("B017", "tests/test_a.py", "Do not assert blind exception"))
+    keys = sorted(f.key for f in sr.parse_ruff(items, tmp_path, ()))
+    assert keys == [
+        "lint:B017:tests/test_a.py:subprocess.run(cmd, shell=True)",
+        "lint:S602:app/run.py:subprocess.run(cmd, shell=True)",
+    ]
 
 
 @pytest.mark.parametrize("items", [None, {}, [{"code": "F401"}]])
@@ -570,3 +609,48 @@ def test_the_script_is_catalogued_so_it_is_mypy_gated_and_drift_checked() -> Non
     from scripts.vendored_catalog import load_catalog
 
     assert load_catalog(REPO_ROOT)["static_ratchet"] == {"src": "scripts/static_ratchet.py"}
+
+
+# ------------------------------------------- bug and security rules, real ruff
+
+def test_a_new_request_without_a_timeout_fails_by_name(tree: Path) -> None:
+    assert ratchet(tree, "--init").returncode == 0
+    (tree / "client.py").write_text(
+        "import requests\n\n\ndef fetch(url: str) -> int:\n    return requests.get(url).status_code\n",
+        encoding="utf-8",
+    )
+    result = ratchet(tree)
+    assert result.returncode == sr.EXIT_NEW, result.stdout
+    assert "[bug/security] client.py" in result.stdout
+    assert "S113" in result.stdout
+
+
+def test_a_baselined_request_without_a_timeout_passes_and_a_second_one_fails(tree: Path) -> None:
+    body = "import requests\n\n\ndef fetch(url: str) -> int:\n    return requests.get(url).status_code\n"
+    (tree / "client.py").write_text(body, encoding="utf-8")
+    assert ratchet(tree, "--init").returncode == 0
+    assert "lint:S113:client.py:return requests.get(url).status_code" in sr.read_baseline(tree / sr.DEFAULT_BASELINE)
+    assert ratchet(tree).returncode == 0
+    (tree / "client.py").write_text(body + "\n\ndef post(url: str) -> None:\n    requests.post(url)\n", encoding="utf-8")
+    result = ratchet(tree)
+    assert result.returncode == sr.EXIT_NEW, result.stdout
+    assert "requests.post(url)" in result.stdout
+
+
+def test_an_empty_rule_list_runs_only_the_unused_check(tree: Path) -> None:
+    (tree / ".fleet.toml").write_text("[static_ratchet]\nenabled = true\nruff_rules = []\n", encoding="utf-8")
+    assert ratchet(tree, "--init").returncode == 0
+    (tree / "client.py").write_text("import requests\n\nrequests.get('u')\n", encoding="utf-8")
+    assert ratchet(tree).returncode == 0
+
+
+def test_an_unknown_rule_code_is_not_confirmed_never_a_pass(tree: Path) -> None:
+    (tree / ".fleet.toml").write_text('[static_ratchet]\nenabled = true\nruff_rules = ["ZZ999"]\n', encoding="utf-8")
+    result = ratchet(tree, "--init")
+    assert result.returncode == sr.EXIT_NOT_CONFIRMED, result.stdout
+
+
+def test_every_curated_code_is_known_to_the_installed_ruff(tmp_path: Path) -> None:
+    (tmp_path / "ok.py").write_text("x = 1\n", encoding="utf-8")
+    cfg = sr.Config(sr.DEFAULT_BASELINE, 10, 100, ())
+    assert sr.run_ruff(tmp_path, cfg) == []  # an unknown code makes ruff exit 2 -> NotConfirmed
