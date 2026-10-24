@@ -52,7 +52,7 @@
  * @param {string|null} [opts.scrollResetSelector='.app']  element scroller to
  *   reset to top on every tab switch, alongside window scroll. In the
  *   standalone-PWA shell all real scrolling lives in a fixed-inset `.app`
- *   element (home-automation #303), so both must be reset; pass null to skip
+ *   element, so both must be reset; pass null to skip
  *   the element reset for apps without that shell.
  * @returns {{
  *   setTab: (tab: string) => void,
@@ -108,7 +108,7 @@ export function initNavTabs(opts = {}) {
     });
     nav.dataset.activeTab = tab;
     // Scroll the new pane to the top. The element scroller is the real one in
-    // the standalone shell (#303); the window is the scroller everywhere else.
+    // the standalone shell; the window is the scroller everywhere else.
     // Resetting both covers both modes.
     if (scrollResetSelector) {
       const scroller = document.querySelector(scrollResetSelector);
@@ -131,7 +131,7 @@ export function initNavTabs(opts = {}) {
     return fallback;
   }
 
-  // Optional count badge (project-scaffolding#338). Nothing here touches the DOM
+  // Optional count badge. Nothing here touches the DOM
   // until an app calls setBadge, so an app that never does renders as before.
   // The badge sits on the icon's top-right corner: the first badge wraps the
   // icon in .tab-icon-wrap (the positioning box) and the last one unwraps it.
@@ -199,22 +199,21 @@ export function initNavTabs(opts = {}) {
  * Keep the floating bottom-tab pill pinned to the bottom on mobile — CSS-first,
  * with a minimal browser-only transform fallback.
  *
- * Hard-won lessons (home-automation #205/#214/#229/#232/#300/#303, validated on
- * a real iPhone): the JS transform is the enemy in a standalone PWA, and nav
+ * Hard-won lessons (validated on a real iPhone): the JS transform is the enemy in a standalone PWA, and nav
  * placement is load-bearing. nav-tabs.css positions the bar `fixed; bottom: …`,
  * which is correct on its own in an installed PWA (no browser chrome) only when
  * the nav is a body-level sibling of the content wrapper, not nested inside a
  * scroller. The VisualViewport transform only ever existed to chase Safari's
  * collapsing *browser* toolbar — and in standalone every measured offset risks
  * stranding the bar UP because iOS's layout and rendered geometry disagree
- * there. #300 proved even a "corrective" standalone translate is actively
+ * there. Even a "corrective" standalone translate was proven actively
  * harmful: visualViewport.offsetTop swings continuously during momentum
  * scrolling, an rAF-scheduled correction is structurally one frame behind, and
  * with ~21px of clearance the correction pushed the bar off-screen. So the rule
  * is blunt: in a standalone PWA NEVER apply a measured translate. CSS owns the
- * position; #303 removes the *cause* by moving all real scrolling into a
- * fixed-inset `.app` element scroller whose bounce cannot move the visual
- * viewport (see the app shell's CSS for that contract).
+ * position; the standalone shell removes the *cause* by moving all real
+ * scrolling into a fixed-inset `.app` element scroller whose bounce cannot
+ * move the visual viewport (see the app shell's CSS for that contract).
  *
  * The transform survives ONLY for a real browser tab, where the toolbar
  * genuinely collapses: translate the bar up by the hidden slice, clamped to a
@@ -263,7 +262,7 @@ function pinNavToVisualViewport(nav, navEvent) {
     }
     // Hidden behind a modal/overlay — re-pin the instant it reappears.
     if (getComputedStyle(nav).visibility === 'hidden') return;
-    // Standalone PWA → never translate (CSS owns it; see the #300 postmortem
+    // Standalone PWA → never translate (CSS owns it; see the lessons
     // above). Browser tab → compensate for the collapsing toolbar, but not
     // while a field is focused (keyboard up) and never by more than a
     // toolbar's worth.
@@ -290,7 +289,7 @@ function pinNavToVisualViewport(nav, navEvent) {
   // matchMedia change covers rotation / desktop↔mobile resize crossing 520px.
   if (mq.addEventListener) mq.addEventListener('change', apply);
 
-  // <dialog> open/close re-pin (home-automation #300): react to scroll-lock.js's
+  // <dialog> open/close re-pin: react to scroll-lock.js's
   // explicit engaged/released signals instead of an independent MutationObserver
   // racing the same `open` attribute mutation. Two observers guessing at ordering
   // off one DOM change is what let a stale translateY survive into the frame

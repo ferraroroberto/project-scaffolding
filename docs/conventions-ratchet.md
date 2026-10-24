@@ -171,7 +171,7 @@ A read-only dry run with **every rule on** over every fleet checkout (42 repos),
 |---|---|---|---|---|
 | `no-window` | 277 (265 in tests) | 14 | all 12 outside tests; 13 sampled in tests | in tests 12 of 13 (the miss: a canary spawn that is meant to fail); outside tests 0 of 12: 8 POSIX-only spawns in functions no branch marks (a macOS installer, `launchctl`, `systemctl`) and 4 consoles meant to be visible (foreground runners, a browser bootstrap) |
 | `logging-not-print` | 0 | 0 | before the CLI rule: 289 hits in 14 repos, all in command-line modules; 25 sampled | 23 of 25 were the command's output; 2 were `ERROR ...` lines a CLI could log instead |
-| `no-drive-path` | 19 | 7 | all | 19 of 19 hardcoded locations (fleet roots, backup targets, a scaffold checkout default); 1 is the scaffold's own `C:/sqlite` runtime-data default, baselined here |
+| `no-drive-path` | 19 | 7 | all | 19 of 19 hardcoded locations (fleet roots, backup targets, a scaffold checkout default); 1 is the scaffold's own `C:/sqlite` runtime-data default, which carries the exempt marker |
 | `secret-compare` | 32 | 14 | all | 32 of 32 raw calls; 2 are the repos' own helpers and drop out once declared |
 | `git-wrapper` | 24 | 11 | all | 24 of 24 raw `git` spawns; 4 are the repos' own wrappers and 10 are the scaffold's vendored scripts, which adopters exclude through `[vendored]`. Of the three repos that have a wrapper today, one real hit remains: an undeclared vendored copy |
 

@@ -50,6 +50,7 @@ FLEET_DATA_ROOT_ENV = "FLEET_DATA_ROOT"
 
 #: Windows default. Top-level and unabbreviated on purpose: someone finding
 #: this directory on a strange machine should not have to guess what it holds.
+# no-drive-path-exempt: the fleet-wide runtime-data root is one fixed, documented location
 WINDOWS_DEFAULT_ROOT = Path("C:/sqlite")
 
 

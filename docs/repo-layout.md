@@ -26,7 +26,7 @@ Five rules hold in every shape. The structure ratchet enforces the first four; t
 
 ### Test mirror
 
-*Documented.* Tests mirror what they test: `tests/unit/<domain>/` mirrors `src/<domain>/`, `tests/api/` mirrors the routers. A repo still on flat `tests/` names files `test_<module>.py` and mirrors into subfolders once it nears 40 test modules.
+*Documented.* Tests mirror what they test: `tests/unit/<domain>/` mirrors `src/<domain>/`, an `api/` folder under `tests/` mirrors the routers. A repo still on flat `tests/` names files `test_<module>.py` and mirrors into subfolders once it nears 40 test modules.
 
 ## webapp-tray
 

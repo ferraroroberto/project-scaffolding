@@ -301,8 +301,13 @@ pytest_targets = ["tests/e2e/test_shot_baseline.py"]
 # script never breaks an adopter. Procedure + limits: docs/static-ratchet.md.
 # This scaffold owns the vendored copies, so it does not exclude `_vendored/`
 # (an adopter does: its copies are duplicates by design).
+# The ratchet scripts are the exception: each is stdlib-only and vendored on its
+# own, so they cannot import a shared module and repeat their config, glob and
+# git-listing helpers by contract. An adopter's `[vendored]` table excludes the
+# same files; the general ruff stage still lints them.
 [static_ratchet]
 enabled = true
+exclude = ["scripts/*_ratchet.py"]
 
 # ---------------------------------------------------------------------------
 # Comment ratchet (project-scaffolding#411). scripts/verify-before-ship.ps1 runs
@@ -323,8 +328,14 @@ enabled = true
 # docs/**/*.md rises above the committed baseline. Opt-in per repo through this
 # table, like [comment_ratchet]. Convention: docs/readme-and-docs.md;
 # mechanism + limits: docs/docs-ratchet.md.
+# docs/agents/CLAUDE.master.md is the byte mirror of CLAUDE.md (an instruction
+# file, outside this ratchet's scope), so its decision-record references are
+# excluded with it; tests/test_claude_master_sync.py keeps the two identical.
+# `allow_refs` keeps the one canonical-issue link brand-icons.md opens with.
 [docs_ratchet]
-enabled = true
+enabled    = true
+exclude    = ["docs/agents/CLAUDE.master.md"]
+allow_refs = ["app-launcher#65"]
 
 # ---------------------------------------------------------------------------
 # Structure ratchet. scripts/verify-before-ship.ps1 runs
@@ -363,6 +374,7 @@ allow_refs = [
     ".github/workflows/ci.yml",
     ".github/workflows/main-gate-watch.yml",
     "scripts/gen_icons.py",
+    "scripts/gen_ssl_cert.py",
 ]
 
 # ---------------------------------------------------------------------------

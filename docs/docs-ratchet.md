@@ -118,7 +118,7 @@ The vendored ratchets share config-loading and glob helpers, because each vendor
 
 ## Cost
 
-A dry run over throwaway copies of the README and `docs/` folder of seven fleet repos (1 to 42 Markdown files each) scanned every file without a "not confirmed" and took 0.2 to 0.7 s per repo, so there is nothing to tune. A first `--init` records real debt: from 5 markers in a small repo to over 700 in a large one, and oversized READMEs are baselined at their current size, not blocked. This scaffold's own baseline is 18 files and 285 markers, about two thirds of them inside inline code.
+A dry run over throwaway copies of the README and `docs/` folder of seven fleet repos (1 to 42 Markdown files each) scanned every file without a "not confirmed" and took 0.2 to 0.7 s per repo, so there is nothing to tune. A first `--init` records real debt: from 5 markers in a small repo to over 700 in a large one, and oversized READMEs are baselined at their current size, not blocked. This scaffold's own baseline is empty.
 
 ## Tests
 

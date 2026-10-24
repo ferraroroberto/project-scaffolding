@@ -107,7 +107,7 @@ Don't re-derive the lifecycle logic per project. A copy-to-adapt **`tray.bat.tem
 
 The in-process single-instance + race-safe adopt-or-spawn primitive (see the single-instance section below) is the other channel and is vendored: **`app/tray/single_instance.py`** is **vendored verbatim** — copy it byte-for-byte into each tray app, never edit it per-app (the app-specific mutex *names* are passed at the call site, so the file stays identical fleet-wide). A fix made once in the scaffold re-propagates by re-copying. The split follows the channel rule in `app/webapp/static/_vendored/README.md`: `single_instance.py` is imported Python that ships *inside* each app's own process (an app-shipped asset → vendor + manifest); `tray_lifecycle.ps1` is shelled to by path and never imported, never ships anywhere but this one machine (machine-local infra → one shared copy). A new tray app therefore vendors **two** scaffold files — `single_instance.py` (single-instance) and `watchdog.py` (self-heal) — plus the filled-in `tray.bat`, and needs `fleet-config` installed on the machine for the shared helper. Both are imported Python running inside the app's own process, so both take the app-shipped channel; both keep the same rule that only *call-site arguments* differ per app, never the file's bytes.
 
-## Gotcha #4 — single-instance must hold in-process; adopt-or-spawn must be race-safe
+## Gotcha 4 — single-instance must hold in-process; adopt-or-spawn must be race-safe
 
 The restart machinery (port reclaim) cleans up the *previous* instance on restart; this is the orthogonal guarantee that a *single start* never creates *two*. Two independent layers, both proven on `whatsapp-radar` from a verified-clean baseline (one `tray.bat` spawned two trays + two uvicorns contending for one port):
 
@@ -137,7 +137,7 @@ The mutex *names* are the only per-app difference; the file is identical everywh
 
 **The cascade caveat.** On a python.org "pythoncore" venv the symptom can *look* like a double-spawn even after the locks are correct: a venv-launched `pythonw.exe` re-execs the base interpreter, so each logical process appears as a parent/child PID pair (the venv stub waiting on the re-exec'd child). That is two PIDs, one logical process — distinct from the genuine double-spawn the locks fix. Pin which one you're seeing (parentage + CommandLine) before concluding the lock failed.
 
-## Gotcha #5 — the webapp must self-heal, and every attempt must leave a breadcrumb
+## Gotcha 5 — the webapp must self-heal, and every attempt must leave a breadcrumb
 
 The port-reclaim and single-instance guarantees make a *restart* deterministic; this is the orthogonal guarantee that the webapp survives the hours between restarts — and that when it doesn't, you can find out why. Three defects, all observed live, all from the same root: **the tray starts the webapp exactly once and then never looks at it again.**
 

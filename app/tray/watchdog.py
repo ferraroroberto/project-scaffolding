@@ -5,7 +5,7 @@ per-app — it is byte-identical across every fleet tray so a fix made once in t
 scaffold re-propagates everywhere. Everything app-specific (the probe, the
 respawn action, the log path, the toast) is passed in by the caller, never
 hardcoded here, which is what keeps the file identical. Full reasoning + the
-worked wiring pattern: scaffold ``docs/windows-tray.md`` (gotcha #5) +
+worked wiring pattern: scaffold ``docs/windows-tray.md`` (gotcha 5) +
 project-scaffolding#201 / app-launcher#386 / photo-ocr#110.
 
 The tray is the only long-lived process watching the webapp, and it starts that

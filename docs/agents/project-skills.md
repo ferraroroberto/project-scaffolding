@@ -66,7 +66,7 @@ Every worktree is its own checkout and discovery scope. Recreate links against t
 
 ## Capability and evidence
 
-Native documentation: [Claude skills](https://code.claude.com/docs/en/skills), [Codex skills](https://developers.openai.com/codex/skills/), [Codex instructions](https://developers.openai.com/codex/guides/agents-md/). Pi's installed `docs/skills.md` and `dist/core/resource-loader.js` are the source for its installed release; Grok's installed `inspect --help` and `inspect --json` establish its compatibility discovery. Check installed versions again after upgrades.
+Native documentation: [Claude skills](https://code.claude.com/docs/en/skills), [Codex skills](https://developers.openai.com/codex/skills/), [Codex instructions](https://developers.openai.com/codex/guides/agents-md/). Pi's installed skills documentation and `dist/core/resource-loader.js` are the source for its installed release; Grok's installed `inspect --help` and `inspect --json` establish its compatibility discovery. Check installed versions again after upgrades.
 
 The issue's disposable fixture probes observed the following on 2026-09-05. **Verified** here means native discovery metadata, not skill execution, hook parity or model quality. **Unsupported** means a capability was tested and absent; **unknown** means it was not established. No row is inferred from a directory's existence.
 
