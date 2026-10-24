@@ -46,6 +46,13 @@
                          rules (skip / static / full), fail-safe to full
                          (project-scaffolding#180). Auto-boots Streamlit per
                          its fixture.
+     10. shot baseline — scripts/shot_baseline.py: compares the screenshots the
+                         e2e slice recaptured (phone + desktop, light + dark)
+                         with the committed baseline, fails on a visible change,
+                         restores the tree; runs the capture itself when the
+                         slice did not; skipped with the browser suite; exit 3 =
+                         "not confirmed", a failure, never a pass
+                         (docs/playwright-ui-testing.md "Screenshot baseline")
 
     Strictness lives in pyproject.toml ([tool.ruff.lint], [tool.mypy]); this
     script only sequences the tools. Anchors to the repo root, so run it from
@@ -150,7 +157,22 @@ if ($tier -eq "skip") {
         $e2eArgs += @("--browser", $b)
     }
     $label = if ($e2eBrowsers) { $e2eBrowsers } else { "suite-default" }
+    # Taken before the run: a shot written after it was recaptured by it.
+    $shotSince = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds() / 1000.0
     Invoke-Stage "pytest e2e (${tier}: $e2eTarget, $label)" { & $py -m pytest @e2eArgs }
+
+    # Screenshot baseline: when the slice just ran the capture, compare what it
+    # wrote; otherwise run the capture itself. Either way the tree is restored.
+    $sliceCaptured = ($e2eArgs -contains "tests/e2e") -or (@($e2eArgs | Where-Object { $_ -like "tests/e2e/test_shot_baseline.py*" }).Count -gt 0)
+    if ($sliceCaptured) {
+        $since = $shotSince.ToString([Globalization.CultureInfo]::InvariantCulture)
+        Invoke-Stage "shot baseline (compare)" { & $py "scripts/shot_baseline.py" --check-tree --since $since }
+    } else {
+        Invoke-Stage "shot baseline (capture + compare)" { & $py "scripts/shot_baseline.py" --baseline }
+    }
+}
+if ($tier -eq "skip") {
+    Write-Host "[SKIP] shot baseline - no e2e surface touched, so no screen was recaptured or compared" -ForegroundColor DarkGray
 }
 
 Write-Host ""
