@@ -1,65 +1,23 @@
 """Ratchet on instruction-file lint: the deterministic rules of the fleet's prompt audit.
 
-Instruction files (`CLAUDE.md`, `AGENTS.md`, `.claude/rules/*.md`, every
-`SKILL.md` and the reference docs a skill links) are read by an agent in every
-session or on every invocation, so a line that makes the model over-trigger, or a
-file past its vendor-documented size cap, costs every run. The weekly prompt audit
+A line that makes the model over-trigger, or a file past its vendor-documented size
+cap, costs every session that reads an instruction file. The weekly prompt audit
 finds those a week later; this stage refuses a new one at ship time, per file and
 per rule, against a committed baseline: it fails only when a count *rises*.
-Existing debt never blocks work, but it cannot grow.
 
-What it counts: the prompt audit's lint-tier rules (rule text, reasons and fix
-shapes: fleet-config's `.claude/skills/prompt-audit/rules.md`), one count per file
-per rule, of the hits that rule could file as a *violation* for that file's
-reader. A single-vendor rule reaches violation only in a file or section scoped
-to that vendor's agent; in an agent-neutral file it is advisory and not counted.
-The reader comes from the file, never the host: a repo's `CLAUDE.md` is
-Claude-scoped unless its `AGENTS.md` points at it, `.claude/rules/*.md` always
-is, and a heading carrying `Claude Code only` or `Codex only` scopes its section.
+It counts the audit's lint-tier rules (`RULES`; rule text and fix shapes in
+fleet-config's `.claude/skills/prompt-audit/rules.md`) over the root `CLAUDE.md` and
+`AGENTS.md`, `.claude/rules/*.md`, `<skill_dir>/*/SKILL.md`, `extra_files` and the
+`.md` files a skill references (scope is `git ls-files`). Only hits that reach
+*violation* for the file's reader count: a single-vendor rule is advisory in an
+agent-neutral file. R-14 is the size cap (`SIZE_CAPS`); an over-cap file is baselined
+at its size and may only shrink. `NOT_ENFORCED` names the rules left to the audit.
 
-  * R-01..R-12, R-30, R-45: phrase patterns in prose (fences, inline code and
-    frontmatter excluded).
-  * R-14: the size caps -- `CLAUDE.md` and rules files 200 lines, a `SKILL.md`
-    body 500 lines, `AGENTS.md` 32,768 bytes (CRLF normalised). A file over its
-    cap is baselined at its size and may only shrink.
-  * R-15: a skill's description (over 1,024 characters, first or second person,
-    an XML tag) and its `name` (1-64 of `[a-z0-9-]`).
-  * R-16 a same-phrase always/never contradiction; R-17 a neutral paragraph naming
-    one vendor's products without a scope marker; R-34 a reference doc linking a
-    further doc the skill never names; R-35 a reference doc over 100 lines with no
-    contents heading in its first 40; R-36 a backslash path in a skill.
-
-Left to the weekly audit (see `NOT_ENFORCED`): R-13 and R-37.
-
-Opt-in, per adopter, in its own `.fleet.toml`:
-
-    [instruction_ratchet]
-    enabled     = true
-    baseline    = ".instruction-ratchet-baseline.json"   # default
-    skill_dirs  = [".claude/skills"]                      # default; each holds <name>/SKILL.md
-    extra_files = []                                      # more instruction files, e.g. a global CLAUDE.md
-
-Scope is `git ls-files`: the root `CLAUDE.md` and `AGENTS.md`, `.claude/rules/*.md`,
-`<skill_dir>/*/SKILL.md`, `extra_files`, and the `.md` files those skills reference.
-
-Exit codes (a state is never folded into a pass):
-
-  0  pass, or the stage is not enabled (declared, not inferred)
-  1  a count rose, a file passed its size cap without a baseline entry, or the
-     baseline is missing / a mode was refused
-  2  bad configuration, baseline or arguments -- fail loud
-  3  NOT CONFIRMED: `git` unusable, a file is not UTF-8 or cannot be read, a
-     fenced block never closes (it would hide every line below it), or a skill's
-     description cannot be read. The gate fails on it.
-
-Modes: `check` (default; what the gate runs), `--init` (write the first
-baseline, refuses to overwrite), `--update-baseline` (lower or drop entries;
-exits 1 and writes nothing while anything rose), `--update-baseline
---allow-additions` (the explicit flag that raises or adds -- shows in review).
-
-Vendor-verbatim: copied byte-for-byte into adopters (manifest key
-`instruction_ratchet`), stdlib-only. Full procedure and limits:
-docs/instruction-ratchet.md.
+Opt-in per adopter: `[instruction_ratchet]` in its `.fleet.toml`. Exit 0 pass or not
+enabled; 1 a count rose or the baseline is missing; 2 bad configuration; 3 NOT
+CONFIRMED (never folded into a pass). Modes: `check`, `--init`, `--update-baseline`,
+`--update-baseline --allow-additions`. Vendor-verbatim (manifest key
+`instruction_ratchet`), stdlib-only; limits and procedure: docs/instruction-ratchet.md.
 """
 
 from __future__ import annotations
