@@ -187,6 +187,7 @@ def test_real_rules_route_representative_paths() -> None:
     assert tier(".docs-ratchet-baseline.json") == "skip"
     assert tier(".structure-ratchet-baseline.json") == "skip"
     assert tier(".instruction-ratchet-baseline.json") == "skip"
+    assert tier(".doc-refs-ratchet-baseline.json") == "skip"
     # A fixture adopter's dotfile has no extension to match, so its folder is declared inert.
     assert tier("tests/_fixtures/verify_skill/repo/.fleet.toml") == "skip"
     assert tier("scripts/verify_skill_templates/SKILL.md.tmpl") == "skip"

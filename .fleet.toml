@@ -179,6 +179,10 @@ path = ".structure-ratchet-baseline.json"
 [[e2e.rule]]
 tier = "none"
 path = ".instruction-ratchet-baseline.json"
+# Likewise the doc-references-ratchet baseline.
+[[e2e.rule]]
+tier = "none"
+path = ".doc-refs-ratchet-baseline.json"
 [[e2e.rule]]
 tier = "none"
 path = "LICENSE"
@@ -335,6 +339,24 @@ enabled = true
 enabled = true
 
 # ---------------------------------------------------------------------------
+# Doc references ratchet. scripts/verify-before-ship.ps1 runs
+# scripts/doc_refs_ratchet.py, which fails when README.md, CLAUDE.md or
+# docs/**/*.md names a repo path, `python -m` module or loopback port that does
+# not exist (a port is checked against `port` above, when declared), beyond the
+# committed baseline. Opt-in per repo through this table, like
+# [instruction_ratchet]. `allow_refs` lists intentional pointers: here, the files
+# an adopter creates from the scaffold's templates and instructions.
+# Mechanism + limits: docs/doc-refs-ratchet.md.
+[doc_refs_ratchet]
+enabled    = true
+allow_refs = [
+    "docs/layout.md",
+    ".github/workflows/ci.yml",
+    ".github/workflows/main-gate-watch.yml",
+    "scripts/gen_icons.py",
+]
+
+# ---------------------------------------------------------------------------
 # Screenshot baseline. scripts/verify-before-ship.ps1 runs
 # scripts/shot_baseline.py after the e2e stage: it compares the screenshots the
 # run recaptured (tests/e2e/_shot.py: phone + desktop, light + dark) with the
@@ -424,6 +446,7 @@ comment_ratchet = { src = "scripts/comment_ratchet.py" }
 docs_ratchet    = { src = "scripts/docs_ratchet.py" }
 structure_ratchet = { src = "scripts/structure_ratchet.py" }
 instruction_ratchet = { src = "scripts/instruction_ratchet.py" }
+doc_refs_ratchet = { src = "scripts/doc_refs_ratchet.py" }
 shot_baseline   = { src = "scripts/shot_baseline.py" }
 pooled_http     = { src = "src/pooled_http.py" }
 no_window       = { src = "src/no_window.py" }
