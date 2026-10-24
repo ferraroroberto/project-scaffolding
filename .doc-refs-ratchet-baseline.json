@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "entries": [
+    {"key": "docs/agents/project-skills.md", "refs": ["docs/skills.md"]},
+    {"key": "docs/app-onboarding.md", "refs": ["scripts/gen_ssl_cert.py", "scripts/gen_ssl_cert.py", "scripts/gen_ssl_cert.py"]},
+    {"key": "docs/e2e-routing.md", "refs": ["app/board", "app/boardroom"]},
+    {"key": "docs/repo-layout.md", "refs": ["tests/api"]},
+    {"key": "docs/structure-ratchet.md", "refs": ["app/web"]}
+  ]
+}
