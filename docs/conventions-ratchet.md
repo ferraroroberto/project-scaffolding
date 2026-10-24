@@ -140,6 +140,29 @@ Re-vendoring the script never breaks a repo that has not opted in: an absent `[c
 
 The script spawns `git` with `CREATE_NO_WINDOW`, derived locally (it is vendor-verbatim, so it cannot import `src/no_window.py`), and with `GIT_OPTIONAL_LOCKS=0`. It shares its config, glob and baseline helpers with the sibling ratchets by copy, because each vendored file must be self-contained.
 
+## Adding a rule from a promotion issue
+
+A cleanup lane that fixes a recurring audit bucket must ship one structural check, and that check lands in the one repo the lane worked on. When the lane declares the check generalizable, the cleanup orchestrator files an issue in this repo labelled `structural-promotion`. The issue is keyed by a hidden `<!-- structural-promotion: name=<rule-name> -->` marker, so the same rule written in a second repo adds a comment to the existing issue instead of opening a new one. A closed issue is never reopened: if it was closed as completed, the rule already exists and that repo adopts it.
+
+A promotion issue names the rule, plus the repo, pull request and check path for every repo that wrote it. It holds no code excerpts and no personal data. It ends in one of three ways: a new entry in this stage's rules, a new ratchet, or a not-planned close that says why.
+
+### Evidence before building
+
+1. **A written convention.** Quote the line the rule enforces from the global instructions or this scaffold's `CLAUDE.md`, or name the repo-declared helper it routes calls through (as `secret-compare` does). A check with no written convention behind it is a repo-specific test: close the issue as not planned and say so.
+2. **A fleet dry run.** Run the candidate rule read-only over every fleet checkout and report it as a row of the table under "Cost and measured hit rate": hits, repos, how many were checked by hand, how many were real. The rule ships only when the false positives left are a kind an exempt marker covers. A kind that would need a marker on most of its hits becomes an exception in the rule, or the proposal closes.
+3. **The right home.** Use the table below.
+4. **A test pair.** Add a seeded violation that fails by rule name, and the compliant form that passes, to `tests/test_conventions_ratchet.py`. For a new ratchet, add the same pair to that ratchet's own test module.
+
+| The check… | Lands as |
+|---|---|
+| is a pattern in Python source that stdlib `ast` can see without importing the scanned code | a new rule in this stage |
+| is already reported by `ruff` or `jscpd` | a rule family in the [static ratchet](static-ratchet.md) |
+| reads non-Python files, or measures a size rather than matching a pattern | a new ratchet with the same contract: opt-in table, committed baseline, shrink-only `--update-baseline`, visible `--allow-additions`, exit 3 for not confirmed |
+
+### Landing it
+
+A new rule is off until a repo names it in `rules`, so re-vendoring the script never breaks a repo. A rule that needs the repo's own helper refuses to run without it. Close the promotion issue with the scaffold pull request that ships the rule. Then roll the rule out with `/propagate-vendored conventions_ratchet`, plus one adoption issue in each repo that wrote the local check: enable the rule, commit its baseline, and delete the local test as step 5 of "Adopting it" describes.
+
 ## Cost and measured hit rate
 
 A read-only dry run with **every rule on** over every fleet checkout (42 repos), each repo's own `[vendored]` table honoured, and a stand-in helper for `secret-compare` and `git-wrapper` so that every raw call counts, finished without a "not confirmed" in 0.03 to 2.2 s per repo. As a gate stage here it adds about 0.6 s, interpreter start included.
