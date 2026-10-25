@@ -82,15 +82,7 @@ export function initNavTabs(opts = {}) {
   const buttons = Array.from(nav.querySelectorAll('.tab[data-tab]'));
   if (!buttons.length) throw new Error('initNavTabs: nav has no .tab[data-tab] buttons');
 
-  // tab name → { button, pane }. The pane is resolved from aria-controls; a tab
-  // may legitimately have no pane (e.g. an external link), in which case pane is
-  // null and only the button state is toggled.
-  const tabs = new Map();
-  buttons.forEach(function (button) {
-    const name = button.dataset.tab;
-    const pane = document.getElementById(button.getAttribute('aria-controls') || '');
-    tabs.set(name, { button: button, pane: pane });
-  });
+  const tabs = discoverTabs(buttons);
 
   const names = Array.from(tabs.keys());
   const fallback = defaultTab && tabs.has(defaultTab) ? defaultTab : names[0];
@@ -131,58 +123,9 @@ export function initNavTabs(opts = {}) {
     return fallback;
   }
 
-  // Optional count badge. Nothing here touches the DOM
-  // until an app calls setBadge, so an app that never does renders as before.
-  // The badge sits on the icon's top-right corner: the first badge wraps the
-  // icon in .tab-icon-wrap (the positioning box) and the last one unwraps it.
   function setBadge(tab, count, noun, tone) {
     const entry = tabs.get(tab);
-    if (!entry) return;
-    const button = entry.button;
-    const n = Math.floor(Number(count));
-    const icon = button.querySelector('.tab-icon');
-    let badge = button.querySelector('.tab-badge');
-    let hidden = button.querySelector('.tab-badge-sr');
-
-    if (!(n > 0)) {
-      if (badge) badge.remove();
-      if (hidden) hidden.remove();
-      const wrap = icon && icon.parentElement;
-      if (wrap && wrap.classList.contains('tab-icon-wrap')) wrap.replaceWith(icon);
-      return;
-    }
-
-    if (!badge) {
-      badge = document.createElement('span');
-      badge.className = 'tab-badge';
-      // The visible digit is decoration; the count is spoken once, by the
-      // visually hidden text below, as part of the tab's accessible name.
-      badge.setAttribute('aria-hidden', 'true');
-      if (icon) {
-        let wrap = icon.parentElement;
-        if (!wrap.classList.contains('tab-icon-wrap')) {
-          wrap = document.createElement('span');
-          wrap.className = 'tab-icon-wrap';
-          icon.replaceWith(wrap);
-          wrap.appendChild(icon);
-        }
-        wrap.appendChild(badge);
-      } else {
-        button.appendChild(badge);
-      }
-    }
-    badge.textContent = n > 9 ? '9+' : String(n);
-    // Set on every call, so a count that escalates to danger (and settles back)
-    // repaints the existing badge without removing it first.
-    badge.dataset.tone = tone === 'danger' ? 'danger' : 'attention';
-
-    if (!hidden) {
-      hidden = document.createElement('span');
-      hidden.className = 'tab-badge-sr';
-      // Inside the label, so the name reads "Board, 2 waiting" with no stray gap.
-      (button.querySelector('.tab-label') || button).appendChild(hidden);
-    }
-    hidden.textContent = ', ' + n + (noun ? ' ' + noun : '');
+    if (entry) paintBadge(entry.button, count, noun, tone);
   }
 
   buttons.forEach(function (button) {
@@ -193,6 +136,90 @@ export function initNavTabs(opts = {}) {
   pinNavToVisualViewport(nav, navEvent);
 
   return { setTab: setTab, getTab: function () { return current; }, setBadge: setBadge };
+}
+
+// tab name → { button, pane }. The pane is resolved from aria-controls; a tab
+// may legitimately have no pane (e.g. an external link), in which case pane is
+// null and only the button state is toggled.
+function discoverTabs(buttons) {
+  const tabs = new Map();
+  buttons.forEach(function (button) {
+    const name = button.dataset.tab;
+    const pane = document.getElementById(button.getAttribute('aria-controls') || '');
+    tabs.set(name, { button: button, pane: pane });
+  });
+  return tabs;
+}
+
+// Optional count badge. Nothing here touches the DOM
+// until an app calls setBadge, so an app that never does renders as before.
+// The badge sits on the icon's top-right corner: the first badge wraps the
+// icon in .tab-icon-wrap (the positioning box) and the last one unwraps it.
+function paintBadge(button, count, noun, tone) {
+  const n = Math.floor(Number(count));
+  const icon = button.querySelector('.tab-icon');
+  let badge = button.querySelector('.tab-badge');
+  let hidden = button.querySelector('.tab-badge-sr');
+
+  if (!(n > 0)) {
+    if (badge) badge.remove();
+    if (hidden) hidden.remove();
+    const wrap = icon && icon.parentElement;
+    if (wrap && wrap.classList.contains('tab-icon-wrap')) wrap.replaceWith(icon);
+    return;
+  }
+
+  if (!badge) {
+    badge = document.createElement('span');
+    badge.className = 'tab-badge';
+    // The visible digit is decoration; the count is spoken once, by the
+    // visually hidden text below, as part of the tab's accessible name.
+    badge.setAttribute('aria-hidden', 'true');
+    if (icon) {
+      let wrap = icon.parentElement;
+      if (!wrap.classList.contains('tab-icon-wrap')) {
+        wrap = document.createElement('span');
+        wrap.className = 'tab-icon-wrap';
+        icon.replaceWith(wrap);
+        wrap.appendChild(icon);
+      }
+      wrap.appendChild(badge);
+    } else {
+      button.appendChild(badge);
+    }
+  }
+  badge.textContent = n > 9 ? '9+' : String(n);
+  // Set on every call, so a count that escalates to danger (and settles back)
+  // repaints the existing badge without removing it first.
+  badge.dataset.tone = tone === 'danger' ? 'danger' : 'attention';
+
+  if (!hidden) {
+    hidden = document.createElement('span');
+    hidden.className = 'tab-badge-sr';
+    // Inside the label, so the name reads "Board, 2 waiting" with no stray gap.
+    (button.querySelector('.tab-label') || button).appendChild(hidden);
+  }
+  hidden.textContent = ', ' + n + (noun ? ' ' + noun : '');
+}
+
+// Largest slice we'll pin against in a browser tab — Safari's toolbar (~44–90px).
+// A bigger gap is the soft keyboard / a picker, which we must not chase.
+const MAX_PIN_PX = 160;
+
+// Installed PWA: no toolbar, so the transform is pure harm here — disable it
+// entirely and let CSS pin the bar.
+function isStandalone() {
+  return window.matchMedia('(display-mode: standalone)').matches ||
+    window.navigator.standalone === true;
+}
+
+function isEditableFocused() {
+  const a = document.activeElement;
+  if (!a) return false;
+  const tag = a.tagName;
+  // Anything that raises the iOS keyboard. SELECT opens a picker that also
+  // shrinks the viewport, so treat it the same.
+  return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || a.isContentEditable;
 }
 
 /**
@@ -234,26 +261,6 @@ function pinNavToVisualViewport(nav, navEvent) {
 
   let rafPending = false;
 
-  // Largest slice we'll pin against in a browser tab — Safari's toolbar (~44–90px).
-  // A bigger gap is the soft keyboard / a picker, which we must not chase.
-  const MAX_PIN_PX = 160;
-
-  // Installed PWA: no toolbar, so the transform is pure harm here — disable it
-  // entirely and let CSS pin the bar.
-  function isStandalone() {
-    return window.matchMedia('(display-mode: standalone)').matches ||
-      window.navigator.standalone === true;
-  }
-
-  function isEditableFocused() {
-    const a = document.activeElement;
-    if (!a) return false;
-    const tag = a.tagName;
-    // Anything that raises the iOS keyboard. SELECT opens a picker that also
-    // shrinks the viewport, so treat it the same.
-    return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || a.isContentEditable;
-  }
-
   function apply() {
     if (!mq.matches) {
       // Desktop / wide: CSS owns the bar. Drop any transform we may have left on.
@@ -289,6 +296,14 @@ function pinNavToVisualViewport(nav, navEvent) {
   // matchMedia change covers rotation / desktop↔mobile resize crossing 520px.
   if (mq.addEventListener) mq.addEventListener('change', apply);
 
+  watchRepinTriggers(nav, navEvent, apply);
+
+  apply();
+}
+
+// Every trigger besides the viewport's own events that re-runs `apply`: modal
+// open/close, overlay toggles, a periodic watchdog, foregrounding and load.
+function watchRepinTriggers(nav, navEvent, apply) {
   // <dialog> open/close re-pin: react to scroll-lock.js's
   // explicit engaged/released signals instead of an independent MutationObserver
   // racing the same `open` attribute mutation. Two observers guessing at ordering
@@ -332,6 +347,4 @@ function pinNavToVisualViewport(nav, navEvent) {
   window.addEventListener('load', function () {
     requestAnimationFrame(function () { requestAnimationFrame(apply); });
   });
-
-  apply();
 }

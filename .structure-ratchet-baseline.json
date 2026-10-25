@@ -1,8 +1,4 @@
 {
   "version": 1,
-  "entries": [
-    {"key": "fn:app/webapp/static/_vendored/nav/nav-tabs.js:initNavTabs", "lines": 128},
-    {"key": "fn:app/webapp/static/_vendored/nav/nav-tabs.js:pinNavToVisualViewport", "lines": 108},
-    {"key": "fn:app/webapp/static/_vendored/row-menu/row-menu.js:createRowMenu", "lines": 286}
-  ]
+  "entries": []
 }
