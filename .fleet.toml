@@ -254,11 +254,20 @@ prefixes = [
     "app/webapp/static/_vendored/text-size/",
     "app/webapp/static/_vendored/toast/",
 ]
-paths          = ["tests/e2e/test_vendored_components.py", "tests/e2e/test_vendored_font_inherit.py"]
+paths          = [
+    "tests/e2e/test_vendored_components.py",
+    "tests/e2e/test_vendored_day.py",
+    "tests/e2e/test_vendored_font_inherit.py",
+    "tests/e2e/test_vendored_home_head.py",
+    "tests/e2e/test_vendored_row_menu.py",
+]
 pytest_targets = [
     "tests/e2e/test_vendored_components.py",
+    "tests/e2e/test_vendored_day.py",
     "tests/e2e/test_vendored_font_inherit.py",
+    "tests/e2e/test_vendored_home_head.py",
     "tests/e2e/test_vendored_nav.py",
+    "tests/e2e/test_vendored_row_menu.py",
     "tests/e2e/test_vendored_row_menu_placement.py",
 ]
 
@@ -270,7 +279,14 @@ pytest_targets = [
 name           = "geometry"
 prefixes       = ["tests/e2e/_fixtures/geometry/"]
 paths          = ["tests/e2e/_geometry.py", "tests/e2e/test_geometry_helper.py"]
-pytest_targets = ["tests/e2e/test_geometry_helper.py", "tests/e2e/test_vendored_components.py", "tests/e2e/test_vendored_nav.py"]
+pytest_targets = [
+    "tests/e2e/test_geometry_helper.py",
+    "tests/e2e/test_vendored_components.py",
+    "tests/e2e/test_vendored_day.py",
+    "tests/e2e/test_vendored_home_head.py",
+    "tests/e2e/test_vendored_nav.py",
+    "tests/e2e/test_vendored_row_menu.py",
+]
 
 # The usage log (#349): client module + server router, driven end to end by
 # its own harness. The gallery loads the client in a separate module script,

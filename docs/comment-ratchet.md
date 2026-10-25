@@ -98,4 +98,4 @@ A read-only dry run over a ~280-file Python/JS/CSS/PowerShell adopter (24 vendor
 
 ## Tests
 
-`tests/test_comment_ratchet.py`: counting per language on fixture strings (including the strings, templates, regex literals, URLs and entities that must not count, and the two pinned limitations above), scope and exclusions, and every mode and exit code on throwaway git repos. A missing prerequisite is a hard failure there, never `pytest.skip`. The scaffold's own gate stage doubles as the guard that its committed baseline is current.
+`tests/ratchets/test_comment_ratchet.py`: counting per language on fixture strings (including the strings, templates, regex literals, URLs and entities that must not count, and the two pinned limitations above), scope and exclusions, and every mode and exit code on throwaway git repos. A missing prerequisite is a hard failure there, never `pytest.skip`. The scaffold's own gate stage doubles as the guard that its committed baseline is current.

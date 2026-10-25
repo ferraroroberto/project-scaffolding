@@ -183,20 +183,8 @@ def _assert_in_band(geo: dict[str, Any]) -> None:
     assert geo["allHit"], geo
 
 
-def test_row_menu_placement_and_size_on_a_phone(phone: Page) -> None:
-    """One node for the whole placement rule (the suite is over its budget):
-    below when it fits, above the pill when below would run under it, re-fitted
-    when an open menu's row scrolls down to the pill, clamped with an internal
-    scroll when neither side fits — and the fleet size, in front of the pill.
-    Then the same rule for a menu floated against another element on another
-    side (#362): above a composer-like box, and left of a row's button rail."""
-    nav_top = int(phone.evaluate(
-        "() => document.querySelector('nav.tabs').getBoundingClientRect().top"
-    ))
-    # Room for the menu between this kebab and the pill, though not the viewport
-    # edge: the case the viewport-only rule got wrong.
-    near_pill = nav_top - 150
-
+def _assert_default_placement_and_fleet_size(phone: Page) -> None:
+    """A row near the top keeps the default, and the menu has the fleet size."""
     # 1. A row near the top keeps the default: below, right edges aligned.
     geo = _open(phone, 120)
     menu, anchor = geo["menu"], geo["anchor"]
@@ -216,6 +204,9 @@ def test_row_menu_placement_and_size_on_a_phone(phone: Page) -> None:
     assert phone.eval_on_selector(row, "el => el.getBoundingClientRect().height") >= 44
     assert int(_style(phone, ".row-menu", "zIndex")) > int(_style(phone, "nav.tabs", "zIndex"))
 
+
+def _assert_flips_and_clamps(phone: Page, nav_top: int, near_pill: int) -> None:
+    """Above the pill, re-fitted on scroll, and clamped with an internal scroll."""
     # 2. The last visible row: below fits the viewport but runs under the pill,
     # so the menu opens above its kebab, uncapped.
     geo = _open(phone, near_pill)
@@ -247,6 +238,9 @@ def test_row_menu_placement_and_size_on_a_phone(phone: Page) -> None:
     assert geo["scrollable"], geo
     _assert_in_band(geo)
 
+
+def _assert_floats_against_another_element(phone: Page, nav_top: int) -> None:
+    """The composer shape (above a box) and the sessions shape (left of a rail)."""
     # 5. Floated against another element than the kebab (#362), the composer
     # shape: above a wide box, right edges 10px in, 6px off it, 260px wide.
     above = {"side": "above", "align": "end", "offset": 6, "inset": 10, "minWidth": 260}
@@ -277,6 +271,9 @@ def test_row_menu_placement_and_size_on_a_phone(phone: Page) -> None:
     assert abs(menu["bottom"] - box["bottom"]) <= 1, geo
     _assert_in_band(geo)
 
+
+def _assert_survives_a_list_rebuild(phone: Page) -> None:
+    """A polled list rebuilt under an open menu never paints it at the viewport inset."""
     # 7. A polled list is rebuilt under an open menu (#373): the new row is
     # attached before it is inserted, as the README's example does. The menu
     # must never paint at the viewport inset, and settles beside the new kebab.
@@ -291,3 +288,22 @@ def test_row_menu_placement_and_size_on_a_phone(phone: Page) -> None:
     assert samples[-1]["visibility"] == "visible", samples
     assert samples[-1]["connected"], samples
     assert samples[-1]["focusInMenu"], samples
+
+
+def test_row_menu_placement_and_size_on_a_phone(phone: Page) -> None:
+    """One node for the whole placement rule (the suite is over its budget):
+    below when it fits, above the pill when below would run under it, re-fitted
+    when an open menu's row scrolls down to the pill, clamped with an internal
+    scroll when neither side fits — and the fleet size, in front of the pill.
+    Then the same rule for a menu floated against another element on another
+    side (#362): above a composer-like box, and left of a row's button rail."""
+    nav_top = int(phone.evaluate(
+        "() => document.querySelector('nav.tabs').getBoundingClientRect().top"
+    ))
+    # Room for the menu between this kebab and the pill, though not the viewport
+    # edge: the case the viewport-only rule got wrong.
+    near_pill = nav_top - 150
+    _assert_default_placement_and_fleet_size(phone)
+    _assert_flips_and_clamps(phone, nav_top, near_pill)
+    _assert_floats_against_another_element(phone, nav_top)
+    _assert_survives_a_list_rebuild(phone)

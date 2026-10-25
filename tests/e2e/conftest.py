@@ -42,7 +42,7 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 import pytest
-from playwright.sync_api import Playwright, sync_playwright
+from playwright.sync_api import Page, Playwright, sync_playwright
 
 from tests._streamlit_lifecycle import (
     STREAMLIT_E2E_PORT,
@@ -170,6 +170,14 @@ def static_server() -> Iterator[str]:
     """Serve app/webapp/static over HTTP on an ephemeral port for the session."""
     with serve_directory(STATIC_DIR) as base_url:
         yield base_url
+
+
+@pytest.fixture()
+def gallery(static_server: str, page: Page) -> Page:
+    """The demo gallery, loaded and module-script-ready, in the light theme."""
+    page.goto(f"{static_server}/_vendored/demo.html")
+    page.wait_for_selector("body[data-demo-ready='1']")
+    return page
 
 
 def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:

@@ -25,7 +25,7 @@ from tests._ratchet_not_confirmed import (
     assert_unreadable_file_not_confirmed,
 )
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
+REPO_ROOT = Path(__file__).resolve().parents[2]
 ALL = cr.Config(cr.DEFAULT_BASELINE, cr.RULES, (), cr.DEFAULT_PRINT_PATHS, ("src/secret_compare.py",), ("src/git_run.py",))
 
 

@@ -26,7 +26,7 @@ from tests._ratchet_not_confirmed import (
     assert_unreadable_file_not_confirmed,
 )
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
+REPO_ROOT = Path(__file__).resolve().parents[2]
 ENABLED = dc.Config(dc.DEFAULT_BASELINE, (), (), dc.DEFAULT_MIN_CONFIDENCE, (), ())
 
 

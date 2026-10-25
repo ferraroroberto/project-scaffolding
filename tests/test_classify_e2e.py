@@ -418,8 +418,10 @@ _NAV_TARGETS = (
     "tests/e2e/test_vendored_font_inherit.py tests/e2e/test_vendored_nav.py "
     "tests/e2e/test_vendored_row_menu_placement.py")
 _COMPONENTS_TARGETS = (
-    "tests/e2e/test_vendored_components.py tests/e2e/test_vendored_font_inherit.py "
-    "tests/e2e/test_vendored_nav.py tests/e2e/test_vendored_row_menu_placement.py")
+    "tests/e2e/test_vendored_components.py tests/e2e/test_vendored_day.py "
+    "tests/e2e/test_vendored_font_inherit.py tests/e2e/test_vendored_home_head.py "
+    "tests/e2e/test_vendored_nav.py tests/e2e/test_vendored_row_menu.py "
+    "tests/e2e/test_vendored_row_menu_placement.py")
 
 
 def test_real_surfaces_route_representative_paths() -> None:
@@ -455,7 +457,8 @@ def test_real_surfaces_route_representative_paths() -> None:
     assert route("tests/e2e/_geometry.py") == (
         "surface",
         "tests/e2e/test_geometry_helper.py tests/e2e/test_vendored_components.py "
-        "tests/e2e/test_vendored_nav.py")
+        "tests/e2e/test_vendored_day.py tests/e2e/test_vendored_home_head.py "
+        "tests/e2e/test_vendored_nav.py tests/e2e/test_vendored_row_menu.py")
     # The usage log (#349): the client, its router under src/ (a full rule ahead
     # of src/ -> none) and its harness all run only that harness.
     assert route("app/webapp/static/_vendored/usage-log/usage-log.js") == (

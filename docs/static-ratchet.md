@@ -156,4 +156,4 @@ Adding the curated `B`/`S` codes to the same ruff call adds no measurable time: 
 
 ## Tests
 
-`tests/test_static_ratchet.py`: pure logic against captured jscpd/ruff JSON shapes (key stability when lines shift, new-versus-baselined, every mode), plus the acceptance criteria end to end on throwaway trees with the real jscpd and ruff. A missing prerequisite is a hard failure there, never `pytest.skip`.
+`tests/ratchets/test_static_ratchet.py`: pure logic against captured jscpd/ruff JSON shapes (key stability when lines shift, new-versus-baselined, every mode), plus the acceptance criteria end to end on throwaway trees with the real jscpd and ruff. A missing prerequisite is a hard failure there, never `pytest.skip`.
