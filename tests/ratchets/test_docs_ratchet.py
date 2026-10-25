@@ -20,7 +20,7 @@ import pytest
 from scripts import docs_ratchet as dr
 from tests._git_repo import git, write
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
+REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
 def kinds(text: str, allow: tuple[str, ...] = ()) -> list[str]:

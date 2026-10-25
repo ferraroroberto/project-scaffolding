@@ -3,9 +3,6 @@
   "entries": [
     {"key": "fn:app/webapp/static/_vendored/nav/nav-tabs.js:initNavTabs", "lines": 128},
     {"key": "fn:app/webapp/static/_vendored/nav/nav-tabs.js:pinNavToVisualViewport", "lines": 108},
-    {"key": "fn:app/webapp/static/_vendored/row-menu/row-menu.js:createRowMenu", "lines": 286},
-    {"key": "fn:tests/e2e/test_vendored_components.py:test_row_menu_contract", "lines": 174},
-    {"key": "fn:tests/e2e/test_vendored_row_menu_placement.py:test_row_menu_placement_and_size_on_a_phone", "lines": 108},
-    {"key": "size:tests/e2e/test_vendored_components.py", "lines": 1496}
+    {"key": "fn:app/webapp/static/_vendored/row-menu/row-menu.js:createRowMenu", "lines": 286}
   ]
 }

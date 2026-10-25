@@ -20,7 +20,7 @@ import pytest
 from scripts import comment_ratchet as cr
 from tests._git_repo import git, write
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
+REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
 def count(text: str, language: str) -> int:

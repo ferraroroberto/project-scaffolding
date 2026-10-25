@@ -28,7 +28,7 @@ from scripts import docs_ratchet
 from scripts import structure_ratchet as sr
 from tests._git_repo import git, write
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
+REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
 def py_function(name: str, lines: int, indent: str = "") -> str:

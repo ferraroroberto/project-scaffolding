@@ -28,7 +28,7 @@ import pytest
 from scripts import static_ratchet as sr
 from src.no_window import NO_WINDOW
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
+REPO_ROOT = Path(__file__).resolve().parents[2]
 ROOT = REPO_ROOT  # parse_* only use it to relativise absolute paths
 
 
