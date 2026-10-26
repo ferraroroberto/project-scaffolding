@@ -97,3 +97,11 @@ It is quiet by design: `permissions: contents: read`, no secret, no third-party 
 - **Keep-the-human-in-control.** Always **state** the CI decision (skip/wait, any rerun) in the finish summary. Auto-rerun capped at **once**, only for the documented flaky leg. No force-merge; CI advisory means no `--admin` needed. **If a repo later makes `e2e` a *required* status check, fall back to watching** — a required check can't be skipped without `--admin` (out of scope).
 
 **Where each piece lives:** convention + block template here; skill mechanism in `fleet-config` `skills/issue-finish/SKILL.md` step 5; per-project instances in each project's block; sister-repo pointer issues (start: `whatsapp-radar`, `app-launcher`) track adoption. Fixing the e2e leg's flakiness is a separate per-project task — this convention makes a flake cheap, not cured.
+
+## Box load lock — a CPU burn never overlaps a gate
+
+A red-under-load proof saturates the shared box, and a browser gate running at the same moment goes red on page-load timeouts that have nothing to do with its diff. `fleet-config` owns a box-wide advisory lock (`skills/_lib/box_lock.py`, reached through `~/.claude/skills/_lib/`): gates hold it in **shared** mode (many run together), a burn holds it **exclusively** (it runs alone).
+
+- **The gate holds it for its whole run.** `scripts/verify-before-ship.ps1` re-runs itself under `box_lock.py run --mode shared --repo <name> -- <gate>`; the `VERIFY_BOX_LOCK_HELD` environment variable marks the inner run so it goes straight to the stages. The run exits with the gate's own code, or `3` when a burn held the lock past the 30-minute default timeout (the gate itself only ever exits `0` or `1`).
+- **No helper, no lock, loud warning.** A machine without the helper (a CI runner, a fresh clone) prints a `[WARN]` line and runs the gate unlocked; a missing helper never fails the gate.
+- **A repo's own gate adopts the same wrapper.** Wrap the gate command in the `box_lock.py run` call above, skipping the wrapper with a warning when the helper is absent.

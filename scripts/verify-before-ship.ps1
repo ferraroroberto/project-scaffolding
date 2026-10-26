@@ -81,6 +81,13 @@
                          "not confirmed", a failure, never a pass
                          (docs/playwright-ui-testing.md "Screenshot baseline")
 
+    Box load lock: the whole run holds fleet-config's shared box lock
+    (~/.claude/skills/_lib/box_lock.py), so a CPU-burn proof, which takes it
+    exclusively, waits for the gate instead of starving its browser stage into
+    timeouts. The script re-runs itself under `box_lock.py run --mode shared`;
+    exit 3 = the lock stayed held past its timeout. A machine without the
+    helper runs the gate unlocked with a [WARN] line.
+
     Strictness lives in pyproject.toml ([tool.ruff.lint], [tool.mypy]); this
     script only sequences the tools. Anchors to the repo root, so run it from
     anywhere:  & .\scripts\verify-before-ship.ps1
@@ -96,6 +103,29 @@ if (-not (Test-Path $py)) {
     Write-Host "[FAIL] .venv not found at $py" -ForegroundColor Red
     Write-Host "       Create it and run: $py -m pip install -r requirements.txt" -ForegroundColor Red
     exit 1
+}
+
+# Box load lock. The outer run re-executes this script under the shared lock;
+# VERIFY_BOX_LOCK_HELD marks the inner run so it goes straight to the stages.
+# Exit 3 is the helper's "lock not taken in time" code; the gate itself only
+# ever exits 0 or 1, so the two cannot be confused.
+if ($env:VERIFY_BOX_LOCK_HELD -ne "1") {
+    $boxLock = Join-Path $env:USERPROFILE ".claude\skills\_lib\box_lock.py"
+    if (Test-Path $boxLock) {
+        $repoName = (Split-Path -Leaf (Get-Location)) -replace '-wt-\d+$', ''
+        $env:VERIFY_BOX_LOCK_HELD = "1"
+        try {
+            & $py $boxLock run --mode shared --repo $repoName -- (Get-Process -Id $PID).Path -NoProfile -File $PSCommandPath
+            $lockExit = $LASTEXITCODE
+        } finally {
+            Remove-Item Env:VERIFY_BOX_LOCK_HELD -ErrorAction SilentlyContinue
+        }
+        if ($lockExit -eq 3) {
+            Write-Host "[FAIL] box load lock not taken in time (a CPU burn holds it) - the gate did not run" -ForegroundColor Red
+        }
+        exit $lockExit
+    }
+    Write-Host "[WARN] box_lock.py not found at $boxLock - running the gate WITHOUT the box load lock" -ForegroundColor Yellow
 }
 
 # Vendor-verbatim primitives — copied byte-identical into consumer repos. Each
