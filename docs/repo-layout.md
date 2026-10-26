@@ -10,11 +10,11 @@ Five rules hold in every shape. The structure ratchet enforces the first four; t
 
 ### File size
 
-*Enforced.* A file over **1,000 lines** does not grow. New code goes in a new module beside it, named for what it does. Applies to code, stylesheets, markup and tests alike.
+*Enforced.* A file over **1,000 lines** does not grow. New code goes in a new module beside it, named for what it does. Applies to code, stylesheets, markup and tests alike. A split aims for about 750 lines: the count of files at 900–1,000 lines may not rise either ([near-limit band](structure-ratchet.md#near-limit-band)).
 
 ### Function length
 
-*Enforced.* A Python or JS function over **100 lines** does not grow. Split it into named helpers, in the same module or a new one beside it. A nested function counts inside its outer function, so a view's `mount<View>()` closure is held as a whole: its helpers move out of the closure into the view's folder. Tests get the same limit.
+*Enforced.* A Python or JS function over **100 lines** does not grow. Split it into named helpers, in the same module or a new one beside it. A nested function counts inside its outer function, so a view's `mount<View>()` closure is held as a whole: its helpers move out of the closure into the view's folder. Tests get the same limit. Helpers aim for about 75 lines: the count of functions at 90–100 lines may not rise either.
 
 ### Flat directory
 

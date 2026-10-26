@@ -359,7 +359,8 @@ allow_refs = ["app-launcher#65"]
 # Python or JS function passes 100 lines, a directory passes 40 modules, or a
 # src/ module imports app/, beyond the committed baseline. Opt-in per repo
 # through this table, like [docs_ratchet]; the defaults are the limits in
-# docs/repo-layout.md. Mechanism + limits: docs/structure-ratchet.md.
+# docs/repo-layout.md; `near_limit_ratio` (default 0.9) sets the shrink-only
+# near-limit band. Mechanism + limits: docs/structure-ratchet.md.
 [structure_ratchet]
 enabled = true
 
