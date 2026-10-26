@@ -460,9 +460,9 @@ def test_a_baselined_unmeasured_function_passes_and_a_new_one_fails(repo: Path) 
 
 
 def test_code_inserted_above_a_baselined_function_does_not_re_flag_it(repo: Path) -> None:
-    write(repo, "src/f.py", py_function("work", 8))
+    write(repo, "src/f.py", "\n" + py_function("work", 8))
     run_mode(repo, init=True)
-    write(repo, "src/f.py", "import os\n\n" + py_function("work", 8))  # 10 lines: still under the file limit
+    write(repo, "src/f.py", "import os\n" + py_function("work", 8))  # still 9 lines: same size, same band
     assert run_mode(repo) == sr.EXIT_PASS
 
 
@@ -471,7 +471,7 @@ def test_init_writes_a_sorted_baseline_and_never_overwrites(repo: Path) -> None:
     write(repo, "big.css", "a{}\n" * 11)
     assert run_mode(repo, init=True) == sr.EXIT_PASS
     assert (repo / sr.DEFAULT_BASELINE).read_text(encoding="utf-8") == (
-        '{\n  "version": 1,\n  "entries": [\n'
+        '{\n  "version": 1,\n  "band": {"files": 0, "functions": 0},\n  "entries": [\n'
         '    {"key": "fn:src/f.py:alpha", "lines": 7},\n'
         '    {"key": "fn:src/f.py:zeta", "lines": 6},\n'
         '    {"key": "size:big.css", "lines": 11},\n'
