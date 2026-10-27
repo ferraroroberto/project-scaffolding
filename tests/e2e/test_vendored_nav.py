@@ -638,6 +638,7 @@ _INSET_BOTTOM = 34
 _PHONE_H = 844
 _FADE = 32  # nav-tabs.css: the fade starts this far above the pill's top edge
 _RED = (255, 0, 0)
+_TOP_SOLID = 0.55  # nav-tabs.css: the top scrim is solid for this share of the inset
 
 _FILL_JS = """() => {
   document.querySelectorAll('body > :not(.tabs):not(.app)')
@@ -725,14 +726,30 @@ def test_standalone_scrim_hides_content_under_the_status_bar(
     bg = _rgba(_style(page, "body", "backgroundColor"))[:3]
     _scroll_app(page, 400)
     pill_top = _PHONE_H - 21 - 61
+    solid = int(_INSET_TOP * _TOP_SOLID)
     assert _pixel(page, 195, 5) == bg
-    assert _pixel(page, 195, _INSET_TOP - 1) == bg
-    assert _pixel(page, 195, _INSET_TOP + 12 + 2) == _RED  # past the --gap tail
+    assert _pixel(page, 195, solid - 2) == bg  # the clock and battery stay clean
+    # The fade runs inside the status-bar band: content shows partly before the
+    # band ends, and is fully visible from its bottom edge on.
+    assert _pixel(page, 195, _INSET_TOP - 4) not in (_RED, bg)
+    assert _pixel(page, 195, _INSET_TOP + 2) == _RED
     assert _pixel(page, 16, pill_top - _FADE - 2) == _RED
     mid = _pixel(page, 16, pill_top - _FADE // 2)
     assert mid not in (_RED, bg), mid
     assert _pixel(page, 16, _PHONE_H - 5) == bg
     assert _pseudo_content(page, "body", "::before") != "none"
+
+
+def test_standalone_scrim_leaves_the_first_card_undimmed_at_scroll_top(
+    nav_standalone: Page,
+) -> None:
+    """At rest the first card starts at the inset, and nothing of it sits under the scrim."""
+    page = nav_standalone
+    _scroll_app(page, 0)
+    top = page.evaluate("() => document.querySelector('#fill').getBoundingClientRect().top")
+    assert top >= _INSET_TOP, top
+    assert _pixel(page, 195, int(top) + 1) == _RED
+    assert _pixel(page, 195, int(top) + 6) == _RED
 
 
 def test_standalone_scrim_leaves_the_last_row_clear_and_tappable(
