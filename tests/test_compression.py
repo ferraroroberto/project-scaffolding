@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pytest
 from starlette.applications import Starlette
+from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import Response, StreamingResponse
 from starlette.routing import Mount, Route
@@ -273,6 +274,136 @@ def test_each_streamed_chunk_is_delivered_before_the_next_is_produced(
     wire = asyncio.run(run())
 
     assert _decoded(wire) == first_chunk + b"data: tick 2\n\n"
+
+
+# ------------------------------- bodies re-streamed by BaseHTTPMiddleware
+
+
+async def _passthrough(request: Request, call_next):  # type: ignore[no-untyped-def]
+    """A pass-through layer; it still turns every body into a stream."""
+    return await call_next(request)
+
+
+def _behind_basehttp(routes: list[Route | Mount], **options: object) -> TestClient:
+    app = Starlette(routes=routes)
+    app.add_middleware(BaseHTTPMiddleware, dispatch=_passthrough)
+    app.add_middleware(StreamSafeGZipMiddleware, **options)
+    return TestClient(app)
+
+
+def test_a_tiny_body_re_streamed_by_basehttpmiddleware_is_left_alone() -> None:
+    client = _behind_basehttp([Route("/r", _serve("application/json", b'{"ok":true}'))])
+
+    response = client.get("/r", headers=GZIP)
+
+    assert "content-encoding" not in response.headers
+    assert response.content == b'{"ok":true}'
+
+
+def test_a_tiny_unsized_body_behind_basehttpmiddleware_is_left_alone() -> None:
+    """The adopters' shape: the re-streamed reply carries no ``Content-Length``."""
+
+    async def unsized(request: Request) -> Response:
+        async def body():  # type: ignore[no-untyped-def]
+            yield b'{"ok":true}'
+
+        return StreamingResponse(body(), media_type="application/json")
+
+    client = _behind_basehttp([Route("/r", unsized)])
+
+    response = client.get("/r", headers=GZIP)
+
+    assert "content-encoding" not in response.headers
+    assert response.content == b'{"ok":true}'
+
+
+def test_a_big_body_re_streamed_by_basehttpmiddleware_still_compresses() -> None:
+    client = _behind_basehttp([Route("/r", _serve("application/json"))])
+
+    response = client.get("/r", headers=GZIP)
+
+    assert response.headers["content-encoding"] == "gzip"
+    assert response.content == BIG
+
+
+def _chunked_wire(
+    chunks: list[bytes], content_type: str = "text/plain"
+) -> tuple[list[Message], bytes]:
+    sent: list[Message] = []
+
+    async def inner(scope: Scope, receive: Receive, send: Send) -> None:
+        async def body():  # type: ignore[no-untyped-def]
+            for chunk in chunks:
+                yield chunk
+
+        await StreamingResponse(body(), media_type=content_type)(scope, receive, send)
+
+    async def run() -> None:
+        async def receive() -> Message:
+            # StreamingResponse polls this for a disconnect; returning at once
+            # would spin it and starve the producer.
+            await asyncio.Event().wait()
+            raise AssertionError("unreachable")
+
+        async def collect(message: Message) -> None:
+            sent.append(message)
+
+        await StreamSafeGZipMiddleware(inner)(_http_scope(), receive, collect)
+
+    asyncio.run(run())
+    wire = b"".join(m.get("body", b"") for m in sent if m["type"] == "http.response.body")
+    return sent, wire
+
+
+def test_small_chunks_that_stay_under_the_minimum_go_out_plain() -> None:
+    sent, wire = _chunked_wire([b"a" * 300, b"b" * 300])
+
+    assert b"content-encoding" not in dict(sent[0]["headers"])
+    assert wire == b"a" * 300 + b"b" * 300
+
+
+def test_small_chunks_that_reach_the_minimum_start_gzip() -> None:
+    chunks = [b"a" * 400, b"b" * 400, b"c" * 400]
+
+    sent, wire = _chunked_wire(chunks)
+
+    assert dict(sent[0]["headers"])[b"content-encoding"] == b"gzip"
+    assert zlib.decompress(wire, 31) == b"".join(chunks)
+
+
+def test_a_slow_small_first_chunk_is_not_held_for_the_minimum() -> None:
+    """A text stream that pauses after a tiny chunk is released by the look-ahead bound."""
+    first_chunk = b"token 1 "
+
+    async def run() -> list[bytes]:
+        released = asyncio.Event()
+        wire: list[bytes] = []
+
+        async def inner(scope: Scope, receive: Receive, send: Send) -> None:
+            async def chunks():  # type: ignore[no-untyped-def]
+                yield first_chunk
+                await asyncio.wait_for(released.wait(), timeout=2)
+                yield b"token 2"
+
+            await StreamingResponse(chunks(), media_type="text/plain")(
+                scope, receive, send
+            )
+
+        async def collect(message: Message) -> None:
+            if message["type"] == "http.response.body" and message.get("body"):
+                wire.append(message["body"])
+            if _decoded(wire).startswith(first_chunk):
+                released.set()
+
+        async def receive() -> Message:
+            await asyncio.Event().wait()
+            raise AssertionError("unreachable")
+
+        middleware = StreamSafeGZipMiddleware(inner, lookahead_seconds=0.05)
+        await middleware(_http_scope(), receive, collect)
+        return wire
+
+    assert _decoded(asyncio.run(run())) == first_chunk + b"token 2"
 
 
 def _decoded(wire: list[bytes]) -> bytes:
