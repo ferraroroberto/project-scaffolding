@@ -69,6 +69,7 @@ Diff-keyed gate at finish: checks the touched web UI still conforms to the desig
 ## Webapp PWA static-asset cache-busting (`CachingStaticFiles` + fleet hash) *(PWA)*
 
 - Required: copy `home-automation`'s `src/static_versioning.py` + `CachingStaticFiles` rather than re-deriving; one fleet hash over every file's hash, stamped as `?v=` idempotently; `.js`/`.css` `immutable`, manifest/icons `max-age=86400`, shell `no-cache, must-revalidate`; no service workers — otherwise iOS Safari runs stale cached JS/CSS after a deploy. Full text: `docs/webapp-pwa-conventions.md` → "Webapp PWA static-asset cache-busting"; snippet: `docs/app-onboarding.md` §4. (`#78`.)
+- **Compression is one vendored middleware**, `src/compression.py` (manifest key `compression`): `app.add_middleware(StreamSafeGZipMiddleware, bypass_paths=(...))`, registered last. It never compresses `text/event-stream`, `multipart/x-mixed-replace`, websockets or already-compressed media; never a stock or hand-rolled `GZipMiddleware`. Measure with `/perf-review`. Full text: `docs/webapp-pwa-conventions.md` → "Webapp PWA response compression".
 
 ## Usage log — local-only views, taps, device class *(PWA)*
 

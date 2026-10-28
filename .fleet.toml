@@ -527,3 +527,4 @@ notify          = { src = "src/notify" }
 doc_capture     = { src = "src/doc_capture" }
 build_info      = { src = "src/build_info.py" }
 usage_log       = { src = "src/usage_log.py" }
+compression     = { src = "src/compression.py" }
