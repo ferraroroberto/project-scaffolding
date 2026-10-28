@@ -69,17 +69,13 @@ Diff-keyed gate at finish: checks the touched web UI still conforms to the desig
 ## Webapp PWA static-asset cache-busting (`CachingStaticFiles` + fleet hash) *(PWA)*
 
 - Required: copy `home-automation`'s `src/static_versioning.py` + `CachingStaticFiles` rather than re-deriving; one fleet hash over every file's hash, stamped as `?v=` idempotently; `.js`/`.css` `immutable`, manifest/icons `max-age=86400`, shell `no-cache, must-revalidate`; no service workers — otherwise iOS Safari runs stale cached JS/CSS after a deploy. Full text: `docs/webapp-pwa-conventions.md` → "Webapp PWA static-asset cache-busting"; snippet: `docs/app-onboarding.md` §4. (`#78`.)
+- **Compression is one vendored middleware**, `src/compression.py` (manifest key `compression`): `app.add_middleware(StreamSafeGZipMiddleware, bypass_paths=(...))`, registered last. It never compresses `text/event-stream`, `multipart/x-mixed-replace`, websockets or already-compressed media; never a stock or hand-rolled `GZipMiddleware`. Measure with `/perf-review`. Full text: `docs/webapp-pwa-conventions.md` → "Webapp PWA response compression".
 
 ## Usage log — local-only views, taps, device class *(PWA)*
 
 - Every fleet web app records real usage through one vendored pair, so `/design-review` reads data instead of asking the owner: the client `app/webapp/static/_vendored/usage-log/` (manifest key `usage-log`; `initUsageLog()`, its `trackView` passed as the nav's `onChange`, `data-track="<id>"` on the controls that matter) and the server `src/usage_log.py` (manifest key `usage_log`; `usage_router(runtime_db_path(<app>, "usage.sqlite3", create=True), dependencies=[<the app's auth>])`). Same origin only: no cloud analytics, no third-party host, no cross-device aggregation.
 - **Privacy is the contract.** Never log message contents, document text, transcripts, names, file names, search queries, form values, URLs with query strings, IP addresses, or the raw user-agent. Only: event kind, view id, control id, a random per-visit session id, device class, and timestamps. Control ids are developer-chosen constants in `data-track`, never derived from element text or user data.
 - Instrumentation never breaks the app (client swallows send failures; a locked or full database drops the batch with one info line). `scripts/usage_summary.py --app <slug> --days 30 --json` is the review's reader; exit 2 means no data yet, never zero usage. Full text: `docs/webapp-pwa-conventions.md` → "Usage log". (`#349`.)
-
-## Webapp PWA response compression (`StreamSafeGZipMiddleware`) *(PWA)*
-
-- Every fleet web app serves compressed text responses through one vendored middleware, `src/compression.py` (manifest key `compression`): `app.add_middleware(StreamSafeGZipMiddleware, bypass_paths=(...))`, registered last so it is the outermost layer. Never a hand-rolled or stock `GZipMiddleware`: the stock one buffers `multipart/x-mixed-replace` and recompresses media.
-- It never compresses `text/event-stream`, `multipart/x-mixed-replace`, websockets, or already-compressed media; a path it cannot recognise by content type goes in `bypass_paths`. Measure with `/perf-review` (the cold-launch byte budget). Full text: `docs/webapp-pwa-conventions.md` → "Webapp PWA response compression".
 
 ## Windows event-loop pinning (uvicorn) *(PWA)*
 
