@@ -427,13 +427,12 @@ def test_malformed_table_or_toml_exits_two(tmp_path: Path) -> None:
     assert run_mode(tmp_path) == dr.EXIT_CONFIG
 
 
-def test_other_files_vendored_generated_and_untracked_are_not_counted(repo: Path) -> None:
+def test_other_files_vendored_and_generated_are_not_counted(repo: Path) -> None:
     run_mode(repo, init=True)
     write(repo, "CLAUDE.md", "see #1 #2\n")
     write(repo, "sub/README.md", "#3\n")
     write(repo, "docs/notes.txt", "#4\n")
     write(repo, "docs/gen.md", "<!-- DO NOT EDIT -->\n#5\n")
-    write(repo, "docs/untracked.md", "#6\n", track=False)
     write(repo, "docs/vendor/v.md", "#7\n")
     (repo / ".fleet.toml").write_text(
         '[docs_ratchet]\nenabled = true\nreadme_max_bytes = 20\n[vendored]\nx = { src = "s", dest = "docs/vendor" }\n',
@@ -634,3 +633,16 @@ def test_the_script_is_catalogued_so_it_is_mypy_gated_and_drift_checked() -> Non
     from scripts.vendored_catalog import load_catalog
 
     assert load_catalog(REPO_ROOT)["docs_ratchet"] == {"src": "scripts/docs_ratchet.py"}
+
+
+def test_an_untracked_file_with_a_violation_fails(repo: Path) -> None:
+    run_mode(repo, init=True)
+    write(repo, "docs/new.md", 'see #9\n', track=False)
+    assert run_mode(repo) == dr.EXIT_RISE
+
+
+def test_an_ignored_file_is_still_skipped(repo: Path) -> None:
+    run_mode(repo, init=True)
+    write(repo, ".gitignore", "docs/ignored.md\n")
+    write(repo, "docs/ignored.md", 'see #9\n', track=False)
+    assert run_mode(repo) == dr.EXIT_PASS

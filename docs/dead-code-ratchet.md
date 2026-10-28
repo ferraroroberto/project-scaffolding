@@ -1,6 +1,6 @@
 # Dead code ratchet
 
-`scripts/dead_code_ratchet.py` is a baseline-and-ratchet stage for the pre-ship gate. It parses every tracked Python file with the standard library's `ast`, collects each function, class and method, and fails when one that **nothing references** is not already recorded in the committed baseline. Existing debt never blocks work; it cannot grow either.
+`scripts/dead_code_ratchet.py` is a baseline-and-ratchet stage for the pre-ship gate. It parses every Python file git lists (tracked, or untracked and not ignored) with the standard library's `ast`, collects each function, class and method, and fails when one that **nothing references** is not already recorded in the committed baseline. Existing debt never blocks work; it cannot grow either.
 
 The [static ratchet](static-ratchet.md) already stops unused imports and locals (`ruff` `F401`/`F841`). A helper nobody calls, a class nothing builds and a handler that lost its route are what `/codebase-audit` keeps finding by hand. Telling them apart from code a framework calls takes a list of entry points, and that list is most of this stage.
 
@@ -130,4 +130,4 @@ The first draft reported 504 hits. About 420 were `unittest.TestCase` subclasses
 
 ## Tests
 
-`tests/ratchets/test_dead_code_ratchet.py`: detection on fixture sources (each kind of reference, nested qualnames, every entry-point rule, the component rule, each dynamic-use signal and the floor, docstrings, framework subclasses), scope, and every mode and exit code on throwaway git repos, including a newly added uncalled function failing by name, route handlers and exports passing, vendored and untracked files, and references from excluded files. A missing prerequisite is a hard failure there, never `pytest.skip`. The scaffold's own gate stage doubles as the guard that its committed baseline is current.
+`tests/ratchets/test_dead_code_ratchet.py`: detection on fixture sources (each kind of reference, nested qualnames, every entry-point rule, the component rule, each dynamic-use signal and the floor, docstrings, framework subclasses), scope, and every mode and exit code on throwaway git repos, including a newly added uncalled function failing by name, route handlers and exports passing, vendored files, a new untracked file failing and an ignored one skipped, and references from excluded files. A missing prerequisite is a hard failure there, never `pytest.skip`. The scaffold's own gate stage doubles as the guard that its committed baseline is current.

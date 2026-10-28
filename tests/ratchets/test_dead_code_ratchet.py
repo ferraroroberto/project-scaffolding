@@ -306,9 +306,8 @@ def test_disabled_or_absent_stage_exits_zero_and_says_so(tmp_path: Path, capsys:
     assert run_mode(tmp_path, init=True) == dc.EXIT_CONFIG
 
 
-def test_untracked_and_vendored_files_are_not_reported(repo: Path) -> None:
+def test_vendored_files_are_not_reported(repo: Path) -> None:
     run_mode(repo, init=True)
-    write(repo, "src/scratch.py", "def untracked_dead():\n    pass\n", track=False)
     write(repo, "src/vend/x.py", "def vendored_dead():\n    pass\n")
     (repo / ".fleet.toml").write_text(
         '[dead_code_ratchet]\nenabled = true\n[vendored]\nx = { dest = "src/vend/" }\n', encoding="utf-8"
@@ -391,3 +390,16 @@ def test_the_script_is_catalogued_so_it_is_mypy_gated_and_drift_checked() -> Non
     from scripts.vendored_catalog import load_catalog
 
     assert load_catalog(REPO_ROOT)["dead_code_ratchet"] == {"src": "scripts/dead_code_ratchet.py"}
+
+
+def test_an_untracked_file_with_a_violation_fails(repo: Path) -> None:
+    run_mode(repo, init=True)
+    write(repo, "src/b.py", 'x = 1\n\ndef forgotten_helper():\n    return x\n', track=False)
+    assert run_mode(repo) == dc.EXIT_RISE
+
+
+def test_an_ignored_file_is_still_skipped(repo: Path) -> None:
+    run_mode(repo, init=True)
+    write(repo, ".gitignore", "src/ignored.py\n")
+    write(repo, "src/ignored.py", 'x = 1\n\ndef forgotten_helper():\n    return x\n', track=False)
+    assert run_mode(repo) == dc.EXIT_PASS

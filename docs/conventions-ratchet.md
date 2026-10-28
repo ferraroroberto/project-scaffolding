@@ -70,7 +70,7 @@ The marker names one rule (`<rule>-exempt`) and needs text after it. A bare `# n
 
 ## Scope
 
-Every tracked `.py` file, except:
+Every `.py` file git lists (tracked, or untracked and not ignored), except:
 
 - files under the repo's `[vendored]` destinations: a vendored copy's debt belongs to the repo it came from;
 - the `exclude` globs, plus `node_modules`, `.venv` and `venv` anywhere.
@@ -185,4 +185,4 @@ The false-positive kinds that remain:
 
 ## Tests
 
-`tests/ratchets/test_conventions_ratchet.py`: for each rule, a seeded violation that fails by name and the compliant form that passes. Also covered: import aliases, the `**kwargs` miss, every platform-branch form and the early return, the CLI-module and file-write exceptions, the system-folder and drive-root exceptions, docstrings versus f-strings, helpers and wrappers, the test-module scope, and exempt markers (a reason is needed, and the marker must name this rule). On throwaway git repos it runs every mode and exit code: a new violation failing by rule, file and line; a second violation of a baselined rule; shrink-only updates; `--allow-additions`; vendored, excluded and untracked files; a tracked baseline and another ratchet's baseline never read as evidence; and exit 3 for an unparseable file and an unusable `git`, in every mode. A missing prerequisite is a hard failure there, never `pytest.skip`. The scaffold's own gate stage doubles as the guard that its committed baseline is current.
+`tests/ratchets/test_conventions_ratchet.py`: for each rule, a seeded violation that fails by name and the compliant form that passes. Also covered: import aliases, the `**kwargs` miss, every platform-branch form and the early return, the CLI-module and file-write exceptions, the system-folder and drive-root exceptions, docstrings versus f-strings, helpers and wrappers, the test-module scope, and exempt markers (a reason is needed, and the marker must name this rule). On throwaway git repos it runs every mode and exit code: a new violation failing by rule, file and line; a second violation of a baselined rule; shrink-only updates; `--allow-additions`; vendored and excluded files, a new untracked file failing and an ignored one skipped; a tracked baseline and another ratchet's baseline never read as evidence; and exit 3 for an unparseable file and an unusable `git`, in every mode. A missing prerequisite is a hard failure there, never `pytest.skip`. The scaffold's own gate stage doubles as the guard that its committed baseline is current.

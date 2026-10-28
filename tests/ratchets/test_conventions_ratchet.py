@@ -307,9 +307,8 @@ def test_disabled_or_absent_stage_exits_zero_and_says_so(tmp_path: Path, capsys:
     assert run_mode(tmp_path, init=True) == cr.EXIT_CONFIG
 
 
-def test_untracked_excluded_and_vendored_files_are_not_scanned(repo: Path) -> None:
+def test_excluded_and_vendored_files_are_not_scanned(repo: Path) -> None:
     run_mode(repo, init=True)
-    write(repo, "src/scratch.py", "P = 'D:/x/y'\n", track=False)
     write(repo, "src/vend/x.py", "P = 'D:/x/y'\n")
     write(repo, "src/gen/y.py", "P = 'D:/x/y'\n")
     (repo / ".fleet.toml").write_text(
@@ -394,3 +393,16 @@ def test_every_rule_is_documented_with_the_line_it_enforces() -> None:
     doc = (REPO_ROOT / "docs" / "conventions-ratchet.md").read_text(encoding="utf-8")
     for rule in cr.RULES:
         assert f"### `{rule}`" in doc, f"docs/conventions-ratchet.md has no section for {rule}"
+
+
+def test_an_untracked_file_with_a_violation_fails(repo: Path) -> None:
+    run_mode(repo, init=True)
+    write(repo, "src/b.py", "import subprocess\n\nsubprocess.Popen(['tool'])\n", track=False)
+    assert run_mode(repo) == cr.EXIT_RISE
+
+
+def test_an_ignored_file_is_still_skipped(repo: Path) -> None:
+    run_mode(repo, init=True)
+    write(repo, ".gitignore", "src/ignored.py\n")
+    write(repo, "src/ignored.py", "import subprocess\n\nsubprocess.Popen(['tool'])\n", track=False)
+    assert run_mode(repo) == cr.EXIT_PASS

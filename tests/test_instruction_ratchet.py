@@ -366,9 +366,8 @@ def test_disabled_or_absent_stage_exits_zero_and_says_so(tmp_path: Path, capsys:
     assert run_mode(tmp_path, init=True) == ir.EXIT_CONFIG
 
 
-def test_untracked_and_nested_files_are_not_linted(repo: Path) -> None:
+def test_nested_files_are_not_linted(repo: Path) -> None:
     run_mode(repo, init=True)
-    write(repo, ".claude/skills/b/SKILL.md", skill("Double-check it.\n"), track=False)
     write(repo, "docs/CLAUDE.md", "Double-check it.\n")
     assert run_mode(repo) == ir.EXIT_PASS
 
@@ -528,3 +527,16 @@ def test_both_engines_give_the_same_hits(pa: dict[str, ModuleType], tmp_path: Pa
             assert got == want, doc.path
             compared += 1
     assert compared == 7  # the five corpus files plus this repo's CLAUDE.md and AGENTS.md
+
+
+def test_an_untracked_file_with_a_violation_fails(repo: Path) -> None:
+    run_mode(repo, init=True)
+    write(repo, ".claude/skills/a/SKILL.md", skill("Double-check it.\n"), track=False)
+    assert run_mode(repo) == ir.EXIT_RISE
+
+
+def test_an_ignored_file_is_still_skipped(repo: Path) -> None:
+    run_mode(repo, init=True)
+    write(repo, ".gitignore", ".claude/skills/b/SKILL.md\n")
+    write(repo, ".claude/skills/b/SKILL.md", skill("Double-check it.\n"), track=False)
+    assert run_mode(repo) == ir.EXIT_PASS

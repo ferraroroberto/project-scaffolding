@@ -48,7 +48,7 @@ A function expression takes the name it is bound to (`const mountHome = async ()
 
 ### Root layout
 
-The check reads the top-level `shape` and `extra_roots` keys of the repo's own `.fleet.toml` (not the `[structure_ratchet]` table) and the root folders from `git ls-files`, so an untracked folder is ignored. A shape's preset lives in the script (`SHAPES`), which keeps the script vendor-verbatim; this table is the same data, and a test compares the two.
+The check reads the top-level `shape` and `extra_roots` keys of the repo's own `.fleet.toml` (not the `[structure_ratchet]` table) and the root folders from the same file list as the other checks (`git ls-files --cached --others --exclude-standard`), so a new untracked folder counts as a root and an ignored one does not. A shape's preset lives in the script (`SHAPES`), which keeps the script vendor-verbatim; this table is the same data, and a test compares the two.
 
 | `shape` | Required root folders | Also allowed | `layers` default |
 |---|---|---|---|
@@ -101,7 +101,7 @@ A file at 990 lines blocks the next change just as a file at 1,001 does, so a sp
 
 ## Scope
 
-Files come from `git ls-files`, spawned with `GIT_OPTIONAL_LOCKS=0`. Always excluded: `node_modules`, `.venv`, `venv`, files whose first five lines contain `DO NOT EDIT` or `@generated` (case-sensitive), `exclude` globs, and every `dest` in the adopter's own `[vendored]` table. Excluded files count toward no check, the directory count included. Untracked files and tracked files deleted from the working tree are not measured.
+Files come from `git ls-files --cached --others --exclude-standard`, spawned with `GIT_OPTIONAL_LOCKS=0`, so a new untracked file is measured before it is added and an ignored one is not. Always excluded: `node_modules`, `.venv`, `venv`, files whose first five lines contain `DO NOT EDIT` or `@generated` (case-sensitive), `exclude` globs, and every `dest` in the adopter's own `[vendored]` table. Excluded files count toward no check, the directory count included. Tracked files deleted from the working tree are not measured.
 
 ## Exit codes
 

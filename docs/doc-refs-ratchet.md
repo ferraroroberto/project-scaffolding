@@ -25,7 +25,7 @@ Before resolving, a path drops its `./` prefix and any line, symbol or test-id s
 - **A module** resolves when `<a>/<b>.py`, `<a>/<b>/__init__.py` or `<a>/<b>/__main__.py` is tracked.
 - **A port** resolves when it is the app's own `port` in `.fleet.toml` (`8447` or `":8447"`). With no `port` declared, ports are not checked, and the pass line says so.
 
-The tree of record is `git ls-files` (spawned with `GIT_OPTIONAL_LOCKS=0`), never the working folder, so a local checkout and CI agree. An ignored path is machine-local by design (`.env`, a build output, a certificate folder), so one batched `git check-ignore --no-index` call asks about every candidate, and about a probe child under it, which catches a folder whose contents are ignored but not the folder itself.
+The tree of record is `git ls-files --cached --others --exclude-standard` (spawned with `GIT_OPTIONAL_LOCKS=0`), never a directory walk, so a local checkout and CI agree on tracked files and a new untracked file already resolves a reference to it. An ignored path is machine-local by design (`.env`, a build output, a certificate folder), so one batched `git check-ignore --no-index` call asks about every candidate, and about a probe child under it, which catches a folder whose contents are ignored but not the folder itself.
 
 ## What is not checked, and why
 
@@ -54,7 +54,7 @@ The tree of record is `git ls-files` (spawned with `GIT_OPTIONAL_LOCKS=0`), neve
 
 ## Scope
 
-Files come from `git ls-files`: the root `README.md` and `CLAUDE.md` plus `docs/**/*.md` (the `include` default is `["README.md", "CLAUDE.md", "docs/"]`). Always excluded: `node_modules`, `.venv`, `venv`, files whose first five lines contain `DO NOT EDIT` or `@generated` (case-sensitive), `exclude` globs, and every `dest` in the adopter's own `[vendored]` table (a vendored doc's references belong to the repo it came from).
+Files come from `git ls-files --cached --others --exclude-standard`: the root `README.md` and `CLAUDE.md` plus `docs/**/*.md` (the `include` default is `["README.md", "CLAUDE.md", "docs/"]`). Always excluded: `node_modules`, `.venv`, `venv`, files whose first five lines contain `DO NOT EDIT` or `@generated` (case-sensitive), `exclude` globs, and every `dest` in the adopter's own `[vendored]` table (a vendored doc's references belong to the repo it came from).
 
 ## Exit codes
 

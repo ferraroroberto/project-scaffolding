@@ -42,7 +42,7 @@ A heading that is both a changelog heading and dated counts once. References are
 
 ## Scope
 
-Files come from `git ls-files`, spawned with `GIT_OPTIONAL_LOCKS=0`: the root `README.md` plus `docs/**/*.md` (the `include` default is `["README.md", "docs/"]`). Always excluded: `node_modules`, `.venv`, `venv`, files whose first five lines contain `DO NOT EDIT` or `@generated` (case-sensitive), `exclude` globs, and every `dest` in the adopter's own `[vendored]` table. `CLAUDE.md`, nested READMEs and `tests/` are out of scope. There is no size budget on `docs/` files; only the root README is measured.
+Files come from `git ls-files --cached --others --exclude-standard`, spawned with `GIT_OPTIONAL_LOCKS=0` (tracked files and new untracked ones, never ignored ones): the root `README.md` plus `docs/**/*.md` (the `include` default is `["README.md", "docs/"]`). Always excluded: `node_modules`, `.venv`, `venv`, files whose first five lines contain `DO NOT EDIT` or `@generated` (case-sensitive), `exclude` globs, and every `dest` in the adopter's own `[vendored]` table. `CLAUDE.md`, nested READMEs and `tests/` are out of scope. There is no size budget on `docs/` files; only the root README is measured.
 
 ## README size
 
