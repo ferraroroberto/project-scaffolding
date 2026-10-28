@@ -413,7 +413,7 @@ def test_malformed_table_or_toml_exits_two(tmp_path: Path) -> None:
     assert run_mode(tmp_path) == cr.EXIT_CONFIG
 
 
-def test_tests_vendored_generated_untracked_and_other_files_are_not_counted(repo: Path) -> None:
+def test_tests_vendored_generated_and_other_files_are_not_counted(repo: Path) -> None:
     (repo / ".fleet.toml").write_text(
         '[comment_ratchet]\nenabled = true\n[vendored]\nnav = { src = "x", sha = "1", dest = "app/_vendored/nav" }\n',
         encoding="utf-8",
@@ -422,7 +422,6 @@ def test_tests_vendored_generated_untracked_and_other_files_are_not_counted(repo
     write(repo, "src/thing_test.py", "# #1\n")
     write(repo, "app/_vendored/nav/nav.js", "// #1\n")
     write(repo, "src/gen.py", "# DO NOT EDIT\n# #1\n")
-    write(repo, "src/ignored.py", "# #1\n", track=False)
     write(repo, "docs/notes.md", "# heading #1\n")
     write(repo, "src/string.py", 'x = "#1"\n')
     assert run_mode(repo, init=True) == cr.EXIT_PASS
@@ -521,3 +520,16 @@ def test_the_script_is_catalogued_so_it_is_mypy_gated_and_drift_checked() -> Non
     from scripts.vendored_catalog import load_catalog
 
     assert load_catalog(REPO_ROOT)["comment_ratchet"] == {"src": "scripts/comment_ratchet.py"}
+
+
+def test_an_untracked_file_with_a_violation_fails(repo: Path) -> None:
+    run_mode(repo, init=True)
+    write(repo, "src/b.py", 'y = 1  # #5\n', track=False)
+    assert run_mode(repo) == cr.EXIT_RISE
+
+
+def test_an_ignored_file_is_still_skipped(repo: Path) -> None:
+    run_mode(repo, init=True)
+    write(repo, ".gitignore", "src/ignored.py\n")
+    write(repo, "src/ignored.py", 'y = 1  # #5\n', track=False)
+    assert run_mode(repo) == cr.EXIT_PASS

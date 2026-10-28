@@ -387,12 +387,11 @@ def test_allow_refs_globs_keep_intentional_pointers_out(repo: Path) -> None:
     assert dr.read_baseline(repo / dr.DEFAULT_BASELINE) == {}
 
 
-def test_untracked_vendored_generated_and_out_of_scope_files_are_not_read(repo: Path) -> None:
+def test_vendored_generated_and_out_of_scope_files_are_not_read(repo: Path) -> None:
     (repo / ".fleet.toml").write_text(
         '[doc_refs_ratchet]\nenabled = true\n[vendored]\nx = { src = "a", dest = "docs/vendored" }\n', encoding="utf-8"
     )
     run_mode(repo, init=True)
-    write(repo, "docs/untracked.md", "`scripts/a.py`\n", track=False)
     write(repo, "docs/vendored/x.md", "`scripts/b.py`\n")
     write(repo, "docs/gen.md", "<!-- DO NOT EDIT -->\n`scripts/c.py`\n")
     write(repo, "src/README.md", "`scripts/d.py`\n")
@@ -518,3 +517,16 @@ def test_the_script_is_catalogued_so_it_is_mypy_gated_and_drift_checked() -> Non
     from scripts.vendored_catalog import load_catalog
 
     assert load_catalog(REPO_ROOT)["doc_refs_ratchet"] == {"src": "scripts/doc_refs_ratchet.py"}
+
+
+def test_an_untracked_file_with_a_violation_fails(repo: Path) -> None:
+    run_mode(repo, init=True)
+    write(repo, "docs/guide.md", 'Then run `scripts/missing.py`.\n', track=False)
+    assert run_mode(repo) == dr.EXIT_RISE
+
+
+def test_an_ignored_file_is_still_skipped(repo: Path) -> None:
+    run_mode(repo, init=True)
+    write(repo, ".gitignore", "docs/ignored.md\n")
+    write(repo, "docs/ignored.md", 'Then run `scripts/missing.py`.\n', track=False)
+    assert run_mode(repo) == dr.EXIT_PASS

@@ -63,7 +63,7 @@ Judgment rules, the lint-assisted candidates for R-39 and R-43, and the eval rul
 
 ## Scope
 
-Files come from `git ls-files`, spawned with `GIT_OPTIONAL_LOCKS=0`: only tracked files are linted, and only the root `CLAUDE.md` and `AGENTS.md` (a nested `CLAUDE.md` is not read). Reference docs are found from the tracked skills. An `extra_files` entry that is not tracked is a configuration error.
+Files come from `git ls-files --cached --others --exclude-standard`, spawned with `GIT_OPTIONAL_LOCKS=0`: tracked files and new untracked ones are linted, never ignored ones, and only the root `CLAUDE.md` and `AGENTS.md` (a nested `CLAUDE.md` is not read). Reference docs are found from the skills in scope. An `extra_files` entry that is absent from that list (missing, or ignored) is a configuration error.
 
 ## Exit codes
 
@@ -71,7 +71,7 @@ Files come from `git ls-files`, spawned with `GIT_OPTIONAL_LOCKS=0`: only tracke
 |---|---|---|
 | `0` | Pass (nothing above its baseline), or the stage is **not enabled** | continues |
 | `1` | A count rose, a file passed its size cap without an entry or past its entry, or the baseline file is missing | fails |
-| `2` | Bad `[instruction_ratchet]` table, an untracked `extra_files` entry, unreadable baseline, bad arguments | fails |
+| `2` | Bad `[instruction_ratchet]` table, an `extra_files` entry that is missing or ignored, unreadable baseline, bad arguments | fails |
 | `3` | **NOT CONFIRMED**: `git` unusable, a file that cannot be read or is not UTF-8, a fenced block that never closes, or a skill whose `description:` cannot be read (missing, or frontmatter a YAML loader would reject or truncate) | fails |
 
 Exit 3 is its own state and never folded into a pass. An unclosed fence would hide every line below it; an unreadable description is a skill that has lost its routing text, which the audit reports as unmeasured.

@@ -534,10 +534,9 @@ def test_vendored_destinations_are_excluded_automatically(repo: Path) -> None:
     assert run_mode(repo) == sr.EXIT_PASS
 
 
-def test_generated_excluded_untracked_and_other_types_are_not_measured(repo: Path) -> None:
+def test_generated_excluded_and_other_types_are_not_measured(repo: Path) -> None:
     run_mode(repo, init=True)
     write(repo, "gen/api.py", "# @generated\n" + py_function("big", 40))
-    write(repo, "src/wip.py", py_function("big", 40), track=False)
     write(repo, "data/big.json", "1\n" * 40)
     write(repo, "notes.md", "x\n" * 40)
     write(repo, "fixtures/huge.sql", "x\n" * 40)
@@ -705,8 +704,9 @@ def test_layout_and_baseline_findings_are_both_reported(tmp_path: Path, capsys: 
     assert "[root layout]" in out
 
 
-def test_untracked_folders_and_root_files_are_not_roots(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+def test_ignored_folders_and_root_files_are_not_roots(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     shape_repo(tmp_path, "streamlit", ("app", "src", "tests"))
+    write(tmp_path, ".gitignore", "scratch/\n")
     write(tmp_path, "scratch/x.txt", "x\n", track=False)
     write(tmp_path, "main.py", "x = 1\n")
     assert_layout_passes(tmp_path, "streamlit", capsys)
@@ -865,3 +865,16 @@ def test_the_layout_doc_states_the_limits_the_script_enforces() -> None:
 def test_the_new_doc_carries_no_history_marker() -> None:
     text = (REPO_ROOT / "docs" / "structure-ratchet.md").read_text(encoding="utf-8")
     assert docs_ratchet.scan_text(text) == []
+
+
+def test_an_untracked_file_with_a_violation_fails(repo: Path) -> None:
+    run_mode(repo, init=True)
+    write(repo, "src/big.py", 'x = 1\nx = 1\nx = 1\nx = 1\nx = 1\nx = 1\nx = 1\nx = 1\nx = 1\nx = 1\nx = 1\n', track=False)
+    assert run_mode(repo) == sr.EXIT_RISE
+
+
+def test_an_ignored_file_is_still_skipped(repo: Path) -> None:
+    run_mode(repo, init=True)
+    write(repo, ".gitignore", "src/ignored.py\n")
+    write(repo, "src/ignored.py", 'x = 1\nx = 1\nx = 1\nx = 1\nx = 1\nx = 1\nx = 1\nx = 1\nx = 1\nx = 1\nx = 1\n', track=False)
+    assert run_mode(repo) == sr.EXIT_PASS
