@@ -30,3 +30,7 @@ extend-select = ["UP", "TID251"]
 # its own canonical primitives identically. The verify script passes the exact
 # files (the vendor-verbatim list) — this only supplies the strictness.
 strict = true
+# Map each file argument to its dotted path from the repo root, so a vendored
+# module passed as a file and imported by a sibling as `tests.e2e._geometry`
+# is one module, not two (the layout lint imports the geometry helper).
+explicit_package_bases = true
