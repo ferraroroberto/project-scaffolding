@@ -42,6 +42,7 @@ flowchart TB
     RUNTIMEDATA["runtime_data.py (#243)\nruntime_db_path(app, file, env_var=)\nvendor-verbatim SQLite-location resolver\nFLEET_DATA_ROOT -> C:/sqlite/&lt;app&gt;/\n(off the spinning disk, one dir per app)"]
     USAGELOG["usage_log.py (#349)\nusage_router(db_path, dependencies=)\nvendor-verbatim local-only usage log\nPOST /api/usage/events + GET /api/usage/summary\nGET /api/usage/time (foreground minutes, #403)\nallowlisted kinds, bounded ids, 365d / row cap"]
     BUILDINFO["build_info.py (#199/#246/#247)\nbuild_identity(): git_sha + built_at\ncaptured once at import, bounded retry inside\nthe capture, never re-resolved later\nvendor-verbatim, self-contained (no local imports)"]
+    COMPRESSION["compression.py\nStreamSafeGZipMiddleware, registered last\nvendor-verbatim; never compresses SSE,\nMJPEG, websockets or already-compressed media"]
   end
   VIEWS -->|orchestrates, business logic stays here| PIPELINES
   VIEWS --> LOGGER
@@ -71,7 +72,9 @@ flowchart TB
     TSCERT["gen_tailscale_cert.py\nprovision/renew Tailscale HTTPS leaf"]
     USAGESUM["usage_summary.py (#349)\n--app slug --days N --json\nreads an app's usage.sqlite3 read-only\n--time = per-day foreground minutes\nexit 2 = no data yet"]
     BRANDGEN["brand_gen.py\nrender_set(): Lucide master SVG -> dark-tile\nPWA/tray/Stream Deck icon set (resvg-py)"]
+    BOXLOCK["box_lock_gate.ps1 (vendor-verbatim)\ndot-sources verify-before-ship.ps1 under\nfleet-config's box_lock.py run --mode shared\nexit 3 = lock held past timeout;\nno helper -> runs unlocked with [WARN]"]
   end
+  BOXLOCK -->|dot-sources, holds the shared box lock for the run| VERIFY
   VERIFY --> srcdir
   VERIFY --> appdir
   VERIFY --> testsdir
@@ -115,6 +118,7 @@ flowchart TB
     CITEST["test_ci_template.py (#351)\nasserts the template's contract: windows-2025 runner,\nNode-24 action majors, one run per commit,\nread-only permissions, no secrets"]
     GATEWATCHTEST["test_main_gate_watch_template.py (#222)\nstill-a-template · failure+main-only · idempotency\n+ anti-false-coverage guard: a live watcher\nmust name a workflow that exists"]
     E2E["e2e/conftest.py + test_smoke.py\npytest-playwright, boots a disposable\nStreamlit via _streamlit_lifecycle.py\n(occupied port refused unless STREAMLIT_E2E_LIVE)\n+ test_vendored_components.py\n(drives _vendored/demo.html, light+dark)\n+ test_vendored_nav.py\n(mounts _vendored/nav skeleton, desktop+pill)\nboth via e2e/_color_assertions.py\n(style · set_theme · rgba, #208)\n+ e2e/_nav_graft.py (nav mount +\nphone context, #394)"]
+    LIVEGUARD["e2e/_e2e_live_guard.py (vendor-verbatim)\nrequire_disposable_instance(port, flag_env_name):\npytest.exit(2) on an occupied port with no\nopt-in env var, never kills or adopts silently"]
     PORTPROBE["_port_probe.py (#208)\nlistening_pids(port): netstat / lsof\nthe ONE port-to-PID parse both\nlifecycle harnesses import"]
     GITREPO["_git_repo.py\ngit() + write(): the throwaway-repo helpers\nthe comment, docs and structure ratchet tests import"]
     GEOM["e2e/_geometry.py (vendor-verbatim, #157)\neffective 44px targets · overlap · overflow\nChart.js config reads · viewport x theme matrix\n+ test_geometry_helper.py\n+ _fixtures/geometry/ (hermetic twins + Chart.js)"]
@@ -125,6 +129,7 @@ flowchart TB
     TRAYBEHAVIOR["e2e/test_tray_lifecycle_behavior.py\nWindows-only, pytest.mark.slow, no browser\ndrives real tray.bat + the canonical tray_lifecycle.ps1\nvia _tray_harness.py's resolve_tray_lifecycle_path()\n+ _dummy_tray_app.py"]
   end
   E2E --> appdir
+  E2E -->|refuses a live port before booting| LIVEGUARD
   E2E -->|sweeps leaked helpers at session finish| SWEEP
   E2E -->|starts the Playwright driver from %TEMP%| CWDISO
   CWDISO -->|reads liveness + PEB cwd via| SWEEP

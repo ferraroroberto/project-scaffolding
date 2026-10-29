@@ -34,6 +34,7 @@ from scripts.vendored_catalog import (
 REPO_ROOT = Path(__file__).resolve().parent.parent
 VENDORED_UI_DIR = REPO_ROOT / "app" / "webapp" / "static" / "_vendored"
 VERIFY_SCRIPT = REPO_ROOT / "scripts" / "verify-before-ship.ps1"
+ARCHITECTURE_DOC = REPO_ROOT / "docs" / "architecture.mmd"
 
 # The mypy --strict list `verify-before-ship.ps1` carried by hand before #230.
 # Every one of these must still be derived from the catalog — a refactor that
@@ -158,4 +159,28 @@ def test_verify_script_derives_its_list_from_the_catalog() -> None:
     assert '"app/tray/single_instance.py"' not in text, (
         "verify-before-ship.ps1 has regrown a hand-maintained $VendoredModules list; "
         "the catalog in .fleet.toml [components] is the single source (#230)"
+    )
+
+
+def test_every_declared_component_is_in_the_architecture_diagram(
+    real_catalog: dict[str, dict[str, str]],
+) -> None:
+    """Structural-check for project-scaffolding#502 (recurring docs audit
+    finding): `src/compression.py` and `scripts/box_lock_gate.ps1` landed
+    without a node in `docs/architecture.mmd`, which `CLAUDE.md`'s "Internal
+    architecture" section requires in the same PR. A catalog entry is the
+    cheapest proxy for "this component exists" — its basename, `.py`/`.ps1`
+    extension included, must appear somewhere in the diagram text; a
+    directory-shaped component (its `src` has no suffix) is checked without
+    one, since the diagram and `.fleet.toml` both drop it for those (e.g.
+    `notify/`, `day-row/`).
+    """
+    text = ARCHITECTURE_DOC.read_text(encoding="utf-8")
+    missing = sorted(
+        name for name in (Path(v["src"]).name for v in real_catalog.values())
+        if name not in text
+    )
+    assert not missing, (
+        f"docs/architecture.mmd has no node naming: {missing} — add one in the "
+        f"same PR that added the component (CLAUDE.md 'Internal architecture')"
     )
