@@ -428,7 +428,9 @@ def test_real_surfaces_route_representative_paths() -> None:
     """This repo's declared surfaces narrow what they own and nothing shared (#258)."""
     cfg = load_config(REAL_FLEET_TOML)
     assert cfg.surfaces_note == "", cfg.surfaces_note
-    assert {s.name for s in cfg.surfaces} == {"nav", "components", "geometry", "usage-log", "shot-baseline"}
+    assert {s.name for s in cfg.surfaces} == {
+        "nav", "components", "geometry", "layout-lint", "usage-log", "shot-baseline",
+    }
 
     def route(*paths: str) -> tuple[str, str]:
         r = classify(list(paths), cfg)
@@ -456,9 +458,13 @@ def test_real_surfaces_route_representative_paths() -> None:
     # The nav harness imports the helper too (#348), so it runs on a helper edit.
     assert route("tests/e2e/_geometry.py") == (
         "surface",
-        "tests/e2e/test_geometry_helper.py tests/e2e/test_vendored_components.py "
+        "tests/e2e/test_geometry_helper.py tests/e2e/test_layout_lint.py "
+        "tests/e2e/test_vendored_components.py "
         "tests/e2e/test_vendored_day.py tests/e2e/test_vendored_home_head.py "
         "tests/e2e/test_vendored_nav.py tests/e2e/test_vendored_row_menu.py")
+    # The layout lint: the helper, its proof and its fixture page run only that proof.
+    assert route("tests/e2e/_layout_lint.py") == ("surface", "tests/e2e/test_layout_lint.py")
+    assert route("tests/e2e/_fixtures/layout/sheet.html") == ("surface", "tests/e2e/test_layout_lint.py")
     # The usage log (#349): the client, its router under src/ (a full rule ahead
     # of src/ -> none) and its harness all run only that harness.
     assert route("app/webapp/static/_vendored/usage-log/usage-log.js") == (
@@ -513,6 +519,24 @@ def test_real_surface_helpers_are_only_imported_by_their_own_targets() -> None:
         return names
 
     all_py = list(suite.rglob("*.py"))
+
+    def importing_tests(helper: Path) -> set[str]:
+        """The modules that import *helper*, with a helper importer replaced by its own."""
+        found: set[str] = set()
+        seen = {helper}
+        pending = [helper]
+        while pending:
+            current = pending.pop()
+            for f in all_py:
+                if f in seen or current.stem not in imported_names(f):
+                    continue
+                seen.add(f)
+                if f.name.startswith("_") and f.name != "conftest.py":
+                    pending.append(f)
+                else:
+                    found.add(f"tests/e2e/{f.relative_to(suite).as_posix()}")
+        return found
+
     for surface in cfg.surfaces:
         owned = {
             f for f in all_py
@@ -520,11 +544,7 @@ def test_real_surface_helpers_are_only_imported_by_their_own_targets() -> None:
             and f.name.startswith("_")
         }
         for helper in owned:
-            importers = {
-                f"tests/e2e/{f.relative_to(suite).as_posix()}"
-                for f in all_py
-                if f != helper and helper.stem in imported_names(f)
-            }
+            importers = importing_tests(helper)
             assert importers <= set(surface.pytest_targets), (surface.name, helper.name, importers)
 
 
