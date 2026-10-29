@@ -1150,6 +1150,107 @@ exit state, restore, the capture modes) and `tests/e2e/test_shot_baseline.py`
 on the component gallery: two captures of the same commit compare clean, and
 a deliberate one-rule change fails and is restored.
 
+### Layout lint
+
+Behaviour tests prove a sheet opens; they do not prove it fits the phone.
+A reason line overflowing a phone bottom sheet shipped that way: every e2e
+test passed because they assert behaviour, and the visual leg was an agent
+looking at the default views, not the state the change created.
+`tests/e2e/_layout_lint.py` (manifest key `layout_lint`) measures layout in
+the page for exactly the states a change creates, so the proof is
+deterministic and lives in the test.
+
+```python
+from tests.e2e._layout_lint import capture_states
+
+def test_reason_sheet_layout(browser, app_url):
+    def reason_sheet(page):
+        page.goto(f"{app_url}/jobs")
+        page.get_by_role("button", name="Why?").click()
+
+    capture_states(browser, {"jobs.reason-sheet": reason_sheet})
+```
+
+A *state* is a named setup function the test already has: navigate, open
+the sheet, stub the data. `capture_states` runs each one on a fresh pinned
+page (`_shot.variant_page`) at phone (390x844, scale 3, touch) and desktop
+(1280x900), light and dark; settles and screenshots it with `_shot.shot`;
+lints it; writes `manifest.json`; and fails the test on any error finding.
+`lint_layout(page)` and `assert_layout_clean(page)` lint a page a test is
+already driving, without capturing.
+
+**What fails** (`Finding.kind`, every one an error):
+
+| kind | what is measured |
+|---|---|
+| `page-overflow` | the document is wider than the viewport, scrollable or hidden behind a root `overflow-x: hidden` |
+| `overflow` | an element's content range runs past its own box and the element does not scroll by design (`overflow-x: auto \| scroll`); only the innermost spilling element is named |
+| `clipped` | an ellipsis, a hidden overflow or a line clamp cuts text and nothing offers the full text (`title` on it or an ancestor, or `aria-label`) |
+| `overlap` | two interactive elements' boxes intersect by more than 1px |
+| `offscreen` | an interactive element sits partly outside the viewport horizontally, or, in a fixed layer, vertically |
+| `tap-target` | on a phone, an interactive element's effective box (visual box plus `::before`/`::after` hit-area expansion, `_geometry.EFFECTIVE_RECT_JS`) is under 44x44px |
+
+`contrast` (text under WCAG AA, 4.5:1 or 3:1 for large text, against its
+composited background) is a **warning**: in the manifest, never a failure,
+and text over a background image is not measured.
+
+What the lint deliberately does not count: a hit-area `::before` that
+reaches past its button (the content range, not `scrollWidth`, decides
+`overflow`); a 1px screen-reader-only box; nested controls; a control
+scrolling beneath a fixed or sticky layer (the floating nav pill); a
+focusable region that wraps controls (a scroll pane, Streamlit's main
+section); an element inside a horizontal scroller; an inline link inside
+running text (WCAG 2.5.8); form controls' own internal scrolling.
+
+**Allowing a finding.** `allow={css selector: reason}` per call. An
+allowed finding stays in the manifest with its reason and stops failing.
+An empty reason or a selector the page cannot parse raises `ValueError`.
+Allow framework chrome the app cannot restyle (Streamlit's header buttons),
+never the app's own defect: the allowlist is reviewed like a baseline.
+
+**Screenshots never enter the tree.** The proof folder is `UI_PROOF_DIR`
+if set, else `<temp>/ui-proof`; one inside any git work tree raises
+`ValueError`. Screenshots stay local and never go to GitHub. A PR may
+quote `Manifest.summary()` and `Finding.line()`: counts per leg, the kind,
+an element path and the measurement, never the page's text.
+
+**The manifest.** `manifest.json` holds every state x viewport x theme:
+its screenshot path, its milliseconds, and its findings with kind,
+severity, element, the other element of an overlap, the measurement, the
+first 40 characters of the element's text (local only) and any allow
+reason. A second call merges into it by state x viewport x theme.
+
+**Apps with a theme toggle** pass `theme_storage_key=<localStorage key>`:
+the theme is written there and to `data-theme` before any page script
+runs. Apps that follow `prefers-color-scheme` need nothing.
+
+**Streamlit.** The same helper, against the suite's disposable
+`streamlit run` on its e2e port; a state navigates by URL or drives
+widgets, then waits for its content. `tests/e2e/test_layout_lint.py`'s
+Streamlit node lints this scaffold's Welcome view, allowing only
+Streamlit's own chrome by its `data-testid` hooks.
+
+**Cost**, measured on this host (Chromium, headless): the lint itself is
+about 12 ms on a 962-element page. A leg is one fresh context, the state's
+setup, settle and screenshot: about 0.7 to 0.9 s for a static page and
+about 1.4 s for a Streamlit view. One state over the default four legs is
+about 3 s static, about 5.5 s Streamlit. Cap the cost with
+`viewports=`/`themes=` only where a state truly cannot differ, and lint
+only the states a change creates.
+
+**Proven here** by `tests/e2e/test_layout_lint.py` against
+`tests/e2e/_fixtures/layout/sheet.html`: loaded bare it carries a reason
+line in a `white-space: nowrap` span overflowing a phone sheet, an
+ellipsized chip label with no title, and a button laid over another, and
+fails with exactly those three findings by name (the sheet line fits at
+desktop width, so desktop names two); `?fixed=1` repairs each and passes.
+
+**Adopting.** Copy `_layout_lint.py` byte-identical beside `_geometry.py`
+and `_shot.py` (it imports both from `tests.e2e`) and record all three in
+the app's `[vendored]` table. Write one `capture_states` call per change
+that creates a state, run it, read the manifest, fix or allow with a
+reason.
+
 ---
 
 ## Cost economics

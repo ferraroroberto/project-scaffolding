@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>layout lint fixture</title>
+<!--
+  Hermetic fixture for tests/e2e/_layout_lint.py. Loaded bare it is BROKEN on
+  purpose, with exactly three layout defects; `?fixed=1` adds the `fixed`
+  class that repairs each one, and the lint must then find nothing.
+
+    1. overflow: the shape of a real regression, a reason line rendered in a
+       short-label span (white-space: nowrap) inside a phone bottom sheet. The
+       line runs past the sheet's edge. Fixed: the label wraps.
+    2. clipped: a chip label cut by an ellipsis with no way to read the rest.
+       Fixed: the full text is offered as a title.
+    3. overlap: an absolutely positioned "Dismiss" button laid over "Retry".
+       Fixed: the two sit in a row with a gap.
+-->
+<script>
+  if (new URLSearchParams(location.search).has("fixed")) document.documentElement.classList.add("fixed");
+</script>
+<style>
+  :root {
+    --bg: #ffffff; --card: #f6f8fa; --ink: #1f2328; --muted: #57606a;
+    --line: #d1d9e0; --accent: #0969da; --on-accent: #ffffff;
+    color-scheme: light dark;
+    font: 16px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0d1117; --card: #161b22; --ink: #e6edf3; --muted: #9198a1;
+      --line: #30363d; --accent: #1f6feb; --on-accent: #ffffff;
+    }
+  }
+  body { margin: 0; background: var(--bg); color: var(--ink); }
+  main { padding: 16px; }
+  h1 { font-size: 20px; margin: 0 0 12px; }
+  button {
+    min-height: 44px; min-width: 44px; padding: 0 16px; border: 0; border-radius: 12px;
+    background: var(--accent); color: var(--on-accent); font: inherit;
+  }
+  .actions { position: relative; height: 44px; }
+  .actions .dismiss { position: absolute; left: 40px; top: 0; }
+  .fixed .actions { display: flex; gap: 12px; }
+  .fixed .actions .dismiss { position: static; }
+
+  .chip { margin-top: 16px; max-width: 160px; }
+  .chip-label {
+    display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+
+  .sheet {
+    position: fixed; left: 0; right: 0; bottom: 0; box-sizing: border-box;
+    padding: 16px; background: var(--card); border-top: 1px solid var(--line);
+    border-radius: 16px 16px 0 0;
+  }
+  .sheet-row { display: block; color: var(--muted); }
+  .short-label { white-space: nowrap; }
+  .fixed .short-label { white-space: normal; overflow-wrap: anywhere; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Job queue</h1>
+  <div class="actions">
+    <button class="retry" type="button">Retry</button>
+    <button class="dismiss" type="button">Dismiss</button>
+  </div>
+  <button class="chip" type="button"><span class="chip-label">Waiting on the nightly backup window</span></button>
+</main>
+<section class="sheet" aria-label="Why this job waits">
+  <strong>Why it waits</strong>
+  <div class="sheet-row">
+    <span class="short-label">Skipped: the model host reported an out-of-memory condition and will retry after the cooldown</span>
+  </div>
+</section>
+<script>
+  // The fixed twin's chip offers its full text; the broken one does not.
+  if (document.documentElement.classList.contains("fixed")) {
+    const label = document.querySelector(".chip-label");
+    label.title = label.textContent;
+  }
+</script>
+</body>
+</html>

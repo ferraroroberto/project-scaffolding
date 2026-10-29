@@ -124,6 +124,7 @@ flowchart TB
     GEOM["e2e/_geometry.py (vendor-verbatim, #157)\neffective 44px targets · overlap · overflow\nChart.js config reads · viewport x theme matrix\n+ test_geometry_helper.py\n+ _fixtures/geometry/ (hermetic twins + Chart.js)"]
     SURF["e2e/_surface.py (vendor-verbatim, #408)\nsurface(page, name): no-op unless DESIGN_SURFACE_CAPTURE\nlight+dark flipped in place → png + json per surface\ncollection hook deselects tests that never call it\n+ test_surface_hook.py + _fixtures/surface/"]
     SHOT["e2e/_shot.py (vendor-verbatim)\ncapture_screen: phone + desktop x light + dark\npinned clock, time zone, locale; settle() then shot()\n+ test_shot_baseline.py + shots/ (committed baseline)"]
+    LAYOUT["e2e/_layout_lint.py (vendor-verbatim)\ncapture_states: each state x phone/desktop x light/dark\nscreenshots to a proof folder outside the checkout\nlint: overflow · clipped · overlap · offscreen ·\ntap-target · contrast (warning) → manifest.json\n+ test_layout_lint.py + _fixtures/layout/"]
     SWEEP["e2e/_browser_sweep.py (vendor-verbatim, #203/#236)\npytest_sessionfinish + standalone CLI\nliveness = running · exited · wedged · unknown\n(an exit code is NOT an exit — GetProcessTimes\nexit time is the discriminator, #236)\nkill only running · orphaned · cwd-in-scope;\nzombies AND wedges reported, never killed\n+ test_browser_sweep.py"]
     CWDISO["e2e/test_helper_cwd_isolation.py (#236)\npins conftest._neutral_driver_cwd: neither the\nNode driver nor any helper may hold this\ncheckout as its cwd — a wedge would pin it forever"]
     TRAYBEHAVIOR["e2e/test_tray_lifecycle_behavior.py\nWindows-only, pytest.mark.slow, no browser\ndrives real tray.bat + the canonical tray_lifecycle.ps1\nvia _tray_harness.py's resolve_tray_lifecycle_path()\n+ _dummy_tray_app.py"]
@@ -187,6 +188,8 @@ flowchart TB
   GEOM --> PLAYWRIGHT
   SURF --> PLAYWRIGHT
   SHOT --> PLAYWRIGHT
+  LAYOUT -->|pinned capture via| SHOT
+  LAYOUT -->|effective-rect rule from| GEOM
   DOCCAP -.->|capture time only| PLAYWRIGHT
   VERIFY --> RUFFMYPY
   BRANDGEN --> RESVG

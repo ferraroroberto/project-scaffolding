@@ -281,12 +281,21 @@ prefixes       = ["tests/e2e/_fixtures/geometry/"]
 paths          = ["tests/e2e/_geometry.py", "tests/e2e/test_geometry_helper.py"]
 pytest_targets = [
     "tests/e2e/test_geometry_helper.py",
+    "tests/e2e/test_layout_lint.py",
     "tests/e2e/test_vendored_components.py",
     "tests/e2e/test_vendored_day.py",
     "tests/e2e/test_vendored_home_head.py",
     "tests/e2e/test_vendored_nav.py",
     "tests/e2e/test_vendored_row_menu.py",
 ]
+
+# The layout lint and its broken/fixed fixture page. It imports _geometry.py
+# (listed above) and _shot.py (whole suite), so those edits reach it too.
+[[e2e.surface]]
+name           = "layout-lint"
+prefixes       = ["tests/e2e/_fixtures/layout/"]
+paths          = ["tests/e2e/_layout_lint.py", "tests/e2e/test_layout_lint.py"]
+pytest_targets = ["tests/e2e/test_layout_lint.py"]
 
 # The usage log (#349): client module + server router, driven end to end by
 # its own harness. The gallery loads the client in a separate module script,
@@ -506,6 +515,7 @@ browser_sweep   = { src = "tests/e2e/_browser_sweep.py" }
 surface_capture = { src = "tests/e2e/_surface.py" }
 # The screenshot baseline's capture half; its comparison is `shot_baseline` below.
 shot_capture    = { src = "tests/e2e/_shot.py" }
+layout_lint     = { src = "tests/e2e/_layout_lint.py" }
 
 # Scripts + library modules copied byte-for-byte into adopters.
 classify_e2e    = { src = "scripts/classify_e2e.py" }
