@@ -148,6 +148,35 @@ function span(className) {
   return el;
 }
 
+/** The wave's DOM: the bars (or the one meter under reduced motion) and the timer. */
+function buildWave(bars, reduced, height, withTimer) {
+  const root = span('rec-wave');
+  root.setAttribute('aria-hidden', 'true');
+  root.dataset.motion = reduced ? 'reduced' : 'full';
+  root.style.setProperty('--rec-wave-height', `${height}px`);
+  const strip = span(reduced ? 'rec-wave-meter' : 'rec-wave-bars');
+  const fills = Array.from({ length: reduced ? 1 : bars }, () => document.createElement('i'));
+  strip.append(...fills);
+  root.appendChild(strip);
+  let timeEl = null;
+  if (withTimer) {
+    timeEl = span('rec-wave-time');
+    root.appendChild(timeEl);
+  }
+  return { root, fills, timeEl };
+}
+
+/** Draw one reading: bar heights, or the meter's width. An empty reading is the flat strip. */
+function paintLevels(fills, reduced, levels) {
+  if (reduced) {
+    fills[0].style.transform = `scaleX(${Math.max(...levels, 0)})`;
+    return;
+  }
+  for (let i = 0; i < fills.length; i += 1) {
+    fills[i].style.transform = `scaleY(${Math.max(MIN_BAR, levels[i] || 0)})`;
+  }
+}
+
 /**
  * Show the live level strip and the elapsed timer in `host` while recording.
  * The strip replaces the host's other children (the record glyph) until
@@ -182,31 +211,7 @@ export function attachRecWave(host, stream, opts) {
   const source = o.source || createLevelSource(stream);
   if (source && stream) source.connect(stream);
 
-  const root = span('rec-wave');
-  root.setAttribute('aria-hidden', 'true');
-  root.dataset.motion = reduced ? 'reduced' : 'full';
-  root.style.setProperty('--rec-wave-height', `${o.height || DEFAULT_HEIGHT}px`);
-
-  const fills = [];
-  const strip = span(reduced ? 'rec-wave-meter' : 'rec-wave-bars');
-  if (reduced) {
-    const fill = document.createElement('i');
-    strip.appendChild(fill);
-    fills.push(fill);
-  } else {
-    for (let i = 0; i < bars; i += 1) {
-      const bar = document.createElement('i');
-      strip.appendChild(bar);
-      fills.push(bar);
-    }
-  }
-  root.appendChild(strip);
-
-  let timeEl = null;
-  if (o.timer !== false) {
-    timeEl = span('rec-wave-time');
-    root.appendChild(timeEl);
-  }
+  const { root, fills, timeEl } = buildWave(bars, reduced, o.height || DEFAULT_HEIGHT, o.timer !== false);
 
   host.dataset.recWave = 'on';
   host.appendChild(root);
@@ -225,15 +230,7 @@ export function attachRecWave(host, stream, opts) {
     host.dataset.recWaveState = next;
   }
 
-  function paint(levels) {
-    if (reduced) {
-      fills[0].style.transform = `scaleX(${Math.max(...levels, 0)})`;
-      return;
-    }
-    for (let i = 0; i < fills.length; i += 1) {
-      fills[i].style.transform = `scaleY(${Math.max(MIN_BAR, levels[i] || 0)})`;
-    }
-  }
+  const paint = (levels) => paintLevels(fills, reduced, levels);
 
   function tick() {
     const now = Date.now();
@@ -262,14 +259,14 @@ export function attachRecWave(host, stream, opts) {
       paint(reading.levels);
       return;
     }
-    if (now - quietSince >= silenceMs && state !== 'silent') {
+    if (state === 'silent') {
+      paint([]);
+      return;
+    }
+    if (now - quietSince >= silenceMs) {
       setState('silent');
       paint([]);
       if (o.onSilent) o.onSilent();
-      return;
-    }
-    if (state === 'silent') {
-      paint([]);
       return;
     }
     // Before the first verdict, or quiet for less than silenceMs: show what is there.
