@@ -79,7 +79,16 @@ Where new code goes:
 - New logic module: a `src/<domain>/` package. Flat `src/` is fine until it reaches 40 modules.
 - New ops script: `scripts/`. A helper the app imports belongs in `src/`.
 
-Homes (the [second-level placement](#second-level-placement) contract): `app/*.py`, `app/cli/`, `app/tray/`, `app/webapp/*.py` (the factory, manager, middleware), `app/webapp/routers/`, `app/webapp/static/`, and `src/` (any module or domain subpackage). A file anywhere else under `app/` fails, for example a new `app/webapp/templates/` or `app/helpers/`.
+Homes (the [second-level placement](#second-level-placement) contract); a file anywhere else under `app/` fails, for example a new templates folder or a helpers module:
+
+```
+app/*.py                    shell modules directly in app/
+app/cli/  app/tray/         everything below
+app/webapp/*.py             factory, manager, middleware
+app/webapp/routers/         everything below
+app/webapp/static/          everything below
+src/                        any module or domain subpackage
+```
 
 Allowed extra roots: `data/` (runtime input and output, gitignored contents), `brand/` (icon masters), `webapp/` (the app's runtime files: tunnel and launcher config, not code). Anything else is declared.
 
