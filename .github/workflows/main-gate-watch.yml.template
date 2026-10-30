@@ -19,15 +19,11 @@
 #
 # WHY THIS EXISTS. CI is advisory in this fleet — the local gate (pytest/ruff/
 # mypy, CLAUDE.md) is the real contract — but a red main should never rely on
-# someone noticing it by accident while reviewing an unrelated PR. That is
-# exactly how whatsapp-radar#258's Gmail idempotency regression went unreported
-# for four days: two markdown-only PRs correctly discounted the red gate for
-# their own diffs, and nobody treated "main is red" as a finding in its own
-# right. Three fleet repos were found sitting on a broken main in a single day
-# (2026-08-15) for the same reason. This watches only runs of the gate workflow
-# triggered by a push to `main` itself — PR runs are excluded by the
-# `branches: [main]` filter below, since a PR's own gate is already visible in
-# its own checks.
+# someone noticing it by accident while reviewing an unrelated PR: a red main
+# must be reported as a finding in its own right, not discovered by accident.
+# This watches only runs of the gate workflow triggered by a push to `main`
+# itself — PR runs are excluded by the `branches: [main]` filter below, since
+# a PR's own gate is already visible in its own checks.
 name: main-gate-watch
 
 on:
