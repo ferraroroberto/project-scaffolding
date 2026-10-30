@@ -1,13 +1,18 @@
 import os
-import shutil
 import subprocess
 import sys
 from pathlib import Path
+
+import pytest
 
 from src.no_window import NO_WINDOW
 from tests.e2e._tray_harness import resolve_tray_lifecycle_path
 
 ROOT = Path(__file__).resolve().parents[1]
+# Fleet convention: always the absolute PowerShell 5.1 path, never `shutil.which`
+# (global-CLAUDE.md "Windows PowerShell in spawned commands"; matches
+# tests/e2e/_tray_harness.py's own POWERSHELL constant).
+POWERSHELL = r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe"
 
 
 def _active_batch_lines() -> list[str]:
@@ -40,6 +45,7 @@ def test_tray_template_does_not_parse_detect_output_with_for_f() -> None:
     assert not any("usebackq" in line for line in active_lines)
 
 
+@pytest.mark.skipif(sys.platform != "win32", reason="tray lifecycle is Windows-only")
 def test_tray_template_launch_args_survive_argv_parsing(tmp_path: Path) -> None:
     """The template's launch line must deliver every switch intact (#145).
 
@@ -52,11 +58,7 @@ def test_tray_template_launch_args_survive_argv_parsing(tmp_path: Path) -> None:
     cannot catch that, so drive the real template through a real `cmd` + real
     `powershell -File` and read the parsed values back.
     """
-    if sys.platform != "win32":
-        return
-    powershell = shutil.which("powershell.exe")
-    if powershell is None:
-        return
+    assert Path(POWERSHELL).exists(), f"expected PowerShell at {POWERSHELL}"
 
     # project-scaffolding#153: the template resolves the helper at
     # %USERPROFILE%/.claude/tray/tray_lifecycle.ps1, not <ScriptDir>\app\tray\,
@@ -111,6 +113,7 @@ def test_tray_template_launch_args_survive_argv_parsing(tmp_path: Path) -> None:
     assert not out.get("SCRIPTDIR", "x").endswith("\\")
 
 
+@pytest.mark.skipif(sys.platform != "win32", reason="tray lifecycle is Windows-only")
 def test_tray_template_does_not_leak_app_name_to_children(tmp_path: Path) -> None:
     """The template must not hand a bare `APP_NAME` to the tray it starts (#264).
 
@@ -123,11 +126,7 @@ def test_tray_template_does_not_leak_app_name_to_children(tmp_path: Path) -> Non
     the template must clear it, not merely stop setting it. The stub helper
     records the environment it inherited plus its `-AppName` argument.
     """
-    if sys.platform != "win32":
-        return
-    powershell = shutil.which("powershell.exe")
-    if powershell is None:
-        return
+    assert Path(POWERSHELL).exists(), f"expected PowerShell at {POWERSHELL}"
 
     fake_home = tmp_path / "_home"
     probe = fake_home / ".claude" / "tray" / "tray_lifecycle.ps1"
@@ -235,6 +234,7 @@ def test_tray_lifecycle_verify_probes_https_over_loopback() -> None:
     assert "return r != null && IsLoopback(r.RequestUri.Host);" not in helper
 
 
+@pytest.mark.skipif(sys.platform != "win32", reason="tray lifecycle is Windows-only")
 def test_resolve_versionurls_returns_flat_string_list(tmp_path: Path) -> None:
     """An explicit -VersionUrl must yield a flat list of strings, not a nested
     array (#149).
@@ -247,11 +247,7 @@ def test_resolve_versionurls_returns_flat_string_list(tmp_path: Path) -> None:
     multi-URL path is a genuine 2-element array), so this drives the real
     function with an explicit URL and asserts each element is a plain string.
     """
-    if sys.platform != "win32":
-        return
-    powershell = shutil.which("powershell.exe")
-    if powershell is None:
-        return
+    assert Path(POWERSHELL).exists(), f"expected PowerShell at {POWERSHELL}"
 
     # Source only the helper's functions (strip its param() header and trailing
     # switch dispatcher), bind the script-scope inputs, then print the type of
@@ -268,7 +264,7 @@ def test_resolve_versionurls_returns_flat_string_list(tmp_path: Path) -> None:
         encoding="utf-8",
     )
     result = subprocess.run(
-        [powershell, "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
+        [POWERSHELL, "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
          "-File", str(harness)],
         check=False, capture_output=True, text=True, creationflags=NO_WINDOW,
     )
@@ -276,18 +272,14 @@ def test_resolve_versionurls_returns_flat_string_list(tmp_path: Path) -> None:
     assert types == ["String"], f"expected one String element, got {types}: {result.stdout}{result.stderr}"
 
 
+@pytest.mark.skipif(sys.platform != "win32", reason="tray lifecycle is Windows-only")
 def test_tray_lifecycle_helper_parses_on_windows(tmp_path: Path) -> None:
-    if sys.platform != "win32":
-        return
-
-    powershell = shutil.which("powershell.exe")
-    if powershell is None:
-        return
+    assert Path(POWERSHELL).exists(), f"expected PowerShell at {POWERSHELL}"
 
     helper = resolve_tray_lifecycle_path()
     result = subprocess.run(
         [
-            powershell,
+            POWERSHELL,
             "-NoProfile",
             "-NonInteractive",
             "-File",
