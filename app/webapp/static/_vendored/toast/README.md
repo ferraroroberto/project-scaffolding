@@ -48,8 +48,8 @@ showToast('Uploading…', undefined, { ms: 0 });       // stays until the next t
 
 | Token | Light value | Used for |
 | --- | --- | --- |
-| `--tabbar-bg` | `rgba(255,255,255,0.85)` (dark `rgba(22,27,34,0.86)`) | glass fill (the nav bar's) |
-| `--tabbar-border` | `rgba(31,35,40,0.12)` (dark `rgba(255,255,255,0.13)`) | hairline border (the nav bar's) |
+| `--tabbar-bg` | `rgba(255,255,255,0.62)` (dark `rgba(42,45,52,0.55)`) | glass fill (the nav bar's) |
+| `--tabbar-border` | `rgba(0,0,0,0.08)` (dark `rgba(255,255,255,0.14)`) | hairline border (the nav bar's) |
 | `--ink` | `#1f2328` | text |
 | `--deficit` | `#cf222e` | error fill (75% mix) and border |
 | `--accent-fg` | `#ffffff` | error text |

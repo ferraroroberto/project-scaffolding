@@ -141,8 +141,10 @@ It is CSS only, with no transform on the nav. Desktop and the wide rail carry no
 | `--bottom-tabs-gap` | `4px` | mobile tab gap — optional, falls back to `4px` |
 | `--bottom-tabs-icon` | `20px` | mobile SVG icon size — optional, falls back to `20px` |
 | `--bottom-tabs-label` | `11px` | mobile label font size — optional, falls back to `11px` |
-| `--tabbar-bg` | `rgba(255,255,255,0.85)` | floating bar glass fill |
-| `--tabbar-border` | `rgba(31,35,40,0.12)` | floating bar border |
+| `--tabbar-bg` | `rgba(255,255,255,0.62)` (dark `rgba(42,45,52,0.55)`) | floating bar clear-glass fill |
+| `--tabbar-border` | `rgba(0,0,0,0.08)` (dark `rgba(255,255,255,0.14)`) | floating bar hairline rim |
+| `--tabbar-pill` | `rgba(0,0,0,0.07)` (dark `rgba(255,255,255,0.14)`) | the sliding capsule behind the active tab; **required**, with it undefined the active tab has no capsule |
+| `--tabbar-shadow` | `0 8px 28px -6px rgba(20,24,40,0.2), 0 1px 4px rgba(20,24,40,0.06)` (dark `0 10px 30px -6px rgba(0,0,0,0.6)`) | floating bar drop shadow |
 
 The tokens marked optional (`--icon-feature`, `--layout-measure`, `--layout-rail`, `--bottom-tabs-height`, `--bottom-tabs-margin`, `--bottom-tabs-pill-height`, `--bottom-tabs-padding`, `--bottom-tabs-gap`, `--bottom-tabs-icon`, `--bottom-tabs-label`) are optional per-context knob settings: `nav-tabs.css` reads each with an inline fallback, so an app that leaves one undefined gets the fallback named in its row and nothing renders wrong. Define one only to override it. Every unmarked token is read with no fallback and must be defined.
 

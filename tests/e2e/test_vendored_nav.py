@@ -205,9 +205,9 @@ def test_app_icon_utility_does_not_resize_nav_glyphs(nav: Page) -> None:
 
 
 def test_app_icon_utility_does_not_resize_pill_glyphs(nav_mobile: Page) -> None:
-    """The pill's 20px glyph survives an app's later icon utility too (#303)."""
+    """The pill's 24px glyph survives an app's later icon utility too (#303)."""
     _adopt_icon_utility(nav_mobile)
-    assert _icon_width(nav_mobile) == 20  # icons.size.nav-tab
+    assert _icon_width(nav_mobile) == 24  # the iOS tab-bar glyph size
 
 
 _LONG_LABELS = ("Capture", "History", "Insights", "Energy", "Family")
@@ -248,21 +248,21 @@ def test_narrow_desktop_stacks_icon_over_label(nav: Page) -> None:
 
 
 def test_mobile_pill_stacks_icon_over_label(nav_mobile: Page) -> None:
-    """The floating pill keeps its 20px icon above the label; no rail when coarse.
+    """The floating pill keeps its 24px icon above the label; no rail when coarse.
 
-    The phone `.app` padding is part of the same contract (#288): the top is
-    the safe area alone, so the first card starts directly under the status
-    bar (the emulator's safe area is 0); the sides keep `--gap` and the bottom
-    keeps the reserve that clears the floating bar.
+    The phone `.app` padding is part of the same contract: the top is the safe
+    area plus the 4px the top scroll fade's tail sits in (the emulator's safe
+    area is 0), so the first card starts where the fade ends; the sides keep
+    `--gap` and the bottom keeps the reserve that clears the floating bar.
     """
-    assert _style(nav_mobile, ".app", "paddingTop") == "0px"
+    assert _style(nav_mobile, ".app", "paddingTop") == "4px"
     assert _style(nav_mobile, ".app", "paddingLeft") == "12px"
     assert _style(nav_mobile, ".app", "paddingRight") == "12px"
     assert _style(nav_mobile, ".app", "paddingBottom") == f"{21 + 61 + 21 + 12}px"
     icon = nav_mobile.locator("#tabHome .tab-icon")
     expect(icon).to_be_visible()
-    assert _style(nav_mobile, "#tabHome .tab-icon", "width") == "20px"
-    assert _style(nav_mobile, "#tabHome .tab-icon", "height") == "20px"
+    assert _style(nav_mobile, "#tabHome .tab-icon", "width") == "24px"
+    assert _style(nav_mobile, "#tabHome .tab-icon", "height") == "24px"
     assert _style(nav_mobile, "#tabHome .tab-icon", "stroke") == _ACCENT_TEXT
     box = icon.bounding_box()
     label = nav_mobile.locator("#tabHome .tab-label").bounding_box()
@@ -376,25 +376,28 @@ def test_pill_takes_every_tap_where_a_tab_meets_a_list_row(nav_mobile: Page) -> 
     assert bar["y"] - last >= 21 + 12, (last, bar)  # --bottom-tabs-margin + --gap
 
 
-def test_mobile_pill_active_tab_is_accent_tint_not_inset_surface(
+def test_mobile_pill_active_tab_is_accent_text_on_a_translucent_capsule(
     nav_mobile: Page,
 ) -> None:
-    """Active pill: accent-soft tint + accent-border-soft hairline, both themes (#159).
+    """Active tab: accent text and icon over the translucent `--tabbar-pill` capsule, both themes.
 
     Regression for the dark-mode "black hole": the active tab used to fill
     with `--card-off` (dark canvas-subtle, true black), which read as a hole
-    punched through the translucent tabbar. It must render as a translucent
-    accent tint instead — matching `button-tint` / `.icon-header-btn.active`
-    emphasis elsewhere in the fleet.
+    punched through the translucent tabbar. The capsule must stay translucent.
+    Before `initNavTabs` has placed the sliding capsule the active tab paints
+    the same fill itself (`.tabs:not(.has-pill)`), so frame one is already right;
+    after it the sliding `.tab-pill` carries the fill and the tab is clear.
     """
-    r, g, b, a = _rgba(_style(nav_mobile, "#tabHome", "backgroundColor"))
-    assert (r, g, b) == (9, 105, 218)
-    assert 0 < a < 1
     assert _style(nav_mobile, "#tabHome", "color") == _ACCENT_TEXT
+    assert 0 < _alpha(_style(nav_mobile, "#tabHome", "backgroundColor")) < 1
+
+    _init_nav(nav_mobile)
+    assert _alpha(_style(nav_mobile, "#tabHome", "backgroundColor")) == 0
+    assert 0 < _alpha(_style(nav_mobile, ".tab-pill", "backgroundColor")) < 1
 
     _set_theme(nav_mobile, "dark")
     _wait_style(nav_mobile, "#tabHome", "color", _ACCENT_TEXT_DARK)
-    dark_bg = _style(nav_mobile, "#tabHome", "backgroundColor")
+    dark_bg = _style(nav_mobile, ".tab-pill", "backgroundColor")
     # The pre-fix `--card-off` fill resolved to this exact opaque literal
     # (#010409 -- demo.html's dark `--card-off`, #299).
     assert dark_bg != "rgb(1, 4, 9)"
@@ -416,6 +419,12 @@ def _init_nav(page: Page) -> None:
     page.evaluate(
         "async () => { const m = await import('/_vendored/nav/nav-tabs.js');"
         " window.__nav = m.initNavTabs(); }"
+    )
+    # The sliding capsule starts `.no-anim` and drops it two frames later; a DOM
+    # snapshot taken before that would differ from one taken after.
+    page.wait_for_function(
+        "() => { const p = document.querySelector('.tab-pill');"
+        " return !p || !p.classList.contains('no-anim'); }"
     )
 
 
