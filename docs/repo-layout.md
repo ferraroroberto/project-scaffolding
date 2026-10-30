@@ -6,7 +6,7 @@ Shape ids (the exact `.fleet.toml` `shape` values): [`webapp-tray`](#webapp-tray
 
 ## Rules for every shape
 
-Five rules hold in every shape. The structure ratchet enforces the first four; the fifth is a convention. Existing offenders are baselined and may not grow; a new offender fails the gate. It also holds the root folders to the shape's tree, with no baseline (see the end of this page).
+Five rules hold in every shape. The structure ratchet enforces the first four; the fifth is a convention. Existing offenders are baselined and may not grow; a new offender fails the gate. It also holds the root folders to the shape's tree: an undeclared one fails with no baseline, and a declared extra root is baselined and shrink-only (see the end of this page).
 
 ### File size
 
@@ -23,6 +23,14 @@ Five rules hold in every shape. The structure ratchet enforces the first four; t
 ### Layer contract
 
 *Enforced.* **`src/` never imports `app/`.** UI calls logic, never the reverse. A helper both need lives in `src/`.
+
+### Extra roots
+
+*Enforced, shrink-only.* A root folder the shape's tree does not list goes in `extra_roots` in `.fleet.toml`, with its reason in `docs/layout.md`. The ratchet records every such folder in the baseline (`root_extras`) and fails on one that is not recorded, so the list can only go down. Before declaring one, check the three outcomes: the folder holds code that belongs under `src/` or `app/`, so move it; every repo of the shape may need it, so it joins the shape's allowed set (as `webapp/` did for `webapp-tray`); or it is required where it is (a framework loads it by name), so it is declared with its reason and recorded with `--update-baseline --allow-additions`.
+
+### Second-level placement
+
+*Enforced for `webapp-tray`, shrink-only.* Under `app/` and `src/` a file lives in one of the shape's homes, so a web app's routers, static assets and domain code cannot scatter. The ratchet counts the files outside every home per folder and fails when a folder is new or holds more than its baseline. Existing outliers are baselined. The homes, with the rule for each, are in the [webapp-tray](#webapp-tray) section.
 
 ### Test mirror
 
@@ -71,7 +79,9 @@ Where new code goes:
 - New logic module: a `src/<domain>/` package. Flat `src/` is fine until it reaches 40 modules.
 - New ops script: `scripts/`. A helper the app imports belongs in `src/`.
 
-Allowed extra roots: `data/` (runtime input and output, gitignored contents), `brand/` (icon masters). Anything else is declared.
+Homes (the [second-level placement](#second-level-placement) contract): `app/*.py`, `app/cli/`, `app/tray/`, `app/webapp/*.py` (the factory, manager, middleware), `app/webapp/routers/`, `app/webapp/static/`, and `src/` (any module or domain subpackage). A file anywhere else under `app/` fails, for example a new `app/webapp/templates/` or `app/helpers/`.
+
+Allowed extra roots: `data/` (runtime input and output, gitignored contents), `brand/` (icon masters), `webapp/` (the app's runtime files: tunnel and launcher config, not code). Anything else is declared.
 
 ## streamlit
 
@@ -98,7 +108,7 @@ Where new code goes:
 - New logic: `src/`. A view that grows past 100 lines of logic hands that logic to `src/`.
 - New batch job: `src/pipelines/<job>.py` exposing `run()`, callable from a view, the CLI and tests.
 
-Allowed extra roots: `data/`, `brand/`.
+Allowed extra roots: `data/`, `brand/`, `config/`.
 
 ## pipeline-cli
 
@@ -242,7 +252,7 @@ Exceptions
 custom_components/   required at the root by Home Assistant
 ```
 
-A justified exception (a root a framework requires, a vendored tool) is declared once, in `docs/layout.md` and in `.fleet.toml` `extra_roots`, never improvised. `docs/`, `.github/` and hidden folders are allowed in every shape; any other root not in the shape's tree, its allowed extra roots or `extra_roots` fails the structure ratchet's root-layout check.
+A justified exception (a root a framework requires, a vendored tool) is declared once, in `docs/layout.md` and in `.fleet.toml` `extra_roots`, never improvised. `docs/`, `.github/` and hidden folders are allowed in every shape; any other root not in the shape's tree, its allowed extra roots or `extra_roots` fails the structure ratchet's root-layout check. A declared exception is recorded in the ratchet's baseline and can only leave it.
 
 ## Migration
 

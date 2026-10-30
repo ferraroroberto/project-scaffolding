@@ -594,8 +594,8 @@ def test_main_rejects_allow_additions_without_update(capsys: pytest.CaptureFixtu
 #: shape id -> (required root folders, other allowed root folders); pinned here on purpose, so a
 #: change to a preset in the script is a deliberate edit in two places (and the doc table).
 EXPECTED_SHAPES: dict[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
-    "webapp-tray": (("app", "src", "tests", "docs"), ("scripts", "data", "brand", "assets", "config")),
-    "streamlit": (("app", "src", "tests"), ("scripts", "data", "brand")),
+    "webapp-tray": (("app", "src", "tests", "docs"), ("scripts", "data", "brand", "assets", "config", "webapp")),
+    "streamlit": (("app", "src", "tests"), ("scripts", "data", "brand", "config")),
     "pipeline-cli": (("tests",), ("src", "common", "scripts", "config", "data")),
     "skills-governance": (("skills", "tests"), ("hooks", "scripts", "architecture")),
     "node": (("src",), ("test", "scripts")),
@@ -813,7 +813,7 @@ def test_the_scaffold_declares_its_shape_and_its_layout_passes() -> None:
     cfg, _ = sr.load_config(REPO_ROOT)
     assert cfg is not None
     assert (cfg.shape, cfg.extra_roots) == ("streamlit", ())
-    assert sr.layout_findings(sr.tracked_files(REPO_ROOT), cfg) == []
+    assert sr.layout.layout_findings(sr.tracked_files(REPO_ROOT), "streamlit", cfg.extra_roots) == []
 
 
 def _doc_shape_table() -> dict[str, tuple[set[str], set[str], str]]:
