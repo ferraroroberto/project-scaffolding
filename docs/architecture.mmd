@@ -42,6 +42,7 @@ flowchart TB
     RUNTIMEDATA["runtime_data.py (#243)\nruntime_db_path(app, file, env_var=)\nvendor-verbatim SQLite-location resolver\nFLEET_DATA_ROOT -> C:/sqlite/&lt;app&gt;/\n(off the spinning disk, one dir per app)"]
     USAGELOG["usage_log.py (#349)\nusage_router(db_path, dependencies=)\nvendor-verbatim local-only usage log\nPOST /api/usage/events + GET /api/usage/summary\nGET /api/usage/time (foreground minutes, #403)\nallowlisted kinds, bounded ids, 365d / row cap"]
     BUILDINFO["build_info.py (#199/#246/#247)\nbuild_identity(): git_sha + built_at\ncaptured once at import, bounded retry inside\nthe capture, never re-resolved later\nvendor-verbatim, self-contained (no local imports)"]
+    RESOURCEPROBE["resource_probe.py\nsample_process(pid): threads, handles, RSS\nstart_breadcrumb(logger) logs them on an interval\nvendor-verbatim; unreadable = SampleUnavailable, never 0"]
     COMPRESSION["compression.py\nStreamSafeGZipMiddleware, registered last\nvendor-verbatim; never compresses SSE,\nMJPEG, websockets or already-compressed media"]
   end
   VIEWS -->|orchestrates, business logic stays here| PIPELINES
@@ -120,6 +121,7 @@ flowchart TB
     E2E["e2e/conftest.py + test_smoke.py\npytest-playwright, boots a disposable\nStreamlit via _streamlit_lifecycle.py\n(occupied port refused unless STREAMLIT_E2E_LIVE)\n+ test_vendored_components.py\n(drives _vendored/demo.html, light+dark)\n+ test_vendored_nav.py\n(mounts _vendored/nav skeleton, desktop+pill)\nboth via e2e/_color_assertions.py\n(style · set_theme · rgba, #208)\n+ e2e/_nav_graft.py (nav mount +\nphone context, #394)"]
     LIVEGUARD["e2e/_e2e_live_guard.py (vendor-verbatim)\nrequire_disposable_instance(port, flag_env_name):\npytest.exit(2) on an occupied port with no\nopt-in env var, never kills or adopts silently"]
     PORTPROBE["_port_probe.py (#208)\nlistening_pids(port): netstat / lsof\nthe ONE port-to-PID parse both\nlifecycle harnesses import"]
+    SOAK["soak/_resource_soak.py (vendor-verbatim)\nrun_soak(pid, url, routes): warm up, sample, drive poll routes,\nsample; leak = threads/handles past a per-cycle budget\nexit 0 pass · 1 leak · 3 NOT CONFIRMED\n+ soak/test_resource_soak.py + _fixtures/soak_app.py (leaking and clean twins)"]
     GITREPO["_git_repo.py\ngit() + write(): the throwaway-repo helpers\nthe comment, docs and structure ratchet tests import"]
     GEOM["e2e/_geometry.py (vendor-verbatim, #157)\neffective 44px targets · overlap · overflow\nChart.js config reads · viewport x theme matrix\n+ test_geometry_helper.py\n+ _fixtures/geometry/ (hermetic twins + Chart.js)"]
     SURF["e2e/_surface.py (vendor-verbatim, #408)\nsurface(page, name): no-op unless DESIGN_SURFACE_CAPTURE\nlight+dark flipped in place → png + json per surface\ncollection hook deselects tests that never call it\n+ test_surface_hook.py + _fixtures/surface/"]
@@ -134,6 +136,7 @@ flowchart TB
   E2E -->|sweeps leaked helpers at session finish| SWEEP
   E2E -->|starts the Playwright driver from %TEMP%| CWDISO
   CWDISO -->|reads liveness + PEB cwd via| SWEEP
+  SOAK -->|samples counts via| RESOURCEPROBE
   E2E -->|kills a stale Streamlit by port| PORTPROBE
   TRAYBEHAVIOR -->|reclaim backstop, kills by port| PORTPROBE
   PORTPROBE -->|creationflags=NO_WINDOW| NOWINDOW

@@ -32,6 +32,7 @@ Clone this directory, rename it, and start building.
 - `src/compression.py` — vendor-verbatim stream-safe gzip middleware (manifest key `compression`). See [`docs/webapp-pwa-conventions.md`](docs/webapp-pwa-conventions.md).
 - `src/no_window.py` — vendor-verbatim `CREATE_NO_WINDOW` subprocess-flag definition (manifest key `no_window`); a file copied byte-identical into adopters (e.g. `_browser_sweep.py`, `classify_e2e.py`) keeps its own local flag instead, since importing this module would not resolve there. See `CLAUDE.md` ("Windows console-subprocess suppression").
 - `src/runtime_data.py` — vendor-verbatim runtime-data location resolver (manifest key `runtime_data`), so always-on SQLite writes land on a fast local drive. See `CLAUDE.md` ("Runtime data lives on a fast drive").
+- `src/resource_probe.py` + `tests/soak/_resource_soak.py` — vendor-verbatim thread/handle/RSS sampler with a runtime breadcrumb, and the gate soak that fails a webapp leaking threads or handles (manifest keys `resource_probe`, `resource_soak`). See [`docs/long-lived-process-conventions.md`](docs/long-lived-process-conventions.md) ("Resource soak").
 - `src/build_info.py` — vendor-verbatim process build-identity capture (manifest key `build_info`). See `CLAUDE.md` ("Restart/deploy coverage — merged is not shipped").
 - `src/doc_capture/` — vendor-verbatim doc-capture screenshot engine + README "tour" regen. See [`src/doc_capture/README.md`](src/doc_capture/README.md).
 - `brand/` + `scripts/brand_gen.py` — the fleet icon/brand generator (favicon, PWA icons, tray `.ico`, Stream Deck button). See [`docs/brand-icons.md`](docs/brand-icons.md).
@@ -115,6 +116,7 @@ src/
   runtime_data.py           vendor-verbatim SQLite-location resolver (C:\sqlite\<app>\, off the spinning disk)
   usage_log.py              vendor-verbatim local-only usage-log router (views, taps, device class -> usage.sqlite3)
   compression.py            vendor-verbatim stream-safe gzip middleware
+  resource_probe.py         vendor-verbatim thread/handle/RSS sampler + runtime breadcrumb
   build_info.py             vendor-verbatim process build-identity capture (git_sha + built_at, captured once at import)
   notify/                   vendor-verbatim Telegram notifier (send_text + factory/config)
   doc_capture/              vendor-verbatim doc-capture screenshot engine (manifest-driven, fail-safe-masked, input-hash-idempotent + README tour regen)
