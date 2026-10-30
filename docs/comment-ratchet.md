@@ -14,6 +14,7 @@ Only comment text, extracted by a real scanner for each language. A regex over r
 | `.js` `.mjs` `.cjs` | `//` and `/* */` | single/double-quoted strings, template literals (including inside `${}`), regex literals |
 | `.css` | `/* */` | strings, unquoted `url(...)` |
 | `.ps1` `.psm1` | `#` line comments (at a token start), `<# #>` blocks, including inside `$( )` | single- and double-quoted strings, here-strings, a mid-word `#` (a variable name followed straight away by `#` and digits) |
+| `.yml` `.yaml`, and `.yml.template`/`.yaml.template` (a copy-to-adapt GitHub Actions source) | `#` line comments starting the line or following whitespace, per the YAML grammar | single- and double-quoted scalars; a block scalar (`\|`/`>`, e.g. a `run:` step) is scanned like any other text, so an embedded shell comment still counts |
 
 A **reference** is `#` plus one to five digits, not preceded by `&` or `#`, ending on a word boundary. A reference to another repo's issue (`repo#<number>`, `owner/repo#<number>`) counts too (the same smell). `https://...` URLs inside a comment are blanked first, so an anchor never counts. Several references on one line count separately. Counting is per **reference**, not per comment line, and per **file**: a new reference in one file cannot hide behind a removal in another.
 

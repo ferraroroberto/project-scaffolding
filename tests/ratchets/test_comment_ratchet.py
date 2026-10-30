@@ -245,6 +245,35 @@ def test_unterminated_powershell_is_not_confirmed(src: str) -> None:
         cr.scan_text(src, "ps")
 
 
+# ------------------------------------------------------------------- counting: YAML
+
+def test_yaml_line_comments_count() -> None:
+    src = "# since #120\nname: ci  # trailing #121\nkey: value\n"
+    assert [r.line for r in cr.scan_text(src, "yaml")] == [1, 2]
+
+
+def test_yaml_requires_whitespace_or_line_start_before_hash() -> None:
+    # `a#130` is a plain scalar (no comment); `a #131` is a comment (project-scaffolding#500).
+    assert count("key: a#130\n", "yaml") == 0
+    assert count("key: a #131\n", "yaml") == 1
+
+
+def test_yaml_quoted_scalars_do_not_count() -> None:
+    src = (
+        "a: 'see #140'\n"
+        "b: 'it''s #141'\n"
+        'c: "see #142"\n'
+        'd: "escaped \\" still open #143"\n'
+    )
+    assert count(src, "yaml") == 0
+
+
+@pytest.mark.parametrize("src", ["a: 'never closed\n#1\n", 'a: "never closed\n#1\n'])
+def test_unterminated_yaml_scalar_is_not_confirmed(src: str) -> None:
+    with pytest.raises(cr.NotConfirmed):
+        cr.scan_text(src, "yaml")
+
+
 # ------------------------------------------------------------------- scope
 
 @pytest.mark.parametrize(
@@ -254,8 +283,13 @@ def test_unterminated_powershell_is_not_confirmed(src: str) -> None:
         ("app/webapp/static/app.js", True),
         ("app/webapp/static/app.css", True),
         ("scripts/x.ps1", True),
+        (".github/workflows/ci.yml", True),
+        ("config/x.yaml", True),
+        (".github/workflows/ci.yml.template", True),  # project-scaffolding#500
+        (".github/workflows/ci.yaml.template", True),
         ("README.md", False),
         ("data/x.json", False),
+        ("tray.bat.template", False),
         ("tests/test_a.py", False),
         ("tests/e2e/helper.py", False),
         ("src/test_thing.py", False),
