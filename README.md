@@ -107,7 +107,7 @@ app/
   views/                    one render() per file (welcome, ...)
   tray/single_instance.py   vendor-verbatim named-mutex primitive for tray apps
   tray/watchdog.py          vendor-verbatim tray self-heal primitives (spawn retry/backoff, health watchdog, breadcrumb log)
-  webapp/static/_vendored/  vendor-verbatim web-app UI components (base/, nav/, icons/, card/, disclosure/, modal/, empty-state/, switch/, icon-tile/, button/, range-tab/, page-foot/, home-head/, select-native/, action-row/, text-size/, toast/, row-menu/, icon-button/, day-row/, day-marks/, segmented/, usage-log/ + demo.html gallery)
+  webapp/static/_vendored/  vendor-verbatim web-app UI components (base/, nav/, icons/, card/, disclosure/, modal/, empty-state/, switch/, icon-tile/, button/, range-tab/, page-foot/, home-head/, select-native/, action-row/, text-size/, toast/, rec-wave/, row-menu/, icon-button/, day-row/, day-marks/, segmented/, usage-log/ + demo.html gallery)
 src/
   config.py                 paths + env-driven settings
   logger.py                 the elegant logger

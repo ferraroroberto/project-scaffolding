@@ -176,6 +176,7 @@
 <link rel="stylesheet" href="day-marks/day-marks.css">
 <link rel="stylesheet" href="text-size/text-size.css">
 <link rel="stylesheet" href="toast/toast.css">
+<link rel="stylesheet" href="rec-wave/rec-wave.css">
 <link rel="stylesheet" href="row-menu/row-menu.css">
 </head>
 <body>
@@ -627,6 +628,27 @@
     <button type="button" class="button-tint" id="demoToastError">Show error</button>
   </div>
 
+  <h2>rec-wave (idle, live, silent mic, reduced motion, no Web Audio)</h2>
+  <div class="card" id="demoRecWave" style="display: flex; flex-wrap: wrap; gap: var(--space-sm);">
+    <!-- The buttons are the app's own: gallery chrome. Each wave host is the
+         span holding the record glyph; the label stays outside it. -->
+    <button type="button" class="button-primary" id="demoRecIdle" style="display: inline-flex; align-items: center; gap: var(--space-sm);">
+      <span><svg class="icon" aria-hidden="true"><use href="#i-mic"></use></svg></span>Record
+    </button>
+    <button type="button" class="button-tint danger" id="demoRecLive" style="display: inline-flex; align-items: center; gap: var(--space-sm);">
+      <span id="demoRecLiveHost"><svg class="icon" aria-hidden="true"><use href="#i-mic"></use></svg></span>Stop
+    </button>
+    <button type="button" class="button-tint danger" id="demoRecSilent" style="display: inline-flex; align-items: center; gap: var(--space-sm);">
+      <span id="demoRecSilentHost"><svg class="icon" aria-hidden="true"><use href="#i-mic"></use></svg></span>Stop
+    </button>
+    <button type="button" class="button-tint danger" id="demoRecReduced" style="display: inline-flex; align-items: center; gap: var(--space-sm);">
+      <span id="demoRecReducedHost"><svg class="icon" aria-hidden="true"><use href="#i-mic"></use></svg></span>Stop
+    </button>
+    <button type="button" class="button-tint danger" id="demoRecNone" style="display: inline-flex; align-items: center; gap: var(--space-sm);">
+      <span id="demoRecNoneHost"><svg class="icon" aria-hidden="true"><use href="#i-mic"></use></svg></span>Stop
+    </button>
+  </div>
+
   <h2>row-menu (kebab menu, inside a sideways-scrolling column)</h2>
   <div class="card" style="display: flex; flex-direction: column; gap: var(--space-sm);">
     <!-- A fixed-height sideways scroller: its overflow-x forces overflow-y to
@@ -679,6 +701,7 @@
   import { buildReadoutText } from './page-foot/page-foot.js';
   import { bindTextSize } from './text-size/text-size.js';
   import { showToast } from './toast/toast.js';
+  import { attachRecWave } from './rec-wave/rec-wave.js';
   import { renderHeadStatus } from './home-head/home-head.js';
   import { createRowMenu } from './row-menu/row-menu.js';
   import { dayRow } from './day-row/day-row.js';
@@ -766,6 +789,24 @@
   document.getElementById('demoToastError').addEventListener('click', () => {
     showToast('Could not reach the server', 'error', { ms: 0 });
   });
+
+  // rec-wave: a fixed level source stands in for the mic, so the gallery needs
+  // no permission and every run draws the same bars. `silenceMs: 1` reaches the
+  // silent verdict on the first tick; the last leg has a source that is not running.
+  const demoLevels = (n) => Array.from({ length: n }, (_, i) =>
+    Math.min(1, 0.25 + 0.7 * Math.abs(Math.sin(i * 0.9)) * (1 - Math.abs(i - n / 2) / n)));
+  const demoSource = (loud) => ({
+    running: true,
+    connect() {},
+    close() {},
+    read: (n) => (loud ? { rms: 0.1, levels: demoLevels(n) } : { rms: 0, levels: new Array(n).fill(0) }),
+  });
+  const waveHost = (id) => document.getElementById(id);
+  attachRecWave(waveHost('demoRecLiveHost'), null, { source: demoSource(true), reducedMotion: false });
+  attachRecWave(waveHost('demoRecSilentHost'), null, { source: demoSource(false), reducedMotion: false, silenceMs: 1 });
+  attachRecWave(waveHost('demoRecReducedHost'), null, { source: demoSource(true), reducedMotion: true });
+  attachRecWave(waveHost('demoRecNoneHost'), null,
+    { source: { running: false, connect() {}, close() {}, read: () => null }, reducedMotion: false });
 
   // row-menu: the items are data. One hidden, one disabled (with its hint) and
   // one destructive show the whole contract; choosing writes the label out.

@@ -247,6 +247,7 @@ prefixes = [
     "app/webapp/static/_vendored/modal/",
     "app/webapp/static/_vendored/page-foot/",
     "app/webapp/static/_vendored/range-tab/",
+    "app/webapp/static/_vendored/rec-wave/",
     "app/webapp/static/_vendored/row-menu/",
     "app/webapp/static/_vendored/segmented/",
     "app/webapp/static/_vendored/select-native/",
@@ -259,6 +260,7 @@ paths          = [
     "tests/e2e/test_vendored_day.py",
     "tests/e2e/test_vendored_font_inherit.py",
     "tests/e2e/test_vendored_home_head.py",
+    "tests/e2e/test_vendored_rec_wave.py",
     "tests/e2e/test_vendored_row_menu.py",
 ]
 pytest_targets = [
@@ -267,6 +269,7 @@ pytest_targets = [
     "tests/e2e/test_vendored_font_inherit.py",
     "tests/e2e/test_vendored_home_head.py",
     "tests/e2e/test_vendored_nav.py",
+    "tests/e2e/test_vendored_rec_wave.py",
     "tests/e2e/test_vendored_row_menu.py",
     "tests/e2e/test_vendored_row_menu_placement.py",
 ]
@@ -495,6 +498,7 @@ page-foot       = { src = "app/webapp/static/_vendored/page-foot" }
 action-row      = { src = "app/webapp/static/_vendored/action-row" }
 text-size       = { src = "app/webapp/static/_vendored/text-size" }
 toast           = { src = "app/webapp/static/_vendored/toast" }
+rec-wave        = { src = "app/webapp/static/_vendored/rec-wave" }
 row-menu        = { src = "app/webapp/static/_vendored/row-menu" }
 icon-button     = { src = "app/webapp/static/_vendored/icon-button" }
 # The date-keyed row (an action-row led by a date tile) and the day marks (#350).
