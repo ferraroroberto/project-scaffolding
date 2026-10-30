@@ -17,12 +17,10 @@ gallery-plus-nav mount and the phone context live once in `_nav_graft.py` (#394)
 
 from __future__ import annotations
 
-import io
 from collections.abc import Iterator
 
 import pytest
-from PIL import Image
-from playwright.sync_api import Browser, CDPSession, Page, expect
+from playwright.sync_api import Browser, Page, expect
 
 from tests.e2e._color_assertions import contrast as _contrast
 from tests.e2e._color_assertions import rgba as _rgba
@@ -207,9 +205,9 @@ def test_app_icon_utility_does_not_resize_nav_glyphs(nav: Page) -> None:
 
 
 def test_app_icon_utility_does_not_resize_pill_glyphs(nav_mobile: Page) -> None:
-    """The pill's 20px glyph survives an app's later icon utility too (#303)."""
+    """The pill's 24px glyph survives an app's later icon utility too (#303)."""
     _adopt_icon_utility(nav_mobile)
-    assert _icon_width(nav_mobile) == 20  # icons.size.nav-tab
+    assert _icon_width(nav_mobile) == 24  # the iOS tab-bar glyph size
 
 
 _LONG_LABELS = ("Capture", "History", "Insights", "Energy", "Family")
@@ -250,21 +248,21 @@ def test_narrow_desktop_stacks_icon_over_label(nav: Page) -> None:
 
 
 def test_mobile_pill_stacks_icon_over_label(nav_mobile: Page) -> None:
-    """The floating pill keeps its 20px icon above the label; no rail when coarse.
+    """The floating pill keeps its 24px icon above the label; no rail when coarse.
 
-    The phone `.app` padding is part of the same contract (#288): the top is
-    the safe area alone, so the first card starts directly under the status
-    bar (the emulator's safe area is 0); the sides keep `--gap` and the bottom
-    keeps the reserve that clears the floating bar.
+    The phone `.app` padding is part of the same contract: the top is the safe
+    area plus the 4px the top scroll fade's tail sits in (the emulator's safe
+    area is 0), so the first card starts where the fade ends; the sides keep
+    `--gap` and the bottom keeps the reserve that clears the floating bar.
     """
-    assert _style(nav_mobile, ".app", "paddingTop") == "0px"
+    assert _style(nav_mobile, ".app", "paddingTop") == "4px"
     assert _style(nav_mobile, ".app", "paddingLeft") == "12px"
     assert _style(nav_mobile, ".app", "paddingRight") == "12px"
     assert _style(nav_mobile, ".app", "paddingBottom") == f"{21 + 61 + 21 + 12}px"
     icon = nav_mobile.locator("#tabHome .tab-icon")
     expect(icon).to_be_visible()
-    assert _style(nav_mobile, "#tabHome .tab-icon", "width") == "20px"
-    assert _style(nav_mobile, "#tabHome .tab-icon", "height") == "20px"
+    assert _style(nav_mobile, "#tabHome .tab-icon", "width") == "24px"
+    assert _style(nav_mobile, "#tabHome .tab-icon", "height") == "24px"
     assert _style(nav_mobile, "#tabHome .tab-icon", "stroke") == _ACCENT_TEXT
     box = icon.bounding_box()
     label = nav_mobile.locator("#tabHome .tab-label").bounding_box()
@@ -378,25 +376,28 @@ def test_pill_takes_every_tap_where_a_tab_meets_a_list_row(nav_mobile: Page) -> 
     assert bar["y"] - last >= 21 + 12, (last, bar)  # --bottom-tabs-margin + --gap
 
 
-def test_mobile_pill_active_tab_is_accent_tint_not_inset_surface(
+def test_mobile_pill_active_tab_is_accent_text_on_a_translucent_capsule(
     nav_mobile: Page,
 ) -> None:
-    """Active pill: accent-soft tint + accent-border-soft hairline, both themes (#159).
+    """Active tab: accent text and icon over the translucent `--tabbar-pill` capsule, both themes.
 
     Regression for the dark-mode "black hole": the active tab used to fill
     with `--card-off` (dark canvas-subtle, true black), which read as a hole
-    punched through the translucent tabbar. It must render as a translucent
-    accent tint instead — matching `button-tint` / `.icon-header-btn.active`
-    emphasis elsewhere in the fleet.
+    punched through the translucent tabbar. The capsule must stay translucent.
+    Before `initNavTabs` has placed the sliding capsule the active tab paints
+    the same fill itself (`.tabs:not(.has-pill)`), so frame one is already right;
+    after it the sliding `.tab-pill` carries the fill and the tab is clear.
     """
-    r, g, b, a = _rgba(_style(nav_mobile, "#tabHome", "backgroundColor"))
-    assert (r, g, b) == (9, 105, 218)
-    assert 0 < a < 1
     assert _style(nav_mobile, "#tabHome", "color") == _ACCENT_TEXT
+    assert 0 < _alpha(_style(nav_mobile, "#tabHome", "backgroundColor")) < 1
+
+    _init_nav(nav_mobile)
+    assert _alpha(_style(nav_mobile, "#tabHome", "backgroundColor")) == 0
+    assert 0 < _alpha(_style(nav_mobile, ".tab-pill", "backgroundColor")) < 1
 
     _set_theme(nav_mobile, "dark")
     _wait_style(nav_mobile, "#tabHome", "color", _ACCENT_TEXT_DARK)
-    dark_bg = _style(nav_mobile, "#tabHome", "backgroundColor")
+    dark_bg = _style(nav_mobile, ".tab-pill", "backgroundColor")
     # The pre-fix `--card-off` fill resolved to this exact opaque literal
     # (#010409 -- demo.html's dark `--card-off`, #299).
     assert dark_bg != "rgb(1, 4, 9)"
@@ -418,6 +419,12 @@ def _init_nav(page: Page) -> None:
     page.evaluate(
         "async () => { const m = await import('/_vendored/nav/nav-tabs.js');"
         " window.__nav = m.initNavTabs(); }"
+    )
+    # The sliding capsule starts `.no-anim` and drops it two frames later; a DOM
+    # snapshot taken before that would differ from one taken after.
+    page.wait_for_function(
+        "() => { const p = document.querySelector('.tab-pill');"
+        " return !p || !p.classList.contains('no-anim'); }"
     )
 
 
@@ -625,166 +632,3 @@ def test_badge_geometry_does_not_scale_with_text_size(nav: Page) -> None:
     nav.evaluate("() => { document.documentElement.style.fontSize = '22px'; }")
     assert _style(nav, ".tab-badge", "fontSize") == "12px"
     assert _style(nav, ".tab-badge", "height") == "16px"
-
-
-# ------------------------------------- status-bar scrim and pill fade
-# Chromium can't emulate `display-mode: standalone`, so the harness adds a copy
-# of nav-tabs.css with that query opened to `all`; the safe-area inset is set
-# through CDP. What it proves is the layer's geometry and colours, not iOS
-# compositing: the on-device check stays the owner's.
-
-_INSET_TOP = 59  # an iPhone's status-bar inset, in CSS px
-_INSET_BOTTOM = 34
-_PHONE_H = 844
-_FADE = 32  # nav-tabs.css: the fade starts this far above the pill's top edge
-_RED = (255, 0, 0)
-_TOP_SOLID = 0.55  # nav-tabs.css: the top scrim is solid for this share of the inset
-
-_FILL_JS = """() => {
-  document.querySelectorAll('body > :not(.tabs):not(.app)')
-    .forEach((e) => { e.style.display = 'none'; });
-  const pane = document.querySelector('#paneHome');
-  pane.replaceChildren();
-  pane.insertAdjacentHTML('beforeend',
-    '<div id="fill" style="height: 2400px; background: rgb(255, 0, 0)"></div>');
-}"""
-
-
-@pytest.fixture()
-def nav_standalone(static_server: str, browser: Browser) -> Iterator[Page]:
-    """The phone pill with the standalone shell forced on and an iPhone inset."""
-    if browser.browser_type.name != "chromium":
-        pytest.skip("the safe-area inset override is a Chromium CDP call")
-    context = browser.new_context(
-        viewport={"width": 390, "height": _PHONE_H},
-        has_touch=True,
-        is_mobile=True,
-        device_scale_factor=1,
-    )
-    page = context.new_page()
-    try:
-        cdp = context.new_cdp_session(page)
-        cdp.send(
-            "Emulation.setSafeAreaInsetsOverride",
-            {"insets": {"top": _INSET_TOP, "bottom": _INSET_BOTTOM}},
-        )
-        # Headless Chromium reports reduced transparency by default, which
-        # would hide both gradients; the reduce branch has its own test.
-        _set_transparency(cdp, "no-preference")
-        mount_nav(page, static_server)
-        css = (NAV_DIR / "nav-tabs.css").read_text(encoding="utf-8")
-        assert "(display-mode: standalone)" in css
-        page.add_style_tag(content=css.replace("(display-mode: standalone)", "all"))
-        page.evaluate(_FILL_JS)
-        assert _style(page, ".app", "position") == "fixed", "standalone shell not forced on"
-        yield page
-    finally:
-        context.close()
-
-
-def _set_transparency(cdp: CDPSession, value: str) -> None:
-    cdp.send(
-        "Emulation.setEmulatedMedia",
-        {"features": [{"name": "prefers-reduced-transparency", "value": value}]},
-    )
-
-
-def _pixel(page: Page, x: int, y: int) -> tuple[int, int, int]:
-    img = Image.open(io.BytesIO(page.screenshot()))
-    r, g, b = img.convert("RGB").getpixel((x, y))
-    return r, g, b
-
-
-def _scroll_app(page: Page, top: int | None) -> None:
-    """Scroll the standalone `.app` scroller; None scrolls to the end."""
-    page.evaluate(
-        "(y) => { const a = document.querySelector('.app');"
-        " a.scrollTop = y ?? a.scrollHeight; }",
-        top,
-    )
-
-
-def test_no_scrim_outside_the_standalone_shell(nav: Page, nav_mobile: Page) -> None:
-    """Desktop and the phone browser tab keep no scrim layer at all."""
-    for page in (nav, nav_mobile):
-        assert _pseudo_content(page, "body", "::before") == "none"
-
-
-@pytest.mark.parametrize("theme", ["light", "dark"])
-def test_standalone_scrim_hides_content_under_the_status_bar(
-    nav_standalone: Page, theme: str
-) -> None:
-    """Scrolled content never shows behind the status bar or the screen edge below the pill.
-
-    Both bands paint the page background (`--bg`) in each theme; content is
-    fully visible between them, and dimmed (neither red nor the background)
-    in the fade just above the pill. Sampled at x=16, inside the 12px content gutter but outside the pill's 21px
-    side margin, so the bar's own glass never enters the reading.
-    """
-    page = nav_standalone
-    _set_theme(page, theme)
-    bg = _rgba(_style(page, "body", "backgroundColor"))[:3]
-    _scroll_app(page, 400)
-    pill_top = _PHONE_H - 21 - 61
-    solid = int(_INSET_TOP * _TOP_SOLID)
-    assert _pixel(page, 195, 5) == bg
-    assert _pixel(page, 195, solid - 2) == bg  # the clock and battery stay clean
-    # The fade runs inside the status-bar band: content shows partly before the
-    # band ends, and is fully visible from its bottom edge on.
-    assert _pixel(page, 195, _INSET_TOP - 4) not in (_RED, bg)
-    assert _pixel(page, 195, _INSET_TOP + 2) == _RED
-    assert _pixel(page, 16, pill_top - _FADE - 2) == _RED
-    mid = _pixel(page, 16, pill_top - _FADE // 2)
-    assert mid not in (_RED, bg), mid
-    assert _pixel(page, 16, _PHONE_H - 5) == bg
-    assert _pseudo_content(page, "body", "::before") != "none"
-
-
-def test_standalone_scrim_leaves_the_first_card_undimmed_at_scroll_top(
-    nav_standalone: Page,
-) -> None:
-    """At rest the first card starts at the inset, and nothing of it sits under the scrim."""
-    page = nav_standalone
-    _scroll_app(page, 0)
-    top = page.evaluate("() => document.querySelector('#fill').getBoundingClientRect().top")
-    assert top >= _INSET_TOP, top
-    assert _pixel(page, 195, int(top) + 1) == _RED
-    assert _pixel(page, 195, int(top) + 6) == _RED
-
-
-def test_standalone_scrim_leaves_the_last_row_clear_and_tappable(
-    nav_standalone: Page,
-) -> None:
-    """Scrolled to the end, the content's last pixel sits above the fade band and takes taps."""
-    page = nav_standalone
-    _scroll_app(page, None)
-    bottom = page.evaluate("() => document.querySelector('#fill').getBoundingClientRect().bottom")
-    band_top = _PHONE_H - 21 - 61 - _FADE
-    assert bottom <= band_top, (bottom, band_top)
-    assert _pixel(page, 195, int(bottom) - 2) == _RED
-    hit = page.evaluate(f"() => document.elementFromPoint(195, {int(bottom) - 2}).id")
-    assert hit == "fill"
-    # The status-bar band is inert too: a tap there still reaches the content.
-    assert page.evaluate("() => document.elementFromPoint(195, 5).id") == "fill"
-
-
-def test_standalone_scrim_paints_nothing_without_a_safe_area(nav_standalone: Page) -> None:
-    """With a zero top inset (no notch) the top band and its tail vanish."""
-    page = nav_standalone
-    cdp = page.context.new_cdp_session(page)
-    cdp.send("Emulation.setSafeAreaInsetsOverride", {"insets": {"top": 0, "bottom": 0}})
-    _scroll_app(page, 400)
-    assert _pixel(page, 195, 0) == _RED
-
-
-def test_standalone_scrim_under_reduced_transparency_is_the_solid_band_alone(
-    nav_standalone: Page,
-) -> None:
-    """Reduce Transparency keeps the status-bar band and drops both gradients."""
-    page = nav_standalone
-    _set_transparency(page.context.new_cdp_session(page), "reduce")
-    bg = _rgba(_style(page, "body", "backgroundColor"))[:3]
-    _scroll_app(page, 400)
-    assert _pixel(page, 195, _INSET_TOP - 1) == bg
-    assert _pixel(page, 195, _INSET_TOP + 1) == _RED
-    assert _pixel(page, 16, _PHONE_H - 5) == _RED

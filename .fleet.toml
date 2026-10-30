@@ -219,8 +219,9 @@ prefixes       = ["app/webapp/static/_vendored/nav/"]
 # The font-inherit harness also mounts the real nav (#319), and the row-menu
 # placement harness lays out the real pill the menu fits against (#362), so a
 # nav edit runs both.
-paths          = ["tests/e2e/test_vendored_nav.py"]
+paths          = ["tests/e2e/test_nav_offset.py", "tests/e2e/test_vendored_nav.py"]
 pytest_targets = [
+    "tests/e2e/test_nav_offset.py",
     "tests/e2e/test_vendored_font_inherit.py",
     "tests/e2e/test_vendored_nav.py",
     "tests/e2e/test_vendored_row_menu_placement.py",

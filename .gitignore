@@ -53,3 +53,4 @@ data/input/*
 # OS
 .DS_Store
 Thumbs.db
+.proof/
