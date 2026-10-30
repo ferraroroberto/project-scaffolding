@@ -415,8 +415,8 @@ def test_load_config_reads_surfaces_relative_to_the_toml(tmp_path: Path) -> None
 # The row-menu placement harness loads row-menu.js and the real pill by URL, so
 # both surfaces that own those files run it (#393).
 _NAV_TARGETS = (
-    "tests/e2e/test_vendored_font_inherit.py tests/e2e/test_vendored_nav.py "
-    "tests/e2e/test_vendored_row_menu_placement.py")
+    "tests/e2e/test_nav_offset.py tests/e2e/test_vendored_font_inherit.py "
+    "tests/e2e/test_vendored_nav.py tests/e2e/test_vendored_row_menu_placement.py")
 _COMPONENTS_TARGETS = (
     "tests/e2e/test_vendored_components.py tests/e2e/test_vendored_day.py "
     "tests/e2e/test_vendored_font_inherit.py tests/e2e/test_vendored_home_head.py "
