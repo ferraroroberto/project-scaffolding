@@ -1,6 +1,6 @@
 # Structure ratchet
 
-`scripts/structure_ratchet.py` is a baseline-and-ratchet stage for the pre-ship gate. It enforces the [repo layout](repo-layout.md) with five checks: **file size**, **function length**, **flat directories**, the **layer contract** and the **root layout**. The first four fail when a new offender appears, or when a baselined one grows; existing offenders never block work, and they cannot grow either. A **near-limit band** holds the files and functions just under their limits to a shrink-only count, so a split that stops at 990 lines fails the same way. The root layout is never baselined.
+`scripts/structure_ratchet.py` is a baseline-and-ratchet stage for the pre-ship gate. It enforces the [repo layout](repo-layout.md) with seven checks: **file size**, **function length**, **flat directories**, the **layer contract**, the **root layout**, **extra roots** and **second-level placement**. All but the root layout fail when a new offender appears, or when a baselined one grows; existing offenders never block work, and they cannot grow either. A **near-limit band** holds the files and functions just under their limits to a shrink-only count, so a split that stops at 990 lines fails the same way. The root layout is never baselined.
 
 It reuses the shape of the [docs ratchet](docs-ratchet.md) and the [comment ratchet](comment-ratchet.md): an opt-in `.fleet.toml` table, a committed baseline, the same flags, and exit 3 for "not confirmed". It is its own script, and not a check inside the [static-analysis ratchet](static-ratchet.md), because that one needs Node and ruff; this one is stdlib-only and runs anywhere Python 3.11 does.
 
@@ -15,6 +15,8 @@ It reuses the shape of the [docs ratchet](docs-ratchet.md) and the [comment ratc
 | Unmeasured | A JS function whose end the scanner cannot find is recorded, never passed | `unmeasured:<path>` → `functions` |
 | Near-limit band | The count of files at **900–1,000 lines** and of functions at **90–100 lines** may not rise | `band` → `files`, `functions` |
 | Root layout | A required root folder with no tracked file fails; so does a tracked root folder the declared `shape` and `extra_roots` do not list | none: not baselined |
+| Extra root | A tracked `extra_roots` folder the shape's preset does not list fails when not recorded | `root_extras` → the folder names (top-level list) |
+| Second-level placement | A file under a home root (`webapp-tray`: `app/`, `src/`) that sits in no home fails when its folder is new or holds more than recorded | `place:<folder>` → `files` |
 
 Tests get the same limits as code. Each failure message names the rule, the limit, where the code goes instead, and the section of `docs/repo-layout.md` that says so:
 
@@ -24,7 +26,7 @@ structure ratchet: 1 finding(s) above the baseline:
       put the new module in a domain subpackage, src/<domain>/. See project-scaffolding docs/repo-layout.md#flat-directory
 ```
 
-The anchors (`#file-size`, `#function-length`, `#flat-directory`, `#layer-contract`, and one per shape id for the root layout) are pinned by a test, so renaming a heading in `repo-layout.md` fails until the script follows.
+The anchors (`#file-size`, `#function-length`, `#flat-directory`, `#layer-contract`, `#extra-roots`, `#second-level-placement`, and one per shape id for the root layout) are pinned by a test, so renaming a heading in `repo-layout.md` fails until the script follows.
 
 ## What is measured
 
@@ -48,12 +50,12 @@ A function expression takes the name it is bound to (`const mountHome = async ()
 
 ### Root layout
 
-The check reads the top-level `shape` and `extra_roots` keys of the repo's own `.fleet.toml` (not the `[structure_ratchet]` table) and the root folders from the same file list as the other checks (`git ls-files --cached --others --exclude-standard`), so a new untracked folder counts as a root and an ignored one does not. A shape's preset lives in the script (`SHAPES`), which keeps the script vendor-verbatim; this table is the same data, and a test compares the two.
+The presets and the three layout checks live in the sibling `scripts/structure_layout.py`, which `structure_ratchet.py` loads; a missing sibling is exit 3, never a skip. The check reads the top-level `shape` and `extra_roots` keys of the repo's own `.fleet.toml` (not the `[structure_ratchet]` table) and the root folders from the same file list as the other checks (`git ls-files --cached --others --exclude-standard`), so a new untracked folder counts as a root and an ignored one does not. A shape's preset lives in `structure_layout.py` (`SHAPES`), which keeps both scripts vendor-verbatim; this table is the same data, and a test compares the two.
 
 | `shape` | Required root folders | Also allowed | `layers` default |
 |---|---|---|---|
-| `webapp-tray` | `app`, `src`, `tests`, `docs` | `scripts`, `data`, `brand`, `assets`, `config` | `[["src", "app"]]` |
-| `streamlit` | `app`, `src`, `tests` | `scripts`, `data`, `brand` | `[["src", "app"]]` |
+| `webapp-tray` | `app`, `src`, `tests`, `docs` | `scripts`, `data`, `brand`, `assets`, `config`, `webapp` | `[["src", "app"]]` |
+| `streamlit` | `app`, `src`, `tests` | `scripts`, `data`, `brand`, `config` | `[["src", "app"]]` |
 | `pipeline-cli` | `tests` | `src`, `common`, `scripts`, `config`, `data` | none |
 | `skills-governance` | `skills`, `tests` | `hooks`, `scripts`, `architecture` | none |
 | `node` | `src` | `test`, `scripts` | none |
@@ -65,10 +67,26 @@ The check reads the top-level `shape` and `extra_roots` keys of the repo's own `
 
 - **A required folder with no tracked file** fails by name; the fix is to add it, or to correct `shape`.
 - **A tracked root folder** that is in neither the preset nor `extra_roots` fails by name. The message names the shape, the folder and both fixes: move the code into a listed folder, or declare the folder in `extra_roots` with a line in the repo's `docs/layout.md`.
-- **A declared exception is data**, not debt: nothing about the layout enters the baseline, `--init` and `--update-baseline` never touch it, and removing a folder from `extra_roots` fails the next run if the folder is still tracked.
+- **A declared exception is recorded, not free**: removing a folder from `extra_roots` fails the next run if the folder is still tracked, and the undeclared-root finding itself is never baselined (see Extra roots).
 - **No `shape`** prints `layout check not applicable` and skips that one check; the other four still run, so re-vendoring never breaks a repo that has not declared one. This is a declared skip, never a pass: the PASS line names the shape only when the layout was checked.
 - **An unknown `shape`** is exit 3, not a skip: the layout cannot be checked against a tree that does not exist. A `shape` that is not a string, or an `extra_roots` that is not a list of single folder names, is exit 2.
 - **`layers`**: when the table does not set it, a shape with a layer pair supplies it (`src` never imports `app` for `webapp-tray` and `streamlit`); a repo with no `shape` keeps the default pair.
+
+### Extra roots
+
+A folder in `extra_roots` that is tracked and that the shape's preset does not list is a deviation. `--init` records the deviations in the baseline's top-level `root_extras` list. The check fails on a deviation that is not in the list; `--update-baseline` drops a name once the folder is gone or promoted into the preset, and adding one takes `--allow-additions`. A name the preset already lists is no deviation, whatever `.fleet.toml` still says, so promoting a folder into a preset needs no baseline edit. The reason for each declared folder is a comment beside it in `.fleet.toml` and a line in `docs/layout.md`.
+
+### Second-level placement
+
+A shape may declare `homes` (path patterns: `dir/` is the folder and everything below it, `dir/*.py` a file directly in `dir`). A file under one of the roots the homes name that matches no home is misplaced. The ratchet counts misplaced files per folder (`place:<folder>`) and fails on a new folder or a higher count, naming the homes. Only `webapp-tray` declares homes; the other shapes follow if it proves useful.
+
+```
+structure ratchet: 1 finding(s) above the baseline:
+  [placement] app/webapp/templates/ holds 2 file(s) outside the homes of the webapp-tray tree; baseline 1
+      move it into one of this shape's homes (app/<module>.py, app/cli/, app/tray/, ...), or into a domain subpackage of src/. See project-scaffolding docs/repo-layout.md#second-level-placement
+```
+
+**A baseline written before this existed** has no `root_extras`. It loads unchanged: the check passes on both and prints that they are not recorded yet, so no adopter fails on the day it re-vendors. The next `--update-baseline` (no `--allow-additions` needed) records today's state, and from then on it may only shrink.
 
 ### Limits
 
@@ -122,9 +140,11 @@ Committed, sorted JSON, one entry per line, with no line numbers:
 {
   "version": 1,
   "band": {"files": 6, "functions": 31},
+  "root_extras": ["spike"],
   "entries": [
     {"key": "dir:tests", "modules": 52},
     {"key": "fn:app/webapp/static/composer.js:mountComposer", "lines": 500},
+    {"key": "place:app/webapp/templates", "files": 2},
     {"key": "size:tests/e2e/test_components.py", "lines": 1496}
   ]
 }
@@ -147,7 +167,7 @@ The fix for a failure is to put the code where the layout says. `--allow-additio
 
 Re-vendoring the script never breaks a repo that has not opted in: an absent `[structure_ratchet]` table, or `enabled = false`, prints `structure ratchet: not enabled` and exits 0 (declared, not inferred).
 
-1. Vendor `scripts/structure_ratchet.py` byte-for-byte (`/propagate-vendored structure_ratchet`; manifest key `structure_ratchet`) and declare it in the repo's `[vendored]` table. It is stdlib-only and needs Python 3.11+ (`tomllib`).
+1. Vendor `scripts/structure_ratchet.py` and its sibling `scripts/structure_layout.py` byte-for-byte (`/propagate-vendored structure_ratchet,structure_layout`; manifest keys `structure_ratchet` and `structure_layout`) and declare both in the repo's `[vendored]` table. It is stdlib-only and needs Python 3.11+ (`tomllib`).
 2. Add to the repo's own `.fleet.toml`:
 
    ```toml
