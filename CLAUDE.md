@@ -100,6 +100,7 @@ Diff-keyed gate at finish: checks the touched web UI still conforms to the desig
 - **Back off what is failing** and **cap the fan-out** (`asyncio.Semaphore(N)`) — prose only, no vendored helper.
 - **Do not leak child processes:** an e2e suite closes every browser/context it opens, even on a failed run; the `tests/e2e/_browser_sweep.py` sweep classifies before it kills, reports what it can't establish as unknown, and never kills by image name.
 - Full text, including the three sweep findings any rewrite must keep: `docs/long-lived-process-conventions.md` → "Outbound-connection discipline".
+- **Soak the booted app for leaks:** the gate drives its poll routes (`tests/soak/_resource_soak.py`, key `resource_soak`) and fails on thread/handle growth, exit 3 NOT CONFIRMED when unmeasurable; `src/resource_probe.py` (key `resource_probe`) `start_breadcrumb(logger)` logs `threads=… handles=… rss=…`. Full text: `docs/long-lived-process-conventions.md` → "Resource soak".
 
 ## Runtime data lives on a fast drive, not wherever the repo was cloned
 *Apply only if this project persists SQLite (or similar fsync-heavy state) from a long-lived process.*

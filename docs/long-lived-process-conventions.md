@@ -26,6 +26,17 @@ Windows ephemeral-port exhaustion (global `CLAUDE.md`) makes a fresh-connection-
   - **Reclassifying is not fixing.** Nothing can reap a wedge, so the e2e conftest starts the Playwright driver from a neutral cwd (`gettempdir()`, never `mkdtemp()`) and every spawned helper roots in `%TEMP%` instead of the checkout; a pinned directory is freed by closing the holder's cwd handle remotely, never by rebooting the host.
   - Full pattern, abort-cascade matrix, liveness discriminator, PEB cwd-attribution trick: `docs/playwright-ui-testing.md` → "Post-run sweep for leaked browser helpers".
 
+## Resource soak (thread/handle leak gate + runtime breadcrumb)
+*Apply only if this project runs a long-lived webapp or daemon.*
+
+A webapp that starts a thread or opens a handle per request looks healthy until the machine runs out of both, and a gate that never runs the app for more than a request or two cannot see it.
+
+- **Soak in the gate — `/propagate-vendored` components `tests/soak/_resource_soak.py` (key `resource_soak`) + `src/resource_probe.py` (key `resource_probe`).** Booting the disposable instance stays the caller's job (see "End-to-end UI testing" in `CLAUDE.md`). Call `run_soak(pid, base_url, routes)` from a pytest test, or run `python -m tests.soak._resource_soak --pid <pid> --base-url <url> --route <poll route> [--route …]`. It warms up, samples, drives `--cycles` rounds of the routes the UI polls, samples again, and prints the thread, handle and RSS numbers either way. Descendants of the pid are counted, so a Windows venv launcher is fine.
+- **Verdicts:** exit 0 within budget, 1 leak (threads or handles grew past the per-cycle budget, default 0.05 threads and 0.25 handles per cycle), 3 NOT CONFIRMED (dead process, unreachable app, a route that is not 2xx, a platform with no sampler). RSS is reported, never gated: too noisy for a fixed budget over a short run. Pass the app's real poll routes, not `/healthz` alone, since a leak lives in the handler that does work.
+- **Cost:** the default soak is 10 warm-up and 40 measured rounds plus about 1.5 s of settling, so roughly 2 s for two routes; this repo's proof against leaking and fixed fixture apps (`tests/soak/test_resource_soak.py`) runs in about 13 s.
+- **Breadcrumb — `src/resource_probe.py`.** Call `stop = start_breadcrumb(logging.getLogger(__name__))` once at app startup; it logs `ℹ️ resources threads=12 handles=340 rss=85.3MB` immediately and every 300 s, so a leak in production is diagnosable from the log. A sample it cannot take logs one warning and stops.
+- Linux reads `/proc`, Windows uses `ctypes`; any other platform is NOT CONFIRMED, never skipped.
+
 ## Runtime data lives on a fast drive, not wherever the repo was cloned
 *Apply only if this project persists SQLite (or similar fsync-heavy state) from a long-lived process.*
 

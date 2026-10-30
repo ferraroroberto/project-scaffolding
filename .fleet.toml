@@ -516,6 +516,8 @@ surface_capture = { src = "tests/e2e/_surface.py" }
 # The screenshot baseline's capture half; its comparison is `shot_baseline` below.
 shot_capture    = { src = "tests/e2e/_shot.py" }
 layout_lint     = { src = "tests/e2e/_layout_lint.py" }
+# The resource soak (needs `resource_probe`); not a browser helper, so it lives in its own tests/soak/ folder.
+resource_soak   = { src = "tests/soak/_resource_soak.py" }
 
 # Scripts + library modules copied byte-for-byte into adopters.
 classify_e2e    = { src = "scripts/classify_e2e.py" }
@@ -538,3 +540,4 @@ doc_capture     = { src = "src/doc_capture" }
 build_info      = { src = "src/build_info.py" }
 usage_log       = { src = "src/usage_log.py" }
 compression     = { src = "src/compression.py" }
+resource_probe  = { src = "src/resource_probe.py" }
