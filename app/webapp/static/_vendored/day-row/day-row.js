@@ -91,11 +91,13 @@ export function dayRow(o) {
   const title = document.createElement('span');
   title.className = 'action-row-title';
   title.textContent = o.title;
+  title.title = o.title;
   text.appendChild(title);
   if (o.meta) {
     const meta = document.createElement('span');
     meta.className = 'action-row-meta';
     meta.textContent = o.meta;
+    meta.title = o.meta;
     text.appendChild(meta);
   }
   main.append(tile, text);

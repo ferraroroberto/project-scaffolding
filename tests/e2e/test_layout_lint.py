@@ -5,7 +5,9 @@ overflowing a phone sheet, a clipped chip label, an overlapping button);
 `?fixed=1` repairs them. Each test node runs one `capture_states` call, which
 covers phone and desktop in light and dark, so the matrix costs one node per
 page, not four. A Streamlit node proves the same helper runs against a real
-`streamlit run` with no per-engine code.
+`streamlit run` with no per-engine code. A gallery node holds the vendored
+component gallery to the lint with no `allow` entries: every adopter copies
+those components, so a defect there ships fleet-wide.
 """
 
 from __future__ import annotations
@@ -85,6 +87,15 @@ def test_proof_dir_defaults_outside_the_checkout(monkeypatch: pytest.MonkeyPatch
     monkeypatch.setenv("UI_PROOF_DIR", str(_FIXTURES))
     with pytest.raises(ValueError, match="never go in a checkout"):
         proof_dir()
+
+
+def test_component_gallery_lints_clean(static_server: str, browser: Browser, out_dir: Path) -> None:
+    def gallery(page: Page) -> None:
+        page.goto(f"{static_server}/_vendored/demo.html")
+        page.wait_for_selector("body[data-demo-ready='1']")
+
+    manifest = capture_states(browser, {"gallery.all": gallery}, out_dir=out_dir)
+    assert len(manifest.entries) == 4
 
 
 def test_streamlit_welcome_view_lints_clean(streamlit_app: str, browser: Browser, out_dir: Path) -> None:
