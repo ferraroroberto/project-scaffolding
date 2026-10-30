@@ -420,8 +420,8 @@ _NAV_TARGETS = (
 _COMPONENTS_TARGETS = (
     "tests/e2e/test_vendored_components.py tests/e2e/test_vendored_day.py "
     "tests/e2e/test_vendored_font_inherit.py tests/e2e/test_vendored_home_head.py "
-    "tests/e2e/test_vendored_nav.py tests/e2e/test_vendored_row_menu.py "
-    "tests/e2e/test_vendored_row_menu_placement.py")
+    "tests/e2e/test_vendored_nav.py tests/e2e/test_vendored_rec_wave.py "
+    "tests/e2e/test_vendored_row_menu.py tests/e2e/test_vendored_row_menu_placement.py")
 
 
 def test_real_surfaces_route_representative_paths() -> None:

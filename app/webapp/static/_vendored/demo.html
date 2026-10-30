@@ -155,6 +155,7 @@
   }
   .demo-day-cell.today { background: var(--accent-soft); color: var(--accent-text); }
   .demo-day-num { font-size: var(--font-body-sm); font-weight: 600; font-variant-numeric: tabular-nums; }
+  .demo-rec { display: inline-flex; align-items: center; gap: var(--space-sm); }
 </style>
 <!-- base.css loads FIRST: element-level rules every component builds on. -->
 <link rel="stylesheet" href="base/base.css">
@@ -176,6 +177,7 @@
 <link rel="stylesheet" href="day-marks/day-marks.css">
 <link rel="stylesheet" href="text-size/text-size.css">
 <link rel="stylesheet" href="toast/toast.css">
+<link rel="stylesheet" href="rec-wave/rec-wave.css">
 <link rel="stylesheet" href="row-menu/row-menu.css">
 </head>
 <body>
@@ -627,6 +629,15 @@
     <button type="button" class="button-tint" id="demoToastError">Show error</button>
   </div>
 
+  <h2>rec-wave (idle, live, silent mic, reduced motion, no Web Audio)</h2>
+  <div class="card" id="demoRecWave" style="display: flex; flex-wrap: wrap; gap: var(--space-sm);">
+    <button type="button" class="button-primary demo-rec" id="demoRecIdle"><span><svg class="icon" aria-hidden="true"><use href="#i-mic"></use></svg></span>Record</button>
+    <button type="button" class="button-tint danger demo-rec" id="demoRecLive"><span id="demoRecLiveHost"><svg class="icon" aria-hidden="true"><use href="#i-mic"></use></svg></span>Stop</button>
+    <button type="button" class="button-tint danger demo-rec" id="demoRecSilent"><span id="demoRecSilentHost"><svg class="icon" aria-hidden="true"><use href="#i-mic"></use></svg></span>Stop</button>
+    <button type="button" class="button-tint danger demo-rec" id="demoRecReduced"><span id="demoRecReducedHost"><svg class="icon" aria-hidden="true"><use href="#i-mic"></use></svg></span>Stop</button>
+    <button type="button" class="button-tint danger demo-rec" id="demoRecNone"><span id="demoRecNoneHost"><svg class="icon" aria-hidden="true"><use href="#i-mic"></use></svg></span>Stop</button>
+  </div>
+
   <h2>row-menu (kebab menu, inside a sideways-scrolling column)</h2>
   <div class="card" style="display: flex; flex-direction: column; gap: var(--space-sm);">
     <!-- A fixed-height sideways scroller: its overflow-x forces overflow-y to
@@ -679,6 +690,7 @@
   import { buildReadoutText } from './page-foot/page-foot.js';
   import { bindTextSize } from './text-size/text-size.js';
   import { showToast } from './toast/toast.js';
+  import { attachRecWave } from './rec-wave/rec-wave.js';
   import { renderHeadStatus } from './home-head/home-head.js';
   import { createRowMenu } from './row-menu/row-menu.js';
   import { dayRow } from './day-row/day-row.js';
@@ -766,6 +778,17 @@
   document.getElementById('demoToastError').addEventListener('click', () => {
     showToast('Could not reach the server', 'error', { ms: 0 });
   });
+
+  // rec-wave: a fixed level source stands in for the mic; `silenceMs: 1` reaches the silent verdict at once.
+  const demoSource = (loud, running = true) => ({
+    running, connect() {}, close() {}, read: (n) => !running ? null : { rms: loud ? 0.1 : 0,
+      levels: Array.from({ length: n }, (_, i) => loud ? Math.min(1, 0.25 + 0.7 * Math.abs(Math.sin(i * 0.9)) * (1 - Math.abs(i - n / 2) / n)) : 0) },
+  });
+  const wave = (id, source, extra) => attachRecWave(document.getElementById(id), null, { source, reducedMotion: false, ...extra });
+  wave('demoRecLiveHost', demoSource(true));
+  wave('demoRecSilentHost', demoSource(false), { silenceMs: 1 });
+  wave('demoRecReducedHost', demoSource(true), { reducedMotion: true });
+  wave('demoRecNoneHost', demoSource(false, false));
 
   // row-menu: the items are data. One hidden, one disabled (with its hint) and
   // one destructive show the whole contract; choosing writes the label out.
