@@ -845,7 +845,7 @@ def test_toast_contract(gallery: Page) -> None:
     expect(toast).to_have_attribute("aria-live", "polite")
     assert _style(gallery, "#toast", "position") == "fixed"
     # The nav-bar glass (--tabbar-bg), not a solid block and not a status colour.
-    assert _style(gallery, "#toast", "backgroundColor") == "rgba(255, 255, 255, 0.85)"
+    assert _style(gallery, "#toast", "backgroundColor") == "rgba(255, 255, 255, 0.62)"
     assert "blur(20px)" in _style(gallery, "#toast", "backdropFilter")
     assert _style(gallery, "#toast", "color") == "rgb(31, 35, 40)"
     assert _style(gallery, "#toast", "fontWeight") == "700"
@@ -864,13 +864,13 @@ def test_toast_contract(gallery: Page) -> None:
     expect(toast).to_have_attribute("aria-live", "assertive")
     assert _style(gallery, "#toast", "borderTopColor") == "rgb(207, 34, 46)"
     assert _style(gallery, "#toast", "color") == "rgb(255, 255, 255)"
-    assert _style(gallery, "#toast", "backgroundColor") != "rgba(255, 255, 255, 0.85)"
+    assert _style(gallery, "#toast", "backgroundColor") != "rgba(255, 255, 255, 0.62)"
     # The next neutral toast drops the tint again.
     gallery.click("#demoToastShow")
-    assert _style(gallery, "#toast", "backgroundColor") == "rgba(255, 255, 255, 0.85)"
+    assert _style(gallery, "#toast", "backgroundColor") == "rgba(255, 255, 255, 0.62)"
     # Dark: the same glass over the dark nav-bar fill.
     _set_theme(gallery, "dark")
-    assert _style(gallery, "#toast", "backgroundColor") == "rgba(22, 27, 34, 0.86)"
+    assert _style(gallery, "#toast", "backgroundColor") == "rgba(42, 45, 52, 0.55)"
     assert _style(gallery, "#toast", "color") == "rgb(230, 237, 243)"
 
 
