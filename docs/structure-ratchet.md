@@ -1,6 +1,6 @@
 # Structure ratchet
 
-`scripts/structure_ratchet.py` is a baseline-and-ratchet stage for the pre-ship gate. It enforces the [repo layout](repo-layout.md) with seven checks: **file size**, **function length**, **flat directories**, the **layer contract**, the **root layout**, **extra roots** and **second-level placement**. All but the root layout fail when a new offender appears, or when a baselined one grows; existing offenders never block work, and they cannot grow either. A **near-limit band** holds the files and functions just under their limits to a shrink-only count, so a split that stops at 990 lines fails the same way. The root layout is never baselined.
+`scripts/structure_ratchet.py` is a baseline-and-ratchet stage for the pre-ship gate. It enforces the [repo layout](repo-layout.md) with seven checks: **file size**, **function length**, **flat directories**, the **layer contract**, the **root layout**, **extra roots** and **second-level placement**. All but the root layout fail when a new offender appears, or when a baselined one grows; existing offenders never block work, and they cannot grow either. A **near-limit band** holds the files and functions just under their limits to a shrink-only count, so a split that stops at 990 lines fails the same way. A **warning band** lists every file, function and directory in that band on every check, without ever failing. The root layout is never baselined.
 
 It reuses the shape of the [docs ratchet](docs-ratchet.md) and the [comment ratchet](comment-ratchet.md): an opt-in `.fleet.toml` table, a committed baseline, the same flags, and exit 3 for "not confirmed". It is its own script, and not a check inside the [static-analysis ratchet](static-ratchet.md), because that one needs Node and ruff; this one is stdlib-only and runs anywhere Python 3.11 does.
 
@@ -115,6 +115,25 @@ A file at 990 lines blocks the next change just as a file at 1,001 does, so a sp
 - **One leaving the band** passes with the below-the-baseline hint; `--update-baseline` lowers the count. Raising it takes `--allow-additions`, like any entry.
 - **`near_limit_ratio`** (default `0.9`, a number strictly between 0 and 1) sets where the band starts for both files and functions; the band's top is always the limit itself. The lowest member is the limit times the ratio, rounded up.
 
+### Warning band
+
+Every check (the gate's mode, not `--init` or `--update-baseline`) prints the band's members before its verdict, so code approaching a limit shows up long before it blocks a change. It is informational: it never changes the exit code, whether the run passes or fails.
+
+- **What it lists:** files at 900–1,000 lines, functions at 90–100 lines, and directories holding 36–40 modules (with the defaults; `near_limit_ratio` sets all three, and the lowest member is the limit times the ratio, rounded up). Directories are listed but not ratcheted.
+- **One line each**, under a summary line. An empty band still prints the summary line with zero counts, so a clear band is never confused with one that was not computed:
+
+  ```
+  structure ratchet: warning band (90% of a limit; reported, never failed): 1 file(s), 1 function(s), 1 directory(s)
+    [warning] app/webapp/views.py: 958 lines
+    [warning] src/usage_log.py: usage_router() is 99 lines
+    [warning] tests/: 37 modules
+  structure ratchet: PASS (...)
+  ```
+
+- **Unknown, never clear:** a file with a JS function whose end the scanner cannot find has an unknown function band. The summary says `function band UNKNOWN in N file(s)` and the file is listed as `[unknown]`. When the tree cannot be measured at all (exit 3), the band is unknown too, and the NOT CONFIRMED message says so.
+
+The band's definition and the warning lines live in the sibling `scripts/structure_band.py`, loaded by path like `structure_layout.py`; a missing sibling is exit 3, never a skip.
+
 **A baseline written before the band existed** has no `band` object. It loads unchanged: the check passes on the band and prints that the band is not recorded yet, so no adopter fails on the day it re-vendors. The next `--update-baseline` (no `--allow-additions` needed) records today's counts, and from then on they may only shrink.
 
 ## Scope
@@ -167,7 +186,7 @@ The fix for a failure is to put the code where the layout says. `--allow-additio
 
 Re-vendoring the script never breaks a repo that has not opted in: an absent `[structure_ratchet]` table, or `enabled = false`, prints `structure ratchet: not enabled` and exits 0 (declared, not inferred).
 
-1. Vendor `scripts/structure_ratchet.py` and its sibling `scripts/structure_layout.py` byte-for-byte (`/propagate-vendored structure_ratchet,structure_layout`; manifest keys `structure_ratchet` and `structure_layout`) and declare both in the repo's `[vendored]` table. It is stdlib-only and needs Python 3.11+ (`tomllib`).
+1. Vendor `scripts/structure_ratchet.py` and its siblings `scripts/structure_layout.py` and `scripts/structure_band.py` byte-for-byte (`/propagate-vendored structure_ratchet,structure_layout,structure_band`; manifest keys `structure_ratchet`, `structure_layout` and `structure_band`) and declare all three in the repo's `[vendored]` table. It is stdlib-only and needs Python 3.11+ (`tomllib`).
 2. Add to the repo's own `.fleet.toml`:
 
    ```toml
@@ -203,4 +222,4 @@ One pass reads every in-scope file once and parses each Python file once; the AS
 
 `tests/ratchets/test_structure_ratchet.py`: Python and JS spans on fixture strings (nesting, methods, arrows, a closure of several hundred lines, braces inside strings, templates, comments and regexes, an unterminated function), the layer match and what it must not match, directory counts, and the full ratchet matrix per check on throwaway git repos (a new offender fails, a baselined one passes at its size, growth fails, a shrink lowers the entry, `--update-baseline` never adds, `--allow-additions` adds), the failure message per rule, scope and vendored exclusion, and every exit code. A missing prerequisite is a hard failure, never `pytest.skip`. Root-layout tests cover each shape's required set, an undeclared root, a declared extra root, no `shape` and an unknown `shape`. The self-adoption tests pin the gate order, the catalog entry, the anchors and limits in `docs/repo-layout.md`, and that the presets in the script match the table above.
 
-`tests/ratchets/test_structure_ratchet_band.py`: the near-limit band on throwaway git repos: the ratio's default, range and rounding; a new file or function in the band fails with its split target; a split that lands just under the limit fails; one leaving lets `--update-baseline` lower the count; one entering while another leaves passes; `--allow-additions` raises it; a baseline from before the band passes, then is recorded and ratcheted; a malformed `band` is a baseline error; and the scaffold records its own band.
+`tests/ratchets/test_structure_ratchet_band.py`: the near-limit band on throwaway git repos: the ratio's default, range and rounding; a new file or function in the band fails with its split target; a split that lands just under the limit fails; one leaving lets `--update-baseline` lower the count; one entering while another leaves passes; `--allow-additions` raises it; a baseline from before the band passes, then is recorded and ratcheted; a malformed `band` is a baseline error; the scaffold records its own band; and the warning band lists files, functions and directories in the band without changing the exit code on a pass or a failure, prints a clear band with zero counts, and reports an unmeasured function's band as unknown.

@@ -138,6 +138,7 @@ scripts/
   static_ratchet.py            gate stage: new duplicate code, unused names or bug/security patterns may not rise above a committed baseline
   structure_ratchet.py        gate stage: oversized files/functions, flat directories, src->app imports, extra roots and misplaced files may not rise above a committed baseline
   structure_layout.py         the structure ratchet's sibling: shape presets, extra roots, second-level placement (vendored with it)
+  structure_band.py           the structure ratchet's sibling: the near-limit band and its never-failing warning lines (vendored with it)
   usage_summary.py           per-view / per-control / device summary of an app's usage.sqlite3, --time = foreground minutes (exit 2 = no data yet)
   vendored_catalog.py         reads .fleet.toml's [components] table, the vendor-verbatim component catalog
   verify-before-ship.ps1       the one pass/fail pre-ship gate, sequencing every stage above
