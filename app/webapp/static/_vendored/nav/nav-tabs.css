@@ -244,7 +244,7 @@
        sibling of .app: iOS captures fixed descendants of scrollers. */
     /* Top = the safe area plus the top fade's height, so the first card at
        scroll-top starts where the fade ends and is never dimmed. */
-    padding: calc(env(safe-area-inset-top, 0px) + 4px) var(--gap) calc(
+    padding: calc(env(safe-area-inset-top, 0px) + var(--nav-fade-band, 24px)) var(--gap) calc(
       env(safe-area-inset-bottom, 0px) + var(--bottom-tabs-margin, 21px) +
       var(--bottom-tabs-height, 61px) + var(--bottom-tabs-margin, 21px) + var(--gap)
     );
@@ -296,42 +296,57 @@
     inset: 0;
   }
 
-  /* Scroll-edge fade under the bar: an inert band anchored to the screen
-     bottom like the bar itself, transparent 16px above the bar's top edge and
-     the page background from its bottom edge down, so rows dim into the bar
-     instead of showing through the glass hard-edged. Above .app, below the
-     bar's 120; pointer-events: none so taps reach the row beneath. */
+  /* Scroll-edge fades: a gentle hint that more content lies past each edge,
+     never a wall. Over a short band the page background covers content fast
+     to --nav-fade-mid at --nav-fade-knee of the band, then a long light tail
+     reaches the solid page colour at the edge. One curve, both edges, so the
+     two fades read as one design. The knee is a number (a fraction of the
+     band) because calc() cannot multiply a length by a percentage. Apps may
+     tune the three tokens; the stops below are derived from them. Declared
+     on the bands themselves, not :root, so --bg resolves where the band
+     paints, whichever element an app sets its dark theme on. */
+  body::before,
+  body::after {
+    --nav-fade-stops:
+      transparent 0,
+      color-mix(in srgb, var(--bg) calc(var(--nav-fade-mid, 50%) * 0.65), transparent)
+        calc(var(--nav-fade-band, 24px) * var(--nav-fade-knee, 0.3) / 2),
+      color-mix(in srgb, var(--bg) var(--nav-fade-mid, 50%), transparent)
+        calc(var(--nav-fade-band, 24px) * var(--nav-fade-knee, 0.3)),
+      color-mix(in srgb, var(--bg) calc(var(--nav-fade-mid, 50%) + (100% - var(--nav-fade-mid, 50%)) * 0.35), transparent)
+        calc(var(--nav-fade-band, 24px) * (var(--nav-fade-knee, 0.3) + 1) / 2),
+      var(--bg) var(--nav-fade-band, 24px);
+  }
+  /* Bottom fade: an inert band anchored to the screen bottom like the bar,
+     fading over the band just above the bar's top edge and solid page colour
+     from there down, so rows never show through the glass hard-edged. Above
+     .app, below the bar's 120; pointer-events: none so taps reach the row
+     beneath. The .app bottom reserve clears the band, so the last row at
+     scroll-end is never dimmed. */
   body::before {
     content: '';
     position: fixed;
     left: 0;
     right: 0;
     bottom: 0;
-    height: calc(16px + var(--bottom-tabs-height, 61px) + var(--bottom-tabs-margin, 21px));
+    height: calc(var(--nav-fade-band, 24px) + var(--bottom-tabs-height, 61px) + var(--bottom-tabs-margin, 21px));
     z-index: 110;
     pointer-events: none;
-    background: linear-gradient(transparent, var(--bg) calc(16px + var(--bottom-tabs-height, 61px)));
+    background: linear-gradient(to bottom, var(--nav-fade-stops));
   }
-  /* Top fade, the same look as the shared nav under a translucent status
-     bar: there the band is solid behind the clock and eases out below it.
-     The `default` status bar is opaque in the page colour (theme-color), so
-     it is the solid part and only the eased tail is drawn, 4px tall, inside
-     the .app top padding. */
+  /* Top fade: the `default` status bar is opaque in the page colour
+     (theme-color), so the band is drawn just below it, inside the .app top
+     padding, with the same curve pointing up. */
   body::after {
     content: '';
     position: fixed;
     top: 0;
     left: 0;
     right: 0;
-    height: calc(env(safe-area-inset-top, 0px) + 4px);
+    height: calc(env(safe-area-inset-top, 0px) + var(--nav-fade-band, 24px));
     z-index: 110;
     pointer-events: none;
-    background: linear-gradient(
-      var(--bg) env(safe-area-inset-top, 0px),
-      color-mix(in srgb, var(--bg) 78%, transparent) calc(env(safe-area-inset-top, 0px) + 1.5px),
-      color-mix(in srgb, var(--bg) 35%, transparent) calc(env(safe-area-inset-top, 0px) + 3px),
-      transparent
-    );
+    background: linear-gradient(to top, var(--nav-fade-stops));
   }
   @media (prefers-reduced-transparency: reduce) {
     body::before,
@@ -345,14 +360,25 @@
      Standalone only: in a browser tab lvh would hide the bar under the
      toolbar. vh first: on iOS it equals the large viewport too. */
   @media (display-mode: standalone) {
+    /* The scrollable-document floor keys to the large viewport here: iOS
+       resizes the installed app's viewport on a cold launch and again each
+       time the keyboard closes, and a dvh floor re-laid out the whole
+       document on every frame of that resize, which painted as the page
+       sliding. lvh is the final height from the first frame, so the floor
+       never moves. A browser tab keeps dvh, where lvh would make a short tab
+       scroll by the toolbar's height. */
+    html {
+      min-height: calc(100vh + 1px);
+      min-height: calc(100lvh + 1px);
+    }
     .tabs {
       top: calc(100vh - var(--bottom-tabs-margin, 21px) - var(--bottom-tabs-height, 61px));
       top: calc(100lvh - var(--bottom-tabs-margin, 21px) - var(--bottom-tabs-height, 61px));
       bottom: auto;
     }
     body::before {
-      top: calc(100vh - 16px - var(--bottom-tabs-height, 61px) - var(--bottom-tabs-margin, 21px));
-      top: calc(100lvh - 16px - var(--bottom-tabs-height, 61px) - var(--bottom-tabs-margin, 21px));
+      top: calc(100vh - var(--nav-fade-band, 24px) - var(--bottom-tabs-height, 61px) - var(--bottom-tabs-margin, 21px));
+      top: calc(100lvh - var(--nav-fade-band, 24px) - var(--bottom-tabs-height, 61px) - var(--bottom-tabs-margin, 21px));
       bottom: auto;
     }
   }

@@ -11,6 +11,7 @@ scroll-edge fade bands at the top and under the bar. Run on both engines:
 
 from __future__ import annotations
 
+import re
 from collections.abc import Iterator
 
 import pytest
@@ -78,25 +79,77 @@ def test_bar_sits_at_the_same_offset_on_every_tab(nav_phone: Page) -> None:
     assert set(offsets.values()) == {offsets["home"]}, offsets
 
 
+# The fade band and its knee: `--nav-fade-band` and `--nav-fade-knee` defaults.
+_BAND = 24
+_KNEE = 0.3
+
+# One gradient stop as both engines serialize it: a colour, then its offset.
+_STOP_RE = re.compile(r"(rgba?\([^)]*\)|color\(srgb [^)]*\))\s+([\d.]+)px")
+
+
+def _stops(image: str) -> list[tuple[float, str, float]]:
+    """(alpha, rgb, offset px) per stop of a fade band's gradient."""
+    stops = []
+    for color, offset in _STOP_RE.findall(image):
+        if color.startswith("color("):
+            r, g, b, *rest = color[len("color(srgb "):-1].replace("/", " ").split()
+            alpha = float(rest[0]) if rest else 1.0
+            rgb = ",".join(str(round(float(c) * 255)) for c in (r, g, b))
+        else:
+            parts = [c.strip() for c in color[color.index("(") + 1:-1].split(",")]
+            alpha = float(parts[3]) if len(parts) == 4 else 1.0
+            rgb = ",".join(parts[:3])
+        stops.append((alpha, rgb, float(offset)))
+    return stops
+
+
 def test_scroll_edge_fades_top_and_bottom(nav_phone: Page) -> None:
     page = nav_phone
 
     bottom = page.evaluate(_FADE_JS, "::before")
     assert bottom["position"] == "fixed", bottom
     assert bottom["bottom"] == "0px", bottom
-    # 16px lead-in above the bar + the 61px bar + its 21px bottom margin.
-    assert bottom["height"] == 98, bottom
+    # The fade band above the bar + the 61px bar + its 21px bottom margin.
+    assert bottom["height"] == _BAND + 61 + 21, bottom
 
     top = page.evaluate(_FADE_JS, "::after")
     assert top["position"] == "fixed", top
     assert top["top"] == "0px", top
-    # The eased tail under the status bar, inside the 4px .app top padding.
-    assert top["height"] == 4, top
+    # The band below the status bar, inside the .app top padding (safe area 0 here).
+    assert top["height"] == _BAND, top
+    assert "to top" in top["image"], top
 
     for fade in (bottom, top):
         assert "linear-gradient" in fade["image"], fade
         assert fade["pointerEvents"] == "none", fade
         assert fade["z"] < fade["barZ"], fade
+
+
+@pytest.mark.parametrize("theme", ["light", "dark"])
+def test_fade_drops_fast_to_half_then_trails_off(nav_phone: Page, theme: str) -> None:
+    """The owner's curve: from the opaque middle the page colour covers content
+    quickly to 50% at the knee, then a long light tail reaches solid at the edge.
+    The same stops on both edges, in the page colour of either theme."""
+    page = nav_phone
+    if theme == "dark":
+        page.evaluate("() => { document.documentElement.dataset.theme = 'dark'; }")
+    bg = page.evaluate(
+        r"() => getComputedStyle(document.body).backgroundColor.match(/\d+/g).slice(0, 3).join(',')"
+    )
+    images = [page.evaluate(_FADE_JS, p)["image"] for p in ("::before", "::after")]
+    assert images[0].replace("linear-gradient(", "linear-gradient(to top, ") == images[1], images
+
+    stops = _stops(images[0])
+    assert len(stops) == 5, images[0]
+    alphas = [a for a, _, _ in stops]
+    offsets = [o for _, _, o in stops]
+    assert alphas[0] == 0 and offsets[0] == 0, stops
+    assert alphas == sorted(alphas), stops
+    assert alphas[2] == 0.5 and offsets[2] == pytest.approx(_BAND * _KNEE, abs=0.01), stops
+    assert alphas[-1] == 1 and offsets[-1] == _BAND, stops
+    # Fast to the knee, light after it.
+    assert alphas[2] / offsets[2] > 2 * (1 - alphas[2]) / (offsets[-1] - offsets[2]), stops
+    assert all(rgb == bg for a, rgb, _ in stops if a > 0), (bg, stops)
 
 
 def test_installed_app_anchors_the_bar_from_the_large_viewport_top(
@@ -131,9 +184,14 @@ def test_installed_app_anchors_the_bar_from_the_large_viewport_top(
       bar.style.height = (before.height + 40) + 'px';
       const after = bar.getBoundingClientRect();
       bar.style.height = '';
-      return { blocks: found.length, topBefore: before.top, topAfter: after.top, lvh: innerHeight };
+      const floor = found.flatMap(r => Array.from(r.cssRules))
+        .filter(c => c.selectorText === 'html').map(c => c.cssText).join(' ');
+      return { blocks: found.length, topBefore: before.top, topAfter: after.top, lvh: innerHeight, floor };
     }""")
     assert m["blocks"] == 1, m
+    # The scrollable-document floor keys to the stable large viewport, so the
+    # keyboard's viewport resize never re-lays out the document.
+    assert "100lvh" in m["floor"] and "dvh" not in m["floor"], m
     assert m["topAfter"] == m["topBefore"], m
     # 21px margin + 61px bar above the large-viewport bottom.
     assert m["topBefore"] == m["lvh"] - 82, m
@@ -152,3 +210,54 @@ def test_document_stays_scrollable_with_the_body_pinned(nav_phone: Page) -> None
         "() => document.scrollingElement.scrollHeight - document.scrollingElement.clientHeight"
     )
     assert overflow >= 1, overflow
+
+
+def test_resize_without_moved_cells_leaves_the_pill_alone(nav_phone: Page) -> None:
+    """iOS fires resize on every keyboard open and close; when the tab cells did
+    not move, the capsule (and so the glass bar) must not be restyled."""
+    page = nav_phone
+    mutations = page.evaluate("""() => new Promise(resolve => {
+      const pill = document.querySelector('.tabs .tab-pill');
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        const seen = [];
+        const obs = new MutationObserver(list => list.forEach(m => seen.push(m.attributeName)));
+        obs.observe(pill, { attributes: true });
+        window.dispatchEvent(new Event('resize'));
+        requestAnimationFrame(() => requestAnimationFrame(() => { obs.disconnect(); resolve(seen); }));
+      }));
+    })""")
+    assert mutations == [], mutations
+
+    # A resize that does move the cells still re-places the capsule.
+    page.set_viewport_size({"width": 360, "height": 844})
+    page.wait_for_function(
+        "() => { const p = document.querySelector('.tabs .tab-pill');"
+        " const on = document.querySelector('.tabs .tab.active');"
+        " return p.style.getPropertyValue('--pill-w') === on.offsetWidth + 'px'; }"
+    )
+
+
+def test_gallery_nav_mode_plays_the_installed_app(static_server: str, browser: Browser) -> None:
+    """demo.html?nav is the on-device check page: the gallery becomes the Home
+    tab of the real nav, and the status bar colour follows the theme toggle."""
+    context = browser.new_context(
+        viewport={"width": 390, "height": 844}, has_touch=True, is_mobile=True
+    )
+    try:
+        page = context.new_page()
+        page.goto(f"{static_server}/_vendored/demo.html?nav")
+        page.wait_for_selector("body[data-nav-demo-ready='1']")
+        assert page.locator("body > nav.tabs").count() == 1
+        assert page.locator("body > main.app #paneHome > .gallery").count() == 1
+        overflow = page.evaluate(
+            "() => document.scrollingElement.scrollHeight - innerHeight"
+        )
+        assert overflow > 844, overflow
+        theme_color = "() => document.querySelector('meta[name=theme-color]').content"
+        light = page.evaluate(theme_color)
+        page.locator("#themeToggle").click()
+        dark = page.evaluate(theme_color)
+        assert light != dark, (light, dark)
+        assert dark == page.evaluate("() => getComputedStyle(document.body).backgroundColor")
+    finally:
+        context.close()

@@ -251,11 +251,11 @@ def test_mobile_pill_stacks_icon_over_label(nav_mobile: Page) -> None:
     """The floating pill keeps its 24px icon above the label; no rail when coarse.
 
     The phone `.app` padding is part of the same contract: the top is the safe
-    area plus the 4px the top scroll fade's tail sits in (the emulator's safe
-    area is 0), so the first card starts where the fade ends; the sides keep
-    `--gap` and the bottom keeps the reserve that clears the floating bar.
+    area plus the 24px top scroll fade band (the emulator's safe area is 0), so
+    the first card starts where the fade ends; the sides keep `--gap` and the
+    bottom keeps the reserve that clears the floating bar and its fade.
     """
-    assert _style(nav_mobile, ".app", "paddingTop") == "4px"
+    assert _style(nav_mobile, ".app", "paddingTop") == "24px"
     assert _style(nav_mobile, ".app", "paddingLeft") == "12px"
     assert _style(nav_mobile, ".app", "paddingRight") == "12px"
     assert _style(nav_mobile, ".app", "paddingBottom") == f"{21 + 61 + 21 + 12}px"
