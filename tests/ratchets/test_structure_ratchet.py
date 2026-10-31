@@ -27,6 +27,10 @@ import pytest
 from scripts import docs_ratchet
 from scripts import structure_ratchet as sr
 from tests._git_repo import git, write
+from tests._ratchet_not_confirmed import (
+    assert_unreadable_file_not_confirmed,
+    git_failure_test,
+)
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
@@ -555,31 +559,12 @@ def test_a_tracked_file_deleted_from_the_tree_is_skipped(repo: Path) -> None:
 def test_an_unparsable_python_file_is_not_confirmed_in_every_mode(
     repo: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    run_mode(repo, init=True)
-    write(repo, "src/bad.py", "def broken(:\n")
-    for kwargs in ({}, {"update": True}, {"update": True, "allow": True}):
-        assert run_mode(repo, **kwargs) == sr.EXIT_NOT_CONFIRMED
-        out = capsys.readouterr().out
-        assert "NOT CONFIRMED" in out
-        assert "src/bad.py" in out
-    (repo / sr.DEFAULT_BASELINE).unlink()
-    assert run_mode(repo, init=True) == sr.EXIT_NOT_CONFIRMED
-    assert not (repo / sr.DEFAULT_BASELINE).exists()
+    assert_unreadable_file_not_confirmed(
+        sr, run_mode, repo, "src/bad.py", b"def broken(:\n", "does not parse as Python", capsys
+    )
 
 
-def test_git_that_cannot_list_files_is_not_confirmed(
-    repo: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
-) -> None:
-    run_mode(repo, init=True)
-    monkeypatch.setenv("GIT_DIR", str(repo / "no-such-git-dir"))
-    assert run_mode(repo) == sr.EXIT_NOT_CONFIRMED
-    assert "git ls-files" in capsys.readouterr().out
-
-
-def test_a_missing_git_binary_is_not_confirmed(repo: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    run_mode(repo, init=True)
-    monkeypatch.setenv("PATH", str(repo / "empty"))
-    assert run_mode(repo) == sr.EXIT_NOT_CONFIRMED
+test_git_that_cannot_list_the_tree_is_not_confirmed = git_failure_test(sr, run_mode)
 
 
 def test_main_rejects_allow_additions_without_update(capsys: pytest.CaptureFixture[str]) -> None:

@@ -19,6 +19,10 @@ import pytest
 
 from scripts import comment_ratchet as cr
 from tests._git_repo import git, write
+from tests._ratchet_not_confirmed import (
+    assert_unreadable_file_not_confirmed,
+    git_failure_test,
+)
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
@@ -484,47 +488,22 @@ def test_a_tracked_file_deleted_from_the_tree_is_skipped(repo: Path) -> None:
 
 
 @pytest.mark.parametrize(
-    ("rel", "text"),
+    ("rel", "body", "says"),
     [
-        pytest.param("web/app.js", "const a = 'never closed;\n// #1\n", id="unterminated-js-string"),
-        pytest.param("web/app.css", "/* never closed\n", id="unterminated-css-comment"),
-        pytest.param("src/bad.py", 'x = """never closed\n', id="unparseable-python"),
-        pytest.param("scripts/x.ps1", "$a = @'\nnever closed\n", id="unterminated-here-string"),
+        pytest.param("web/app.js", b"const a = 'never closed;\n// #1\n", "unterminated", id="unterminated-js-string"),
+        pytest.param("web/app.css", b"/* never closed\n", "unterminated", id="unterminated-css-comment"),
+        pytest.param("src/bad.py", b'x = """never closed\n', "python tokenizer rejected the file", id="unparseable-python"),
+        pytest.param("scripts/x.ps1", b"$a = @'\nnever closed\n", "unterminated", id="unterminated-here-string"),
+        pytest.param("src/latin.py", b"# caf\xe9 #1\n", "is not valid UTF-8", id="not-utf8"),
     ],
 )
 def test_a_file_the_scanner_cannot_finish_is_not_confirmed_in_every_mode(
-    repo: Path, rel: str, text: str, capsys: pytest.CaptureFixture[str]
+    repo: Path, rel: str, body: bytes, says: str, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    run_mode(repo, init=True)
-    write(repo, rel, text)
-    for kwargs in ({}, {"update": True}, {"update": True, "allow": True}):
-        assert run_mode(repo, **kwargs) == cr.EXIT_NOT_CONFIRMED
-        out = capsys.readouterr().out
-        assert "NOT CONFIRMED" in out
-        assert rel in out
-    (repo / cr.DEFAULT_BASELINE).unlink()
-    assert run_mode(repo, init=True) == cr.EXIT_NOT_CONFIRMED
-    assert not (repo / cr.DEFAULT_BASELINE).exists()
+    assert_unreadable_file_not_confirmed(cr, run_mode, repo, rel, body, says, capsys)
 
 
-def test_undecodable_bytes_are_not_confirmed(repo: Path) -> None:
-    run_mode(repo, init=True)
-    (repo / "src" / "latin.py").write_bytes(b"# caf\xe9 #1\n")
-    git(repo, "add", "src/latin.py")
-    assert run_mode(repo) == cr.EXIT_NOT_CONFIRMED
-
-
-def test_git_that_cannot_list_files_is_not_confirmed(repo: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
-    run_mode(repo, init=True)
-    monkeypatch.setenv("GIT_DIR", str(repo / "no-such-git-dir"))
-    assert run_mode(repo) == cr.EXIT_NOT_CONFIRMED
-    assert "git ls-files" in capsys.readouterr().out
-
-
-def test_a_missing_git_binary_is_not_confirmed(repo: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    run_mode(repo, init=True)
-    monkeypatch.setenv("PATH", str(repo / "empty"))
-    assert run_mode(repo) == cr.EXIT_NOT_CONFIRMED
+test_git_that_cannot_list_the_tree_is_not_confirmed = git_failure_test(cr, run_mode)
 
 
 def test_main_rejects_allow_additions_without_update(capsys: pytest.CaptureFixture[str]) -> None:

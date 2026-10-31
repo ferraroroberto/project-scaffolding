@@ -58,3 +58,18 @@ def assert_unlistable_git_not_confirmed(
     monkeypatch.setenv(var, str(repo / value))
     assert run_mode(repo) == ratchet.EXIT_NOT_CONFIRMED
     assert says in capsys.readouterr().out
+
+
+def git_failure_test(ratchet: ModuleType, run_mode: Callable[..., int]) -> Callable[..., None]:
+    """The parametrized "git cannot list the tree" test for one ratchet's suite.
+
+    Assign the result to a module-level `test_*` name; it asks for the suite's own `repo` fixture.
+    """
+
+    @pytest.mark.parametrize(("var", "value", "says"), GIT_FAILURES)
+    def test_git_that_cannot_list_the_tree_is_not_confirmed(
+        repo: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], var: str, value: str, says: str
+    ) -> None:
+        assert_unlistable_git_not_confirmed(ratchet, run_mode, repo, monkeypatch, capsys, var, value, says)
+
+    return test_git_that_cannot_list_the_tree_is_not_confirmed

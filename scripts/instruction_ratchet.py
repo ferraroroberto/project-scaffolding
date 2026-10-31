@@ -99,7 +99,7 @@ class Audience:
     unpointed: tuple[str, ...]  # basenames scoped to this reader unless AGENTS.md points at them
 
 
-#: Mirrors the prompt audit's `sources.toml` [audiences]; tests/test_instruction_ratchet.py checks it.
+#: Mirrors the prompt audit's `sources.toml` [audiences]; tests/ratchets/test_instruction_ratchet.py checks it.
 AUDIENCES: dict[str, Audience] = {
     "claude": Audience("anthropic", ("Claude Code only",), ("Claude", "Anthropic"),
                        ("*/.claude/rules/*.md",), ("CLAUDE.md",)),

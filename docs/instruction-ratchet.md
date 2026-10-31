@@ -127,7 +127,7 @@ The script spawns `git` with `CREATE_NO_WINDOW`, derived locally (it is vendor-v
 
 ## One implementation
 
-The rule logic is a port of the prompt audit's `prompt_audit/lint.py` and its helpers (fence handling, frontmatter validation, reference resolution, audience scoping). `tests/test_instruction_ratchet.py` holds the drift guard: with a fleet-config checkout beside this repo (or `FLEET_CONFIG_DIR` set) it asserts the size caps, rule tags, patterns and audiences match the audit's, and that both engines give the same hits, line for line, on a fixture tree and on this repo's own files. Without a checkout the drift tests report as skipped with the reason, never as passed. This lets the audit import this script's rule tables instead of keeping its own copy.
+The rule logic is a port of the prompt audit's `prompt_audit/lint.py` and its helpers (fence handling, frontmatter validation, reference resolution, audience scoping). `tests/ratchets/test_instruction_ratchet.py` holds the drift guard: with a fleet-config checkout beside this repo (or `FLEET_CONFIG_DIR` set) it asserts the size caps, rule tags, patterns and audiences match the audit's, and that both engines give the same hits, line for line, on a fixture tree and on this repo's own files. Without a checkout the drift tests report as skipped with the reason, never as passed. This lets the audit import this script's rule tables instead of keeping its own copy.
 
 ## Cost
 
@@ -135,4 +135,4 @@ Over 287 instruction files in the fleet's repos the port gave the same hits as t
 
 ## Tests
 
-`tests/test_instruction_ratchet.py`: the configuration contract, the reader rules (pointer, rules files, scope-marker sections, other-vendor rules), every enforced rule family and what must not count (fences, inline code, frontmatter, R-13, R-37), the size caps per kind with CRLF normalisation, every "not confirmed" cause, every mode and exit code on throwaway git repos, the scaffold's own adoption and gate wiring, and the drift guard against the prompt audit.
+`tests/ratchets/test_instruction_ratchet.py`: the configuration contract, the reader rules (pointer, rules files, scope-marker sections, other-vendor rules), every enforced rule family and what must not count (fences, inline code, frontmatter, R-13, R-37), the size caps per kind with CRLF normalisation, every "not confirmed" cause, every mode and exit code on throwaway git repos, the scaffold's own adoption and gate wiring, and the drift guard against the prompt audit.

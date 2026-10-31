@@ -19,6 +19,10 @@ import pytest
 
 from scripts import docs_ratchet as dr
 from tests._git_repo import git, write
+from tests._ratchet_not_confirmed import (
+    assert_unreadable_file_not_confirmed,
+    git_failure_test,
+)
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
@@ -559,45 +563,20 @@ def test_a_generated_or_out_of_scope_readme_has_no_budget(repo: Path) -> None:
 # ------------------------------------------------------- not confirmed
 
 @pytest.mark.parametrize(
-    ("rel", "text"),
+    ("rel", "body", "says"),
     [
-        pytest.param("docs/bad.md", "```\nnever closed\n", id="unclosed-fence"),
-        pytest.param("README.md", "<!-- never closed\n", id="unclosed-html-comment"),
+        pytest.param("docs/bad.md", b"```\nnever closed\n", "never closes", id="unclosed-fence"),
+        pytest.param("README.md", b"<!-- never closed\n", "never closes", id="unclosed-html-comment"),
+        pytest.param("docs/latin.md", b"caf\xe9 #1\n", "is not valid UTF-8", id="not-utf8"),
     ],
 )
 def test_a_file_the_scanner_cannot_finish_is_not_confirmed_in_every_mode(
-    repo: Path, rel: str, text: str, capsys: pytest.CaptureFixture[str]
+    repo: Path, capsys: pytest.CaptureFixture[str], rel: str, body: bytes, says: str
 ) -> None:
-    run_mode(repo, init=True)
-    write(repo, rel, text)
-    for kwargs in ({}, {"update": True}, {"update": True, "allow": True}):
-        assert run_mode(repo, **kwargs) == dr.EXIT_NOT_CONFIRMED
-        out = capsys.readouterr().out
-        assert "NOT CONFIRMED" in out
-        assert rel in out
-    (repo / dr.DEFAULT_BASELINE).unlink()
-    assert run_mode(repo, init=True) == dr.EXIT_NOT_CONFIRMED
-    assert not (repo / dr.DEFAULT_BASELINE).exists()
+    assert_unreadable_file_not_confirmed(dr, run_mode, repo, rel, body, says, capsys)
 
 
-def test_undecodable_bytes_are_not_confirmed(repo: Path) -> None:
-    run_mode(repo, init=True)
-    (repo / "docs" / "latin.md").write_bytes(b"caf\xe9 #1\n")
-    git(repo, "add", "docs/latin.md")
-    assert run_mode(repo) == dr.EXIT_NOT_CONFIRMED
-
-
-def test_git_that_cannot_list_files_is_not_confirmed(repo: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
-    run_mode(repo, init=True)
-    monkeypatch.setenv("GIT_DIR", str(repo / "no-such-git-dir"))
-    assert run_mode(repo) == dr.EXIT_NOT_CONFIRMED
-    assert "git ls-files" in capsys.readouterr().out
-
-
-def test_a_missing_git_binary_is_not_confirmed(repo: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    run_mode(repo, init=True)
-    monkeypatch.setenv("PATH", str(repo / "empty"))
-    assert run_mode(repo) == dr.EXIT_NOT_CONFIRMED
+test_git_that_cannot_list_the_tree_is_not_confirmed = git_failure_test(dr, run_mode)
 
 
 def test_main_rejects_allow_additions_without_update(capsys: pytest.CaptureFixture[str]) -> None:
