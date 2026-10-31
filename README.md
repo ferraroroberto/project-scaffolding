@@ -32,6 +32,7 @@ Clone this directory, rename it, and start building.
 - `src/compression.py` — vendor-verbatim stream-safe gzip middleware (manifest key `compression`). See [`docs/webapp-pwa-conventions.md`](docs/webapp-pwa-conventions.md).
 - `src/no_window.py` — vendor-verbatim `CREATE_NO_WINDOW` subprocess-flag definition (manifest key `no_window`); a file copied byte-identical into adopters (e.g. `_browser_sweep.py`, `classify_e2e.py`) keeps its own local flag instead, since importing this module would not resolve there. See `CLAUDE.md` ("Windows console-subprocess suppression").
 - `src/runtime_data.py` — vendor-verbatim runtime-data location resolver (manifest key `runtime_data`), so always-on SQLite writes land on a fast local drive. See `CLAUDE.md` ("Runtime data lives on a fast drive").
+- `src/fleet_root.py` — vendor-verbatim fleet-root resolver (manifest key `fleet_root`): `fleet_root()` from `FLEET_ROOT`, a machine-local config, or the checkout's parent, never a drive letter. See [`docs/conventions-ratchet.md`](docs/conventions-ratchet.md) (`no-drive-path`).
 - `src/resource_probe.py` + `tests/soak/_resource_soak.py` — vendor-verbatim thread/handle/RSS sampler with a runtime breadcrumb, and the gate soak that fails a webapp leaking threads or handles (manifest keys `resource_probe`, `resource_soak`). See [`docs/long-lived-process-conventions.md`](docs/long-lived-process-conventions.md) ("Resource soak").
 - `src/build_info.py` — vendor-verbatim process build-identity capture (manifest key `build_info`). See `CLAUDE.md` ("Restart/deploy coverage — merged is not shipped").
 - `src/doc_capture/` — vendor-verbatim doc-capture screenshot engine + README "tour" regen. See [`src/doc_capture/README.md`](src/doc_capture/README.md).
@@ -114,6 +115,7 @@ src/
   no_window.py              the one CREATE_NO_WINDOW flag every spawn imports
   pooled_http.py            vendor-verbatim pooled outbound HTTP client (keep-alive session + single-retry dispatch)
   runtime_data.py           vendor-verbatim SQLite-location resolver (C:\sqlite\<app>\, off the spinning disk)
+  fleet_root.py             vendor-verbatim fleet-root resolver (FLEET_ROOT -> machine config -> checkout parent)
   usage_log.py              vendor-verbatim local-only usage-log router (views, taps, device class -> usage.sqlite3)
   compression.py            vendor-verbatim stream-safe gzip middleware
   resource_probe.py         vendor-verbatim thread/handle/RSS sampler + runtime breadcrumb

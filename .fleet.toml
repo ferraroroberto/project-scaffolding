@@ -546,6 +546,7 @@ box_lock_gate   = { src = "scripts/box_lock_gate.ps1" }
 pooled_http     = { src = "src/pooled_http.py" }
 no_window       = { src = "src/no_window.py" }
 runtime_data    = { src = "src/runtime_data.py" }
+fleet_root      = { src = "src/fleet_root.py" }
 notify          = { src = "src/notify" }
 doc_capture     = { src = "src/doc_capture" }
 build_info      = { src = "src/build_info.py" }
