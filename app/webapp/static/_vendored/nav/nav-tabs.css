@@ -242,9 +242,9 @@
     /* Bottom reserve = bar + its margin above and below + the gap, so the
        last row scrolls clear of the fixed bar. Keep the bar a body-level
        sibling of .app: iOS captures fixed descendants of scrollers. */
-    /* Top = the safe area plus the top fade's height, so the first card at
-       scroll-top starts where the fade ends and is never dimmed. */
-    padding: calc(env(safe-area-inset-top, 0px) + var(--nav-fade-band, 24px)) var(--gap) calc(
+    /* Top = the safe area only: the top fade is off at scroll-top, so the
+       first card sits right under the status bar. */
+    padding: env(safe-area-inset-top, 0px) var(--gap) calc(
       env(safe-area-inset-bottom, 0px) + var(--bottom-tabs-margin, 21px) +
       var(--bottom-tabs-height, 61px) + var(--bottom-tabs-margin, 21px) + var(--gap)
     );
@@ -297,78 +297,64 @@
   }
 
   /* Scroll-edge fades: a gentle hint that more content lies past each edge,
-     never a wall. Both bands are built from the same three tokens: the band
-     height, the page-colour coverage at the knee (--nav-fade-mid) and where
-     the knee sits (--nav-fade-knee). The knee is a number (a fraction of the
-     band) because calc() cannot multiply a length by a percentage. Apps may
-     tune the tokens; the stops below are derived from them. Declared on the
-     bands themselves, not :root, so --bg resolves where the band paints,
-     whichever element an app sets its dark theme on. */
-  body::before {
-    --nav-fade-stops:
-      transparent 0,
-      color-mix(in srgb, var(--bg) calc(var(--nav-fade-mid, 50%) * 0.65), transparent)
-        calc(var(--nav-fade-band, 24px) * var(--nav-fade-knee, 0.3) / 2),
-      color-mix(in srgb, var(--bg) var(--nav-fade-mid, 50%), transparent)
-        calc(var(--nav-fade-band, 24px) * var(--nav-fade-knee, 0.3)),
-      color-mix(in srgb, var(--bg) calc(var(--nav-fade-mid, 50%) + (100% - var(--nav-fade-mid, 50%)) * 0.35), transparent)
-        calc(var(--nav-fade-band, 24px) * (var(--nav-fade-knee, 0.3) + 1) / 2),
-      var(--bg) var(--nav-fade-band, 24px);
-  }
-  /* Bottom fade: an inert band anchored to the screen bottom like the bar.
-     Going down from the content, the page colour covers fast to the knee,
-     then a long light tail reaches solid at the bar's top edge, and solid
-     page colour
-     from there down, so rows never show through the glass hard-edged. Above
-     .app, below the bar's 120; pointer-events: none so taps reach the row
-     beneath. The .app bottom reserve clears the band, so the last row at
-     scroll-end is never dimmed. */
+     never a wall, and no solid zone. Both edges use one eased curve: from
+     the screen edge inward the content's opacity runs 0, .25, .5, .75, .92
+     and 1 at 0, 10, 25, 50, 75 and 100% of the band, so content stays at
+     least half visible over three quarters of each band and only vanishes at
+     the edge. Drawn as page colour (--bg) over the content, coverage being
+     one minus that opacity. Inert: above .app, below the bar's 120, and
+     pointer-events: none so taps reach the row beneath.
+     Bottom: from --nav-fade-tail above the bar's top edge down to the screen
+     edge, so rows show through the bar's glass and fade out under it. */
   body::before {
     content: '';
     position: fixed;
     left: 0;
     right: 0;
     bottom: 0;
-    height: calc(var(--nav-fade-band, 24px) + var(--bottom-tabs-height, 61px) + var(--bottom-tabs-margin, 21px));
-    z-index: 110;
-    pointer-events: none;
-    background: linear-gradient(to bottom, var(--nav-fade-stops));
-  }
-  /* Top fade: solid page colour from above the screen edge through the safe
-     area, then strongest at the top and easing out downward: fast from solid
-     to the knee, then a long light tail to transparent, so the band ends on
-     the content without a visible cut. It is the bottom curve inverted (each
-     stop's coverage is one minus the bottom stop's at the same offset),
-     because a fast ramp on the content side reads as a hard edge across
-     whatever scrolls under it.
-     The band starts --nav-fade-overhang above the fixed origin: an installed
-     iOS app with the `default` status bar puts `top: 0` (and every fixed
-     layer) below the status bar while the content scrolls up behind it, so a
-     band starting at 0 left that strip uncovered and its lower edge drew a
-     hard line across the content. Where the fixed origin is the screen edge
-     the overhang is simply off screen.
-     At scroll-top the .app top padding (safe area plus band) keeps the first
-     control below the band. */
-  body::after {
-    --nav-fade-solid: calc(var(--nav-fade-overhang, 80px) + env(safe-area-inset-top, 0px));
-    content: '';
-    position: fixed;
-    top: calc(-1 * var(--nav-fade-overhang, 80px));
-    left: 0;
-    right: 0;
-    height: calc(var(--nav-fade-solid) + var(--nav-fade-band, 24px));
+    height: calc(var(--nav-fade-tail, 24px) + var(--bottom-tabs-height, 61px) + var(--bottom-tabs-margin, 21px));
     z-index: 110;
     pointer-events: none;
     background: linear-gradient(
       to bottom,
-      var(--bg) var(--nav-fade-solid),
-      color-mix(in srgb, var(--bg) calc(100% - var(--nav-fade-mid, 50%) * 0.65), transparent)
-        calc(var(--nav-fade-solid) + var(--nav-fade-band, 24px) * var(--nav-fade-knee, 0.3) / 2),
-      color-mix(in srgb, var(--bg) calc(100% - var(--nav-fade-mid, 50%)), transparent)
-        calc(var(--nav-fade-solid) + var(--nav-fade-band, 24px) * var(--nav-fade-knee, 0.3)),
-      color-mix(in srgb, var(--bg) calc((100% - var(--nav-fade-mid, 50%)) * 0.65), transparent)
-        calc(var(--nav-fade-solid) + var(--nav-fade-band, 24px) * (var(--nav-fade-knee, 0.3) + 1) / 2),
-      transparent calc(var(--nav-fade-solid) + var(--nav-fade-band, 24px))
+      transparent 0%,
+      color-mix(in srgb, var(--bg) 8%, transparent) 25%,
+      color-mix(in srgb, var(--bg) 25%, transparent) 50%,
+      color-mix(in srgb, var(--bg) 50%, transparent) 75%,
+      color-mix(in srgb, var(--bg) 75%, transparent) 90%,
+      var(--bg) 100%
+    );
+  }
+  /* Top: a --nav-fade-band band from the top of the viewport, solid only
+     through the safe area. In an installed iOS app with the `default` status
+     bar the viewport starts below the status bar and no fixed layer paints in
+     that strip, so the band starts at the viewport top and stays thin.
+     Its opacity is --nav-fade-on, which nav-tabs.js raises from 0 at
+     scroll-top to 1 over the first band of scroll: at rest the first row sits
+     right under the status bar, undimmed, with no top padding past the safe
+     area. */
+  body::after {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: calc(env(safe-area-inset-top, 0px) + var(--nav-fade-band, 12px));
+    z-index: 110;
+    pointer-events: none;
+    opacity: var(--nav-fade-on, 0);
+    background: linear-gradient(
+      to bottom,
+      var(--bg) env(safe-area-inset-top, 0px),
+      color-mix(in srgb, var(--bg) 75%, transparent)
+        calc(env(safe-area-inset-top, 0px) + var(--nav-fade-band, 12px) * 0.1),
+      color-mix(in srgb, var(--bg) 50%, transparent)
+        calc(env(safe-area-inset-top, 0px) + var(--nav-fade-band, 12px) * 0.25),
+      color-mix(in srgb, var(--bg) 25%, transparent)
+        calc(env(safe-area-inset-top, 0px) + var(--nav-fade-band, 12px) * 0.5),
+      color-mix(in srgb, var(--bg) 8%, transparent)
+        calc(env(safe-area-inset-top, 0px) + var(--nav-fade-band, 12px) * 0.75),
+      transparent calc(env(safe-area-inset-top, 0px) + var(--nav-fade-band, 12px))
     );
   }
   @media (prefers-reduced-transparency: reduce) {
@@ -400,8 +386,8 @@
       bottom: auto;
     }
     body::before {
-      top: calc(100vh - var(--nav-fade-band, 24px) - var(--bottom-tabs-height, 61px) - var(--bottom-tabs-margin, 21px));
-      top: calc(100lvh - var(--nav-fade-band, 24px) - var(--bottom-tabs-height, 61px) - var(--bottom-tabs-margin, 21px));
+      top: calc(100vh - var(--nav-fade-tail, 24px) - var(--bottom-tabs-height, 61px) - var(--bottom-tabs-margin, 21px));
+      top: calc(100lvh - var(--nav-fade-tail, 24px) - var(--bottom-tabs-height, 61px) - var(--bottom-tabs-margin, 21px));
       bottom: auto;
     }
   }

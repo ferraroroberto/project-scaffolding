@@ -119,6 +119,7 @@ export function initNavTabs(opts = {}) {
 
   setTab(initialTab());
   expandStandaloneViewport();
+  gateTopFade();
   // Rotation, a desktop↔phone width crossing or a text-size change moves the
   // tab cells: re-place the capsule without a slide.
   window.addEventListener('resize', function () { placePill(nav, pill, true); }, { passive: true });
@@ -138,6 +139,19 @@ function expandStandaloneViewport() {
   requestAnimationFrame(function () {
     if (window.scrollY === 1) window.scrollTo(0, 0);
   });
+}
+
+// The top scroll-edge fade (body::after in nav-tabs.css) is off at
+// scroll-top, so the first row sits undimmed right under the status bar, and
+// reaches full strength over the first --nav-fade-band of scroll.
+function gateTopFade() {
+  const root = document.documentElement;
+  const band = parseFloat(getComputedStyle(root).getPropertyValue('--nav-fade-band')) || 12;
+  function update() {
+    root.style.setProperty('--nav-fade-on', String(Math.min(1, Math.max(0, window.scrollY / band))));
+  }
+  window.addEventListener('scroll', update, { passive: true });
+  update();
 }
 
 // tab name → { button, pane }. The pane is resolved from aria-controls; a tab
