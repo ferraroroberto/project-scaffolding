@@ -64,22 +64,33 @@
                          the committed baseline; opt-in per rule via .fleet.toml
                          [conventions_ratchet]; exit 3 = "not confirmed", a
                          failure, never a pass (docs/conventions-ratchet.md)
-     11. mypy --strict — the vendor-verbatim primitives only; the list is
+     11. runtime write ratchet — scripts/runtime_write_ratchet.py: fails when a
+                         tracked Python file gains a write target whose path
+                         resolves under a code folder, beyond the committed
+                         baseline; a new unresolvable target is exit 3 = "not
+                         confirmed", a failure, never a pass; opt-in via
+                         .fleet.toml [runtime_write_ratchet]
+                         (docs/runtime-write-ratchet.md)
+     12. mypy --strict — the vendor-verbatim primitives only; the list is
                          derived from .fleet.toml's [components] catalog via
                          scripts/vendored_catalog.py, never hand-maintained here
-     12. pytest (non-e2e) — unit suite, tests/e2e excluded
-     13. pytest (e2e)  — diff-proportionate: the browser slice is routed by
+     13. pytest (non-e2e) — unit suite, tests/e2e excluded
+     14. pytest (e2e)  — diff-proportionate: the browser slice is routed by
                          scripts/classify_e2e.py against the .fleet.toml [e2e]
                          rules (skip / static / full), fail-safe to full
                          (docs/e2e-routing.md). Auto-boots Streamlit per
                          its fixture.
-     14. shot baseline — scripts/shot_baseline.py: compares the screenshots the
+     15. shot baseline — scripts/shot_baseline.py: compares the screenshots the
                          e2e slice recaptured (phone + desktop, light + dark)
                          with the committed baseline, fails on a visible change,
                          restores the tree; runs the capture itself when the
                          slice did not; skipped with the browser suite; exit 3 =
                          "not confirmed", a failure, never a pass
                          (docs/playwright-ui-testing.md "Screenshot baseline")
+     16. runtime write probe — scripts/runtime_write_ratchet.py --probe: fails
+                         on any untracked or ignored file the test stages left
+                         under a code folder (snapshot taken before stage 13);
+                         an unreadable snapshot is exit 3 = "not confirmed"
 
     Box load lock: the whole run holds fleet-config's shared box lock
     (~/.claude/skills/_lib/box_lock.py), so a CPU-burn proof, which takes it
@@ -151,7 +162,12 @@ Invoke-Stage "instruction ratchet"                { & $py "scripts/instruction_r
 Invoke-Stage "doc refs ratchet"                   { & $py "scripts/doc_refs_ratchet.py" }
 Invoke-Stage "dead code ratchet"                  { & $py "scripts/dead_code_ratchet.py" }
 Invoke-Stage "conventions ratchet"                { & $py "scripts/conventions_ratchet.py" }
+Invoke-Stage "runtime write ratchet"              { & $py "scripts/runtime_write_ratchet.py" }
 Invoke-Stage "mypy --strict (vendored)"           { & $py -m mypy @VendoredModules }
+# Runtime write probe, first half: what already sits untracked or ignored under
+# the code folders, so the probe after the tests names only what they wrote.
+$runtimeSnapshot = Join-Path ([IO.Path]::GetTempPath()) "runtime-write-snapshot-$PID.json"
+Invoke-Stage "runtime write probe (snapshot)"     { & $py "scripts/runtime_write_ratchet.py" --snapshot $runtimeSnapshot }
 Invoke-Stage "pytest (unit, non-e2e)"             { & $py -m pytest --ignore=tests/e2e }
 
 # ---------------------------------------------------------------- e2e routing
@@ -218,6 +234,7 @@ if ($tier -eq "skip") {
 if ($tier -eq "skip") {
     Write-Host "[SKIP] shot baseline - no e2e surface touched, so no screen was recaptured or compared" -ForegroundColor DarkGray
 }
+Invoke-Stage "runtime write probe"                { & $py "scripts/runtime_write_ratchet.py" --probe $runtimeSnapshot }
 
 Write-Host ""
 Write-Host "[PASS] all checks green - safe to ship." -ForegroundColor Green

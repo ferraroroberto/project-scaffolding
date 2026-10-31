@@ -58,7 +58,7 @@ flowchart TB
   DATALOGS["data/\nlogs/app.log, input/, output/\n(gitignored)"]
 
   subgraph scriptsdir["scripts/"]
-    VERIFY["verify-before-ship.ps1\nbyte-compile -> ruff -> static ratchet\n-> comment ratchet -> docs ratchet -> structure ratchet -> instruction ratchet -> doc refs ratchet -> dead code ratchet -> conventions ratchet -> mypy --strict (vendored primitives) -> pytest (non-e2e)\n-> routed e2e (skip/static/full) -> shot baseline"]
+    VERIFY["verify-before-ship.ps1\nbyte-compile -> ruff -> static ratchet\n-> comment ratchet -> docs ratchet -> structure ratchet -> instruction ratchet -> doc refs ratchet -> dead code ratchet -> conventions ratchet -> runtime write ratchet -> mypy --strict (vendored primitives) -> pytest (non-e2e)\n-> routed e2e (skip/static/full) -> shot baseline -> runtime write probe"]
     CLASSIFY["classify_e2e.py (vendor-verbatim, #180)\ndiff-proportionate e2e routing\nreads .fleet.toml [e2e] rules, fail-safe to full"]
     RATCHET["static_ratchet.py (vendor-verbatim, #410)\nfails only on NEW duplicates (jscpd) / unused code\n(ruff F401,F841) / bug + security patterns (ruff B,S) vs .static-ratchet-baseline.json\nopt-in via .fleet.toml [static_ratchet]; exit 3 = not confirmed"]
     CRATCHET["comment_ratchet.py (vendor-verbatim, #411)\nfails when a file's count of #NNN refs inside comments\n(py/js/css/ps1) rises vs .comment-ratchet-baseline.json\nopt-in via .fleet.toml [comment_ratchet]; exit 3 = not confirmed"]
@@ -68,6 +68,7 @@ flowchart TB
     RRATCHET["doc_refs_ratchet.py (vendor-verbatim, stdlib)\nREADME.md, CLAUDE.md, docs/ references to repo paths,\npython -m modules and ports (vs .fleet.toml port) that do\nnot exist may not rise vs .doc-refs-ratchet-baseline.json\nopt-in via .fleet.toml [doc_refs_ratchet]; exit 3 = not confirmed"]
     XRATCHET["dead_code_ratchet.py (vendor-verbatim, stdlib ast)\nPython functions, classes and methods nothing references\n(entry points: routes, __all__, tests, hooks, [components] API, allow)\nmay not rise vs .dead-code-ratchet-baseline.json\nopt-in via .fleet.toml [dead_code_ratchet]; exit 3 = not confirmed"]
     VRATCHET["conventions_ratchet.py (vendor-verbatim, stdlib ast)\nfleet-convention rules opted into per repo: no-window spawns,\nprint in app code, drive paths, raw secret compare, raw git\nmay not rise per file and rule vs .conventions-ratchet-baseline.json\nopt-in via .fleet.toml [conventions_ratchet]; exit 3 = not confirmed"]
+    WRATCHET["runtime_write_ratchet.py (vendor-verbatim, stdlib ast)\nwrite targets resolving under code folders may not rise\nvs .runtime-write-ratchet-baseline.json; unresolved = exit 3\n--snapshot/--probe: no new runtime file under code folders after the tests\nloads sibling runtime_write_resolve.py: the path resolver\nopt-in via .fleet.toml [runtime_write_ratchet]"]
     SHOTBASE["shot_baseline.py (vendor-verbatim, Pillow)\ncompares recaptured screenshots with the committed\nbaseline (git index), raster + glyph jitter bands,\nrestores the tree; opt-in via .fleet.toml [shot_baseline]\nexit 1 = drift, exit 3 = not confirmed"]
     GENVERIFY["gen_verify_skill.py (#412, not vendored)\nstatic parse of an adopter's surface() calls, extra_steps,\nkey views + [verify] -> .claude/skills/verify-<app>/\nSKILL.md + features/*.md; --check = STATIC / MAINTAIN\n(clean|changed|blocked, exit 0/1/2)"]
     CATALOG["vendored_catalog.py (#230)\nreads .fleet.toml [components] -- the canonical\nkey -> src map of what this scaffold publishes"]
@@ -98,6 +99,8 @@ flowchart TB
   XRATCHET -.->|reads [dead_code_ratchet] + [vendored] + [components] from| FLEETTOML
   VERIFY -->|runs, opt-in, after the dead code ratchet| VRATCHET
   VRATCHET -.->|reads [conventions_ratchet] + [vendored] from| FLEETTOML
+  VERIFY -->|runs, opt-in, after the conventions ratchet, and brackets the tests| WRATCHET
+  WRATCHET -.->|reads [runtime_write_ratchet] + [vendored] from| FLEETTOML
   VERIFY -->|runs after the e2e stage| SHOTBASE
   SHOTBASE -.->|reads [shot_baseline] from| FLEETTOML
   SHOTBASE -.->|compares the PNGs written by| SHOT
