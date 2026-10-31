@@ -407,7 +407,9 @@ def test_build_footer_ends_a_gap_above_the_bottom_fade(nav_phone: Page, tail: in
       footBottom: document.getElementById('testFoot').getBoundingClientRect().bottom,
       fadeTop: innerHeight - parseFloat(getComputedStyle(document.body, '::before').height),
     })""")
-    assert m["fadeTop"] - m["footBottom"] >= 12, m
+    # The pinned caption line box is fractional (1.1 x 12px) and the browser rounds
+    # the scroll extent to a whole pixel, so the gap may lose under 1px of --gap.
+    assert m["fadeTop"] - m["footBottom"] >= 12 - 1, m
     assert _undimmed(page, "#testFoot"), m
 
 
