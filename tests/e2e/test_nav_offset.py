@@ -356,3 +356,108 @@ def test_bottom_fade_eases_to_solid_at_the_screen_edge_without_a_step(
     steps = [coverage[y + 1] - coverage[y] for y in range(len(coverage) - 1)]
     assert min(steps) >= -0.02, (theme, coverage)
     assert max(steps) <= 0.05, (theme, coverage)
+
+
+# Hides both scroll-edge fade layers, so a clip shot with them on can be
+# compared against the same pixels with nothing drawn over the content.
+_FADES_OFF_CSS = "body::before, body::after { display: none !important; }"
+
+
+def _undimmed(page: Page, selector: str) -> bool:
+    """Whether the element's pixels are identical with the fades on and off."""
+    box = page.locator(selector).bounding_box()
+    assert box, selector
+    clip = {"x": box["x"], "y": box["y"], "width": box["width"], "height": box["height"]}
+    on = page.screenshot(clip=clip, animations="disabled")
+    off_style = page.add_style_tag(content=_FADES_OFF_CSS)
+    off = page.screenshot(clip=clip, animations="disabled")
+    off_style.evaluate("el => el.remove()")
+    return on == off
+
+
+# A long page ending in the build-identity footer (the vendored page-foot's
+# shape, last child of .app) with no margin of its own: the strict case.
+_LONG_PAGE_WITH_FOOT_JS = """() => {
+  const app = document.querySelector('.app');
+  const filler = document.createElement('div');
+  filler.style.cssText = 'height: 1600px; background: var(--card)';
+  const foot = document.createElement('footer');
+  foot.className = 'page-foot';
+  foot.id = 'testFoot';
+  foot.style.cssText = 'margin: 0; text-align: center; color: var(--ink)';
+  foot.innerHTML = '<p style="margin: 0">Build: 0123abc · 2026-01-01 00:00</p>';
+  app.append(filler, foot);
+}"""
+
+
+@pytest.mark.parametrize("tail", [None, 60])
+def test_build_footer_ends_a_gap_above_the_bottom_fade(nav_phone: Page, tail: int | None) -> None:
+    """Scrolled to the end, the last content (the build footer) sits a full
+    --gap above the bottom fade's top edge, so it is never dimmed, including
+    when an app lengthens the fade's tail."""
+    page = nav_phone
+    if tail is not None:
+        page.evaluate(f"() => document.documentElement.style.setProperty('--nav-fade-tail', '{tail}px')")
+    page.evaluate(_LONG_PAGE_WITH_FOOT_JS)
+    page.evaluate("() => window.scrollTo(0, document.scrollingElement.scrollHeight)")
+    page.wait_for_function(
+        "() => Math.ceil(scrollY + innerHeight) >= document.scrollingElement.scrollHeight"
+    )
+    m = page.evaluate("""() => ({
+      footBottom: document.getElementById('testFoot').getBoundingClientRect().bottom,
+      fadeTop: innerHeight - parseFloat(getComputedStyle(document.body, '::before').height),
+    })""")
+    assert m["fadeTop"] - m["footBottom"] >= 12, m
+    assert _undimmed(page, "#testFoot"), m
+
+
+# task-os's header shape: a rounded header card as the first child of .app,
+# under an app rule that keeps .app's top padding to the safe area alone.
+_HEADER_CARD_JS = """([sticky]) => {
+  const app = document.querySelector('.app');
+  const head = document.createElement('div');
+  head.className = 'card home-head';
+  head.id = 'testHead';
+  head.style.cssText = 'height: 56px; margin: 0 0 12px; border: 1px solid var(--line);'
+    + 'border-radius: 16px; background: var(--card); box-sizing: border-box;'
+    + (sticky ? 'position: sticky; top: 0; z-index: 2;' : '');
+  const filler = document.createElement('div');
+  filler.style.height = '1600px';
+  app.prepend(head);
+  app.append(filler);
+  const style = document.createElement('style');
+  style.textContent = '.app { padding-top: env(safe-area-inset-top, 0); }';
+  document.head.append(style);
+}"""
+
+
+@pytest.mark.parametrize("standalone", [False, True], ids=["tab", "standalone"])
+@pytest.mark.parametrize("sticky", [False, True], ids=["static", "sticky"])
+def test_first_card_top_edge_is_undimmed_at_rest(
+    static_server: str, browser: Browser, sticky: bool, standalone: bool
+) -> None:
+    """At scroll 0 nothing is dimmed: the first rounded header card's top edge,
+    flush under the status bar, shows at full opacity, for a static or a
+    sticky header, and in the installed app, whose 1px viewport-expanding
+    scroll at startup must leave the top fade off once it returns to rest."""
+    with phone_nav(browser, static_server) as page:
+        page.evaluate(_SHORT_TABS_JS)
+        page.evaluate(_HEADER_CARD_JS, [sticky])
+        if standalone:
+            page.evaluate(
+                "() => { const real = window.matchMedia.bind(window);"
+                " window.matchMedia = q => q.includes('display-mode: standalone')"
+                " ? { matches: true, media: q, addEventListener() {}, removeEventListener() {} }"
+                " : real(q); }"
+            )
+        page.evaluate(
+            "async () => { const m = await import('/_vendored/nav/nav-tabs.js');"
+            " window.__nav = m.initNavTabs(); }"
+        )
+        page.wait_for_function(
+            "() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(() => r(true))))"
+        )
+        page.wait_for_function("() => scrollY === 0")
+        top = page.evaluate("() => document.getElementById('testHead').getBoundingClientRect().top")
+        assert top == 0, top
+        assert _undimmed(page, "#testHead")
