@@ -222,9 +222,16 @@ function mountPill(nav) {
 function placePill(nav, pill, jump) {
   const on = nav.querySelector('.tab.active');
   if (!on || !on.offsetWidth) return;
+  const x = on.offsetLeft + 'px';
+  const w = on.offsetWidth + 'px';
+  // iOS fires resize on every keyboard open and close without moving the
+  // cells; a no-op write would still restyle the glass bar and repaint it.
+  if (jump && nav.classList.contains('has-pill') &&
+      pill.style.getPropertyValue('--pill-x') === x &&
+      pill.style.getPropertyValue('--pill-w') === w) return;
   if (jump) pill.classList.add('no-anim');
-  pill.style.setProperty('--pill-x', on.offsetLeft + 'px');
-  pill.style.setProperty('--pill-w', on.offsetWidth + 'px');
+  pill.style.setProperty('--pill-x', x);
+  pill.style.setProperty('--pill-w', w);
   nav.classList.add('has-pill');
   if (pill.classList.contains('no-anim')) {
     requestAnimationFrame(function () {

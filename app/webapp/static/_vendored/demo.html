@@ -881,9 +881,8 @@
   document.body.dataset.demoReady = '1';
 </script>
 <script type="module">
-  // usage-log in its own module, so nothing here can stop the gallery script
-  // above. Served by a plain static server the POST fails, silently by
-  // contract; tests/e2e/test_vendored_usage_log.py serves the real router.
+  // usage-log in its own module, so nothing here can stop the gallery script above. On a
+  // plain static server its POST fails silently; test_vendored_usage_log.py serves the router.
   import { initUsageLog } from './usage-log/usage-log.js';
 
   const usage = initUsageLog();
@@ -895,5 +894,6 @@
   window.demoUsage = usage;
   document.body.dataset.usageReady = '1';
 </script>
+<script type="module" src="demo-nav.js"></script>
 </body>
 </html>
