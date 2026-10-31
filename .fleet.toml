@@ -317,8 +317,8 @@ pytest_targets = ["tests/e2e/test_vendored_usage_log.py"]
 [[e2e.surface]]
 name           = "shot-baseline"
 prefixes       = ["tests/e2e/shots/"]
-paths          = ["scripts/shot_baseline.py", "tests/e2e/test_shot_baseline.py"]
-pytest_targets = ["tests/e2e/test_shot_baseline.py"]
+paths          = ["scripts/shot_baseline.py", "tests/e2e/test_shot_capture.py"]
+pytest_targets = ["tests/e2e/test_shot_capture.py"]
 
 # ---------------------------------------------------------------------------
 # Static-analysis ratchet (project-scaffolding#410). scripts/verify-before-ship.ps1
@@ -449,7 +449,7 @@ rules   = ["no-window", "logging-not-print", "no-drive-path"]
 [shot_baseline]
 enabled   = true
 shots_dir = "tests/e2e/shots"
-capture   = ["-m", "pytest", "tests/e2e/test_shot_baseline.py::test_gallery_shots", "-q", "-p", "no:cacheprovider"]
+capture   = ["-m", "pytest", "tests/e2e/test_shot_capture.py::test_gallery_shots", "-q", "-p", "no:cacheprovider"]
 
 # ---------------------------------------------------------------------------
 # [components] -- the canonical catalog of this scaffold's vendor-verbatim

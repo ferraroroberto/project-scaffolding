@@ -54,3 +54,7 @@ data/input/*
 .DS_Store
 Thumbs.db
 .proof/
+
+# gen_tailscale_cert.py writes the TLS leaf and its private key here; an app
+# cloned from the scaffold must never see the key as a committable file.
+webapp/certificates/

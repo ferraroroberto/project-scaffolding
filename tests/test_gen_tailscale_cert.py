@@ -19,6 +19,7 @@ from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.x509.oid import NameOID
 
 from scripts import gen_tailscale_cert as gtc
+from src.no_window import NO_WINDOW
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
@@ -96,3 +97,11 @@ def test_a_stalled_tailscale_status_is_a_clear_exit_not_a_hang(monkeypatch: pyte
     monkeypatch.setattr(gtc.subprocess, "run", stalled)
     with pytest.raises(SystemExit, match="tailscale status timed out"):
         gtc._tailscale_hostname()
+
+
+def test_the_folder_the_script_writes_the_private_key_into_is_gitignored() -> None:
+    key = (gtc.CERT_DIR / "key.pem").relative_to(REPO_ROOT).as_posix()
+    result = subprocess.run(
+        ["git", "check-ignore", "-q", key], cwd=REPO_ROOT, capture_output=True, creationflags=NO_WINDOW, timeout=30
+    )
+    assert result.returncode == 0, f"{key} is not gitignored: a cloned app would show its private key as committable"

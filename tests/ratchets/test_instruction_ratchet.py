@@ -222,6 +222,32 @@ def test_an_unreadable_skill_description_is_not_confirmed(tmp_path: Path, text: 
         lint(tmp_path, ".claude/skills/a/SKILL.md", text)
 
 
+@pytest.mark.parametrize(
+    ("header", "folded"),
+    [
+        pytest.param(">", "I format your report. Use when asked.", id="folded"),
+        pytest.param(">-", "I format your report. Use when asked.", id="folded-stripped"),
+        pytest.param("|", "I format your report.\nUse when asked.", id="literal"),
+    ],
+)
+def test_a_block_scalar_description_is_read_not_its_indicator(header: str, folded: str) -> None:
+    text = f"---\nname: a\ndescription: {header}\n  I format your report.\n  Use when asked.\n---\nBody.\n"
+    assert ir.frontmatter_error(text) is None
+    assert ir.frontmatter_field(text, "description") == folded
+
+
+def test_a_block_scalar_description_gets_the_same_checks_as_an_inline_one(tmp_path: Path) -> None:
+    text = "---\nname: report-format\ndescription: >\n  I format your report.\n---\nBody.\n"
+    hits = lint(tmp_path, ".claude/skills/a/SKILL.md", text)
+    assert rules(hits, "consider")["R-15"] == 2  # I + your, found in text the old reader never saw
+
+
+def test_an_empty_description_does_not_read_the_next_key() -> None:
+    text = "---\nname: a\ndescription:\nlicense: MIT\n---\nBody.\n"
+    assert ir.frontmatter_field(text, "description") is None
+    assert ir.frontmatter_field(text, "license") == "MIT"
+
+
 def test_an_unclosed_fence_is_not_confirmed(tmp_path: Path) -> None:
     with pytest.raises(ir.NotConfirmed, match="line 3"):
         lint(tmp_path, "AGENTS.md", "Text.\n\n```\nhidden\n")
