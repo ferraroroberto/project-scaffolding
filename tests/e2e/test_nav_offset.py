@@ -117,7 +117,8 @@ def test_scroll_edge_fades_top_and_bottom(nav_phone: Page) -> None:
     assert top["top"] == "0px", top
     # The band below the status bar, inside the .app top padding (safe area 0 here).
     assert top["height"] == _BAND, top
-    assert "to top" in top["image"], top
+    # Drawn from the screen edge down: strongest at the top, transparent last.
+    assert "to top" not in top["image"], top
 
     for fade in (bottom, top):
         assert "linear-gradient" in fade["image"], fade
@@ -127,9 +128,12 @@ def test_scroll_edge_fades_top_and_bottom(nav_phone: Page) -> None:
 
 @pytest.mark.parametrize("theme", ["light", "dark"])
 def test_fade_drops_fast_to_half_then_trails_off(nav_phone: Page, theme: str) -> None:
-    """The owner's curve: from the opaque middle the page colour covers content
+    """Bottom: going down from the opaque middle the page colour covers content
     quickly to 50% at the knee, then a long light tail reaches solid at the edge.
-    The same stops on both edges, in the page colour of either theme."""
+    Top: that curve inverted, strongest at the screen edge and easing out to
+    transparent over the content, so no fast ramp lands on the content side
+    (on the owner's iPhone that ramp read as a hard cut across the header).
+    Both in the page colour of either theme."""
     page = nav_phone
     if theme == "dark":
         page.evaluate("() => { document.documentElement.dataset.theme = 'dark'; }")
@@ -137,7 +141,17 @@ def test_fade_drops_fast_to_half_then_trails_off(nav_phone: Page, theme: str) ->
         r"() => getComputedStyle(document.body).backgroundColor.match(/\d+/g).slice(0, 3).join(',')"
     )
     images = [page.evaluate(_FADE_JS, p)["image"] for p in ("::before", "::after")]
-    assert images[0].replace("linear-gradient(", "linear-gradient(to top, ") == images[1], images
+
+    top = _stops(images[1])
+    assert len(top) == 5, images[1]
+    assert top[0][0] == 1 and top[0][2] == 0, top
+    assert top[-1][0] == 0 and top[-1][2] == _BAND, top
+    assert [a for a, _, _ in top] == sorted((a for a, _, _ in top), reverse=True), top
+    # The inverse of the bottom curve, stop for stop at the same offsets.
+    for (ta, _, to), (ba, _, bo) in zip(top, _stops(images[0])):
+        assert to == pytest.approx(bo, abs=0.01), (top, images[0])
+        assert ta == pytest.approx(1 - ba, abs=0.01), (top, images[0])
+    assert all(rgb == bg for a, rgb, _ in top if a > 0), (bg, top)
 
     stops = _stops(images[0])
     assert len(stops) == 5, images[0]
