@@ -297,16 +297,14 @@
   }
 
   /* Scroll-edge fades: a gentle hint that more content lies past each edge,
-     never a wall. Over a short band the page background covers content fast
-     to --nav-fade-mid at --nav-fade-knee of the band, then a long light tail
-     reaches the solid page colour at the edge. One curve, both edges, so the
-     two fades read as one design. The knee is a number (a fraction of the
+     never a wall. Both bands are built from the same three tokens: the band
+     height, the page-colour coverage at the knee (--nav-fade-mid) and where
+     the knee sits (--nav-fade-knee). The knee is a number (a fraction of the
      band) because calc() cannot multiply a length by a percentage. Apps may
-     tune the three tokens; the stops below are derived from them. Declared
-     on the bands themselves, not :root, so --bg resolves where the band
-     paints, whichever element an app sets its dark theme on. */
-  body::before,
-  body::after {
+     tune the tokens; the stops below are derived from them. Declared on the
+     bands themselves, not :root, so --bg resolves where the band paints,
+     whichever element an app sets its dark theme on. */
+  body::before {
     --nav-fade-stops:
       transparent 0,
       color-mix(in srgb, var(--bg) calc(var(--nav-fade-mid, 50%) * 0.65), transparent)
@@ -317,8 +315,10 @@
         calc(var(--nav-fade-band, 24px) * (var(--nav-fade-knee, 0.3) + 1) / 2),
       var(--bg) var(--nav-fade-band, 24px);
   }
-  /* Bottom fade: an inert band anchored to the screen bottom like the bar,
-     fading over the band just above the bar's top edge and solid page colour
+  /* Bottom fade: an inert band anchored to the screen bottom like the bar.
+     Going down from the content, the page colour covers fast to the knee,
+     then a long light tail reaches solid at the bar's top edge, and solid
+     page colour
      from there down, so rows never show through the glass hard-edged. Above
      .app, below the bar's 120; pointer-events: none so taps reach the row
      beneath. The .app bottom reserve clears the band, so the last row at
@@ -334,9 +334,15 @@
     pointer-events: none;
     background: linear-gradient(to bottom, var(--nav-fade-stops));
   }
-  /* Top fade: the `default` status bar is opaque in the page colour
-     (theme-color), so the band is drawn just below it, inside the .app top
-     padding, with the same curve pointing up. */
+  /* Top fade: solid page colour over the safe area (the `default` status bar
+     is opaque in the same colour through theme-color), then strongest at the
+     screen edge and easing out downward: fast from solid to the knee, then a
+     long light tail to transparent, so the band ends on the content without
+     a visible cut. It is the bottom curve inverted (each stop's coverage is
+     one minus the bottom stop's at the same offset), because a fast ramp on
+     the content side reads as a hard edge across whatever scrolls under it.
+     At scroll-top the .app top padding (safe area plus band) keeps the first
+     control below the band. */
   body::after {
     content: '';
     position: fixed;
@@ -346,7 +352,17 @@
     height: calc(env(safe-area-inset-top, 0px) + var(--nav-fade-band, 24px));
     z-index: 110;
     pointer-events: none;
-    background: linear-gradient(to top, var(--nav-fade-stops));
+    background: linear-gradient(
+      to bottom,
+      var(--bg) env(safe-area-inset-top, 0px),
+      color-mix(in srgb, var(--bg) calc(100% - var(--nav-fade-mid, 50%) * 0.65), transparent)
+        calc(env(safe-area-inset-top, 0px) + var(--nav-fade-band, 24px) * var(--nav-fade-knee, 0.3) / 2),
+      color-mix(in srgb, var(--bg) calc(100% - var(--nav-fade-mid, 50%)), transparent)
+        calc(env(safe-area-inset-top, 0px) + var(--nav-fade-band, 24px) * var(--nav-fade-knee, 0.3)),
+      color-mix(in srgb, var(--bg) calc((100% - var(--nav-fade-mid, 50%)) * 0.65), transparent)
+        calc(env(safe-area-inset-top, 0px) + var(--nav-fade-band, 24px) * (var(--nav-fade-knee, 0.3) + 1) / 2),
+      transparent calc(env(safe-area-inset-top, 0px) + var(--nav-fade-band, 24px))
+    );
   }
   @media (prefers-reduced-transparency: reduce) {
     body::before,
