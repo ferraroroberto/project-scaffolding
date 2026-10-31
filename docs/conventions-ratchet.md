@@ -45,6 +45,33 @@ A hit is a string literal (f-string parts included, docstrings excluded) that **
 - a bare drive root (`"C:\\"`), which anchors a filesystem walk rather than naming a data location;
 - a drive in the middle of a string (`"see E:/x"`, a URL).
 
+#### The fix: `fleet_root()` instead of a drive letter
+
+Most hits name a fleet location: a sibling repo, a helper in another checkout, a scratch folder beside the repos. Their fix is the vendored resolver `src/fleet_root.py` (manifest key `fleet_root`), not a different literal:
+
+```python
+from src.fleet_root import fleet_root
+
+helper = fleet_root() / "fleet-config" / "skills" / "_lib" / "send_file.py"
+```
+
+`fleet_root()` returns the directory holding the fleet's repos, resolved in this order:
+
+1. the `FLEET_ROOT` environment variable;
+2. the machine-local config `$XDG_CONFIG_HOME/fleet/fleet.toml` (`~/.config/fleet/fleet.toml` when unset), key `root`. It lives in the user's home, never in a repo, because the root is a fact about the machine;
+3. the parent of the git checkout holding the module, so a repo cloned at `<root>/<repo>`, or a worktree at `<root>/<repo>-wt-<N>`, needs no setup.
+
+Every step yields an existing absolute directory or raises `FleetRootError` naming the step and the value it read. A set-but-wrong value never falls through to the next step, so a typo in `FLEET_ROOT` surfaces instead of resolving to wherever the checkout sits. When no step applies (no variable, no `root` key, and the module is not inside a git checkout), it raises rather than guessing. Tests: `tests/locations/test_fleet_root.py`.
+
+A location that is genuinely one fixed place on every machine (the runtime-data root `C:/sqlite` in `src/runtime_data.py`) keeps its literal under a `no-drive-path-exempt` marker with the reason.
+
+**Enabling the rule in a repo that has hits today.** Add `"no-drive-path"` to `rules` in its `[conventions_ratchet]` table, then record today's hits instead of fixing them first:
+
+- no baseline yet: `python scripts/conventions_ratchet.py --init`;
+- a baseline already committed for other rules: `python scripts/conventions_ratchet.py --update-baseline --allow-additions`, which adds the new rule's counts and shows them in review.
+
+Commit the baseline in the same PR as the `rules` change. From then on a new drive literal fails the gate, and each burned-down hit shrinks the baseline with `--update-baseline`. The scaffold itself runs the rule with a baseline of zero.
+
 ### `secret-compare`
 
 There is **no global-instruction line** for this rule. It enforces a convention the repo declares by naming its helper: every constant-time comparison goes through one function, which compares bytes rather than `str`, because `hmac.compare_digest` raises `TypeError` on a non-ASCII `str`. Several fleet repos keep a local test for exactly this.
