@@ -248,57 +248,36 @@ def test_the_siblings_are_catalogued_and_all_three_scripts_stay_under_the_limit(
         assert lines <= sr.DEFAULT_MAX_FILE_LINES, name
 
 
-def test_the_script_runs_standalone_beside_its_sibling_and_exits_three_without_it(tmp_path: Path) -> None:
-    """The gate runs `python scripts/structure_ratchet.py`; an adopter that vendored only one file must not pass."""
+def _assert_runs_only_beside_both_siblings(tmp_path: Path, *interpreter_flags: str) -> None:
+    """Copy the ratchet alone, then each sibling in turn: exit 3 naming the missing one, then a run."""
     scripts = tmp_path / "scripts"
-    scripts.mkdir()
+    scripts.mkdir(exist_ok=True)
     shutil.copy(REPO_ROOT / "scripts" / "structure_ratchet.py", scripts)
-    command = [sys.executable, str(scripts / "structure_ratchet.py"), "--root", str(tmp_path)]
+    (tmp_path / ".fleet.toml").write_text("layer = 'x'\n", encoding="utf-8")
+    command = [sys.executable, *interpreter_flags, str(scripts / "structure_ratchet.py"), "--root", str(tmp_path)]
     env = {k: v for k, v in os.environ.items() if k != "PYTHONPATH"}  # the repo's own scripts/ must not resolve
-
-    def invoke() -> subprocess.CompletedProcess[str]:
-        return subprocess.run(command, capture_output=True, text=True, env=env, cwd=tmp_path,
-                              creationflags=NO_WINDOW, check=False)
-
-    missing = invoke()
-    assert missing.returncode == sr.EXIT_NOT_CONFIRMED
-    assert "structure_layout.py is missing" in missing.stdout
-    shutil.copy(REPO_ROOT / "scripts" / "structure_layout.py", scripts)
-    band_missing = invoke()
-    assert band_missing.returncode == sr.EXIT_NOT_CONFIRMED
-    assert "structure_band.py is missing" in band_missing.stdout
-    shutil.copy(REPO_ROOT / "scripts" / "structure_band.py", scripts)
-    (tmp_path / ".fleet.toml").write_text("layer = 'x'\n", encoding="utf-8")
-    present = invoke()
-    assert present.returncode == sr.EXIT_PASS, present.stdout
-    assert "not enabled" in present.stdout
-
-
-def test_the_script_finds_its_sibling_under_safe_path_without_putting_scripts_on_sys_path(tmp_path: Path) -> None:
-    """`python -P` keeps scripts/ off sys.path so a local scripts/inspect.py cannot shadow the stdlib."""
-    scripts = tmp_path / "scripts"
-    scripts.mkdir()
-    shutil.copy(REPO_ROOT / "scripts" / "structure_ratchet.py", scripts)
-    (scripts / "inspect.py").write_text("raise RuntimeError('shadowed the stdlib')\n", encoding="utf-8")
-    (tmp_path / ".fleet.toml").write_text("layer = 'x'\n", encoding="utf-8")
-    command = [sys.executable, "-P", str(scripts / "structure_ratchet.py"), "--root", str(tmp_path)]
-    env = {k: v for k, v in os.environ.items() if k != "PYTHONPATH"}
-
-    def invoke() -> subprocess.CompletedProcess[str]:
-        return subprocess.run(command, capture_output=True, text=True, env=env, cwd=tmp_path,
-                              creationflags=NO_WINDOW, check=False)
-
-    missing = invoke()
-    assert missing.returncode == sr.EXIT_NOT_CONFIRMED
-    assert "structure_layout.py is missing" in missing.stdout
-    shutil.copy(REPO_ROOT / "scripts" / "structure_layout.py", scripts)
-    band_missing = invoke()
-    assert band_missing.returncode == sr.EXIT_NOT_CONFIRMED
-    assert "structure_band.py is missing" in band_missing.stdout
-    shutil.copy(REPO_ROOT / "scripts" / "structure_band.py", scripts)
-    present = invoke()
+    for sibling in ("structure_layout.py", "structure_band.py"):
+        missing = subprocess.run(command, capture_output=True, text=True, env=env, cwd=tmp_path,
+                                 creationflags=NO_WINDOW, check=False)
+        assert missing.returncode == sr.EXIT_NOT_CONFIRMED, missing.stdout + missing.stderr
+        assert f"{sibling} is missing" in missing.stdout
+        shutil.copy(REPO_ROOT / "scripts" / sibling, scripts)
+    present = subprocess.run(command, capture_output=True, text=True, env=env, cwd=tmp_path,
+                             creationflags=NO_WINDOW, check=False)
     assert present.returncode == sr.EXIT_PASS, present.stdout + present.stderr
     assert "not enabled" in present.stdout
+
+
+def test_the_script_runs_standalone_beside_its_siblings_and_exits_three_without_either(tmp_path: Path) -> None:
+    """The gate runs `python scripts/structure_ratchet.py`; an adopter that vendored only some files must not pass."""
+    _assert_runs_only_beside_both_siblings(tmp_path)
+
+
+def test_the_script_finds_its_siblings_under_safe_path_without_putting_scripts_on_sys_path(tmp_path: Path) -> None:
+    """`python -P` keeps scripts/ off sys.path so a local scripts/inspect.py cannot shadow the stdlib."""
+    (tmp_path / "scripts").mkdir()
+    (tmp_path / "scripts" / "inspect.py").write_text("raise RuntimeError('shadowed the stdlib')\n", encoding="utf-8")
+    _assert_runs_only_beside_both_siblings(tmp_path, "-P")
 
 
 def test_the_scaffold_records_its_layout_in_its_own_baseline() -> None:
