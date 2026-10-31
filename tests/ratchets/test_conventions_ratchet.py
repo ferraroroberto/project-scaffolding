@@ -406,3 +406,13 @@ def test_an_ignored_file_is_still_skipped(repo: Path) -> None:
     write(repo, ".gitignore", "src/ignored.py\n")
     write(repo, "src/ignored.py", "import subprocess\n\nsubprocess.Popen(['tool'])\n", track=False)
     assert run_mode(repo) == cr.EXIT_PASS
+
+
+def test_the_module_docstring_names_every_exemption_the_scanner_applies() -> None:
+    """The docstring is the spec an adopter reads in their vendored copy."""
+    spec = " ".join((cr.__doc__ or "").split())
+    for module in cr._CLI_MODULES:
+        assert f"`{module}`" in spec, f"docstring omits the CLI module {module}"
+    for folder in ("Windows", "Program Files", "Program Files (x86)", "ProgramData"):
+        assert f"`?:\\{folder}`" in spec, f"docstring omits the system folder {folder}"
+        assert cr._SYSTEM_DRIVE.match(f"C:/{folder}/x"), f"the scanner does not exempt {folder}"
