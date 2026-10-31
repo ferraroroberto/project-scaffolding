@@ -475,8 +475,8 @@ def test_real_surfaces_route_representative_paths() -> None:
 
     # The screenshot baseline: the comparison (a full rule ahead of scripts/ ->
     # none), its proof and a re-baselined PNG all run only that proof.
-    assert route("scripts/shot_baseline.py") == ("surface", "tests/e2e/test_shot_baseline.py")
-    assert route("tests/e2e/shots/gallery-phone-light.png") == ("surface", "tests/e2e/test_shot_baseline.py")
+    assert route("scripts/shot_baseline.py") == ("surface", "tests/e2e/test_shot_capture.py")
+    assert route("tests/e2e/shots/gallery-phone-light.png") == ("surface", "tests/e2e/test_shot_capture.py")
     # conftest imports the capture helper's launch args, so it is shared.
     assert route("tests/e2e/_shot.py") == ("full", "tests/e2e")
 

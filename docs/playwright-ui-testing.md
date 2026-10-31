@@ -1146,7 +1146,7 @@ the repo is.
 `capture` argv that runs only the capture tests; write one test that calls
 `capture_screen` per screen; run it, review the PNGs, commit them; add the
 gate stage. Proven here by `tests/test_shot_baseline.py` (the bands, every
-exit state, restore, the capture modes) and `tests/e2e/test_shot_baseline.py`
+exit state, restore, the capture modes) and `tests/e2e/test_shot_capture.py`
 on the component gallery: two captures of the same commit compare clean, and
 a deliberate one-rule change fails and is restored.
 

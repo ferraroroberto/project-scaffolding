@@ -141,6 +141,26 @@ def test_visible_change_fails_and_is_restored(repo: Path, capsys: pytest.Capture
     git(repo, "diff", "--quiet", "--", "shots")
 
 
+def test_a_failure_mid_comparison_still_restores_every_rewritten_shot(
+    repo: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    since = time.time()
+    _recapture(repo / "shots" / "home-phone-light.png", changes=200, delta=100)
+    _recapture(repo / "shots" / "home-phone-dark.png", changes=200, delta=100)
+    judged: list[str] = []
+
+    def judge_then_die(name: str, *args: object) -> None:
+        judged.append(name)
+        if len(judged) == 2:
+            raise KeyboardInterrupt
+
+    monkeypatch.setattr(sb, "_judge", judge_then_die)
+    with pytest.raises(KeyboardInterrupt):
+        sb.run(repo, mode="check-tree", since=since)
+    assert len(judged) == 2
+    git(repo, "diff", "--quiet", "--", "shots")  # both recaptured PNGs are back to the committed copy
+
+
 def test_allowlisted_shot_passes_with_its_reason(repo: Path, capsys: pytest.CaptureFixture[str]) -> None:
     (repo / ".fleet.toml").write_text(
         _ENABLED + '[shot_baseline.allowed_to_differ]\n"home-phone-dark.png" = "shows uptime"\n', encoding="utf-8")

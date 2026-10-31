@@ -50,7 +50,7 @@ A function expression takes the name it is bound to (`const mountHome = async ()
 
 ### Root layout
 
-The presets and the three layout checks live in the sibling `scripts/structure_layout.py`, which `structure_ratchet.py` loads; a missing sibling is exit 3, never a skip. The check reads the top-level `shape` and `extra_roots` keys of the repo's own `.fleet.toml` (not the `[structure_ratchet]` table) and the root folders from the same file list as the other checks (`git ls-files --cached --others --exclude-standard`), so a new untracked folder counts as a root and an ignored one does not. A shape's preset lives in `structure_layout.py` (`SHAPES`), which keeps both scripts vendor-verbatim; this table is the same data, and a test compares the two.
+The presets and the three layout checks live in the sibling `scripts/structure_layout.py`, which `structure_ratchet.py` loads by its own path (so `python -P`, which keeps `scripts/` off `sys.path`, finds it); a missing sibling is exit 3, never a skip. The check reads the top-level `shape` and `extra_roots` keys of the repo's own `.fleet.toml` (not the `[structure_ratchet]` table) and the root folders from the same file list as the other checks (`git ls-files --cached --others --exclude-standard`), so a new untracked folder counts as a root and an ignored one does not. A shape's preset lives in `structure_layout.py` (`SHAPES`), which keeps both scripts vendor-verbatim; this table is the same data, and a test compares the two.
 
 | `shape` | Required root folders | Also allowed | `layers` default |
 |---|---|---|---|

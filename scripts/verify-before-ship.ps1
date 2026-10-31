@@ -207,7 +207,7 @@ if ($tier -eq "skip") {
 
     # Screenshot baseline: when the slice just ran the capture, compare what it
     # wrote; otherwise run the capture itself. Either way the tree is restored.
-    $sliceCaptured = ($e2eArgs -contains "tests/e2e") -or (@($e2eArgs | Where-Object { $_ -like "tests/e2e/test_shot_baseline.py*" }).Count -gt 0)
+    $sliceCaptured = ($e2eArgs -contains "tests/e2e") -or (@($e2eArgs | Where-Object { $_ -like "tests/e2e/test_shot_capture.py*" }).Count -gt 0)
     if ($sliceCaptured) {
         $since = $shotSince.ToString([Globalization.CultureInfo]::InvariantCulture)
         Invoke-Stage "shot baseline (compare)" { & $py "scripts/shot_baseline.py" --check-tree --since $since }

@@ -269,6 +269,29 @@ def test_the_script_runs_standalone_beside_its_sibling_and_exits_three_without_i
     assert "not enabled" in present.stdout
 
 
+def test_the_script_finds_its_sibling_under_safe_path_without_putting_scripts_on_sys_path(tmp_path: Path) -> None:
+    """`python -P` keeps scripts/ off sys.path so a local scripts/inspect.py cannot shadow the stdlib."""
+    scripts = tmp_path / "scripts"
+    scripts.mkdir()
+    shutil.copy(REPO_ROOT / "scripts" / "structure_ratchet.py", scripts)
+    (scripts / "inspect.py").write_text("raise RuntimeError('shadowed the stdlib')\n", encoding="utf-8")
+    (tmp_path / ".fleet.toml").write_text("layer = 'x'\n", encoding="utf-8")
+    command = [sys.executable, "-P", str(scripts / "structure_ratchet.py"), "--root", str(tmp_path)]
+    env = {k: v for k, v in os.environ.items() if k != "PYTHONPATH"}
+
+    def invoke() -> subprocess.CompletedProcess[str]:
+        return subprocess.run(command, capture_output=True, text=True, env=env, cwd=tmp_path,
+                              creationflags=NO_WINDOW, check=False)
+
+    missing = invoke()
+    assert missing.returncode == sr.EXIT_NOT_CONFIRMED
+    assert "structure_layout.py is missing" in missing.stdout
+    shutil.copy(REPO_ROOT / "scripts" / "structure_layout.py", scripts)
+    present = invoke()
+    assert present.returncode == sr.EXIT_PASS, present.stdout + present.stderr
+    assert "not enabled" in present.stdout
+
+
 def test_the_scaffold_records_its_layout_in_its_own_baseline() -> None:
     assert recorded_at_repo()["root_extras"] == []
 

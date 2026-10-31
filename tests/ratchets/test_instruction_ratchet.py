@@ -28,8 +28,12 @@ import pytest
 from scripts import docs_ratchet
 from scripts import instruction_ratchet as ir
 from tests._git_repo import git, write
+from tests._ratchet_not_confirmed import (
+    assert_unreadable_file_not_confirmed,
+    git_failure_test,
+)
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
+REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
 def lint(root: Path, rel: str, text: str, *, agents: str | None = None) -> list[ir.Hit]:
@@ -218,6 +222,32 @@ def test_an_unreadable_skill_description_is_not_confirmed(tmp_path: Path, text: 
         lint(tmp_path, ".claude/skills/a/SKILL.md", text)
 
 
+@pytest.mark.parametrize(
+    ("header", "folded"),
+    [
+        pytest.param(">", "I format your report. Use when asked.", id="folded"),
+        pytest.param(">-", "I format your report. Use when asked.", id="folded-stripped"),
+        pytest.param("|", "I format your report.\nUse when asked.", id="literal"),
+    ],
+)
+def test_a_block_scalar_description_is_read_not_its_indicator(header: str, folded: str) -> None:
+    text = f"---\nname: a\ndescription: {header}\n  I format your report.\n  Use when asked.\n---\nBody.\n"
+    assert ir.frontmatter_error(text) is None
+    assert ir.frontmatter_field(text, "description") == folded
+
+
+def test_a_block_scalar_description_gets_the_same_checks_as_an_inline_one(tmp_path: Path) -> None:
+    text = "---\nname: report-format\ndescription: >\n  I format your report.\n---\nBody.\n"
+    hits = lint(tmp_path, ".claude/skills/a/SKILL.md", text)
+    assert rules(hits, "consider")["R-15"] == 2  # I + your, found in text the old reader never saw
+
+
+def test_an_empty_description_does_not_read_the_next_key() -> None:
+    text = "---\nname: a\ndescription:\nlicense: MIT\n---\nBody.\n"
+    assert ir.frontmatter_field(text, "description") is None
+    assert ir.frontmatter_field(text, "license") == "MIT"
+
+
 def test_an_unclosed_fence_is_not_confirmed(tmp_path: Path) -> None:
     with pytest.raises(ir.NotConfirmed, match="line 3"):
         lint(tmp_path, "AGENTS.md", "Text.\n\n```\nhidden\n")
@@ -391,24 +421,20 @@ def test_an_untracked_extra_file_is_a_config_error(repo: Path) -> None:
     assert not (repo / ir.DEFAULT_BASELINE).exists()
 
 
-@pytest.mark.parametrize("mode", [{}, {"update": True}])
-def test_a_file_the_linter_cannot_finish_is_not_confirmed(repo: Path, mode: dict[str, bool], capsys: pytest.CaptureFixture[str]) -> None:
-    run_mode(repo, init=True)
-    write(repo, "CLAUDE.md", "```\nnever closed\n")
-    assert run_mode(repo, **mode) == ir.EXIT_NOT_CONFIRMED
-    assert "CLAUDE.md: the fenced block opened on line 1 never closes" in capsys.readouterr().out
+@pytest.mark.parametrize(
+    ("body", "says"),
+    [
+        pytest.param(b"```\nnever closed\n", "the fenced block opened on line 1 never closes", id="unclosed-fence"),
+        pytest.param(b"caf\xe9\n", "is not valid UTF-8", id="not-utf8"),
+    ],
+)
+def test_a_file_the_linter_cannot_finish_is_not_confirmed_in_every_mode(
+    repo: Path, body: bytes, says: str, capsys: pytest.CaptureFixture[str]
+) -> None:
+    assert_unreadable_file_not_confirmed(ir, run_mode, repo, "CLAUDE.md", body, says, capsys)
 
 
-def test_undecodable_bytes_are_not_confirmed(repo: Path) -> None:
-    run_mode(repo, init=True)
-    (repo / "CLAUDE.md").write_bytes(b"caf\xe9\n")
-    assert run_mode(repo) == ir.EXIT_NOT_CONFIRMED
-
-
-def test_git_that_cannot_list_files_is_not_confirmed(repo: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    run_mode(repo, init=True)
-    monkeypatch.setenv("PATH", str(repo / "empty"))
-    assert run_mode(repo) == ir.EXIT_NOT_CONFIRMED
+test_git_that_cannot_list_the_tree_is_not_confirmed = git_failure_test(ir, run_mode)
 
 
 def test_main_rejects_allow_additions_without_update(capsys: pytest.CaptureFixture[str]) -> None:

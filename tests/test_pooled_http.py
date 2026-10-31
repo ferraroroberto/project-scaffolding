@@ -91,3 +91,45 @@ def test_pooled_request_gives_up_after_second_failure(
 
     with pytest.raises(requests.exceptions.ConnectionError):
         pooled_http.pooled_request("GET", "http://x/y", timeout=2.0, session=session)
+
+
+def _failing_session(monkeypatch: pytest.MonkeyPatch, error: Exception) -> tuple[requests.Session, list[str]]:
+    calls: list[str] = []
+
+    def failing_request(method: str, url: str, timeout: float | None = None, **kwargs: object) -> object:
+        calls.append(method)
+        raise error
+
+    session = pooled_http.build_session()
+    monkeypatch.setattr(session, "request", failing_request)
+    return session, calls
+
+
+@pytest.mark.parametrize("method", ["POST", "PATCH", "post"])
+def test_a_non_idempotent_method_is_never_resent(monkeypatch: pytest.MonkeyPatch, method: str) -> None:
+    # RemoteDisconnected after the handler ran is wrapped into the same ConnectionError.
+    session, calls = _failing_session(monkeypatch, requests.exceptions.ConnectionError("RemoteDisconnected"))
+
+    with pytest.raises(requests.exceptions.ConnectionError):
+        pooled_http.pooled_request(method, "http://x/y", timeout=2.0, session=session)
+
+    assert len(calls) == 1
+
+
+@pytest.mark.parametrize("method", ["GET", "HEAD", "OPTIONS", "PUT", "DELETE", "get"])
+def test_an_idempotent_method_is_resent_once(monkeypatch: pytest.MonkeyPatch, method: str) -> None:
+    session, calls = _failing_session(monkeypatch, requests.exceptions.ConnectionError("still down"))
+
+    with pytest.raises(requests.exceptions.ConnectionError):
+        pooled_http.pooled_request(method, "http://x/y", timeout=2.0, session=session)
+
+    assert len(calls) == 2
+
+
+def test_a_connect_timeout_is_not_retried(monkeypatch: pytest.MonkeyPatch) -> None:
+    session, calls = _failing_session(monkeypatch, requests.exceptions.ConnectTimeout("offline"))
+
+    with pytest.raises(requests.exceptions.ConnectTimeout):
+        pooled_http.pooled_request("GET", "http://x/y", timeout=2.0, session=session)
+
+    assert len(calls) == 1
