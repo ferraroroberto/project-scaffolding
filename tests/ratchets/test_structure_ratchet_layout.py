@@ -239,10 +239,11 @@ def test_a_malformed_root_extras_is_a_baseline_error(tmp_path: Path, value: str)
 
 # ------------------------------------------------------------ self-adoption
 
-def test_the_sibling_is_catalogued_and_both_scripts_stay_under_the_limit() -> None:
+def test_the_siblings_are_catalogued_and_all_three_scripts_stay_under_the_limit() -> None:
     components = (REPO_ROOT / ".fleet.toml").read_text(encoding="utf-8")
     assert 'structure_layout = { src = "scripts/structure_layout.py" }' in components
-    for name in ("structure_ratchet.py", "structure_layout.py"):
+    assert 'structure_band  = { src = "scripts/structure_band.py" }' in components
+    for name in ("structure_ratchet.py", "structure_layout.py", "structure_band.py"):
         lines = (REPO_ROOT / "scripts" / name).read_text(encoding="utf-8").count("\n")
         assert lines <= sr.DEFAULT_MAX_FILE_LINES, name
 
@@ -263,6 +264,10 @@ def test_the_script_runs_standalone_beside_its_sibling_and_exits_three_without_i
     assert missing.returncode == sr.EXIT_NOT_CONFIRMED
     assert "structure_layout.py is missing" in missing.stdout
     shutil.copy(REPO_ROOT / "scripts" / "structure_layout.py", scripts)
+    band_missing = invoke()
+    assert band_missing.returncode == sr.EXIT_NOT_CONFIRMED
+    assert "structure_band.py is missing" in band_missing.stdout
+    shutil.copy(REPO_ROOT / "scripts" / "structure_band.py", scripts)
     (tmp_path / ".fleet.toml").write_text("layer = 'x'\n", encoding="utf-8")
     present = invoke()
     assert present.returncode == sr.EXIT_PASS, present.stdout
@@ -287,6 +292,10 @@ def test_the_script_finds_its_sibling_under_safe_path_without_putting_scripts_on
     assert missing.returncode == sr.EXIT_NOT_CONFIRMED
     assert "structure_layout.py is missing" in missing.stdout
     shutil.copy(REPO_ROOT / "scripts" / "structure_layout.py", scripts)
+    band_missing = invoke()
+    assert band_missing.returncode == sr.EXIT_NOT_CONFIRMED
+    assert "structure_band.py is missing" in band_missing.stdout
+    shutil.copy(REPO_ROOT / "scripts" / "structure_band.py", scripts)
     present = invoke()
     assert present.returncode == sr.EXIT_PASS, present.stdout + present.stderr
     assert "not enabled" in present.stdout
