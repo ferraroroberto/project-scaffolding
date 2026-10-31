@@ -253,12 +253,12 @@ def test_mobile_pill_stacks_icon_over_label(nav_mobile: Page) -> None:
     The phone `.app` padding is part of the same contract: the top is the safe
     area only (0 in the emulator), since the top scroll fade is off at rest;
     the sides keep `--gap` and the bottom keeps the reserve that clears the
-    floating bar.
+    bottom fade (its 24px tail above the bar, the bar, its margin) by a gap.
     """
     assert _style(nav_mobile, ".app", "paddingTop") == "0px"
     assert _style(nav_mobile, ".app", "paddingLeft") == "12px"
     assert _style(nav_mobile, ".app", "paddingRight") == "12px"
-    assert _style(nav_mobile, ".app", "paddingBottom") == f"{21 + 61 + 21 + 12}px"
+    assert _style(nav_mobile, ".app", "paddingBottom") == f"{24 + 61 + 21 + 12}px"
     icon = nav_mobile.locator("#tabHome .tab-icon")
     expect(icon).to_be_visible()
     assert _style(nav_mobile, "#tabHome .tab-icon", "width") == "24px"
