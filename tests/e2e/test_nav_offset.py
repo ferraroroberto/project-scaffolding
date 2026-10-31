@@ -11,13 +11,15 @@ scroll-edge fade bands at the top and under the bar. Run on both engines:
 
 from __future__ import annotations
 
+import io
 import re
 from collections.abc import Iterator
 
 import pytest
+from PIL import Image
 from playwright.sync_api import Browser, Page
 
-from tests.e2e._nav_graft import phone_nav
+from tests.e2e._nav_graft import mount_nav, phone_nav
 
 _TABS = ("home", "stats", "history")
 
@@ -82,6 +84,8 @@ def test_bar_sits_at_the_same_offset_on_every_tab(nav_phone: Page) -> None:
 # The fade band and its knee: `--nav-fade-band` and `--nav-fade-knee` defaults.
 _BAND = 24
 _KNEE = 0.3
+# Solid page colour above the fixed origin: `--nav-fade-overhang`'s default.
+_OVERHANG = 80
 
 # One gradient stop as both engines serialize it: a colour, then its offset.
 _STOP_RE = re.compile(r"(rgba?\([^)]*\)|color\(srgb [^)]*\))\s+([\d.]+)px")
@@ -114,9 +118,10 @@ def test_scroll_edge_fades_top_and_bottom(nav_phone: Page) -> None:
 
     top = page.evaluate(_FADE_JS, "::after")
     assert top["position"] == "fixed", top
-    assert top["top"] == "0px", top
-    # The band below the status bar, inside the .app top padding (safe area 0 here).
-    assert top["height"] == _BAND, top
+    # Starts above the fixed origin (the installed app's status bar), then the
+    # band, inside the .app top padding (safe area 0 here).
+    assert top["top"] == f"-{_OVERHANG}px", top
+    assert top["height"] == _OVERHANG + _BAND, top
     # Drawn from the screen edge down: strongest at the top, transparent last.
     assert "to top" not in top["image"], top
 
@@ -144,12 +149,13 @@ def test_fade_drops_fast_to_half_then_trails_off(nav_phone: Page, theme: str) ->
 
     top = _stops(images[1])
     assert len(top) == 5, images[1]
-    assert top[0][0] == 1 and top[0][2] == 0, top
-    assert top[-1][0] == 0 and top[-1][2] == _BAND, top
+    assert top[0][0] == 1 and top[0][2] == _OVERHANG, top
+    assert top[-1][0] == 0 and top[-1][2] == _OVERHANG + _BAND, top
     assert [a for a, _, _ in top] == sorted((a for a, _, _ in top), reverse=True), top
-    # The inverse of the bottom curve, stop for stop at the same offsets.
+    # The inverse of the bottom curve, stop for stop at the same offsets past
+    # the solid overhang.
     for (ta, _, to), (ba, _, bo) in zip(top, _stops(images[0])):
-        assert to == pytest.approx(bo, abs=0.01), (top, images[0])
+        assert to - _OVERHANG == pytest.approx(bo, abs=0.01), (top, images[0])
         assert ta == pytest.approx(1 - ba, abs=0.01), (top, images[0])
     assert all(rgb == bg for a, rgb, _ in top if a > 0), (bg, top)
 
@@ -275,3 +281,69 @@ def test_gallery_nav_mode_plays_the_installed_app(static_server: str, browser: B
         assert dark == page.evaluate("() => getComputedStyle(document.body).backgroundColor")
     finally:
         context.close()
+
+
+# The installed iOS app's status bar: content scrolls up behind it, but a
+# `position: fixed; top: 0` layer starts below it, so the fixed layers are moved
+# down by this much to play the device's geometry in a desktop engine.
+_STATUS_BAR = 59
+_CONTRAST = (255, 0, 255)
+
+# Fixed layers start below the emulated status bar; the page under them is one
+# flat contrast colour, so each row's pixel gives the top band's coverage.
+_EMULATE_STATUS_BAR_JS = r"""([inset, contrast]) => {
+  const probe = document.createElement('div');
+  probe.style.background = 'var(--bg)';
+  document.body.append(probe);
+  const bg = getComputedStyle(probe).backgroundColor.match(/\d+/g).slice(0, 3).map(Number);
+  probe.remove();
+  const style = document.createElement('style');
+  style.textContent = `
+    body::after, body::before, .tabs { translate: 0 ${inset}px; }
+    html, body { background: rgb(${contrast.join(',')}) !important; }
+    body > * { visibility: hidden !important; }`;
+  document.head.append(style);
+  return bg;
+}"""
+
+
+# WebKit only: it is the engine of the installed iOS app this emulates, and
+# Chromium does not paint the overhang of a fixed layer moved by `translate`.
+@pytest.mark.only_browser("webkit")
+@pytest.mark.parametrize("theme", ["light", "dark"])
+def test_top_fade_covers_the_status_bar_strip_without_a_step(
+    static_server: str, browser: Browser, theme: str
+) -> None:
+    """In the installed app (dark theme, owner's iPhone) the content behind the
+    59px status bar showed through uncovered and the band began at its lower
+    edge, so whatever scrolled under it was cut by a hard line. From the screen
+    edge through the status bar the page colour must cover solid, then ease out
+    over the band with no step between rows."""
+    context = browser.new_context(
+        viewport={"width": 430, "height": 932}, has_touch=True, is_mobile=True,
+        device_scale_factor=1,
+    )
+    try:
+        page = context.new_page()
+        mount_nav(page, static_server)
+        if theme == "dark":
+            page.evaluate("() => { document.documentElement.dataset.theme = 'dark'; }")
+        bg = page.evaluate(_EMULATE_STATUS_BAR_JS, [_STATUS_BAR, list(_CONTRAST)])
+        rows = _STATUS_BAR + _BAND + 8
+        shot = Image.open(io.BytesIO(page.screenshot(
+            clip={"x": 0, "y": 0, "width": 430, "height": rows}
+        ))).convert("RGB")
+    finally:
+        context.close()
+
+    channel = max(range(3), key=lambda c: abs(_CONTRAST[c] - bg[c]))
+    span = _CONTRAST[channel] - bg[channel]
+    coverage = [
+        round((_CONTRAST[channel] - shot.getpixel((215, y))[channel]) / span, 3)
+        for y in range(rows)
+    ]
+    assert min(coverage[:_STATUS_BAR]) >= 0.97, (theme, coverage)
+    steps = [coverage[y] - coverage[y + 1] for y in range(rows - 1)]
+    assert min(steps) >= -0.02, (theme, coverage)
+    assert max(steps) <= 0.15, (theme, coverage)
+    assert coverage[_STATUS_BAR + _BAND + 2] <= 0.02, (theme, coverage)
