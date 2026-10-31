@@ -109,7 +109,7 @@ Content fades gently at the top and bottom edges of the phone pill layout, a hin
 
 Reduce Transparency (`prefers-reduced-transparency: reduce`) drops both bands. It is CSS only, with no transform on the nav. Desktop and the wide rail carry no such layer. The bands are the nav's own `body::before` and `body::after`, so don't put an app rule on either. `tests/e2e/test_nav_offset.py` checks both bands' geometry and stops in light and dark on a 390x844 phone; the real look is confirmed on an iPhone.
 
-**On-device check page:** the gallery opened as `demo.html?nav` mounts the real nav with the gallery as its long Home tab and two short tabs, and keeps `theme-color` on the page colour as its theme toggle flips. Serve `app/webapp/static/` over HTTP and open it on the phone (add it to the Home Screen for the installed-app behaviour). It mounts the nav after load, so it shows the fades and the keyboard behaviour, not a cold launch.
+**On-device check page:** the gallery opened as `demo.html?nav` (its `demo-nav.js` module) mounts the real nav with the gallery as its long Home tab and two short tabs, and keeps `theme-color` on the page colour as its theme toggle flips. Serve `app/webapp/static/` over HTTP and open it on the phone (add it to the Home Screen for the installed-app behaviour). It mounts the nav after load, so it shows the fades and the keyboard behaviour, not a cold launch.
 
 ## Required design tokens
 
