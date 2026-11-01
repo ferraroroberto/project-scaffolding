@@ -572,5 +572,7 @@ notify          = { src = "src/notify" }
 doc_capture     = { src = "src/doc_capture" }
 build_info      = { src = "src/build_info.py" }
 usage_log       = { src = "src/usage_log.py" }
+# The usage log's Cloudflare server half, for a public site served by a Worker (#540).
+usage_log_worker = { src = "src/usage_log_worker.js" }
 compression     = { src = "src/compression.py" }
 resource_probe  = { src = "src/resource_probe.py" }

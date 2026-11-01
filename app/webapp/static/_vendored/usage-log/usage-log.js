@@ -42,6 +42,59 @@ const ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}$/;
 // Mirrors src/usage_log.py MAX_EVENTS_PER_BATCH.
 const MAX_BATCH = 50;
 
+/** The view id of a page path for the `site` option: `/` is `home`, `/a/b` is `a:b`
+ *  (lowercase, `.html` and slashes at the ends dropped, cut to fit ID_PATTERN). */
+export function pageId(path) {
+  const clean = String(path || '/').split(/[?#]/)[0].replace(/\.html$/i, '').replace(/^\/+|\/+$/g, '');
+  if (!clean) return 'home';
+  const id = clean.toLowerCase().replace(/\//g, ':').replace(/[^a-z0-9._:-]+/g, '-')
+    .replace(/^[^a-z0-9]+/, '').slice(0, 64);
+  return ID_PATTERN.test(id) ? id : 'page';
+}
+
+/** A host as an id (`linkedin.com`): lowercase, no `www.`, no port; null when it does not fit. */
+export function hostId(host) {
+  const id = String(host || '').toLowerCase().replace(/:\d+$/, '').replace(/^www\./, '').slice(0, 64);
+  return ID_PATTERN.test(id) ? id : null;
+}
+
+/** The tap id of a followed link for the `site` option: `nav:<page id>` on this host,
+ *  `out:<host>` elsewhere, `mail` / `tel`; null for an in-page anchor or anything else. */
+export function linkId(href, here) {
+  if (!href) return null;
+  if (/^mailto:/i.test(href)) return 'mail';
+  if (/^tel:/i.test(href)) return 'tel';
+  let url;
+  try { url = new URL(href, here.href); } catch (_) { return null; }
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') return null;
+  if (url.host === here.host) {
+    if (url.pathname === here.pathname && url.hash) return null;
+    return ('nav:' + pageId(url.pathname)).slice(0, 64);
+  }
+  const host = hostId(url.host);
+  return host ? ('out:' + host).slice(0, 64) : null;
+}
+
+/** `site` option: a followed link without its own `data-track` becomes a tap (`linkId`). */
+function trackLink(e, track) {
+  if (!e.target || !e.target.closest) return;
+  const link = e.target.closest('a[href]');
+  const id = link ? linkId(link.getAttribute('href'), location) : null;
+  if (id) track(id);
+}
+
+/** `site` option, on load: the external referrer's host, then the page as a view. */
+function startSite(push, trackView) {
+  try {
+    if (document.referrer) {
+      const from = new URL(document.referrer);
+      const id = from.host !== location.host ? hostId(from.host) : null;
+      if (id) push({ kind: 'referrer', id: id });
+    }
+    trackView(pageId(location.pathname));
+  } catch (_) { /* never break the app */ }
+}
+
 function randomSessionId() {
   try {
     if (crypto.randomUUID) return crypto.randomUUID();
@@ -92,6 +145,10 @@ function noop() {}
  *   `keepalive` fetch instead. Omitted, sends are unchanged.
  * @param {Document|HTMLElement} [opts.root=document]  where the delegated
  *   `data-track` tap listener is attached.
+ * @param {boolean} [opts.site=false]  public-site mode: also record the page as a
+ *   `view` on load (`pageId(location.pathname)`), a `referrer` event when the
+ *   visitor came from another host, and every followed link without its own
+ *   `data-track` as a `tap` (`linkId`). Off, nothing changes.
  * @returns {{ trackView: (id: string) => void, track: (id: string) => void,
  *   flush: () => void, currentView: () => string|null }}  `trackView` is safe
  *   to pass straight to initNavTabs's `onChange`; `track` records a `tap` for
@@ -104,6 +161,7 @@ export function initUsageLog(opts = {}) {
     flushMs = 10000,
     headers = null,
     root = document,
+    site = false,
   } = opts;
   const hasHeaders = typeof headers === 'function' || (headers !== null && typeof headers === 'object');
 
@@ -170,8 +228,8 @@ export function initUsageLog(opts = {}) {
 
   function onTap(e) {
     const target = e.target && e.target.closest ? e.target.closest('[data-track]') : null;
-    if (!target) return;
-    track(target.getAttribute('data-track'));
+    if (target) { track(target.getAttribute('data-track')); return; }
+    if (site) trackLink(e, track);
   }
 
   try {
@@ -188,6 +246,7 @@ export function initUsageLog(opts = {}) {
   } catch (_) { /* never break the app */ }
 
   push({ kind: 'session_start' });
+  if (site) startSite(push, trackView);
 
   return {
     trackView: trackView,

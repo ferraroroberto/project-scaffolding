@@ -53,6 +53,25 @@ const usage = initUsageLog({
 - A beacon cannot carry headers, so when `headers` is given the page-hide send is a `keepalive` fetch instead of `sendBeacon`. Without `headers`, sends are unchanged.
 - Same-origin only and the privacy contract are unchanged: the headers go to the app's own endpoint, and nothing new is recorded. A `headers` function that throws is swallowed and the send goes without extra headers.
 
+## Public sites (`site: true`)
+
+A public website served by a Cloudflare Worker (not the owner's machine) vendors the third piece, `src/usage_log_worker.js` (manifest key `usage_log_worker`), and mounts it in its Worker on the same paths:
+
+```js
+import { handleUsageEvents, usageSummary } from './usage_log_worker.js';
+if (url.pathname === '/api/usage/events') return handleUsageEvents(request, env.DB);
+// GET /api/usage/summary, behind the site's own auth:
+return Response.json(await usageSummary(env.DB, 30));
+```
+
+and starts the client in site mode:
+
+```js
+initUsageLog({ site: true });
+```
+
+Site mode adds, on top of everything above: the page as a `view` on load (`pageId(location.pathname)`: `/` is `home`, `/a/b` is `a:b`), one `referrer` event per page load when the visitor came from another host (id = that host, `linkedin.com`), and every followed link that has no `data-track` of its own as a `tap` (`linkId`: `nav:<page id>`, `out:<host>`, `mail`, `tel`; in-page anchors are skipped). The Cloudflare half stores the same rows plus `country` (two letters from the edge) and `visitor` (a SHA-256 of a random salt, the address and the user agent, cut to 16 hex; the salt is new each UTC day and deleted after it). It never stores the address, the user agent, a URL, a query string or a cookie. Without `site`, the client sends exactly what it always did.
+
 ## Markup contract
 
 - `data-track="<id>"` on a control records a `tap` with that id when the control (or anything inside it) is clicked. One delegated capture-phase listener on `document` handles every control; nothing scrapes element text.
@@ -84,6 +103,7 @@ The client posts `POST /api/usage/events` (same-origin path; an absolute or prot
 | `view` | `trackView(id)`: a tab switch, or a sheet/dialog the app tracks. |
 | `tap` | A click on a `[data-track]` control, or a `usage.track(id)` call; carries the current view. |
 | `session_end` | The page goes hidden (sent with `sendBeacon`). |
+| `referrer` | `site` mode only: once per page load when the referrer is another host; the id is that host. |
 
 The server stamps the timestamp (UTC) on receipt and stores one row per event: `ts`, `session_id`, `kind`, `view_id`, `control_id`, `device_class`, `os_class`. Device class comes from the pointer type and the short side of the screen; OS class from a coarse match on the user-agent, which is never sent.
 

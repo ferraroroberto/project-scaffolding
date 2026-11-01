@@ -41,6 +41,16 @@ control id, a random per-visit session id, device class, and timestamps.
 Control ids are developer-chosen constants in ``data-track``, never derived
 from element text or user data.
 
+**Public sites:** a site that vendors the Cloudflare server half
+(``src/usage_log_worker.js``, same contract, same table in D1) and starts the
+client with ``site: true`` also records the page as a ``view``, an external
+``referrer`` host, followed links as ``tap`` (``nav:<page>``, ``out:<host>``),
+and two columns only that server half fills: ``country`` (two letters, from the
+edge) and ``visitor`` (a salted hash of address and user agent whose salt
+changes every day, so a visitor counts once per day and never across days).
+This module accepts ``referrer`` events and carries the two columns, empty, so
+one table and one summary serve both.
+
 The privacy contract is enforced here, not trusted to the client: an event is
 stored only if its ``kind`` is in :data:`EVENT_KINDS` and its id matches
 :data:`ID_PATTERN` (bounded, no spaces, no ``/`` — a URL or a sentence cannot
@@ -95,7 +105,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 #: The only event kinds stored. Anything else is dropped.
-EVENT_KINDS = frozenset({"session_start", "view", "tap", "session_end"})
+EVENT_KINDS = frozenset({"session_start", "view", "tap", "session_end", "referrer"})
 #: Coarse device classes the client derives; the raw user-agent never leaves it.
 DEVICE_CLASSES = frozenset({"phone", "tablet", "desktop"})
 OS_CLASSES = frozenset({"ios", "android", "windows", "other"})
@@ -135,10 +145,14 @@ CREATE TABLE IF NOT EXISTS events (
     view_id      TEXT,
     control_id   TEXT,
     device_class TEXT NOT NULL,
-    os_class     TEXT NOT NULL
+    os_class     TEXT NOT NULL,
+    country      TEXT,
+    visitor      TEXT
 );
 CREATE INDEX IF NOT EXISTS events_ts ON events (ts);
 """
+#: Columns added after the first release, created in place on an older file.
+_ADDED_COLUMNS = (("country", "TEXT"), ("visitor", "TEXT"))
 
 
 class PayloadError(ValueError):
@@ -177,8 +191,8 @@ def _valid_id(value: object) -> bool:
 def validate_event(raw: object) -> Event | None:
     """One client event → a storable :class:`Event`, or ``None`` to drop it.
 
-    Dropped: a ``kind`` outside :data:`EVENT_KINDS`; a ``view`` without a
-    valid ``id``; a ``tap`` without a valid ``id``; any id (including the
+    Dropped: a ``kind`` outside :data:`EVENT_KINDS`; a ``view``, ``tap`` or
+    ``referrer`` without a valid ``id``; any id (including the
     optional ``view`` a tap carries) that does not match :data:`ID_PATTERN`.
     Keys other than ``kind``/``id``/``view`` are ignored, never stored.
     """
@@ -193,7 +207,7 @@ def validate_event(raw: object) -> Event | None:
         return None
     if kind == "view":
         return Event(kind, ident, None) if _valid_id(ident) else None
-    if kind == "tap":
+    if kind in ("tap", "referrer"):
         if not _valid_id(ident):
             return None
         return Event(kind, context_view if isinstance(context_view, str) else None, ident)
@@ -262,6 +276,10 @@ class UsageLog:
         conn.execute("PRAGMA journal_mode=WAL")
         conn.execute("PRAGMA synchronous=NORMAL")
         conn.executescript(_SCHEMA)
+        have = {row[1] for row in conn.execute("PRAGMA table_info(events)")}
+        for name, kind in _ADDED_COLUMNS:
+            if name not in have:
+                conn.execute(f"ALTER TABLE events ADD COLUMN {name} {kind}")
         return conn
 
     def record(self, batch: Batch, *, now: datetime | None = None) -> int:
@@ -345,7 +363,8 @@ def _counts(conn: sqlite3.Connection, sql: str, params: Sequence[object]) -> dic
 def summarize(
     conn: sqlite3.Connection, days: int, *, now: datetime | None = None
 ) -> dict[str, Any]:
-    """Per-view visits, per-control taps, device/OS split by session, totals.
+    """Per-view visits, per-control taps, device/OS split by session, totals,
+    and for a public site its referrers, countries and visitors.
 
     Session ids are counted, never returned.
     """
@@ -387,7 +406,33 @@ def summarize(
             " GROUP BY os_class ORDER BY os_class",
             params,
         ),
+        **_site_counts(conn, where, params),
     }
+
+
+def _site_counts(conn: sqlite3.Connection, where: str, params: Sequence[object]) -> dict[str, Any]:
+    """The public-site part of the summary: external referrers, sessions per
+    country, and visitors (a visitor counts once per day). Empty for an app that
+    never records them, and for a file older than the two columns."""
+    columns = {row[1] for row in conn.execute("PRAGMA table_info(events)")}
+    referrers = _counts(
+        conn,
+        f"SELECT control_id, COUNT(*) {where} AND kind = 'referrer'"
+        " GROUP BY control_id ORDER BY COUNT(*) DESC, control_id",
+        params,
+    )
+    if not {"country", "visitor"} <= columns:
+        return {"referrers": referrers, "countries": {}, "visitors": 0}
+    countries = _counts(
+        conn,
+        f"SELECT country, COUNT(DISTINCT session_id) {where} AND country IS NOT NULL"
+        " GROUP BY country ORDER BY COUNT(DISTINCT session_id) DESC, country",
+        params,
+    )
+    visitors = conn.execute(
+        f"SELECT COUNT(DISTINCT visitor) {where} AND visitor IS NOT NULL", params
+    ).fetchone()[0]
+    return {"referrers": referrers, "countries": countries, "visitors": int(visitors)}
 
 
 # ------------------------------------------------------------ foreground time
