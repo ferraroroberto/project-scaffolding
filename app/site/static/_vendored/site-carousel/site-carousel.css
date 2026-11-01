@@ -1,0 +1,23 @@
+/* site-carousel: whole cards only, arrows centred underneath.
+ *
+ * VENDORED VERBATIM from project-scaffolding (app/site/static/_vendored/). Do NOT edit
+ * this file per-site: a site's brand is token values in its own stylesheet, loaded
+ * after this one. Contract: README.md beside this file.
+ */
+
+/* Carousels: whole cards. A phone shows one card and the edge of the next, bleeding to the
+   screen edge; two from 640 px; three from 1024 px. The arrows sit centred underneath. */
+.carousel, .gallery.slides, .gallery.reel { display: grid; grid-auto-flow: column; grid-auto-columns: 82%; gap: var(--gap); overflow-x: auto; overscroll-behavior-x: contain; scroll-snap-type: x mandatory; scrollbar-width: none; margin-inline: calc(-1 * var(--gutter)); padding: 1px var(--gutter); scroll-padding-inline: var(--gutter); }
+.carousel::-webkit-scrollbar, .gallery.slides::-webkit-scrollbar, .gallery.reel::-webkit-scrollbar { display: none; }
+.carousel > *, .gallery.slides > *, .gallery.reel > * { scroll-snap-align: start; }
+.swipe-nav { display: flex; justify-content: center; gap: var(--s2); margin-top: var(--s4); }
+.swipe-nav[hidden] { display: none; }
+.swipe-nav button { display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; border: var(--frame); border-radius: var(--radius); background: var(--paper); color: var(--ink); cursor: pointer; }
+.swipe-nav button:hover { border-color: var(--ink); }
+.swipe-nav button[disabled] { opacity: 0.3; cursor: default; }
+@media (min-width: 640px) { .carousel, .gallery.slides, .gallery.reel { grid-auto-columns: calc((100% - var(--gap)) / 2); } }
+@media (min-width: 1024px) {
+  .carousel, .gallery.slides, .gallery.reel { margin-inline: 0; padding-inline: 0; scroll-padding-inline: 0; grid-auto-columns: calc((100% - 2 * var(--gap)) / 3); }
+  /* The six testimonials all show on a desktop: a 3 x 2 grid, nothing to scroll. */
+  .carousel:has(> .card > .quote) { grid-auto-flow: row; grid-template-columns: repeat(3, minmax(0, 1fr)); overflow: visible; }
+}

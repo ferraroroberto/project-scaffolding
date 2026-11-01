@@ -1,0 +1,36 @@
+/* site-base: the reset, type by role, links, focus and reduced motion.
+ *
+ * VENDORED VERBATIM from project-scaffolding (app/site/static/_vendored/). Do NOT edit
+ * this file per-site: a site's brand is token values in its own stylesheet, loaded
+ * after this one. Contract: README.md beside this file.
+ */
+
+*, *::before, *::after { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; scroll-padding-top: calc(var(--header) + 12px); }
+body { margin: 0; background: var(--paper); color: var(--ink); font: 400 var(--fs-body)/1.7 var(--font); overflow-x: clip; }
+img, iframe { max-width: 100%; }
+img { display: block; height: auto; }
+
+/* Type: sizes follow the role, not the element */
+h1, h2, h3, h4 { font-weight: 500; font-style: normal; margin: 0 0 0.5em; text-wrap: balance; }
+main :is(h1, h2, h3), .list-head p { font-size: var(--fs-h2); line-height: 1.25; letter-spacing: -0.01em; font-weight: 500; }
+main .title { font-size: var(--fs-title); line-height: 1.15; letter-spacing: -0.02em; }
+main .title.long { font-size: var(--fs-h2); line-height: 1.25; letter-spacing: -0.01em; }
+main h4, .card :is(h2, h3), .product-title { font-size: var(--fs-h3); line-height: 1.4; letter-spacing: 0; }
+.lead { font-size: var(--fs-lead); line-height: 1.6; font-weight: 400; letter-spacing: 0; }
+.small, .card p, figcaption, .product-info li p { font-size: var(--fs-card); line-height: 1.6; }
+p, ul, ol, blockquote { margin: 0 0 1em; }
+ul, ol { padding-left: 1.25em; }
+strong { font-weight: 500; }
+a { color: inherit; text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 0.2em; }
+a:hover { text-decoration-thickness: 2px; }
+/* One left edge: nothing is centred or right-aligned, whatever the page markup says. */
+.center, .right { text-align: start; }
+blockquote { margin-left: 0; padding-left: 1em; border-left: 3px solid var(--ink); }
+hr { border: 0; border-top: var(--frame); width: 100%; margin: 0; }
+:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  * { transition: none !important; }
+}

@@ -528,6 +528,21 @@ day-marks       = { src = "app/webapp/static/_vendored/day-marks" }
 # The usage log's client half; its server half is `usage_log` below (#349).
 usage-log       = { src = "app/webapp/static/_vendored/usage-log" }
 
+# Web-page (static site) components (app/site/static/_vendored/) -- see that dir's README.
+site-tokens      = { src = "app/site/static/_vendored/site-tokens" }
+site-base        = { src = "app/site/static/_vendored/site-base" }
+site-header      = { src = "app/site/static/_vendored/site-header" }
+site-section     = { src = "app/site/static/_vendored/site-section" }
+site-image       = { src = "app/site/static/_vendored/site-image" }
+site-video       = { src = "app/site/static/_vendored/site-video" }
+site-button      = { src = "app/site/static/_vendored/site-button" }
+site-card        = { src = "app/site/static/_vendored/site-card" }
+site-testimonial = { src = "app/site/static/_vendored/site-testimonial" }
+site-carousel    = { src = "app/site/static/_vendored/site-carousel" }
+site-product     = { src = "app/site/static/_vendored/site-product" }
+site-pen         = { src = "app/site/static/_vendored/site-pen" }
+site-footer      = { src = "app/site/static/_vendored/site-footer" }
+
 # Windows tray primitives -- docs/windows-tray.md (gotchas #4, #5).
 single_instance = { src = "app/tray/single_instance.py" }
 tray_watchdog   = { src = "app/tray/watchdog.py" }
@@ -575,4 +590,9 @@ usage_log       = { src = "src/usage_log.py" }
 # The usage log's Cloudflare server half, for a public site served by a Worker (#540).
 usage_log_worker = { src = "src/usage_log_worker.js" }
 compression     = { src = "src/compression.py" }
+# A built static site's build, preview and gate check; site_serve and site_check import site_routes.
+site_images     = { src = "scripts/site_images.py" }
+site_routes     = { src = "scripts/site_routes.py" }
+site_serve      = { src = "scripts/site_serve.py" }
+site_check      = { src = "scripts/site_check.py" }
 resource_probe  = { src = "src/resource_probe.py" }

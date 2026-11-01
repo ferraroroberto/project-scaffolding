@@ -206,7 +206,25 @@ docs/layout.md
 
 Where new code goes: a new page is a root `<page>.html` (or `games/<name>.html` for a self-contained game); its styles and scripts go in `css/` and `js/`, never inline beyond a few lines.
 
-Allowed extra roots: none beyond the tree.
+**A built static site** is the same shape with a build step that runs locally, never on the host. The source lives in `content/`, the build writes the publish folder `site/`, which is committed so the host serves it as-is, and `scripts/` holds the build, the preview server and the gate:
+
+```
+content/                    the source: pages, partials, images, static/ (stylesheet, script)
+  static/_vendored/         the fleet web-page components, copied verbatim
+site/                       the build output the host publishes; never edited by hand
+scripts/
+  build.py                  content/ -> site/; the gate fails when the committed site/ differs
+  site_images.py            vendored: WebP variants per image role, the social-card JPEG
+  site_routes.py            vendored: the host's URL rules
+  site_serve.py             vendored: preview server with the host's URL rules
+  site_check.py             vendored: offline routes, hosts and local-reference check
+  verify-before-ship.ps1
+docs/layout.md
+```
+
+Where new code goes in a built site: a new page is a file in `content/`; its styles go in the site's own stylesheet beside the vendored components (`app/site/static/_vendored/README.md` in this scaffold, the load order and what stays the site's own); a build step goes in `scripts/`. Never edit `site/` by hand: rebuild it.
+
+Allowed extra roots: none beyond the tree; `content`, `site` and `scripts` need no `extra_roots`.
 
 ## agent-workspace
 

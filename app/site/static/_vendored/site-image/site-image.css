@@ -1,0 +1,19 @@
+/* site-image: one frame for every content image, sized by its role.
+ *
+ * VENDORED VERBATIM from project-scaffolding (app/site/static/_vendored/). Do NOT edit
+ * this file per-site: a site's brand is token values in its own stylesheet, loaded
+ * after this one. Contract: README.md beside this file.
+ */
+
+/* Images: one frame for every content image. Drawings arrive on white paper (images.py). */
+.img { margin: 0; }
+main img { border: var(--frame); border-radius: var(--radius); background: var(--paper); }
+/* A cut-out (transparent corners) keeps its own shape. */
+main img.cutout { border: 0; border-radius: 0; background: none; }
+.img img { width: 100%; max-width: var(--img-feature); }
+/* A drawing beside text sits whole in a square frame, whatever its own shape. */
+.col.media img.drawing { aspect-ratio: 1; object-fit: contain; }
+/* An image the author placed in a narrow column stays small on a phone. */
+.img.narrow img { width: auto; max-width: min(100%, 220px); }
+@media (min-width: 768px) { .img.narrow img { width: 100%; max-width: 100%; } }
+figcaption { color: var(--ink); margin-top: var(--s3); }

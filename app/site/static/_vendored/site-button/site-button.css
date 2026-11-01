@@ -1,0 +1,13 @@
+/* site-button: one control height, one radius.
+ *
+ * VENDORED VERBATIM from project-scaffolding (app/site/static/_vendored/). Do NOT edit
+ * this file per-site: a site's brand is token values in its own stylesheet, loaded
+ * after this one. Contract: README.md beside this file.
+ */
+
+/* Buttons and fields: one control height, one radius */
+.btns { margin: 0; }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: var(--s2); min-height: var(--control); padding: 0 var(--s5); border: 1px solid var(--ink); border-radius: var(--radius); background: var(--ink); color: var(--paper); font: 500 1rem/1.2 var(--font); text-decoration: none; cursor: pointer; transition: background 0.15s; }
+.btn:hover { background: #333; border-color: #333; }
+.btn.secondary { background: var(--paper); color: var(--ink); }
+.btn[disabled] { background: var(--paper); color: var(--ink-2); border: 1px dashed var(--line-strong); cursor: not-allowed; }

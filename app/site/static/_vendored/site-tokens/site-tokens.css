@@ -1,0 +1,59 @@
+/* site-tokens: the token contract (space, type, layout, image roles, the pen), with the reference brand values.
+ *
+ * VENDORED VERBATIM from project-scaffolding (app/site/static/_vendored/). Do NOT edit
+ * this file per-site: a site's brand is token values in its own stylesheet, loaded
+ * after this one. Contract: README.md beside this file.
+ */
+
+:root {
+  /* Colour: paper, ink and one pen. Ratios are against --paper. */
+  --paper: #fff;
+  --ink: #111;              /* 18.9:1 text, headings, primary button, pen rule, focus */
+  --ink-2: #595959;         /* 7.0:1 meta, captions, labels */
+  --line: #e3e3e3;          /* hairline frame and rules, decorative only */
+  --line-strong: #8c8c8c;   /* 3.4:1 form-field borders (non-text needs 3:1) */
+  --accent: #ffcc00;        /* the pen only: never text, border, button or fill */
+  --footer-band: #595959;   /* the footer band, the --ink-2 grey; white on it 7.0:1, the labels 6.0:1 */
+
+  /* Type: Poppins 400, 400 italic and 500 */
+  --font: "Poppins", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --fs-title: clamp(2rem, 1.4rem + 2.5vw, 3rem);         /* page title, 32-48 */
+  --fs-h2: clamp(1.5rem, 1.2rem + 1.25vw, 2rem);         /* section heading, 24-32 */
+  --fs-h3: 1.125rem;                                     /* subhead, card title, 18 */
+  --fs-lead: clamp(1.125rem, 1.06rem + 0.3vw, 1.25rem);  /* intro, 18-20 */
+  --fs-body: clamp(1rem, 0.97rem + 0.15vw, 1.0625rem);   /* body, 16-17 */
+  --fs-card: 1rem;                                       /* card text, captions, lists, 16 */
+  --fs-small: 0.875rem;                                  /* meta only, 14 */
+  --fs-label: 0.8125rem;                                 /* uppercase label, 13 */
+
+  /* Space: a 4 px base */
+  --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px; --s5: 24px; --s6: 32px; --s7: 48px; --s8: 64px; --s9: 96px;
+  --gutter: clamp(16px, 4vw, 48px);
+  --gap: clamp(16px, 2vw, 24px);
+  --section: clamp(40px, 6vw, 80px);
+
+  /* Shape: one radius, one hairline, no shadows. 12 px matches the rounded panels inside the drawings. */
+  --radius: 12px;
+  --frame: 1px solid var(--line);
+  --control: 48px;
+  --header: 64px;
+
+  /* Layout: .wrap is the size container, so 100cqi is the content width */
+  --content: 1120px;
+  --measure: 40rem;
+
+  /* Image roles: the size an image takes whatever column it sits in (phone values first) */
+  --img-feature: 100cqi;
+  --img-tile: 100cqi;
+  --img-thumb: 96px;
+
+  /* The pen: an ink rule between sections, a yellow marker behind title words, a drawn quote mark */
+  --pen-rule: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 12' preserveAspectRatio='none'%3E%3Cpath d='M1 7C18 5 34 8.5 52 6.2S84 4.4 99 6.8' fill='none' stroke='%23111' stroke-width='1.25' stroke-linecap='round' vector-effect='non-scaling-stroke'/%3E%3C/svg%3E");
+  --pen-marker: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 20' preserveAspectRatio='none'%3E%3Cpath d='M2 6C30 3 68 4 98 2L97 16C66 18 32 17 3 19Z' fill='%23ffcc00' fill-opacity='.65'/%3E%3C/svg%3E");
+  --pen-underline: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 12' preserveAspectRatio='none'%3E%3Cpath d='M2 8.5C18 5.5 34 9.5 52 6.8S84 4.6 98 7.6' fill='none' stroke='%23111' stroke-width='2.6' stroke-linecap='round' vector-effect='non-scaling-stroke'/%3E%3C/svg%3E");
+  --pen-quote: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 36'%3E%3Cpath d='M19 3C9 6 3 14 3.5 23.5c.3 5 3.4 8.5 7.6 8.5 4 0 6.9-3 6.9-6.8 0-3.9-3-6.7-6.6-6.7-.6 0-1 0-1.5.2C11 13 14.5 9 20.5 6.6ZM43 3C33 6 27 14 27.5 23.5c.3 5 3.4 8.5 7.6 8.5 4 0 6.9-3 6.9-6.8 0-3.9-3-6.7-6.6-6.7-.6 0-1 0-1.5.2C35 13 38.5 9 44.5 6.6Z' fill='%23ffcc00'/%3E%3C/svg%3E");
+  --pen-strike: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 20' preserveAspectRatio='none'%3E%3Cpath d='M2 15C30 11 66 8 98 4' fill='none' stroke='%23111' stroke-width='2.4' stroke-linecap='round' vector-effect='non-scaling-stroke'/%3E%3C/svg%3E");
+}
+/* A feature picture beside text takes at most half the row, so the text keeps the other half below 1024 px. */
+@media (min-width: 768px) { :root { --img-feature: min(520px, calc((100cqi - var(--s8)) / 2)); --img-tile: calc((100cqi - var(--gap)) / 2); } }
+@media (min-width: 1024px) { :root { --header: 72px; --img-tile: calc((100cqi - 2 * var(--gap)) / 3); --img-thumb: 160px; } }

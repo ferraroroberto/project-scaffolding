@@ -1,0 +1,27 @@
+/* site-product: product grid and the product page with its sticky picture.
+ *
+ * VENDORED VERBATIM from project-scaffolding (app/site/static/_vendored/). Do NOT edit
+ * this file per-site: a site's brand is token values in its own stylesheet, loaded
+ * after this one. Contract: README.md beside this file.
+ */
+
+/* Shop */
+.products { display: grid; gap: var(--gap); grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.product-card { display: flex; flex-direction: column; gap: var(--s2); text-decoration: none; }
+.product-title { margin: var(--s1) 0 0; }
+.price { color: var(--ink-2); margin: 0; }
+/* Product page: the picture beside the text, staying in view while the description scrolls;
+   the Buy button sits directly under the price. */
+.product { display: grid; gap: var(--s5); }
+.product-media { display: grid; gap: var(--gap); }
+.product-media img { width: 100%; }
+.product-info { max-width: var(--measure); }
+.product-info .price { font-size: var(--fs-lead); color: var(--ink); font-weight: 500; margin-bottom: var(--s4); }
+.product-info .btns { margin-bottom: var(--s6); }
+@media (min-width: 768px) {
+  .products { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .product { grid-template-columns: minmax(0, var(--img-feature)) minmax(0, 1fr); gap: var(--s8); align-items: start; }
+  /* Centred in the space under the header, so no tall blank stretch opens above or below it;
+     at most 160 px down, so on a tall narrow window it still starts near the title. */
+  .product-media { position: sticky; top: clamp(calc(var(--header) + var(--s5)), calc(50svh + var(--header) / 2 - var(--img-feature) / 2), calc(var(--header) + 160px)); }
+}

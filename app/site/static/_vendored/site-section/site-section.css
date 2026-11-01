@@ -1,0 +1,41 @@
+/* site-section: white bands separated by the drawn rule, and the one-left-edge row layout.
+ *
+ * VENDORED VERBATIM from project-scaffolding (app/site/static/_vendored/). Do NOT edit
+ * this file per-site: a site's brand is token values in its own stylesheet, loaded
+ * after this one. Contract: README.md beside this file.
+ */
+
+/* Sections: white paper, separated by space and one hand-drawn ink rule */
+.band { padding: var(--section) 0; }
+main > .band + .band { padding-top: 0; }
+main > .band + .band::before { content: ""; display: block; height: 12px; max-width: var(--content); margin: 0 max(var(--gutter), (100% - var(--content)) / 2) var(--section); background: var(--pen-rule) 0 50% / 100% 100% no-repeat; }
+main .band.grey, main .band.dark { background: none; color: inherit; }
+.wrap { max-width: calc(var(--content) + 2 * var(--gutter)); margin: 0 auto; padding: 0 var(--gutter); display: flex; flex-direction: column; gap: var(--gap); container-type: inline-size; }
+.row, .col { display: contents; }
+.b { order: var(--m, 0); min-width: 0; }
+.b > :last-child, .card > :last-child, .text > :last-child { margin-bottom: 0; }
+.text, .acc, .list-head { max-width: var(--measure); }
+.anchor { display: block; }
+
+@media (min-width: 768px) {
+  .wrap { display: block; }
+  .wrap > * + * { margin-top: var(--s6); }
+  /* The author's column spans are ignored: columns share the row equally from the left edge. */
+  .row { --media-w: var(--img-tile); display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); column-gap: var(--s8); align-items: start; }
+  .row + .row { margin-top: var(--s7); }
+  .col { display: flex; flex-direction: column; gap: var(--s5); min-width: 0; }
+  .b { order: 0; }
+  /* Text beside media: the media takes its role's width on the side the author put it. */
+  .row:has(> .col.feature) { --media-w: var(--img-feature); }
+  .row:has(> .col.thumb) { --media-w: var(--img-thumb); column-gap: var(--s5); }
+  .row:has(> .col.media):has(> .col:not(.media)) { grid-template-columns: minmax(0, 1fr) var(--media-w); }
+  .row:has(> .col.media:first-child):has(> .col:not(.media)) { grid-template-columns: var(--media-w) minmax(0, 1fr); }
+}
+/* A guest's portrait beside their entry stays a row on a phone, the name set as a card title. */
+@media (max-width: 767px) {
+  .row:has(> .col.thumb) { display: grid; grid-template-columns: var(--img-thumb) minmax(0, 1fr); column-gap: var(--s4); align-items: start; }
+  .row:has(> .col.thumb) + .row:has(> .col.thumb) { margin-top: var(--s4); }
+  .row:has(> .col.thumb) > .col { display: block; min-width: 0; }
+}
+.row:has(> .col.thumb) .text > p:first-child { font-size: var(--fs-h3); line-height: 1.4; font-weight: 500; margin-bottom: var(--s2); }
+.row:has(> .col.thumb) .text > p { font-size: var(--fs-card); line-height: 1.6; }

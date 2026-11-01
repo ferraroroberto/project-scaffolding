@@ -1,0 +1,37 @@
+/* site-header: the sticky header, text nav and full-width phone menu.
+ *
+ * VENDORED VERBATIM from project-scaffolding (app/site/static/_vendored/). Do NOT edit
+ * this file per-site: a site's brand is token values in its own stylesheet, loaded
+ * after this one. Contract: README.md beside this file.
+ */
+
+/* Header and navigation */
+.skip { position: absolute; left: -9999px; }
+.skip:focus { left: 8px; top: 8px; z-index: 20; background: var(--paper); padding: 8px 12px; }
+/* No backdrop-filter here: it would make the header the containing block of the fixed phone menu
+   and clip the menu to the header's height. */
+.site-header { position: sticky; top: 0; z-index: 10; background: var(--paper); border-bottom: 1px solid transparent; }
+.site-header.scrolled { border-bottom-color: var(--line); }
+.site-header-inner { max-width: calc(var(--content) + 2 * var(--gutter)); margin: 0 auto; padding: 0 var(--gutter); height: var(--header); display: flex; align-items: center; justify-content: space-between; gap: var(--s4); }
+.logo img { width: auto; height: 32px; }
+.menu-toggle { display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; margin-right: -10px; border: 0; background: none; color: inherit; cursor: pointer; }
+.menu-toggle .icon:last-child, .menu-open .menu-toggle .icon:first-child { display: none; }
+.menu-open .menu-toggle .icon:last-child { display: block; }
+.site-nav { display: none; }
+.site-nav ul { list-style: none; margin: 0; padding: 0; }
+.site-nav a { text-decoration: none; white-space: nowrap; }
+.site-nav a:hover span { text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 0.3em; }
+.site-nav a[aria-current="page"] span { background: var(--pen-marker) 0 82% / 100% 62% no-repeat; padding: 0 0.15em; margin: 0 -0.15em; }
+.site-nav a[aria-current="page"]:hover span { text-decoration: none; }
+.menu-open .site-nav { display: block; position: fixed; inset: var(--header) 0 0; background: var(--paper); padding: var(--s2) var(--gutter); overflow-y: auto; }
+.menu-open .site-nav li { border-bottom: var(--frame); }
+.menu-open .site-nav a { display: flex; align-items: center; min-height: 56px; font-size: 1.25rem; font-weight: 500; }
+.menu-open { overflow: hidden; }
+.icon { width: 24px; height: 24px; flex: none; }
+@media (min-width: 1024px) {
+  .logo img { height: 40px; }
+  .menu-toggle { display: none; }
+  .site-nav { display: block; }
+  .site-nav ul { display: flex; gap: clamp(14px, 1.5vw, 24px); }
+  .site-nav a { display: inline-flex; align-items: center; min-height: 44px; font-size: 0.9375rem; }
+}
