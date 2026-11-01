@@ -37,7 +37,7 @@ from src.usage_log import (
     validate_event,
 )
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
+REPO_ROOT = Path(__file__).resolve().parents[2]
 CLIENT_DIR = REPO_ROOT / "app" / "webapp" / "static" / "_vendored" / "usage-log"
 SESSION = "3f2b8c1e-0d4a-4b6f-9c2e-1a2b3c4d5e6f"
 NOW = datetime(2026, 10, 12, 12, 0, 0, tzinfo=UTC)
@@ -143,16 +143,19 @@ def test_unknown_keys_are_never_stored(tmp_path: Path) -> None:
     secret = "Dear-Alice-the-launch-code-is-1234"
     batch = parse_batch(_body(
         [{"kind": "tap", "id": "send", "view": "chat", "text": secret, "value": secret}],
-        user_agent=secret, ip=secret, url=secret,
+        user_agent=secret, ip=secret, url=secret, country=secret, visitor=secret,
     ))
     UsageLog(db).record(batch)
     conn = sqlite3.connect(db)
     try:
         columns = [row[1] for row in conn.execute("PRAGMA table_info(events)")]
+        site_columns = conn.execute("SELECT country, visitor FROM events").fetchall()
     finally:
         conn.close()
     assert columns == ["id", "ts", "session_id", "kind", "view_id", "control_id",
-                       "device_class", "os_class"]
+                       "device_class", "os_class", "country", "visitor"]
+    # Only a server half that sees the request fills these; a client never can.
+    assert site_columns == [(None, None)]
     assert _rows(db) == [("tap", "chat", "send", "phone", "ios")]
     for f in tmp_path.iterdir():
         assert secret.encode() not in f.read_bytes(), f.name
@@ -605,3 +608,57 @@ def test_time_route_absent_log_is_not_zero_usage(tmp_path: Path) -> None:
     body = _client(db).get("/api/usage/time").json()
     assert body["log_exists"] is False and body["total_minutes"] == 0.0
     assert not db.exists(), "reading foreground time never creates the log"
+
+
+def test_referrer_events_are_stored_with_their_host(tmp_path: Path) -> None:
+    """A public site's client reports the external referrer host once per page load."""
+    db = tmp_path / "usage.sqlite3"
+    batch = parse_batch(_body([
+        {"kind": "session_start"},
+        {"kind": "referrer", "id": "linkedin.com"},
+        {"kind": "referrer", "id": "https://x.example/a"},
+        {"kind": "referrer"},
+    ]))
+    assert batch.rejected == 2
+    log = UsageLog(db)
+    log.record(batch)
+    out = log.summary(7)
+    assert out["referrers"] == {"linkedin.com": 1}
+    assert out["countries"] == {} and out["visitors"] == 0
+
+
+def test_an_older_file_gains_the_site_columns_in_place(tmp_path: Path) -> None:
+    """A usage.sqlite3 created before the site columns existed is migrated on the next write."""
+    db = tmp_path / "usage.sqlite3"
+    conn = sqlite3.connect(db)
+    conn.executescript(
+        "CREATE TABLE events (id INTEGER PRIMARY KEY, ts TEXT NOT NULL, session_id TEXT NOT NULL,"
+        " kind TEXT NOT NULL, view_id TEXT, control_id TEXT, device_class TEXT NOT NULL,"
+        " os_class TEXT NOT NULL);"
+    )
+    conn.close()
+    UsageLog(db).record(parse_batch(_body([{"kind": "view", "id": "board"}])))
+    conn = sqlite3.connect(db)
+    try:
+        columns = [row[1] for row in conn.execute("PRAGMA table_info(events)")]
+    finally:
+        conn.close()
+    assert columns[-2:] == ["country", "visitor"]
+    assert _rows(db) == [("view", "board", None, "phone", "ios")]
+
+
+def test_summary_counts_countries_and_daily_visitors_when_present(tmp_path: Path) -> None:
+    """Rows written by the Cloudflare half carry country and visitor; the summary counts them."""
+    db = tmp_path / "usage.sqlite3"
+    UsageLog(db).record(parse_batch(_body([{"kind": "view", "id": "home"}])))
+    conn = sqlite3.connect(db)
+    with conn:
+        conn.executemany(
+            "INSERT INTO events (ts, session_id, kind, view_id, device_class, os_class, country, visitor)"
+            " VALUES (strftime('%Y-%m-%dT%H:%M:%SZ','now'), ?, 'view', 'home', 'phone', 'ios', ?, ?)",
+            [("s-aaaaaaaa", "ES", "v1"), ("s-bbbbbbbb", "ES", "v1"), ("s-cccccccc", "IT", "v2")],
+        )
+    conn.close()
+    out = UsageLog(db).summary(7)
+    assert out["countries"] == {"ES": 2, "IT": 1}
+    assert out["visitors"] == 2

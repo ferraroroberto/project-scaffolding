@@ -66,8 +66,46 @@ disabled.track('some.id');
 disabled.trackView('board');
 disabled.flush();
 
+const disabledSends = sent.length;
+
+// Public-site mode (`site: true`): page view and referrer on load, followed links as taps.
+define('location', { href: 'https://example.com/about', host: 'example.com', pathname: '/about' });
+document.referrer = 'https://www.linkedin.com/feed/';
+function all(usage) {
+  usage.flush();
+  return sent.splice(0).flatMap((s) => s.body.events);
+}
+function follow(href) {
+  handlers.click({
+    target: { closest: (sel) => (sel === 'a[href]' ? { getAttribute: () => href } : null) },
+  });
+}
+const site = initUsageLog({ root, site: true });
+const siteLoad = all(site);
+for (const href of ['/inspiring-conversations/sara?x=1', 'https://twitter.com/x', 'mailto:a@b.c', '#top', 'javascript:void(0)']) {
+  follow(href);
+}
+const siteLinks = all(site);
+
+document.referrer = 'https://example.com/';
+const sameHost = all(initUsageLog({ root, site: true }));
+
+document.referrer = 'https://www.linkedin.com/feed/';
+const plain = initUsageLog({ root });
+follow('https://twitter.com/x');
+const plainEvents = all(plain);
+
+const { pageId, hostId, linkId } = await import(pathToFileURL(process.argv[2]).href);
+const here = { href: 'https://example.com/about', host: 'example.com', pathname: '/about' };
+const ids = {
+  pages: ['/', '/about/', '/a/B c.html', '/' + 'x'.repeat(80)].map(pageId),
+  hosts: ['www.Google.com:443', 'bad host', ''].map(hostId),
+  links: ['/about#jump', '/contact', 'HTTP://WWW.Example.org/a', 'ftp://x.y'].map((h) => linkId(h, here)),
+};
+
 console.log(JSON.stringify({
   tracked, clicked, invalid, beforeView,
   disabledHasTrack: typeof disabled.track === 'function',
-  disabledSends: sent.length,
+  disabledSends,
+  siteLoad, siteLinks, sameHost, plainEvents, ids,
 }));
