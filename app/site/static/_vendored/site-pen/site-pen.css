@@ -1,0 +1,18 @@
+/* site-pen: the hand-drawn marker, underline and strike behind words.
+ *
+ * VENDORED VERBATIM from project-scaffolding (app/site/static/_vendored/). Do NOT edit
+ * this file per-site: a site's brand is token values in its own stylesheet, loaded
+ * after this one. Contract: README.md beside this file.
+ */
+
+/* Pen highlights: strokes behind the words, repeated on each line they wrap to.
+   The marker is for title words; the underline for one phrase in running text; the
+   circle is retired and draws the underline. */
+.hl { background: none; color: inherit; -webkit-box-decoration-break: clone; box-decoration-break: clone; background-repeat: no-repeat; }
+.hl-underline, .hl-circle { padding-bottom: 0.12em; background-image: var(--pen-underline); background-size: 100% 0.42em; background-position: 0 100%; transition: background-size 0.15s; }
+.hl-marker { padding: 0 0.15em; margin: 0 -0.15em; background-image: var(--pen-marker); background-size: 100% 62%; background-position: 0 82%; transition: background-size 0.15s; }
+.hl-strike { background-image: var(--pen-strike); background-size: 100% 100%; }
+/* A highlighted link is shown by its pen stroke alone; hovering thickens the stroke. */
+.hl a, a .hl { text-decoration: none; }
+.hl-marker:has(a:hover), a:hover .hl-marker { background-size: 100% 86%; }
+:is(.hl-underline, .hl-circle):has(a:hover), a:hover :is(.hl-underline, .hl-circle) { background-size: 100% 0.6em; }

@@ -56,7 +56,7 @@ SHAPES = {
     "pipeline-cli": Shape(("tests",), ("src", "common", "scripts", "config", "data")),
     "skills-governance": Shape(("skills", "tests"), ("hooks", "scripts", "architecture")),
     "node": Shape(("src",), ("test", "scripts")),
-    "static-site": Shape((), ("css", "js", "assets", "games")),
+    "static-site": Shape((), ("css", "js", "assets", "games", "content", "site", "scripts")),
     "agent-workspace": Shape((), ("scripts",)),
     # No layer pair: the service in src/ mounts its admin app, so src imports app_web by design.
     "service": Shape(("src", "tests", "app_web", "tray"), ("scripts", "config", "launchers", "assets")),

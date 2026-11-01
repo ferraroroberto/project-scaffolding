@@ -584,7 +584,7 @@ EXPECTED_SHAPES: dict[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
     "pipeline-cli": (("tests",), ("src", "common", "scripts", "config", "data")),
     "skills-governance": (("skills", "tests"), ("hooks", "scripts", "architecture")),
     "node": (("src",), ("test", "scripts")),
-    "static-site": ((), ("css", "js", "assets", "games")),
+    "static-site": ((), ("css", "js", "assets", "games", "content", "site", "scripts")),
     "agent-workspace": ((), ("scripts",)),
     "service": (("src", "tests", "app_web", "tray"), ("scripts", "config", "launchers", "assets")),
 }

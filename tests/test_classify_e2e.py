@@ -741,6 +741,31 @@ def test_shared_or_imported_or_deleted_modules_keep_the_whole_suite(tmp_path: Pa
     assert r.tier == "full", "a module does not excuse a path outside every surface"
 
 
+# ------------------------------------------------- the static-site table in the doc
+
+def test_the_documented_static_site_table_routes_on_the_build_output(tmp_path: Path) -> None:
+    """docs/e2e-routing.md's built-static-site block parses and routes as its prose says."""
+    doc = (REPO_ROOT / "docs" / "e2e-routing.md").read_text(encoding="utf-8")
+    section = doc.split("### A built static site's table", 1)[1]
+    block = re.search(r"```toml\n(.*?)```", section, re.S)
+    assert block is not None, "the static-site section lost its TOML block"
+    fleet_toml = tmp_path / ".fleet.toml"
+    fleet_toml.write_text(block.group(1), encoding="utf-8")
+    cfg = load_config(fleet_toml)
+    assert cfg.source == "declared"
+
+    def tier(*paths: str) -> str:
+        return classify(list(paths), cfg).tier
+    assert tier("site/img/photo-1a2b3c4d-800.webp", "site/fonts/body.woff2") == "static"
+    assert tier("site/about.html") == "full"
+    assert tier("site/css/site.css") == "full"
+    assert tier("site/_redirects") == "full"
+    assert tier("content/about.md", "scripts/build.py", "docs/layout.md") == "skip"
+    assert tier("content/about.md", "site/about.html") == "full", "the rebuilt page decides, not the source"
+    assert tier("tests/e2e/test_layout.py") == "full"
+    assert tier("scripts/verify-before-ship.ps1") == "full"
+
+
 # ------------------------------------------------------- vendored-copy lint fit
 
 def test_classifier_fits_the_strictest_adopter_line_length() -> None:

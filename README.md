@@ -20,6 +20,7 @@ Clone this directory, rename it, and start building.
 - `app/tray/single_instance.py` — vendor-verbatim named-mutex primitive for tray apps. See [`docs/windows-tray.md`](docs/windows-tray.md) (single-instance gotcha).
 - `app/tray/watchdog.py` — vendor-verbatim tray self-heal primitives (manifest key `tray_watchdog`): spawn retry/backoff, dead/wedged health watchdog, breadcrumb log. See [`docs/windows-tray.md`](docs/windows-tray.md) (webapp self-heal gotcha).
 - `app/webapp/static/_vendored/` — vendor-verbatim fleet design-system component library (nav, card, modal, switch, toast, usage-log, day-row, ...) for the FastAPI + static PWA shape. See [`app/webapp/static/_vendored/README.md`](app/webapp/static/_vendored/README.md) and `CLAUDE.md` ("Web-app visual identity").
+- `app/site/static/_vendored/` + `scripts/site_*.py` — vendor-verbatim components for a fleet web page (a built static site): tokens, header and phone menu, sections, image roles, card, carousel, testimonial, product page, video on tap, pen, footer, plus responsive images, the preview server and the offline site check. See [`app/site/static/_vendored/README.md`](app/site/static/_vendored/README.md); moving a site off a hosted builder: [`docs/site-migration.md`](docs/site-migration.md).
 - `tests/e2e/_geometry.py` — vendor-verbatim rendered-geometry design-conformance helper (touch targets, overlap, overflow, theme matrix). See [`docs/playwright-ui-testing.md`](docs/playwright-ui-testing.md) ("Rendered-geometry design-conformance helper").
 - `tests/e2e/_e2e_live_guard.py` — vendor-verbatim e2e live-instance guard (manifest key `e2e_live_guard`): refuses to drive a port already live unless the caller opts in. See `CLAUDE.md` ("End-to-end UI testing" — regression suite).
 - `tests/e2e/_surface.py` — vendor-verbatim design-surface capture hook (manifest key `surface_capture`) for `/design-review`'s screenshot inventory. See [`docs/playwright-ui-testing.md`](docs/playwright-ui-testing.md) ("Design surface capture").
@@ -108,6 +109,7 @@ app/
   views/                    one render() per file (welcome, ...)
   tray/single_instance.py   vendor-verbatim named-mutex primitive for tray apps
   tray/watchdog.py          vendor-verbatim tray self-heal primitives (spawn retry/backoff, health watchdog, breadcrumb log)
+  site/static/_vendored/    vendor-verbatim web-page (static site) components (site-tokens/, site-base/, site-header/, site-section/, site-image/, site-video/, site-button/, site-card/, site-testimonial/, site-carousel/, site-product/, site-pen/, site-footer/)
   webapp/static/_vendored/  vendor-verbatim web-app UI components (base/, nav/, icons/, card/, disclosure/, modal/, empty-state/, switch/, icon-tile/, button/, range-tab/, page-foot/, home-head/, select-native/, action-row/, text-size/, toast/, rec-wave/, row-menu/, icon-button/, day-row/, day-marks/, segmented/, usage-log/ + demo.html gallery)
 src/
   config.py                 paths + env-driven settings

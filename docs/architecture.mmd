@@ -21,6 +21,7 @@ flowchart TB
     LOGPANEL["log_panel.py (#256)\nstream_to_streamlit / render_log_panel\nStreamlit panels over the logger's ring buffer"]
     TRAYLIB["tray/\nsingle_instance.py (named-mutex primitive, vendor-verbatim)\nwatchdog.py (spawn retry/backoff + dead-vs-wedged\nhealth watchdog + breadcrumb log, vendor-verbatim, #201)"]
     WEBVEND["webapp/static/_vendored/\nbase/ (controls inherit the font, #266)\nnav/ (bottom-tab nav) · icons/ (Lucide sprite)\ncard/ · disclosure/ · modal/\nempty-state/ · switch/ · icon-tile/ · button/\nrange-tab/ · page-foot/ · home-head/ · select-native/\naction-row/ (tap-the-row list row, #268;\navatar / check lead, one trailing item, #341)\ntext-size/ (Small/Default/Large + pre-paint boot, #276)\ntoast/ (neutral frosted toast, #313)\nrec-wave/ (live recording waveform, #507)\nrow-menu/ (kebab menu, data-driven items, #317)\nicon-button/ (glyph-only, unpainted at rest, #324)\nday-row/ (date-tile action-row, #350)\nday-marks/ (one shape per day, ring = exception, #350)\nsegmented/ (selected segment is the state, #341)\nusage-log/ (view/tap log client, #349; site mode, #540)\n+ demo.html (gallery / render harness)"]
+    SITEVEND["site/static/_vendored/ (web pages: static sites)\nsite-tokens/ (token contract + reference brand) · site-base/\nsite-header/ (phone menu) · site-section/ (bands, rule, rows)\nsite-image/ · site-video/ (player on tap) · site-button/\nsite-card/ · site-testimonial/ · site-carousel/ (whole cards)\nsite-product/ · site-pen/ (drawn accents) · site-footer/"]
     STYLES["styles/light.css\nruntime CSS overlay"]
     STCFG[".streamlit/config.toml\nnative dark theme"]
   end
@@ -75,9 +76,11 @@ flowchart TB
     TSCERT["gen_tailscale_cert.py\nprovision/renew Tailscale HTTPS leaf"]
     USAGESUM["usage_summary.py (#349)\n--app slug --days N --json\nreads an app's usage.sqlite3 read-only\n--time = per-day foreground minutes\nexit 2 = no data yet"]
     BRANDGEN["brand_gen.py\nrender_set(): Lucide master SVG -> dark-tile\nPWA/tray/Stream Deck icon set (resvg-py)"]
+    SITESCRIPTS["site_images.py · site_routes.py · site_serve.py · site_check.py\n(vendor-verbatim, a built static site's scripts/)\nWebP variants per role + social JPEG (Pillow) ·\nCloudflare Pages URL rules · preview server ·\noffline check: sitemap routes, forbidden hosts, local refs"]
     BOXLOCK["box_lock_gate.ps1 (vendor-verbatim)\ndot-sources verify-before-ship.ps1 under\nfleet-config's box_lock.py run --mode shared\nexit 3 = lock held past timeout;\nno helper -> runs unlocked with [WARN]"]
   end
   BOXLOCK -->|dot-sources, holds the shared box lock for the run| VERIFY
+  SITESCRIPTS -->|sizes and classes the images of| SITEVEND
   VERIFY --> srcdir
   VERIFY --> appdir
   VERIFY --> testsdir

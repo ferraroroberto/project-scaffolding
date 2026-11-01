@@ -74,6 +74,41 @@ See this repo's own `.fleet.toml` for the complete worked example the scaffold s
 - **CSS/JS route to `full`, never to a curated subset.** Global stylesheets and the WebKit projection are exactly where layout regressions surface; a hand-maintained "layout subset" is both drift-prone and an under-testing risk. Keep static assets to genuinely inert file types. The one narrowing a shared stylesheet gets is the rule-by-rule selector ownership in [Shared stylesheets](#shared-stylesheets--narrowing-by-the-rules-a-diff-changes) below, which fails safe to `full` on anything it can't attribute.
 - **Order matters.** A `static` rule for `_vendored/**.html` must come *before* the `full` rule for the enclosing `app/webapp/` prefix, or the broader rule wins first and the fragment routes to `full`.
 
+### A built static site's table
+
+A built static site (the `static-site` shape with `content/`, `site/` and `scripts/`, see `docs/repo-layout.md`) routes on its **build output**, not its source. Its gate rebuilds `site/` and fails when the committed copy differs, so every source or build change that alters what a browser loads also changes `site/`, and `site/` alone decides the tier. The source and the build scripts can then be `none` without ever hiding a page change:
+
+```toml
+[e2e]
+static_pytest_target = "tests/e2e/test_smoke.py"
+static_browsers      = ["chromium"]
+full_pytest_target   = "tests/e2e"
+
+[[e2e.rule]]              # images and fonts in the build output are inert -> static
+tier       = "static"
+prefix     = "site/"
+extensions = ["webp", "jpg", "jpeg", "png", "gif", "svg", "ico", "woff2"]
+
+[[e2e.rule]]              # every other built file (pages, stylesheet, script, _redirects) -> full
+tier   = "full"
+prefix = "site/"
+
+[[e2e.rule]]              # the source: a change a browser can see also changes site/
+tier   = "none"
+prefix = "content/"
+
+[[e2e.rule]]              # the build, preview and check scripts: the same reason
+tier       = "none"
+prefix     = "scripts/"
+extensions = ["py"]
+
+[[e2e.rule]]
+tier   = "none"
+prefix = "docs/"
+```
+
+The `none` rules are safe only while the gate's stale-build check runs before the browser phase; a site without that check routes `content/` to `full` instead. `tests/e2e/`, the gate script and `.fleet.toml` match no rule, so they fall to `full`. `tests/test_classify_e2e.py` loads this block and pins its routing.
+
 ## Surfaces — narrowing `full` to one slice of the suite
 
 A repo whose suite has grown past a handful of tests pays for the whole of it on every `full` diff, even when the change sits squarely inside one view. `[[e2e.surface]]` entries let the repo say which tests cover which paths. They are optional: with none declared, routing is exactly the three tiers above.
