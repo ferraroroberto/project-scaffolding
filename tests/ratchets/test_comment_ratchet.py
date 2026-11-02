@@ -272,7 +272,44 @@ def test_yaml_quoted_scalars_do_not_count() -> None:
     assert count(src, "yaml") == 0
 
 
-@pytest.mark.parametrize("src", ["a: 'never closed\n#1\n", 'a: "never closed\n#1\n'])
+@pytest.mark.parametrize(
+    "src",
+    [
+        "description: the customer's first store\n",
+        "description: a \"quoted\" word and it's fine\n",
+        "- the customer's store\n",
+        "key: [the customer's store, other]\n",
+        "key: {a: it's}\n",
+        "description: >\n  the customer's first store\n  and the shop's neighbour\n",
+    ],
+)
+def test_yaml_quote_inside_a_plain_scalar_is_not_a_quoted_scalar(src: str) -> None:
+    # An apostrophe or double quote mid-value is a plain-scalar character, so it must
+    # neither raise NotConfirmed nor swallow a following comment.
+    cr.scan_text(src, "yaml")
+    assert count(src + "key: v # real #151\n", "yaml") == 1
+
+
+@pytest.mark.parametrize(
+    "src",
+    [
+        "a: 'see #160'\n",
+        "- 'see #161'\n",
+        "? 'see #162'\n: v\n",
+        "'k #163': v\n",
+        "a: !!str 'see #164'\n",
+        "a: &anchor 'see #165'\n",
+        "a: ['see #166', 'b']\n",
+        "a: {k: 'see #167'}\n",
+        "a:\n  'see #168'\n",
+        "a: 'it''s #169'\n",
+    ],
+)
+def test_yaml_quoted_scalar_at_a_value_start_still_hides_a_hash(src: str) -> None:
+    assert count(src, "yaml") == 0
+
+
+@pytest.mark.parametrize("src", ["a: 'never closed\n#1\n", 'a: "never closed\n#1\n', "- 'never closed\n#1\n"])
 def test_unterminated_yaml_scalar_is_not_confirmed(src: str) -> None:
     with pytest.raises(cr.NotConfirmed):
         cr.scan_text(src, "yaml")
