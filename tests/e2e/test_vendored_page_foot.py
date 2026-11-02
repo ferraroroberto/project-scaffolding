@@ -5,14 +5,19 @@ came from each app's body or container and the same line looked different on
 the same phone. These tests mount the real `page-foot.css` under two
 deliberately different body typefaces and assert the readout's computed type
 and its rendered pixels match, then pin the type itself to the design.md
-`caption` style with tabular numerals.
+`caption` style with tabular numerals. The last test mounts it at the end of
+`.app` beside the real nav at phone size and asserts it ends clear of the
+bottom fade (the footer adds no bottom padding; the nav's reserve does).
 """
 
 from __future__ import annotations
 
-import pytest
-from playwright.sync_api import Page
+from collections.abc import Iterator
 
+import pytest
+from playwright.sync_api import Browser, Page
+
+from tests.e2e._nav_graft import phone_nav
 from tests.e2e.conftest import STATIC_DIR
 
 _CSS = (STATIC_DIR / "_vendored" / "page-foot" / "page-foot.css").read_text(encoding="utf-8")
@@ -100,3 +105,56 @@ def test_readout_does_not_widen_with_the_body(page: Page, body: str) -> None:
     _mount(page, _BODIES[body])
     height = page.locator("#readout").evaluate("el => el.getBoundingClientRect().height")
     assert abs(height - 13.2) < 0.5, height
+
+
+_GAP = 12  # design.md --gap; the last term of the nav's bottom reserve
+
+_MOUNT_JS = """() => {
+  document.querySelectorAll('body > :not(.tabs):not(.app)')
+    .forEach((e) => { e.style.display = 'none'; });
+  const app = document.querySelector('.app');
+  app.replaceChildren();
+  const filler = document.createElement('div');
+  filler.style.height = '2000px';
+  app.appendChild(filler);
+  app.insertAdjacentHTML('beforeend',
+    '<footer class="page-foot" id="foot"><p>Build: 0123abc \u00b7 2026-10-31 17:52</p></footer>');
+}"""
+
+_STATE_JS = """() => {
+  const foot = document.getElementById('foot');
+  const fade = getComputedStyle(document.body, '::before');
+  const rect = foot.getBoundingClientRect();
+  let node = foot;
+  let opacity = 1;
+  while (node) { opacity *= parseFloat(getComputedStyle(node).opacity); node = node.parentElement; }
+  return {
+    footBottom: rect.bottom,
+    footTop: rect.top,
+    fadeTop: innerHeight - parseFloat(fade.height),
+    fadeBottom: fade.bottom,
+    opacity,
+    scrollY: scrollY,
+    maxScroll: document.scrollingElement.scrollHeight - innerHeight,
+  };
+}"""
+
+
+@pytest.fixture()
+def phone(static_server: str, browser: Browser) -> Iterator[Page]:
+    with phone_nav(browser, static_server) as page:
+        page.add_style_tag(url=f"{static_server}/_vendored/page-foot/page-foot.css")
+        page.evaluate(_MOUNT_JS)
+        yield page
+
+
+def test_footer_ends_above_the_nav_fade_undimmed(phone: Page) -> None:
+    page = phone
+    page.evaluate("() => window.scrollTo({ top: 1e6, behavior: 'instant' })")
+    state = page.evaluate(_STATE_JS)
+    assert state["maxScroll"] > 1000, state  # the page really scrolls
+    assert state["scrollY"] == state["maxScroll"], state  # and we are at its end
+    assert state["fadeBottom"] == "0px", state  # fade anchored to the screen bottom
+    assert state["footTop"] >= 0, state  # footer is on screen, not past the top
+    assert state["fadeTop"] - state["footBottom"] >= _GAP - 0.5, state
+    assert state["opacity"] == 1, state
