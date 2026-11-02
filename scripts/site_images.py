@@ -31,7 +31,8 @@ from PIL import Image, ImageChops
 
 log = logging.getLogger("build")
 
-WIDTHS = (480, 800, 1200, 1600, 2400)
+# 240 gives a 240-480 px source (a thumbnail slot) a second srcset candidate.
+WIDTHS = (240, 480, 800, 1200, 1600, 2400)
 WEBP_QUALITY = 80
 OG_WIDTH = 1200
 PAPER = (242, 242, 242)  # the grey paper the older drawings were exported on
@@ -128,7 +129,7 @@ class ImageSet:
         if dims is None:
             return []
         width = dims[0]
-        steps = [w for w in WIDTHS if w < width] + [min(width, WIDTHS[-1])]
+        steps = list(dict.fromkeys([w for w in WIDTHS if w < width] + [min(width, WIDTHS[-1])]))
         stem = self.stem(name)
         out = []
         for w in steps:

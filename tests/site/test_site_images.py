@@ -19,20 +19,32 @@ def test_variants_never_upscale_and_carry_a_content_hash(tmp_path: Path) -> None
     make(tmp_path / "src" / "photo one.png", (1000, 500))
     images = ImageSet(tmp_path / "src", tmp_path / "out", write=True)
     variants = images.variants("photo one.png")
-    assert [w for _, w in variants] == [480, 800, 1000]
+    assert [w for _, w in variants] == [240, 480, 800, 1000]
     stem = images.stem("photo one.png")
     assert stem.startswith("photo-one-") and len(stem) == len("photo-one-") + 8
-    assert variants[0][0] == f"/img/{stem}-480.webp"
+    assert variants[1][0] == f"/img/{stem}-480.webp"
     with Image.open(tmp_path / "out" / f"{stem}-480.webp") as im:
         assert im.size == (480, 240)
     assert images.social("photo one.png") == f"/img/{stem}-og.jpg"
     assert images.variants("absent.png") == [] and images.social("absent.png") is None
 
 
+def test_a_small_source_gets_a_thumbnail_candidate_for_srcset(tmp_path: Path) -> None:
+    make(tmp_path / "src" / "guest.png", (400, 400))
+    images = ImageSet(tmp_path / "src", tmp_path / "out", write=True)
+    assert [w for _, w in images.variants("guest.png")] == [240, 400]
+
+
+def test_a_huge_source_lists_the_largest_width_once(tmp_path: Path) -> None:
+    make(tmp_path / "src" / "wide.png", (3000, 10))
+    images = ImageSet(tmp_path / "src", tmp_path / "out", write=True)
+    assert [w for _, w in images.variants("wide.png")] == [240, 480, 800, 1200, 1600, 2400]
+
+
 def test_a_dry_run_lists_what_is_missing_and_writes_nothing(tmp_path: Path) -> None:
     make(tmp_path / "src" / "a.png", (300, 300))
     images = ImageSet(tmp_path / "src", tmp_path / "out", write=False)
-    assert len(images.variants("a.png")) == 1
+    assert len(images.variants("a.png")) == 2
     assert images.missing and not (tmp_path / "out").exists()
 
 
