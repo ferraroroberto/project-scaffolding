@@ -21,6 +21,7 @@ The rules were first built and proven on the fleet's first web page and extracte
 | [`site-product/`](site-product/) | The product grid, and the product page with its sticky, centred picture and Buy under the price. |
 | [`site-pen/`](site-pen/) | The hand-drawn marker, underline and strike behind words. |
 | [`site-footer/`](site-footer/) | The dark band: 7:1 text, 44 px link rows, two link columns on a phone. |
+| [`site-consent/`](site-consent/) | The non-modal consent bar: Accept and Reject as equals, one cookie, a `consent:change` event; it knows nothing about what the choice gates. |
 
 The build-side Python is in `scripts/` (manifest keys `site_images`, `site_routes`, `site_serve`, `site_check`); [`docs/components.md`](../../../../docs/components.md) lists the whole set.
 
@@ -42,6 +43,7 @@ Stylesheets in this order, then the site's own stylesheet last, so its brand tok
 <link rel="stylesheet" href="/_vendored/site-product/site-product.css">
 <link rel="stylesheet" href="/_vendored/site-pen/site-pen.css">
 <link rel="stylesheet" href="/_vendored/site-footer/site-footer.css">
+<link rel="stylesheet" href="/_vendored/site-consent/site-consent.css">
 <link rel="stylesheet" href="/css/site.css">
 ```
 

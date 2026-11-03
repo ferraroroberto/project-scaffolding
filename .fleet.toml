@@ -542,6 +542,7 @@ site-carousel    = { src = "app/site/static/_vendored/site-carousel" }
 site-product     = { src = "app/site/static/_vendored/site-product" }
 site-pen         = { src = "app/site/static/_vendored/site-pen" }
 site-footer      = { src = "app/site/static/_vendored/site-footer" }
+site-consent     = { src = "app/site/static/_vendored/site-consent" }
 
 # Windows tray primitives -- docs/windows-tray.md (gotchas #4, #5).
 single_instance = { src = "app/tray/single_instance.py" }
