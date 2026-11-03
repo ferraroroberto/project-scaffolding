@@ -6,13 +6,15 @@ Records which views and controls a fleet web app's owner actually uses, and on w
 
 Never log message contents, document text, transcripts, names, file names, search queries, form values, URLs with query strings, IP addresses, or the raw user-agent. Only: event kind, view id, control id, a random per-visit session id, device class, and timestamps. Control ids are developer-chosen constants in `data-track` and in `usage.track(id)` calls, never derived from element text or user data.
 
+The one widening is identified mode (below): a public site only, only after its visitor consented, never a fleet app.
+
 The server enforces it again: unknown kinds, ids outside the bounded id pattern and unknown device/OS classes are dropped, and the table has no column for anything else.
 
 ## Files
 
 | File | Role |
 | --- | --- |
-| `usage-log.js` | `initUsageLog(opts?)` → `{ trackView, track, flush, currentView }`; also exports `deviceClass()` / `osClass()`. Batches events and sends them with `fetch` (`keepalive`) or `navigator.sendBeacon` when the page is hidden (a `keepalive` fetch instead when the `headers` option is set). No dependencies. |
+| `usage-log.js` | `initUsageLog(opts?)` → `{ trackView, track, flush, currentView, stop }`; also exports `deviceClass()` / `osClass()`. Batches events and sends them with `fetch` (`keepalive`) or `navigator.sendBeacon` when the page is hidden (a `keepalive` fetch instead when the `headers` option is set). No dependencies. |
 
 The server half is `src/usage_log.py` (a separate manifest key, `usage_log`, because it lives in `src/`, not in this static tree).
 
@@ -71,6 +73,29 @@ initUsageLog({ site: true });
 ```
 
 Site mode adds, on top of everything above: the page as a `view` on load (`pageId(location.pathname)`: `/` is `home`, `/a/b` is `a:b`), one `referrer` event per page load when the visitor came from another host (id = that host, `linkedin.com`), and every followed link that has no `data-track` of its own as a `tap` (`linkId`: `nav:<page id>`, `out:<host>`, `mail`, `tel`; in-page anchors are skipped). The Cloudflare half stores the same rows plus `country` (two letters from the edge) and `visitor` (a SHA-256 of a random salt, the address and the user agent, cut to 16 hex; the salt is new each UTC day and deleted after it). It never stores the address, the user agent, a URL, a query string or a cookie. Without `site`, the client sends exactly what it always did.
+
+## Identified mode (public sites, only behind consent)
+
+A public site whose owner chose to keep a returning-visitor id and the raw address runs this mode, and only after the visitor has accepted a consent banner. Fleet apps never use it.
+
+```js
+// Called only once the consent banner reports `granted`; nothing runs before it.
+const usage = initUsageLog({ site: true, visitorCookie: 'uv' });
+// Consent withdrawn:
+usage.stop();
+```
+
+```js
+return handleUsageEvents(request, env.STATS, {
+  identify: { visitorCookie: 'uv', consentCookie: 'consent', ipRetentionDays: 30 },
+});
+```
+
+- **Client.** Importing the module does nothing: no request, no cookie, no listener. `visitorCookie` names a first-party cookie holding a random 128-bit hex id (`Path=/`, `SameSite=Lax`, `Secure` on https, lifetime `visitorCookieDays`, default 396 days, about 13 months). It is created when absent or malformed and never extended by a later visit. The id is not in the posted body; the browser sends the cookie to the same-origin endpoint. A cookie name outside the id pattern disables the logger. `stop()` detaches every listener, drops the queue unsent, deletes the visitor cookie and makes every later call a no-op; it exists in every mode.
+- **Server, consent enforced again.** With `identify`, a request whose `consentCookie` is not `granted` stores nothing and touches no table: it answers `200 {accepted: 0, rejected: <n>}` with one `usage.no_consent` log line. With consent, `visitor` holds the cookie id (32 lowercase hex, else NULL) instead of the daily hash, no daily salt is used, and the `ip` column holds `cf-connecting-ip` (an address literal, else NULL). A missing cookie name or a non-positive `ipRetentionDays` is a 503 with a `usage.misconfigured` line, never a silent default.
+- **Address retention.** Every identified write clears `ip` on rows older than `ipRetentionDays`; country, device, pages and the visitor id stay. The same purge is exported as `purgeIps(db, days)` for a read path (an admin page) to run too, since a Pages project has no timer.
+- **Summary.** `usageSummary` and `usage_log.summarize` add `returning`: visitors in the window also seen on another UTC day, earlier stored history included. It is 0 for the daily hash, which changes every day.
+- **Schema.** The `ip` column is created in place on an older D1 database and on an older local file; `src/usage_log.py` carries it always empty, so `scripts/usage_summary.py` reads an exported D1 file.
 
 ## Markup contract
 

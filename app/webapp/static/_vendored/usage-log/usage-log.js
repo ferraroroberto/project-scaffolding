@@ -16,6 +16,11 @@
  * timestamps. Control ids are developer-chosen constants in `data-track`,
  * never derived from element text or user data.
  *
+ * The one widening is identified mode (`visitorCookie`), for a public site and only
+ * once its visitor consented: a random visitor-id cookie, and an address its server
+ * half stores for a retention window. Fleet apps never use it. Importing this module
+ * does nothing; only `initUsageLog` sends, sets a cookie or adds a listener.
+ *
  * Markup contract:
  *   <button data-track="refresh-all">…</button>   a tap on it (or inside it)
  *                                                  records control id
@@ -128,6 +133,39 @@ export function osClass() {
   return 'other';
 }
 
+// Mirrors src/usage_log_worker.js VISITOR_ID_PATTERN: 128 random bits as lowercase hex.
+const VISITOR_ID_PATTERN = /^[0-9a-f]{32}$/;
+// 13 months, the longest an audience-measurement cookie is commonly accepted for.
+const DEFAULT_VISITOR_COOKIE_DAYS = 396;
+
+function readCookie(name) {
+  try {
+    for (const part of String(document.cookie || '').split(';')) {
+      const at = part.indexOf('=');
+      if (at > 0 && part.slice(0, at).trim() === name) return part.slice(at + 1).trim();
+    }
+  } catch (_) { /* cookies blocked */ }
+  return null;
+}
+
+function writeCookie(name, value, maxAgeSeconds) {
+  try {
+    const secure = typeof location !== 'undefined' && location.protocol === 'https:' ? '; Secure' : '';
+    document.cookie = name + '=' + value + '; Max-Age=' + maxAgeSeconds + '; Path=/; SameSite=Lax' + secure;
+  } catch (_) { /* cookies blocked */ }
+}
+
+/** `visitorCookie` option: the visitor id in that cookie, created when absent or malformed.
+ *  An existing cookie is reused and keeps its expiry: a visit never extends it. */
+function ensureVisitorCookie(name, days) {
+  if (VISITOR_ID_PATTERN.test(readCookie(name) || '')) return;
+  let id;
+  try {
+    id = Array.from(crypto.getRandomValues(new Uint8Array(16)), function (b) { return b.toString(16).padStart(2, '0'); }).join('');
+  } catch (_) { return; }
+  writeCookie(name, id, Math.round(days * 86400));
+}
+
 function noop() {}
 
 /**
@@ -149,11 +187,20 @@ function noop() {}
  *   `view` on load (`pageId(location.pathname)`), a `referrer` event when the
  *   visitor came from another host, and every followed link without its own
  *   `data-track` as a `tap` (`linkId`). Off, nothing changes.
+ * @param {string} [opts.visitorCookie]  identified mode, for a public site and only
+ *   after the visitor consented: the name of a first-party cookie holding a random
+ *   128-bit hex visitor id (`Path=/`, `SameSite=Lax`, `Secure` on https), created
+ *   when absent and never extended. The id is not in the posted body; the browser
+ *   sends the cookie to the same-origin endpoint, whose server half checks consent
+ *   again. Omitted, no cookie is read or written.
+ * @param {number} [opts.visitorCookieDays=396]  the visitor cookie's lifetime (13 months).
  * @returns {{ trackView: (id: string) => void, track: (id: string) => void,
- *   flush: () => void, currentView: () => string|null }}  `trackView` is safe
- *   to pass straight to initNavTabs's `onChange`; `track` records a `tap` for
- *   a developer-chosen constant id without a click (the same event a click on
- *   `data-track="<id>"` produces); `flush` sends the queue now.
+ *   flush: () => void, currentView: () => string|null, stop: () => void }}
+ *   `trackView` is safe to pass straight to initNavTabs's `onChange`; `track`
+ *   records a `tap` for a developer-chosen constant id without a click (the same
+ *   event a click on `data-track="<id>"` produces); `flush` sends the queue now;
+ *   `stop` (consent withdrawn) detaches every listener, drops the queue unsent,
+ *   deletes the visitor cookie and makes every later call a no-op.
  */
 export function initUsageLog(opts = {}) {
   const {
@@ -162,12 +209,22 @@ export function initUsageLog(opts = {}) {
     headers = null,
     root = document,
     site = false,
+    visitorCookie = null,
+    visitorCookieDays = DEFAULT_VISITOR_COOKIE_DAYS,
   } = opts;
   const hasHeaders = typeof headers === 'function' || (headers !== null && typeof headers === 'object');
 
   if (typeof endpoint !== 'string' || endpoint[0] !== '/' || endpoint[1] === '/') {
     console.warn('usage-log: endpoint must be a same-origin path like "/api/usage/events"; logging disabled');
-    return { trackView: noop, track: noop, flush: noop, currentView: function () { return null; } };
+    return { trackView: noop, track: noop, flush: noop, currentView: function () { return null; }, stop: noop };
+  }
+  if (visitorCookie !== null && (typeof visitorCookie !== 'string' || !ID_PATTERN.test(visitorCookie))) {
+    console.warn('usage-log: visitorCookie must be a plain cookie name; logging disabled');
+    return { trackView: noop, track: noop, flush: noop, currentView: function () { return null; }, stop: noop };
+  }
+  if (visitorCookie) {
+    const days = typeof visitorCookieDays === 'number' && visitorCookieDays > 0 ? visitorCookieDays : DEFAULT_VISITOR_COOKIE_DAYS;
+    ensureVisitorCookie(visitorCookie, days);
   }
 
   const envelope = {
@@ -178,6 +235,7 @@ export function initUsageLog(opts = {}) {
   let queue = [];
   let view = null;
   let timer = null;
+  let stopped = false;
 
   function extraHeaders() {
     try {
@@ -208,6 +266,7 @@ export function initUsageLog(opts = {}) {
   }
 
   function push(event) {
+    if (stopped) return;
     queue.push(event);
     if (queue.length >= MAX_BATCH) { flush(false); return; }
     if (!timer) timer = setTimeout(function () { timer = null; flush(false); }, flushMs);
@@ -232,17 +291,34 @@ export function initUsageLog(opts = {}) {
     if (site) trackLink(e, track);
   }
 
+  function onVisibility() {
+    if (document.visibilityState === 'hidden') {
+      push({ kind: 'session_end' });
+      flush(true);
+    } else {
+      push({ kind: 'session_start' });
+    }
+  }
+
+  function onPageHide() { flush(true); }
+
+  function stop() {
+    if (stopped) return;
+    stopped = true;
+    if (timer) { clearTimeout(timer); timer = null; }
+    queue = [];
+    try {
+      root.removeEventListener('click', onTap, true);
+      document.removeEventListener('visibilitychange', onVisibility);
+      window.removeEventListener('pagehide', onPageHide);
+    } catch (_) { /* never break the app */ }
+    if (visitorCookie) writeCookie(visitorCookie, '', 0);
+  }
+
   try {
     root.addEventListener('click', onTap, true);
-    document.addEventListener('visibilitychange', function () {
-      if (document.visibilityState === 'hidden') {
-        push({ kind: 'session_end' });
-        flush(true);
-      } else {
-        push({ kind: 'session_start' });
-      }
-    });
-    window.addEventListener('pagehide', function () { flush(true); });
+    document.addEventListener('visibilitychange', onVisibility);
+    window.addEventListener('pagehide', onPageHide);
   } catch (_) { /* never break the app */ }
 
   push({ kind: 'session_start' });
@@ -253,5 +329,6 @@ export function initUsageLog(opts = {}) {
     track: track,
     flush: function () { flush(false); },
     currentView: function () { return view; },
+    stop: stop,
   };
 }

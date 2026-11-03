@@ -2,43 +2,12 @@
 // D1 (node:sqlite) and prints what it did as JSON; tests/test_usage_log_worker.py asserts
 // on it, and compares its event validation with usage_log.py's on the same cases.
 
-import { DatabaseSync } from 'node:sqlite';
 import { readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
+import { fakeD1 } from './_fake_d1.mjs';
 
 const worker = await import(pathToFileURL(process.argv[2]).href);
 const cases = JSON.parse(readFileSync(process.argv[3], 'utf8'));
-
-/** The slice of the D1 API the worker half uses, over node:sqlite. */
-function fakeD1() {
-  const sql = new DatabaseSync(':memory:');
-  const statement = (text, args = []) => ({
-    bind: (...bound) => statement(text, bound),
-    run: async () => { sql.prepare(text).run(...args); return { success: true }; },
-    first: async (column) => {
-      const row = sql.prepare(text).get(...args);
-      if (row === undefined) return null;
-      return column ? row[column] : { ...row };
-    },
-    all: async () => ({ results: sql.prepare(text).all(...args).map((r) => ({ ...r })) }),
-    apply: () => sql.prepare(text).run(...args),
-  });
-  return {
-    sql,
-    prepare: (text) => statement(text),
-    batch: async (statements) => {
-      sql.exec('BEGIN');
-      try {
-        const out = statements.map((s) => s.apply());
-        sql.exec('COMMIT');
-        return out;
-      } catch (err) {
-        sql.exec('ROLLBACK');
-        throw err;
-      }
-    },
-  };
-}
 
 function post(body, { ip = '203.0.113.9', ua = 'Probe/1.0', country = 'ES', method = 'POST' } = {}) {
   const req = new Request('https://site.example/api/usage/events', {
