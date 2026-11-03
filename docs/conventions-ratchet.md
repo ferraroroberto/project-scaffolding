@@ -1,6 +1,6 @@
 # Conventions ratchet
 
-`scripts/conventions_ratchet.py` is a baseline-and-ratchet stage for the pre-ship gate. It holds a small set of fleet conventions as stdlib `ast` rules, counts each enabled rule's hits per tracked Python file, and **fails when a file's count for a rule rises** above the committed baseline. Existing debt never blocks work; it cannot grow either.
+`scripts/conventions_ratchet.py` is a baseline-and-ratchet stage for the pre-ship gate. It holds a small set of fleet conventions as stdlib `ast` rules (and one markup rule over web files), counts each enabled rule's hits per tracked file, and **fails when a file's count for a rule rises** above the committed baseline. Existing debt never blocks work; it cannot grow either.
 
 Before it, each convention was guarded by a one-off test in whichever repo last hit the bug: a no-window spawn test here, a constant-time compare test in one app, a raw-git check in another. This stage is the one vendored copy of those guards. A repo that adopts it can delete its local duplicate once the matching rule is enabled and its baseline is committed.
 
@@ -84,6 +84,27 @@ A hit is a call to `hmac.compare_digest` or `secrets.compare_digest`, through an
 
 A hit is a spawn (the same calls as `no-window`) whose program is literally `git` or `git.exe`: the first item of a list or tuple argument, or the first word of a string command, any directory stripped. It is not reported in the files listed in `git_wrappers`, and the rule refuses to run without `git_wrappers`. A program computed at run time is not seen.
 
+### `password-input-vendored`
+
+There is **no global-instruction line** for this rule. It enforces the scaffold's component contract: every web app that asks for its own password does it through the one vendored sign-in sheet (`app/webapp/static/_vendored/sign-in/`), never its own modal.
+
+It is the only rule that reads web files rather than Python: `.html`, `.htm`, `.js`, `.mjs`, `.cjs`, `.ts`, `.jsx`, `.tsx`, `.vue`, `.svelte`, `.jinja`, `.jinja2` and `.j2`. A hit is a line that makes a password input: `type="password"` (any quote, or none), `type: 'password'`, `el.type = 'password'`, or `setAttribute('type', 'password')`. It is not reported:
+
+- inside a `_vendored/sign-in/` folder, wherever the app copied it: the component is the one place the field may live;
+- in a test file or anything under a `tests/` or `test/` folder (a bespoke modal fixture is how the rule is proven red);
+- on a line that only mentions passwords (`placeholder="password"`, `type="password-hint"`, a label).
+
+The rule reads line by line, so a selector that only reads the field (`querySelector('input[type="password"]')`) is a hit too, and a password input built from a string spread across lines, or written by Python (an inline `HTMLResponse`), is not seen.
+
+A password field that is not this app's own sign-in keeps its own markup under a marker with the reason, in the file's comment syntax: a settings field that types into another machine's page, or a separate sign-in page whose request and session differ from the sheet's (a cookie session posting a `secret`):
+
+```html
+<!-- password-input-vendored-exempt: types into the remote PC's page, not this app's sign-in -->
+<input type="password" id="pcPassword" class="input-native">
+```
+
+**Enabling it in an app with a bespoke modal today.** Add `"password-input-vendored"` to `rules` and record today's hit with `--update-baseline --allow-additions` (or `--init` when there is no baseline yet). Moving the app onto the sheet removes the hit, and `--update-baseline` shrinks the baseline to zero.
+
 ### Exempting one call
 
 A call that must break a rule keeps a reasoned marker on one of its own lines, or in the comment block directly above it:
@@ -93,16 +114,16 @@ A call that must break a rule keeps a reasoned marker on one of its own lines, o
 return subprocess.run(cmd, cwd=str(PROJECT_ROOT)).returncode
 ```
 
-The marker names one rule (`<rule>-exempt`) and needs text after it. A bare `# no-window-exempt` exempts nothing, and a marker for another rule does not cover this one. This is the same marker the scaffold's own `tests/test_no_window_convention.py` reads.
+In a web file the marker sits in that file's comment syntax (`<!-- ... -->`, `// ...`, `/* ... */`), on the hit's line or in the comment block right above it. The marker names one rule (`<rule>-exempt`) and needs text after it. A bare `# no-window-exempt` exempts nothing, and a marker for another rule does not cover this one. This is the same marker the scaffold's own `tests/test_no_window_convention.py` reads.
 
 ## Scope
 
-Every `.py` file git lists (tracked, or untracked and not ignored), except:
+Every `.py` file git lists (tracked, or untracked and not ignored), and every web file for `password-input-vendored`, except:
 
 - files under the repo's `[vendored]` destinations: a vendored copy's debt belongs to the repo it came from;
 - the `exclude` globs, plus `node_modules`, `.venv` and `venv` anywhere.
 
-Only Python source is read. A baseline (this stage's or any other ratchet's) is JSON and is never read as a hit or as evidence about one.
+Only Python source and web files are read. A baseline (this stage's or any other ratchet's) is JSON and is never read as a hit or as evidence about one.
 
 ## Exit codes
 
@@ -111,7 +132,7 @@ Only Python source is read. A baseline (this stage's or any other ratchet's) is 
 | `0` | Pass (no rule count above the baseline), or the stage is **not enabled** | continues |
 | `1` | A file's count for a rule rose, or the baseline file is missing | fails |
 | `2` | Bad `[conventions_ratchet]` table (unknown key or rule, no rules, a helper rule with no helper), unreadable baseline, bad arguments | fails |
-| `3` | **NOT CONFIRMED**: `git` unusable, or a tracked `.py` file that cannot be read or does not parse. The message names the file and line | fails |
+| `3` | **NOT CONFIRMED**: `git` unusable, a tracked `.py` file that does not parse, or a scanned file that cannot be read. The message names the file and line | fails |
 
 Exit 3 is its own state and never folded into a pass: a file the scanner cannot parse may hold a violation, so skipping it would report a clean tree it never saw.
 

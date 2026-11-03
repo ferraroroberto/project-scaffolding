@@ -321,6 +321,14 @@ prefixes       = ["app/webapp/static/_vendored/usage-log/"]
 paths          = ["src/usage_log.py", "tests/e2e/test_vendored_usage_log.py"]
 pytest_targets = ["tests/e2e/test_vendored_usage_log.py"]
 
+# The sign-in sheet, driven by its own harness over the gallery page, which does
+# not load it; demo.html stays shared (whole suite).
+[[e2e.surface]]
+name           = "sign-in"
+prefixes       = ["app/webapp/static/_vendored/sign-in/"]
+paths          = ["tests/e2e/test_vendored_sign_in.py"]
+pytest_targets = ["tests/e2e/test_vendored_sign_in.py"]
+
 # The screenshot baseline: the comparison, its proof and the committed PNGs.
 # The capture helper tests/e2e/_shot.py stays out: conftest imports it, so an
 # edit there runs the whole suite.
@@ -435,17 +443,18 @@ allow   = [
 
 # ---------------------------------------------------------------------------
 # Conventions ratchet. scripts/verify-before-ship.ps1 runs
-# scripts/conventions_ratchet.py, which fails when a tracked Python file gains a
+# scripts/conventions_ratchet.py, which fails when a tracked file gains a
 # hit of one of the listed fleet-convention rules (a spawn without the no-window
 # flag, a print in app code, a hardcoded drive path, a raw secret compare outside
-# `secret_helpers`, a raw git spawn outside `git_wrappers`), beyond the committed
+# `secret_helpers`, a raw git spawn outside `git_wrappers`; in a web file, a
+# password input outside the vendored sign-in sheet), beyond the committed
 # baseline. Opt-in per repo and per rule through this table, like
 # [dead_code_ratchet]. The scaffold has no secret-compare helper or git wrapper,
-# so it enforces the three rules that need none.
+# so it enforces the four rules that need none.
 # Mechanism + limits: docs/conventions-ratchet.md.
 [conventions_ratchet]
 enabled = true
-rules   = ["no-window", "logging-not-print", "no-drive-path"]
+rules   = ["no-window", "logging-not-print", "no-drive-path", "password-input-vendored"]
 
 # ---------------------------------------------------------------------------
 # Runtime write ratchet. scripts/verify-before-ship.ps1 runs
@@ -545,6 +554,8 @@ day-row         = { src = "app/webapp/static/_vendored/day-row" }
 day-marks       = { src = "app/webapp/static/_vendored/day-marks" }
 # The usage log's client half; its server half is `usage_log` below (#349).
 usage-log       = { src = "app/webapp/static/_vendored/usage-log" }
+# The one password sign-in sheet; conventions_ratchet's password-input-vendored rule holds apps to it.
+sign-in         = { src = "app/webapp/static/_vendored/sign-in" }
 
 # Web-page (static site) components (app/site/static/_vendored/) -- see that dir's README.
 site-tokens      = { src = "app/site/static/_vendored/site-tokens" }
