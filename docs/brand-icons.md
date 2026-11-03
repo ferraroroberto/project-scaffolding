@@ -18,14 +18,14 @@ each redefining its own palette and inset math).
 
 ## `brand/` — the curated master library
 
-`brand/catalog.json` is the discoverable inventory: 22 SVG masters mapped to their upstream
+`brand/catalog.json` is the discoverable inventory: 23 SVG masters mapped to their upstream
 Lucide glyph and the fleet repos that use, or are the intended consumers of, that identity.
 Every SVG is vendored **verbatim** from
 [`lucide-static` v1.23.0](https://www.npmjs.com/package/lucide-static) and keeps its `@license`
 comment. The initial six shipped identities remain (`rocket`, `camera`, `mic`, `share-2` renamed
 locally to `hub`, `radar`, `house`); the library also carries the stable identity metaphors already
 represented across the fleet (`shopping-basket`, `sprout`, `shuffle`, `calculator`, `globe-2`,
-`graduation-cap`, `chart-column`, `lightbulb`, `file-text`, `mail`, `folder`, `sun`,
+`graduation-cap`, `chart-column`, `lightbulb`, `file-text`, `mail`, `folder`, `folder-tree`, `sun`,
 `credit-card`, `book-open`, and `list-checks`).
 
 This is intentionally a curated **app-identity** library, not a mirror of Lucide and not the
