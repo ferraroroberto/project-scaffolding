@@ -77,6 +77,7 @@ Where new code goes:
 - New endpoint: `app/webapp/routers/<concern>.py`, holding request parsing and the response only. The logic goes in `src/<domain>/`.
 - New view: `static/js/<view>/` and `static/styles/<view>.css`, both linked from `index.html`. Never a new block in a shared stylesheet or another view's script.
 - New logic module: a `src/<domain>/` package. Flat `src/` is fine until it reaches 40 modules.
+- New second HTTP surface (a separately bound listener, for example a public player tunnelled on its own port): `app/webapp/<package>/` with its own `server.py`, static files and entry point. It mounts nothing from the main app and the main app mounts nothing from it, so the package boundary is the isolation boundary. Any other new folder under `app/webapp/` is still misplaced.
 - New ops script: `scripts/`. A helper the app imports belongs in `src/`.
 
 Homes (the [second-level placement](#second-level-placement) contract); a file anywhere else under `app/` fails, for example a new templates folder or a helpers module:
@@ -87,6 +88,7 @@ app/cli/  app/tray/         everything below
 app/webapp/*.py             factory, manager, middleware
 app/webapp/routers/         everything below
 app/webapp/static/          everything below
+app/webapp/<package>/       a surface package: any folder here that holds its own server.py, everything below it
 src/                        any module or domain subpackage
 ```
 
