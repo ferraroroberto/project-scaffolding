@@ -1,6 +1,6 @@
 # Architecture decisions
 
-The register of every standing architecture decision in the fleet. Read it before building: if a decision here covers what you are about to do, follow it.
+The register of every standing architecture decision in the fleet. Read it before building: if a decision here covers what you are about to do, follow it. For a human-readable tour of what each app does, the layers and how work flows, see the [fleet guide](https://github.com/ferraroroberto/fleet-config/blob/main/docs/fleet-guide.md).
 
 ## How it works
 
