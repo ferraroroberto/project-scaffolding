@@ -1,0 +1,25 @@
+/* site-consent: the non-modal consent bar.
+ *
+ * VENDORED VERBATIM from project-scaffolding (app/site/static/_vendored/). Do NOT edit
+ * this file per-site: a site's brand is token values in its own stylesheet, loaded
+ * after this one. Contract: README.md beside this file.
+ */
+
+/* Consent: a bar fixed to the bottom edge. Nothing is dimmed, disabled or trapped. */
+.site-consent { position: fixed; inset: auto 0 0; z-index: 50; padding: var(--s4) var(--gutter); background: var(--paper); color: var(--ink); border-top: 1px solid var(--line-strong); }
+.site-consent[hidden] { display: none; }
+.site-consent:focus { outline: none; }
+.site-consent .consent-inner { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s3) var(--s5); max-width: var(--content); margin: 0 auto; }
+.site-consent p { flex: 1 1 24rem; max-width: var(--measure); margin: 0; font-size: var(--fs-card); line-height: 1.5; }
+.site-consent .consent-actions { display: flex; gap: var(--s3); }
+/* Accept and Reject are one style: neither is the louder choice. */
+.site-consent button { min-height: var(--control); min-width: 7rem; padding: 0 var(--s5); border: 1px solid var(--ink); border-radius: var(--radius); background: var(--paper); color: var(--ink); font: 500 1rem/1.2 var(--font); cursor: pointer; }
+.site-consent button:hover { background: var(--line); }
+.site-consent :is(a, button):focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+/* A control focused behind the bar scrolls clear of it, and the page end stays reachable. */
+html:has(.site-consent:not([hidden])) { scroll-padding-bottom: var(--consent-h, 8rem); }
+html:has(.site-consent:not([hidden])) body { padding-bottom: var(--consent-h, 8rem); }
+@media (max-width: 479px) {
+  .site-consent .consent-actions { width: 100%; }
+  .site-consent button { flex: 1; }
+}
