@@ -285,6 +285,91 @@ def test_a_web_exempt_marker_needs_the_rule_and_a_reason() -> None:
         cr.scan_source(b"x = 'caf\xe9'\n", "src/latin.py", frozenset())
 
 
+# ------------------------------------------------------------- login-lockout
+
+_ROUTER = "from fastapi import APIRouter\n\nrouter = APIRouter()\n"
+_GUARDED_BODY = (
+    "    wait = request.app.state.login_lockout.retry_after(request.client.host)\n"
+    "    if wait > 0:\n        raise HTTPException(429, headers=retry_after_header(wait))\n"
+)
+
+
+def login_hits(src: str, path: str = "app/webapp/routers/auth.py") -> list[str]:
+    return [f"{h.rule}:{h.line}" for h in cr.scan_source(src, path, cr.rules_for(path, ALL))]
+
+
+def test_a_login_route_in_a_module_without_the_lockout_fails() -> None:
+    src = _ROUTER + "\n@router.post('/api/login')\nasync def login(request):\n    return {}\n"
+    found = cr.scan_source(src, "app/a.py", cr.rules_for("app/a.py", ALL))
+    assert [(h.rule, h.line) for h in found] == [("login-lockout", 5)]
+    assert "does not import login_lockout" in found[0].message
+
+
+def test_a_login_route_that_imports_the_lockout_but_never_checks_it_fails() -> None:
+    src = ("from src.login_lockout import LoginLockout\n" + _ROUTER
+           + "\n@router.post('/api/login')\nasync def login(request):\n    return {}\n")
+    found = cr.scan_source(src, "app/a.py", cr.rules_for("app/a.py", ALL))
+    assert [(h.rule, h.line) for h in found] == [("login-lockout", 6)]
+    assert "never calls retry_after()" in found[0].message
+
+
+@pytest.mark.parametrize(
+    "imports",
+    [
+        pytest.param("from src.login_lockout import LoginLockout, retry_after_header\n", id="from-module"),
+        pytest.param("import src.login_lockout as ll\n", id="module-alias"),
+        pytest.param("from src import login_lockout\n", id="from-package"),
+        pytest.param("from app.webapp.login_lockout import retry_after_header\n", id="other-dest"),
+    ],
+)
+def test_a_guarded_login_route_passes(imports: str) -> None:
+    src = imports + _ROUTER + "\n@router.post('/api/login')\nasync def login(request):\n" + _GUARDED_BODY
+    assert login_hits(src) == []
+
+
+@pytest.mark.parametrize(
+    "decorator",
+    [
+        pytest.param("@router.post('/api/login')", id="api"),
+        pytest.param("@admin.post('/admin/api/login')", id="admin-sub-app"),
+        pytest.param("@app.post(path='/login/')", id="path-keyword-trailing-slash"),
+        pytest.param("@router.post('/api/login', status_code=200)", id="extra-kwargs"),
+    ],
+)
+def test_every_spelling_of_a_login_post_route_is_seen(decorator: str) -> None:
+    src = _ROUTER + f"\n{decorator}\ndef login(request):\n    return {{}}\n"
+    assert login_hits(src) == ["login-lockout:5"]
+
+
+@pytest.mark.parametrize(
+    "decorator",
+    [
+        pytest.param("@router.get('/api/login')", id="get"),
+        pytest.param("@router.post('/api/logout')", id="logout"),
+        pytest.param("@router.post('/api/login/status')", id="login-sub-path"),
+        pytest.param("@router.post('/api/user-login-hint')", id="longer-word"),
+        pytest.param("@router.post(LOGIN_PATH)", id="computed-path"),
+    ],
+)
+def test_routes_that_take_no_password_are_not_hits(decorator: str) -> None:
+    src = _ROUTER + f"\n{decorator}\ndef handler(request):\n    return {{}}\n"
+    assert login_hits(src) == []
+
+
+def test_a_login_exempt_marker_needs_a_reason_and_tests_are_not_held_to_the_rule() -> None:
+    route = "@router.post('/api/login')\nasync def login(request):\n    return {}\n"
+    reason = "# login-lockout-exempt: the hub's lock-out sits in its auth middleware\n"
+    assert login_hits(_ROUTER + reason + route) == []
+    assert login_hits(_ROUTER + "# login-lockout-exempt\n" + route) == ["login-lockout:5"]
+    assert login_hits(_ROUTER + route, "tests/test_auth.py") == []
+
+
+def test_the_login_rule_is_opt_in() -> None:
+    src = _ROUTER + "\n@router.post('/api/login')\nasync def login(request):\n    return {}\n"
+    only_window = cr.Config(cr.DEFAULT_BASELINE, ("no-window",))
+    assert cr.scan_source(src, "app/a.py", cr.rules_for("app/a.py", only_window)) == []
+
+
 # ------------------------------------------------------- ratchet on a git repo
 
 @pytest.fixture

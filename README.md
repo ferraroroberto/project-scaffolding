@@ -31,6 +31,7 @@ Clone this directory, rename it, and start building.
 - `src/pooled_http.py` — vendor-verbatim pooled outbound HTTP client (manifest key `pooled_http`): keep-alive session + single-retry dispatch. See `CLAUDE.md` ("Outbound-connection discipline").
 - `src/usage_log.py` + `scripts/usage_summary.py` — vendor-verbatim server half of the local-only usage log (manifest key `usage_log`). See `CLAUDE.md` ("Usage log").
 - `src/compression.py` — vendor-verbatim stream-safe gzip middleware (manifest key `compression`). See [`docs/webapp-pwa-conventions.md`](docs/webapp-pwa-conventions.md).
+- `src/login_lockout.py` — vendor-verbatim per-client login lock-out: `429` + `Retry-After` after repeated wrong passwords, one owner alert per guessing streak (manifest key `login_lockout`). See the sign-in sheet's [README](app/webapp/static/_vendored/sign-in/README.md) ("Server side").
 - `src/no_window.py` — vendor-verbatim `CREATE_NO_WINDOW` subprocess-flag definition (manifest key `no_window`); a file copied byte-identical into adopters (e.g. `_browser_sweep.py`, `classify_e2e.py`) keeps its own local flag instead, since importing this module would not resolve there. See `CLAUDE.md` ("Windows console-subprocess suppression").
 - `src/runtime_data.py` — vendor-verbatim runtime-data location resolver (manifest key `runtime_data`), so always-on SQLite writes land on a fast local drive. See `CLAUDE.md` ("Runtime data lives on a fast drive").
 - `src/fleet_root.py` — vendor-verbatim fleet-root resolver (manifest key `fleet_root`): `fleet_root()` from `FLEET_ROOT`, a machine-local config, or the checkout's parent, never a drive letter. See [`docs/conventions-ratchet.md`](docs/conventions-ratchet.md) (`no-drive-path`).
@@ -121,6 +122,7 @@ src/
   fleet_root.py             vendor-verbatim fleet-root resolver (FLEET_ROOT -> machine config -> checkout parent)
   usage_log.py              vendor-verbatim local-only usage-log router (views, taps, device class -> usage.sqlite3)
   compression.py            vendor-verbatim stream-safe gzip middleware
+  login_lockout.py          vendor-verbatim per-client login lock-out (429 + Retry-After) + guessing alert
   resource_probe.py         vendor-verbatim thread/handle/RSS sampler + runtime breadcrumb
   build_info.py             vendor-verbatim process build-identity capture (git_sha + built_at, captured once at import)
   notify/                   vendor-verbatim Telegram notifier (send_text + factory/config)
