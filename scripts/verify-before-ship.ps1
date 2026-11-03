@@ -71,25 +71,33 @@
                          confirmed", a failure, never a pass; opt-in via
                          .fleet.toml [runtime_write_ratchet]
                          (docs/runtime-write-ratchet.md)
-     12. mypy --strict — the vendor-verbatim primitives only; the list is
+     12. usage track ratchet — scripts/usage_track_ratchet.py: fails when a web
+                         app's HTML or JS gains a control with no constant
+                         data-track id, a <dialog> with no data-track-view, or
+                         a tracking id built at run time, beyond the committed
+                         baseline, or (never baselined) when the app does not
+                         reach its usage log; opt-in per rule via .fleet.toml
+                         [usage_track_ratchet]; exit 3 = "not confirmed", a
+                         failure, never a pass (docs/usage-track-ratchet.md)
+     13. mypy --strict — the vendor-verbatim primitives only; the list is
                          derived from .fleet.toml's [components] catalog via
                          scripts/vendored_catalog.py, never hand-maintained here
-     13. pytest (non-e2e) — unit suite, tests/e2e excluded
-     14. pytest (e2e)  — diff-proportionate: the browser slice is routed by
+     14. pytest (non-e2e) — unit suite, tests/e2e excluded
+     15. pytest (e2e)  — diff-proportionate: the browser slice is routed by
                          scripts/classify_e2e.py against the .fleet.toml [e2e]
                          rules (skip / static / full), fail-safe to full
                          (docs/e2e-routing.md). Auto-boots Streamlit per
                          its fixture.
-     15. shot baseline — scripts/shot_baseline.py: compares the screenshots the
+     16. shot baseline — scripts/shot_baseline.py: compares the screenshots the
                          e2e slice recaptured (phone + desktop, light + dark)
                          with the committed baseline, fails on a visible change,
                          restores the tree; runs the capture itself when the
                          slice did not; skipped with the browser suite; exit 3 =
                          "not confirmed", a failure, never a pass
                          (docs/playwright-ui-testing.md "Screenshot baseline")
-     16. runtime write probe — scripts/runtime_write_ratchet.py --probe: fails
+     17. runtime write probe — scripts/runtime_write_ratchet.py --probe: fails
                          on any untracked or ignored file the test stages left
-                         under a code folder (snapshot taken before stage 13);
+                         under a code folder (snapshot taken before stage 14);
                          an unreadable snapshot is exit 3 = "not confirmed"
 
     Box load lock: the whole run holds fleet-config's shared box lock
@@ -163,6 +171,7 @@ Invoke-Stage "doc refs ratchet"                   { & $py "scripts/doc_refs_ratc
 Invoke-Stage "dead code ratchet"                  { & $py "scripts/dead_code_ratchet.py" }
 Invoke-Stage "conventions ratchet"                { & $py "scripts/conventions_ratchet.py" }
 Invoke-Stage "runtime write ratchet"              { & $py "scripts/runtime_write_ratchet.py" }
+Invoke-Stage "usage track ratchet"                { & $py "scripts/usage_track_ratchet.py" }
 Invoke-Stage "mypy --strict (vendored)"           { & $py -m mypy @VendoredModules }
 # Runtime write probe, first half: what already sits untracked or ignored under
 # the code folders, so the probe after the tests names only what they wrote.

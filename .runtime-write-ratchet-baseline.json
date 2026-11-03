@@ -14,6 +14,7 @@
     {"key": "scripts/shot_baseline.py", "counts": {"unresolved": 3}},
     {"key": "scripts/static_ratchet.py", "counts": {"unresolved": 2}},
     {"key": "scripts/structure_ratchet.py", "counts": {"unresolved": 2}},
+    {"key": "scripts/usage_track_ratchet.py", "counts": {"unresolved": 2}},
     {"key": "src/doc_capture/engine.py", "counts": {"unresolved": 3}},
     {"key": "src/runtime_data.py", "counts": {"unresolved": 2}},
     {"key": "src/usage_log.py", "counts": {"unresolved": 3}}

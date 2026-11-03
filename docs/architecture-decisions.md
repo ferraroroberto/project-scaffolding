@@ -24,6 +24,8 @@ Issue: https://github.com/ferraroroberto/project-scaffolding/issues/560
 
 Every feature that touches the UX is tracked in the app's `usage-log` and ingested by its `/api/usage` routes: each interactive control carries a constant tracking id, each sheet, dialog and drawer records its view on open and returns to the previous view on close, and every fleet web app initialises `usage-log` and mounts its routes. Ids are constants, never built from content.
 
-Why: the owner judges UX from usage statistics and time-spent figures, and untracked controls or views make both wrong. Enforcement is the usage-tracking ratchet, which lands with https://github.com/ferraroroberto/project-scaffolding/issues/559; until then the decision is followed by convention and not yet checked by the gate.
+Why: the owner judges UX from usage statistics and time-spent figures, and untracked controls or views make both wrong.
+
+Enforcement: the [usage track ratchet](usage-track-ratchet.md) fails the ship on a new untracked control, an untracked `<dialog>`, a tracking id built at run time, or a web app that does not vendor, start and mount its usage log; existing gaps sit in each app's baseline and only shrink. The client records a `data-track-view` sheet on open and hands back the view on close, and `tests/usage_log/test_usage_log_time_spent.py` holds the time-spent minutes exact through the real client and server.
 
 Issue: https://github.com/ferraroroberto/project-scaffolding/issues/561

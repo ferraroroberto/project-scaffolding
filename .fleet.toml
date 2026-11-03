@@ -195,6 +195,10 @@ path = ".conventions-ratchet-baseline.json"
 [[e2e.rule]]
 tier = "none"
 path = ".runtime-write-ratchet-baseline.json"
+# Likewise the usage-track-ratchet baseline.
+[[e2e.rule]]
+tier = "none"
+path = ".usage-track-ratchet-baseline.json"
 [[e2e.rule]]
 tier = "none"
 path = "LICENSE"
@@ -458,6 +462,20 @@ rules   = ["no-window", "logging-not-print", "no-drive-path"]
 enabled = true
 
 # ---------------------------------------------------------------------------
+# Usage track ratchet. scripts/verify-before-ship.ps1 runs
+# scripts/usage_track_ratchet.py, which fails when a web app's HTML or JS gains a
+# control with no constant `data-track` id, a <dialog> with no `data-track-view`,
+# or a tracking id built at run time, beyond the committed baseline; with
+# `usage-log-wired` listed it also fails, never baselined, when the app does not
+# vendor, start and mount its usage log. Opt-in per repo and per rule through this
+# table, like [conventions_ratchet]. The scaffold is not a web app, so it holds
+# its component tree to the three markup rules and does not claim the wiring.
+# Mechanism + limits: docs/usage-track-ratchet.md.
+[usage_track_ratchet]
+enabled = true
+rules   = ["untracked-control", "untracked-sheet", "dynamic-id"]
+
+# ---------------------------------------------------------------------------
 # Screenshot baseline. scripts/verify-before-ship.ps1 runs
 # scripts/shot_baseline.py after the e2e stage: it compares the screenshots the
 # run recaptured (tests/e2e/_shot.py: phone + desktop, light + dark) with the
@@ -574,6 +592,9 @@ instruction_ratchet = { src = "scripts/instruction_ratchet.py" }
 doc_refs_ratchet = { src = "scripts/doc_refs_ratchet.py" }
 dead_code_ratchet = { src = "scripts/dead_code_ratchet.py" }
 conventions_ratchet = { src = "scripts/conventions_ratchet.py" }
+usage_track_ratchet = { src = "scripts/usage_track_ratchet.py" }
+# usage_track_ratchet loads this sibling (the HTML and JS readers): vendor both.
+usage_track_scan = { src = "scripts/usage_track_scan.py" }
 runtime_write_ratchet = { src = "scripts/runtime_write_ratchet.py" }
 # runtime_write_ratchet loads this sibling (the static path resolver): vendor both.
 runtime_write_resolve = { src = "scripts/runtime_write_resolve.py" }

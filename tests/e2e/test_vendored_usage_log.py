@@ -154,6 +154,45 @@ def test_without_headers_the_page_hide_send_is_still_a_beacon(
     assert page.evaluate("window.__beacons") == 1
 
 
+def test_a_sheet_records_its_view_and_hands_it_back_on_close(tmp_path: Path, page: Page) -> None:
+    """Real `showModal()` / `close()` / `remove()` reach the client's observer: nested sheets
+    stack, and a sheet removed while open hands the view back too (time spent stays exact)."""
+    db = tmp_path / "usage.sqlite3"
+    app = FastAPI()
+    app.include_router(usage_router(db))
+    app.mount("/", StaticFiles(directory=STATIC_DIR))
+    with _serve(app) as base:
+        page.goto(f"{base}/_vendored/usage-log/usage-log.js")
+        page.evaluate("""async () => {
+            const { initUsageLog } = await import('/_vendored/usage-log/usage-log.js');
+            const settle = () => new Promise((done) => setTimeout(done, 0));
+            const sheet = (id) => {
+                const el = document.createElement('dialog');
+                el.dataset.trackView = id;
+                document.body.append(el);
+                return el;
+            };
+            window.usage = initUsageLog();
+            window.usage.trackView('board');
+            const links = sheet('links-sheet'), edit = sheet('link-edit'), share = sheet('share-sheet');
+            links.showModal(); await settle();
+            edit.showModal(); await settle();
+            edit.close(); await settle();
+            links.close(); await settle();
+            share.show(); await settle();
+            share.remove(); await settle();
+        }""")
+        with page.expect_response(lambda r: _is_events_post(base, r)) as sent:
+            page.evaluate("window.usage.flush()")
+        assert sent.value.status == 200, sent.value.text()
+    conn = sqlite3.connect(db)
+    try:
+        views = [v for (v,) in conn.execute("SELECT view_id FROM events WHERE kind = 'view' ORDER BY id")]
+    finally:
+        conn.close()
+    assert views == ["board", "links-sheet", "link-edit", "links-sheet", "board", "share-sheet", "board"]
+
+
 def _drive(page: Page, base: str) -> list[str]:
     """Load the gallery, switch view, tap the tracked control, flush; returns
     every URL the page requested."""
