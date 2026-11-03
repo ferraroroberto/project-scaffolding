@@ -7,7 +7,7 @@ Canonical AI-agent instructions; Claude Code reads as project memory, other agen
 Conventions:
 - Issue refs and `docs/…` paths are `project-scaffolding`'s (`ferraroroberto/project-scaffolding`) unless another repo named — a derived project reads those docs there, not in its own tree.
 - ***(PWA)*** in a heading = *apply only if this project serves a FastAPI + static PWA web app; Streamlit POC spikes are exempt*. Other gates spelled out under their own heading.
-- **Don't diverge, don't re-author.** Every convention/vendored component/token contract here is owned here: fix in this scaffold, re-vendor downstream, never fork in a consuming app. Each section closes with reference docs + decision record; where a section keeps only one-line rules, its full procedure, reasoning and snippets live verbatim under the same heading in the named doc — read it before working in that area.
+- **Don't diverge, don't re-author.** Every convention/vendored component/token contract here is owned here: fix in this scaffold, re-vendor downstream, never fork in a consuming app. Each section closes with reference docs + decision record; where a section keeps only one-line rules, its full procedure, reasoning and snippets live verbatim under the same heading in the named doc — read it before working in that area. Standing architecture decisions (one `adr` issue each) are registered in `docs/architecture-decisions.md`: read it before building.
 
 ## Agent config artifacts (instructions and scoped project skills)
 *Apply when adopting this scaffold's agent configuration layout.*
