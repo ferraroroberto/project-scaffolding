@@ -30,6 +30,7 @@ Clone this directory, rename it, and start building.
 - `tests/e2e/conftest.py`'s `_neutral_driver_cwd` — roots the Playwright driver in `%TEMP%` so a wedged helper can't pin the worktree. See [`docs/playwright-ui-testing.md`](docs/playwright-ui-testing.md) ("Freeing a pinned directory").
 - `src/pooled_http.py` — vendor-verbatim pooled outbound HTTP client (manifest key `pooled_http`): keep-alive session + single-retry dispatch. See `CLAUDE.md` ("Outbound-connection discipline").
 - `src/usage_log.py` + `scripts/usage_summary.py` — vendor-verbatim server half of the local-only usage log (manifest key `usage_log`). See `CLAUDE.md` ("Usage log").
+- `src/usage_log_starlette.py` — vendor-verbatim Starlette route for the usage log, with `GET` limited to the owner (manifest key `usage_log_starlette`). See the usage-log [README](app/webapp/static/_vendored/usage-log/README.md) ("Starlette apps").
 - `src/compression.py` — vendor-verbatim stream-safe gzip middleware (manifest key `compression`). See [`docs/webapp-pwa-conventions.md`](docs/webapp-pwa-conventions.md).
 - `src/login_lockout.py` — vendor-verbatim per-client login lock-out: `429` + `Retry-After` after repeated wrong passwords, one owner alert per guessing streak (manifest key `login_lockout`). See the sign-in sheet's [README](app/webapp/static/_vendored/sign-in/README.md) ("Server side").
 - `src/no_window.py` — vendor-verbatim `CREATE_NO_WINDOW` subprocess-flag definition (manifest key `no_window`); a file copied byte-identical into adopters (e.g. `_browser_sweep.py`, `classify_e2e.py`) keeps its own local flag instead, since importing this module would not resolve there. See `CLAUDE.md` ("Windows console-subprocess suppression").
@@ -121,6 +122,7 @@ src/
   runtime_data.py           vendor-verbatim SQLite-location resolver (C:\sqlite\<app>\, off the spinning disk)
   fleet_root.py             vendor-verbatim fleet-root resolver (FLEET_ROOT -> machine config -> checkout parent)
   usage_log.py              vendor-verbatim local-only usage-log router (views, taps, device class -> usage.sqlite3)
+  usage_log_starlette.py    vendor-verbatim Starlette route + owner-only reads for the usage log
   compression.py            vendor-verbatim stream-safe gzip middleware
   login_lockout.py          vendor-verbatim per-client login lock-out (429 + Retry-After) + guessing alert
   resource_probe.py         vendor-verbatim thread/handle/RSS sampler + runtime breadcrumb
