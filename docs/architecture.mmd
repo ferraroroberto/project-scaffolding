@@ -46,6 +46,7 @@ flowchart TB
     BUILDINFO["build_info.py (#199/#246/#247)\nbuild_identity(): git_sha + built_at\ncaptured once at import, bounded retry inside\nthe capture, never re-resolved later\nvendor-verbatim, self-contained (no local imports)"]
     RESOURCEPROBE["resource_probe.py\nsample_process(pid): threads, handles, RSS\nstart_breadcrumb(logger) logs them on an interval\nvendor-verbatim; unreadable = SampleUnavailable, never 0"]
     COMPRESSION["compression.py\nStreamSafeGZipMiddleware, registered last\nvendor-verbatim; never compresses SSE,\nMJPEG, websockets or already-compressed media"]
+    LOGINLOCKOUT["login_lockout.py\nLoginLockout: retry_after / record_failure / reset\nvendor-verbatim, stdlib; 5 free, 2 s doubling to 300 s,\nforgotten after 1 h, bounded table, in memory\non_alert once per 3-failure streak, global cooldown\n(server half of _vendored/sign-in/)"]
   end
   VIEWS -->|orchestrates, business logic stays here| PIPELINES
   VIEWS --> LOGGER
@@ -55,6 +56,7 @@ flowchart TB
   PIPELINES --> CONFIG
   LOGGER -->|writes| DATALOGS
   PIPELINES -.->|optional| NOTIFY
+  LOGINLOCKOUT -.->|on_alert, wired by the app| NOTIFY
 
   DATALOGS["data/\nlogs/app.log, input/, output/\n(gitignored)"]
 
@@ -68,7 +70,7 @@ flowchart TB
     IRATCHET["instruction_ratchet.py (vendor-verbatim, stdlib)\nprompt-audit lint rules (violation cap for the file's reader)\n+ size caps over CLAUDE.md, AGENTS.md, rules, SKILL.md, skill refs\nmay not rise vs .instruction-ratchet-baseline.json\nopt-in via .fleet.toml [instruction_ratchet]; exit 3 = not confirmed"]
     RRATCHET["doc_refs_ratchet.py (vendor-verbatim, stdlib)\nREADME.md, CLAUDE.md, docs/ references to repo paths,\npython -m modules and ports (vs .fleet.toml port) that do\nnot exist may not rise vs .doc-refs-ratchet-baseline.json\nopt-in via .fleet.toml [doc_refs_ratchet]; exit 3 = not confirmed"]
     XRATCHET["dead_code_ratchet.py (vendor-verbatim, stdlib ast)\nPython functions, classes and methods nothing references\n(entry points: routes, __all__, tests, hooks, [components] API, allow)\nmay not rise vs .dead-code-ratchet-baseline.json\nopt-in via .fleet.toml [dead_code_ratchet]; exit 3 = not confirmed"]
-    VRATCHET["conventions_ratchet.py (vendor-verbatim, stdlib ast)\nfleet-convention rules opted into per repo: no-window spawns,\nprint in app code, drive paths, raw secret compare, raw git\nmay not rise per file and rule vs .conventions-ratchet-baseline.json\nopt-in via .fleet.toml [conventions_ratchet]; exit 3 = not confirmed"]
+    VRATCHET["conventions_ratchet.py (vendor-verbatim, stdlib ast)\nfleet-convention rules opted into per repo: no-window spawns,\nprint in app code, drive paths, raw secret compare, raw git,\npassword input outside sign-in/, login route without login_lockout\nmay not rise per file and rule vs .conventions-ratchet-baseline.json\nopt-in via .fleet.toml [conventions_ratchet]; exit 3 = not confirmed"]
     WRATCHET["runtime_write_ratchet.py (vendor-verbatim, stdlib ast)\nwrite targets resolving under code folders may not rise\nvs .runtime-write-ratchet-baseline.json; unresolved = exit 3\n--snapshot/--probe: no new runtime file under code folders after the tests\nloads sibling runtime_write_resolve.py: the path resolver\nopt-in via .fleet.toml [runtime_write_ratchet]"]
     UTRATCHET["usage_track_ratchet.py (vendor-verbatim, stdlib html.parser + JS tokenizer)\ncontrols with no constant data-track, dialogs with no data-track-view,\ntracking ids built at run time may not rise per file and rule\nvs .usage-track-ratchet-baseline.json; usage-log-wired never baselined\nloads sibling usage_track_scan.py: the HTML + JS readers\nopt-in via .fleet.toml [usage_track_ratchet]; exit 3 = not confirmed"]
     SHOTBASE["shot_baseline.py (vendor-verbatim, Pillow)\ncompares recaptured screenshots with the committed\nbaseline (git index), raster + glyph jitter bands,\nrestores the tree; opt-in via .fleet.toml [shot_baseline]\nexit 1 = drift, exit 3 = not confirmed"]

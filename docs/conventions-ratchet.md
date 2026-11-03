@@ -105,6 +105,26 @@ A password field that is not this app's own sign-in keeps its own markup under a
 
 **Enabling it in an app with a bespoke modal today.** Add `"password-input-vendored"` to `rules` and record today's hit with `--update-baseline --allow-additions` (or `--init` when there is no baseline yet). Moving the app onto the sheet removes the hit, and `--update-baseline` shrinks the baseline to zero.
 
+### `login-lockout`
+
+There is **no global-instruction line** for this rule. It enforces the scaffold's component contract: every web app's password route answers `429` with `Retry-After` after repeated wrong passwords, through the one vendored `src/login_lockout.py` (manifest key `login_lockout`), never a hand-rolled counter or no limit at all. The sign-in sheet shows the wait; the module enforces it. Wiring: the "Server side" section of `app/webapp/static/_vendored/sign-in/README.md`.
+
+A hit is a FastAPI route decorator `@<anything>.post("<path>")`, the path given by position or `path=`, whose last path segment is `login` (`/api/login`, `/login/`, an admin sub-app's `/api/login`), when:
+
+- the module imports nothing named `login_lockout` (`from src.login_lockout import ...`, `import src.login_lockout as ll`, `from src import login_lockout`, any folder the app copied it to), or
+- it does, but the handler's body never calls `retry_after(...)`, the check that refuses a locked client before the password is read.
+
+A route registered any other way (`add_api_route`, `api_route(methods=["POST"])`) or with a computed path is not seen. The rule does not check that the handler also calls `record_failure` and `reset`: the route's own test (6 wrong passwords: five `401`s, then a `429` with `Retry-After`) proves the lock-out works.
+
+A password route whose lock-out lives elsewhere (an auth middleware in front of it) keeps its exception with a reasoned marker in the comment block right above its decorator:
+
+```python
+# login-lockout-exempt: the lock-out runs in AuthMiddleware before this route
+@router.post("/api/login")
+```
+
+**Enabling it in an app with an unguarded route today.** Add `"login-lockout"` to `rules` and record today's hit with `--update-baseline --allow-additions`. Wiring the module in removes the hit, and `--update-baseline` shrinks the baseline to zero.
+
 ### Exempting one call
 
 A call that must break a rule keeps a reasoned marker on one of its own lines, or in the comment block directly above it:
@@ -222,6 +242,7 @@ A read-only dry run with **every rule on** over every fleet checkout (42 repos),
 | `no-drive-path` | 19 | 7 | all | 19 of 19 hardcoded locations (fleet roots, backup targets, a scaffold checkout default); 1 is the scaffold's own `C:/sqlite` runtime-data default, which carries the exempt marker |
 | `secret-compare` | 32 | 14 | all | 32 of 32 raw calls; 2 are the repos' own helpers and drop out once declared |
 | `git-wrapper` | 24 | 11 | all | 24 of 24 raw `git` spawns; 4 are the repos' own wrappers and 10 are the scaffold's vendored scripts, which adopters exclude through `[vendored]`. Of the three repos that have a wrapper today, one real hit remains: an undeclared vendored copy |
+| `login-lockout` | 11 | 11 (of 44) | all | 11 of 11 unguarded password routes, one per web app with a password sign-in: nine with no limit, two with a hand-rolled counter the vendored module replaces. Run alone, 0.3 to 1.2 s per repo |
 
 Before the platform-branch and system-folder rules, the dry run also reported `open`/`xdg-open`/`pbcopy`/`xclip` branches (`no-window`), `C:/ProgramData/pip/pip.ini` and a bare `"C:\\"` drive root (`no-drive-path`). Each became a rule above.
 
@@ -233,4 +254,4 @@ The false-positive kinds that remain:
 
 ## Tests
 
-`tests/ratchets/test_conventions_ratchet.py`: for each rule, a seeded violation that fails by name and the compliant form that passes. Also covered: import aliases, the `**kwargs` miss, every platform-branch form and the early return, the CLI-module and file-write exceptions, the system-folder and drive-root exceptions, docstrings versus f-strings, helpers and wrappers, the test-module scope, and exempt markers (a reason is needed, and the marker must name this rule). On throwaway git repos it runs every mode and exit code: a new violation failing by rule, file and line; a second violation of a baselined rule; shrink-only updates; `--allow-additions`; vendored and excluded files, a new untracked file failing and an ignored one skipped; a tracked baseline and another ratchet's baseline never read as evidence; and exit 3 for an unparseable file and an unusable `git`, in every mode. A missing prerequisite is a hard failure there, never `pytest.skip`. The scaffold's own gate stage doubles as the guard that its committed baseline is current.
+`tests/ratchets/test_conventions_ratchet.py`: for each rule, a seeded violation that fails by name and the compliant form that passes. Also covered: import aliases, the `**kwargs` miss, every platform-branch form and the early return, the CLI-module and file-write exceptions, the system-folder and drive-root exceptions, docstrings versus f-strings, helpers and wrappers, every spelling of a login `post` route and the routes that take no password, the test-module scope, and exempt markers (a reason is needed, and the marker must name this rule). On throwaway git repos it runs every mode and exit code: a new violation failing by rule, file and line; a second violation of a baselined rule; shrink-only updates; `--allow-additions`; vendored and excluded files, a new untracked file failing and an ignored one skipped; a tracked baseline and another ratchet's baseline never read as evidence; and exit 3 for an unparseable file and an unusable `git`, in every mode. A missing prerequisite is a hard failure there, never `pytest.skip`. The scaffold's own gate stage doubles as the guard that its committed baseline is current.

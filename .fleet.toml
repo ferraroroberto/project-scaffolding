@@ -454,7 +454,7 @@ allow   = [
 # Mechanism + limits: docs/conventions-ratchet.md.
 [conventions_ratchet]
 enabled = true
-rules   = ["no-window", "logging-not-print", "no-drive-path", "password-input-vendored"]
+rules   = ["no-window", "logging-not-print", "no-drive-path", "password-input-vendored", "login-lockout"]
 
 # ---------------------------------------------------------------------------
 # Runtime write ratchet. scripts/verify-before-ship.ps1 runs
@@ -648,6 +648,8 @@ usage_log       = { src = "src/usage_log.py" }
 # The usage log's Cloudflare server half, for a public site served by a Worker (#540).
 usage_log_worker = { src = "src/usage_log_worker.js" }
 compression     = { src = "src/compression.py" }
+# The sign-in sheet's server half; conventions_ratchet's login-lockout rule holds login routes to it.
+login_lockout   = { src = "src/login_lockout.py" }
 # A built static site's build, preview and gate check; site_serve and site_check import site_routes.
 site_images     = { src = "scripts/site_images.py" }
 site_routes     = { src = "scripts/site_routes.py" }
