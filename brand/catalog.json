@@ -12,6 +12,7 @@
     {"file": "credit-card.svg", "glyph": "credit-card", "consumers": ["accounting-quarterly", "family-accounting"]},
     {"file": "file-text.svg", "glyph": "file-text", "consumers": ["content-management", "mass-html-to-markdown", "pdf-to-markdown"]},
     {"file": "folder.svg", "glyph": "folder", "consumers": ["mcp-personal-onedrive"]},
+    {"file": "folder-tree.svg", "glyph": "folder-tree", "consumers": ["folder-explorer"]},
     {"file": "globe-2.svg", "glyph": "globe-2", "consumers": ["website"]},
     {"file": "graduation-cap.svg", "glyph": "graduation-cap", "consumers": ["vibe-coding-workshop"]},
     {"file": "house.svg", "glyph": "house", "consumers": ["home-automation"]},
