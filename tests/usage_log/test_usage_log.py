@@ -153,7 +153,7 @@ def test_unknown_keys_are_never_stored(tmp_path: Path) -> None:
     finally:
         conn.close()
     assert columns == ["id", "ts", "session_id", "kind", "view_id", "control_id",
-                       "device_class", "os_class", "country", "visitor"]
+                       "device_class", "os_class", "country", "visitor", "ip"]
     # Only a server half that sees the request fills these; a client never can.
     assert site_columns == [(None, None)]
     assert _rows(db) == [("tap", "chat", "send", "phone", "ios")]
@@ -643,7 +643,7 @@ def test_an_older_file_gains_the_site_columns_in_place(tmp_path: Path) -> None:
         columns = [row[1] for row in conn.execute("PRAGMA table_info(events)")]
     finally:
         conn.close()
-    assert columns[-2:] == ["country", "visitor"]
+    assert columns[-3:] == ["country", "visitor", "ip"]
     assert _rows(db) == [("view", "board", None, "phone", "ios")]
 
 

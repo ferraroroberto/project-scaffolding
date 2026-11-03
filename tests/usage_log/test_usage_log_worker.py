@@ -103,7 +103,8 @@ def test_bad_requests_are_refused(probe: dict[str, Any]) -> None:
 def test_the_summary_has_the_python_keys_plus_the_site_counts(probe: dict[str, Any]) -> None:
     summary = probe["summary"]
     assert set(summary) == {"days", "since", "events", "sessions", "first_ts", "last_ts", "views",
-                            "controls", "devices", "os", "referrers", "countries", "visitors"}
+                            "controls", "devices", "os", "referrers", "countries", "visitors",
+                            "returning"}
     assert summary["views"] == {"home": 3, "about": 1}
     assert summary["referrers"] == {"linkedin.com": 1}
     assert summary["countries"] == {"ES": 1, "IT": 1}

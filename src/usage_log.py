@@ -51,6 +51,14 @@ changes every day, so a visitor counts once per day and never across days).
 This module accepts ``referrer`` events and carries the two columns, empty, so
 one table and one summary serve both.
 
+**Identified mode** (that server half only, a public site behind a consent
+banner, never a fleet app): with consent, ``visitor`` is a random first-party
+cookie id instead of the daily hash and a third column, ``ip``, holds the
+address until a retention window clears it. This module carries ``ip`` too,
+always empty, so ``scripts/usage_summary.py`` reads an exported D1 file; the
+summary's ``returning`` counts visitors in the window also seen on another
+UTC day (0 for daily hashes, which change every day).
+
 The privacy contract is enforced here, not trusted to the client: an event is
 stored only if its ``kind`` is in :data:`EVENT_KINDS` and its id matches
 :data:`ID_PATTERN` (bounded, no spaces, no ``/`` — a URL or a sentence cannot
@@ -147,12 +155,20 @@ CREATE TABLE IF NOT EXISTS events (
     device_class TEXT NOT NULL,
     os_class     TEXT NOT NULL,
     country      TEXT,
-    visitor      TEXT
+    visitor      TEXT,
+    ip           TEXT
 );
 CREATE INDEX IF NOT EXISTS events_ts ON events (ts);
 """
 #: Columns added after the first release, created in place on an older file.
-_ADDED_COLUMNS = (("country", "TEXT"), ("visitor", "TEXT"))
+_ADDED_COLUMNS = (("country", "TEXT"), ("visitor", "TEXT"), ("ip", "TEXT"))
+#: Visitors in the window also seen on another UTC day, earlier history included
+#: (mirrors ``RETURNING_SQL`` in ``src/usage_log_worker.js``).
+_RETURNING_SQL = (
+    "SELECT COUNT(*) FROM (SELECT visitor FROM events WHERE visitor IN"
+    " (SELECT visitor FROM events WHERE ts >= ? AND visitor IS NOT NULL)"
+    " GROUP BY visitor HAVING COUNT(DISTINCT substr(ts, 1, 10)) > 1)"
+)
 
 
 class PayloadError(ValueError):
@@ -412,8 +428,9 @@ def summarize(
 
 def _site_counts(conn: sqlite3.Connection, where: str, params: Sequence[object]) -> dict[str, Any]:
     """The public-site part of the summary: external referrers, sessions per
-    country, and visitors (a visitor counts once per day). Empty for an app that
-    never records them, and for a file older than the two columns."""
+    country, visitors (a daily-hash visitor counts once per day) and returning
+    visitors. Empty for an app that never records them, and for a file older
+    than the two columns."""
     columns = {row[1] for row in conn.execute("PRAGMA table_info(events)")}
     referrers = _counts(
         conn,
@@ -422,7 +439,7 @@ def _site_counts(conn: sqlite3.Connection, where: str, params: Sequence[object])
         params,
     )
     if not {"country", "visitor"} <= columns:
-        return {"referrers": referrers, "countries": {}, "visitors": 0}
+        return {"referrers": referrers, "countries": {}, "visitors": 0, "returning": 0}
     countries = _counts(
         conn,
         f"SELECT country, COUNT(DISTINCT session_id) {where} AND country IS NOT NULL"
@@ -432,7 +449,9 @@ def _site_counts(conn: sqlite3.Connection, where: str, params: Sequence[object])
     visitors = conn.execute(
         f"SELECT COUNT(DISTINCT visitor) {where} AND visitor IS NOT NULL", params
     ).fetchone()[0]
-    return {"referrers": referrers, "countries": countries, "visitors": int(visitors)}
+    returning = conn.execute(_RETURNING_SQL, params).fetchone()[0]
+    return {"referrers": referrers, "countries": countries, "visitors": int(visitors),
+            "returning": int(returning)}
 
 
 # ------------------------------------------------------------ foreground time
