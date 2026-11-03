@@ -39,7 +39,7 @@ The server half is `src/usage_log.py` (a separate manifest key, `usage_log`, bec
    const usage = initUsageLog();
    initNavTabs({ storageKey: 'my-app.tab', onChange: usage.trackView });
    ```
-4. Add `data-track="<id>"` to the controls that matter. Not every control: the ones a design review would ask about.
+4. Give **every** interactive control a constant `data-track="<id>"` and every `<dialog>` a `data-track-view="<id>"`. The usage track ratchet (`scripts/usage_track_ratchet.py` in `project-scaffolding`, manifest key `usage_track_ratchet`) fails the gate on a new control or sheet without one; vendor it with this component.
 
 ## Authenticated endpoints
 
@@ -102,7 +102,8 @@ return handleUsageEvents(request, env.STATS, {
 - `data-track="<id>"` on a control records a `tap` with that id when the control (or anything inside it) is clicked. One delegated capture-phase listener on `document` handles every control; nothing scrapes element text.
 - An id is a developer-chosen constant matching `^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}$`: no spaces, no `/`, at most 64 characters. `refresh-all`, `job:cancel`, `settings.theme` pass; a sentence, a path or a URL does not, and is dropped on both sides.
 - `usage.track(id)` records the same `tap` (same id pattern, same current view, same batch) with no click, for a feature counted when it **succeeded**: an upload finished, a transcript landed, a send was acknowledged. The id is a string literal in the call, never built from element text, a file name, a message or any user data; an id outside the pattern queues nothing. When the logger is disabled (off-origin `endpoint`) the call is a no-op, so callers need no guard. Never fake a click on a probe element with a runtime-set `data-track` instead.
-- `trackView(id)` records a `view`. The nav's `onChange(tab)` calls it on every tab switch (including the initial restore), using the tab's `data-tab` value. Call it yourself for a sheet or dialog that deserves its own id.
+- `trackView(id)` records a `view`. The nav's `onChange(tab)` calls it on every tab switch (including the initial restore), using the tab's `data-tab` value. It is for tabs; a sheet uses `data-track-view` instead.
+- `data-track-view="<id>"` on a `<dialog>` (or any element whose `open` attribute toggles) records a `view` with that id when it opens and returns to the view under it when it closes or leaves the document, so its minutes stop the moment it goes. Open sheets stack: closing a sheet opened from a sheet returns to its parent. A tab switch while a sheet is open records the tab at once, and closing the sheet then stays on it. The client watches `open` with one `MutationObserver`, so `showModal()`, `show()` and `close()` need no extra call. A sheet already open in the markup at page load is not seen.
 
 ## Event schema
 
@@ -125,7 +126,7 @@ The client posts `POST /api/usage/events` (same-origin path; an absolute or prot
 | Kind | When |
 | --- | --- |
 | `session_start` | Page load, and each return to the foreground. |
-| `view` | `trackView(id)`: a tab switch, or a sheet/dialog the app tracks. |
+| `view` | `trackView(id)` on a tab switch; a `data-track-view` sheet opening, or closing back to the view under it. |
 | `tap` | A click on a `[data-track]` control, or a `usage.track(id)` call; carries the current view. |
 | `session_end` | The page goes hidden (sent with `sendBeacon`). |
 | `referrer` | `site` mode only: once per page load when the referrer is another host; the id is that host. |

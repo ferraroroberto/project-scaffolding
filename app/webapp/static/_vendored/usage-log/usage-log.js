@@ -25,10 +25,12 @@
  *   <button data-track="refresh-all">…</button>   a tap on it (or inside it)
  *                                                  records control id
  *                                                  "refresh-all"
+ *   <dialog data-track-view="settings">…</dialog>  opening it records view
+ *                                                  "settings"; closing it
+ *                                                  returns to the view under it
  * Wiring:
  *   const usage = initUsageLog();
  *   initNavTabs({ storageKey: 'app.tab', onChange: usage.trackView });
- *   usage.trackView('settings-sheet');             // a sheet/dialog opening
  *   usage.track('upload.done');                    // a feature that succeeded,
  *                                                  // where no click carries it
  *
@@ -209,6 +211,65 @@ function makeSender(endpoint, headers, envelope) {
   };
 }
 
+/** Attach one visit's page listeners; returns the function that detaches them. */
+function listen(root, onTap, onVisibility, onPageHide) {
+  try {
+    root.addEventListener('click', onTap, true);
+    document.addEventListener('visibilitychange', onVisibility);
+    window.addEventListener('pagehide', onPageHide);
+  } catch (_) { /* never break the app */ }
+  return function detach() {
+    try {
+      root.removeEventListener('click', onTap, true);
+      document.removeEventListener('visibilitychange', onVisibility);
+      window.removeEventListener('pagehide', onPageHide);
+    } catch (_) { /* never break the app */ }
+  };
+}
+
+function sheetView(el) {
+  const id = el.getAttribute('data-track-view');
+  return typeof id === 'string' && ID_PATTERN.test(id) ? id : null;
+}
+
+/** One visit's open-sheet stack. A `data-track-view` element whose `open` attribute appears
+ *  becomes the view (`show(id)`); when it closes or leaves the document, the sheet or tab under
+ *  it is the view again, so a sheet's minutes stop the moment it goes. `setBase(id)` records the
+ *  tab the app last set with `trackView`, the view under every sheet. */
+function watchSheets(root, show) {
+  const open = [];  // innermost last
+  let base = null;
+  let observer = null;
+  function close(at) {
+    open.splice(at, 1);
+    show(open.length ? sheetView(open[open.length - 1]) : base);
+  }
+  function onRecords(records) {
+    for (const record of records) {
+      const el = record.target;
+      if (record.type !== 'attributes' || !el.hasAttribute('data-track-view')) continue;
+      const at = open.indexOf(el);
+      const id = sheetView(el);
+      if (el.hasAttribute('open') && at < 0 && id) { open.push(el); show(id); }
+      else if (!el.hasAttribute('open') && at >= 0) close(at);
+    }
+    for (let i = open.length - 1; i >= 0; i--) {
+      if (open[i].isConnected === false) close(i);
+    }
+  }
+  try {
+    // `showModal()`, `show()` and `close()` all toggle `open`; childList catches a sheet removed while open.
+    if (typeof MutationObserver === 'function') {
+      observer = new MutationObserver(onRecords);
+      observer.observe(root, { subtree: true, childList: true, attributes: true, attributeFilter: ['open'] });
+    }
+  } catch (_) { /* never break the app */ }
+  return {
+    setBase: function (id) { base = id; },
+    stop: function () { open.length = 0; if (observer) observer.disconnect(); },
+  };
+}
+
 /**
  * Start recording for this page visit.
  *
@@ -269,6 +330,7 @@ export function initUsageLog(opts = {}) {
   let view = null;
   let timer = null;
   let stopped = false;
+  const sheets = watchSheets(root, show);
 
   function flush(beacon) {
     if (timer) { clearTimeout(timer); timer = null; }
@@ -284,8 +346,15 @@ export function initUsageLog(opts = {}) {
 
   function trackView(id) {
     if (typeof id !== 'string' || !ID_PATTERN.test(id)) return;
+    sheets.setBase(id);
     view = id;
     push({ kind: 'view', id: id });
+  }
+
+  /** A sheet opening or closing: `id` becomes the view (null when no view is left under it). */
+  function show(id) {
+    if (!id) view = null;
+    else if (id !== view) { view = id; push({ kind: 'view', id: id }); }
   }
 
   function track(id) {
@@ -317,20 +386,12 @@ export function initUsageLog(opts = {}) {
     stopped = true;
     if (timer) { clearTimeout(timer); timer = null; }
     queue = [];
-    try {
-      root.removeEventListener('click', onTap, true);
-      document.removeEventListener('visibilitychange', onVisibility);
-      window.removeEventListener('pagehide', onPageHide);
-    } catch (_) { /* never break the app */ }
+    sheets.stop();
+    detach();
     if (visitorCookie) writeCookie(visitorCookie, '', 0);
   }
 
-  try {
-    root.addEventListener('click', onTap, true);
-    document.addEventListener('visibilitychange', onVisibility);
-    window.addEventListener('pagehide', onPageHide);
-  } catch (_) { /* never break the app */ }
-
+  const detach = listen(root, onTap, onVisibility, onPageHide);
   push({ kind: 'session_start' });
   if (site) startSite(push, trackView);
 
