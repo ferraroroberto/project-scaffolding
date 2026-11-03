@@ -45,6 +45,7 @@ Clone this directory, rename it, and start building.
 - `scripts/gen_verify_skill.py` + `scripts/verify_skill_templates/` — generator for a web app's own `verify-<app>` skill. See [`docs/verify-skill.md`](docs/verify-skill.md).
 - `.fleet.toml`'s `[components]` table + `scripts/vendored_catalog.py` — the canonical catalog of every vendor-verbatim component this scaffold publishes. See [`docs/components.md`](docs/components.md).
 - `docs/agents/` — the master AGENTS/CLAUDE templates, the adapt prompt and the rollout runbook.
+- [`docs/architecture-decisions.md`](docs/architecture-decisions.md) — the register of standing architecture decisions, one `adr` issue each.
 - [`docs/repo-layout.md`](docs/repo-layout.md) — where code goes: canonical tree, placement rules, extra roots per repo shape.
 - `docs/playwright-ui-testing.md` — the two-loop browser-testing recipe (headed agent verification + optional headless regression suite).
 - `docs/shared-chrome-profile.md` — serializing access to a persistent Chrome profile shared across jobs.
