@@ -159,6 +159,7 @@ function writeCookie(name, value, maxAgeSeconds) {
  *  An existing cookie is reused and keeps its expiry: a visit never extends it. */
 function ensureVisitorCookie(name, days) {
   if (VISITOR_ID_PATTERN.test(readCookie(name) || '')) return;
+  if (typeof days !== 'number' || !(days > 0)) days = DEFAULT_VISITOR_COOKIE_DAYS;
   let id;
   try {
     id = Array.from(crypto.getRandomValues(new Uint8Array(16)), function (b) { return b.toString(16).padStart(2, '0'); }).join('');
@@ -167,6 +168,46 @@ function ensureVisitorCookie(name, days) {
 }
 
 function noop() {}
+
+/** Why these options must disable the logger, or null when they are usable. */
+function optionProblem(endpoint, visitorCookie) {
+  if (typeof endpoint !== 'string' || endpoint[0] !== '/' || endpoint[1] === '/') {
+    return 'endpoint must be a same-origin path like "/api/usage/events"';
+  }
+  if (visitorCookie !== null && (typeof visitorCookie !== 'string' || !ID_PATTERN.test(visitorCookie))) {
+    return 'visitorCookie must be a plain cookie name';
+  }
+  return null;
+}
+
+/** `send(events, beacon)` for one page visit: the envelope plus a batch, to the same-origin
+ *  endpoint. A beacon is used only when asked and no extra headers are configured. */
+function makeSender(endpoint, headers, envelope) {
+  const hasHeaders = typeof headers === 'function' || (headers !== null && typeof headers === 'object');
+
+  function extraHeaders() {
+    try {
+      const h = typeof headers === 'function' ? headers() : headers;
+      return h && typeof h === 'object' ? h : {};
+    } catch (_) { return {}; }
+  }
+
+  return function send(events, beacon) {
+    const body = JSON.stringify(Object.assign({}, envelope, { events: events }));
+    try {
+      if (beacon && !hasHeaders && navigator.sendBeacon) {
+        if (navigator.sendBeacon(endpoint, new Blob([body], { type: 'application/json' }))) return;
+      }
+      fetch(endpoint, {
+        method: 'POST',
+        headers: Object.assign({}, extraHeaders(), { 'Content-Type': 'application/json' }),
+        body: body,
+        credentials: 'same-origin',
+        keepalive: true,
+      }).catch(noop);
+    } catch (_) { /* never break the app */ }
+  };
+}
 
 /**
  * Start recording for this page visit.
@@ -212,53 +253,22 @@ export function initUsageLog(opts = {}) {
     visitorCookie = null,
     visitorCookieDays = DEFAULT_VISITOR_COOKIE_DAYS,
   } = opts;
-  const hasHeaders = typeof headers === 'function' || (headers !== null && typeof headers === 'object');
-
-  if (typeof endpoint !== 'string' || endpoint[0] !== '/' || endpoint[1] === '/') {
-    console.warn('usage-log: endpoint must be a same-origin path like "/api/usage/events"; logging disabled');
+  const problem = optionProblem(endpoint, visitorCookie);
+  if (problem) {
+    console.warn('usage-log: ' + problem + '; logging disabled');
     return { trackView: noop, track: noop, flush: noop, currentView: function () { return null; }, stop: noop };
   }
-  if (visitorCookie !== null && (typeof visitorCookie !== 'string' || !ID_PATTERN.test(visitorCookie))) {
-    console.warn('usage-log: visitorCookie must be a plain cookie name; logging disabled');
-    return { trackView: noop, track: noop, flush: noop, currentView: function () { return null; }, stop: noop };
-  }
-  if (visitorCookie) {
-    const days = typeof visitorCookieDays === 'number' && visitorCookieDays > 0 ? visitorCookieDays : DEFAULT_VISITOR_COOKIE_DAYS;
-    ensureVisitorCookie(visitorCookie, days);
-  }
+  if (visitorCookie) ensureVisitorCookie(visitorCookie, visitorCookieDays);
 
-  const envelope = {
+  const send = makeSender(endpoint, headers, {
     session_id: randomSessionId(),
     device_class: deviceClass(),
     os_class: osClass(),
-  };
+  });
   let queue = [];
   let view = null;
   let timer = null;
   let stopped = false;
-
-  function extraHeaders() {
-    try {
-      const h = typeof headers === 'function' ? headers() : headers;
-      return h && typeof h === 'object' ? h : {};
-    } catch (_) { return {}; }
-  }
-
-  function send(events, beacon) {
-    const body = JSON.stringify(Object.assign({}, envelope, { events: events }));
-    try {
-      if (beacon && !hasHeaders && navigator.sendBeacon) {
-        if (navigator.sendBeacon(endpoint, new Blob([body], { type: 'application/json' }))) return;
-      }
-      fetch(endpoint, {
-        method: 'POST',
-        headers: Object.assign({}, extraHeaders(), { 'Content-Type': 'application/json' }),
-        body: body,
-        credentials: 'same-origin',
-        keepalive: true,
-      }).catch(noop);
-    } catch (_) { /* never break the app */ }
-  }
 
   function flush(beacon) {
     if (timer) { clearTimeout(timer); timer = null; }
