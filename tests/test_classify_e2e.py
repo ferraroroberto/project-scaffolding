@@ -430,7 +430,7 @@ def test_real_surfaces_route_representative_paths() -> None:
     cfg = load_config(REAL_FLEET_TOML)
     assert cfg.surfaces_note == "", cfg.surfaces_note
     assert {s.name for s in cfg.surfaces} == {
-        "nav", "components", "geometry", "layout-lint", "usage-log", "shot-baseline",
+        "nav", "components", "geometry", "layout-lint", "usage-log", "sign-in", "shot-baseline",
     }
 
     def route(*paths: str) -> tuple[str, str]:
@@ -470,6 +470,11 @@ def test_real_surfaces_route_representative_paths() -> None:
     # of src/ -> none) and its harness all run only that harness.
     assert route("app/webapp/static/_vendored/usage-log/usage-log.js") == (
         "surface", "tests/e2e/test_vendored_usage_log.py")
+    # The sign-in sheet: its files and its harness run only that harness.
+    assert route("app/webapp/static/_vendored/sign-in/sign-in.js",
+                 "app/webapp/static/_vendored/sign-in/sign-in.css") == (
+        "surface", "tests/e2e/test_vendored_sign_in.py")
+    assert route("tests/e2e/test_vendored_sign_in.py") == ("surface", "tests/e2e/test_vendored_sign_in.py")
     assert route("src/usage_log.py") == ("surface", "tests/e2e/test_vendored_usage_log.py")
     assert route("src/usage_log.py", "tests/usage_log/test_usage_log.py") == (
         "surface", "tests/e2e/test_vendored_usage_log.py")

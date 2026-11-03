@@ -202,6 +202,85 @@ def test_an_exempt_marker_needs_the_rule_and_a_reason() -> None:
 def test_a_file_that_does_not_parse_is_not_confirmed() -> None:
     with pytest.raises(cr.NotConfirmed, match="does not parse"):
         cr.scan_source(b"def broken(:\n", "src/a.py", frozenset(cr.RULES))
+
+
+# ------------------------------------------------------- password-input-vendored
+
+_BESPOKE_MODAL = """<div id="loginOverlay" class="login-overlay" hidden>
+  <form id="loginForm" class="login-card">
+    <h2>Sign in</h2>
+    <input id="loginPassword" type="password" autocomplete="current-password">
+    <button type="submit">Unlock</button>
+  </form>
+</div>
+"""
+
+
+def web_hits(src: str, path: str = "app/webapp/static/index.html", cfg: cr.Config = ALL) -> list[str]:
+    """`rule:line` of every hit in one in-memory web file."""
+    return [f"{h.rule}:{h.line}" for h in cr.scan_web(src, path, cr.rules_for(path, cfg))]
+
+
+def test_a_bespoke_password_modal_fails() -> None:
+    assert web_hits(_BESPOKE_MODAL) == ["password-input-vendored:4"]
+
+
+@pytest.mark.parametrize(
+    "line",
+    [
+        pytest.param("<input type='password'>", id="single-quoted"),
+        pytest.param("<input TYPE=password name=p>", id="unquoted"),
+        pytest.param("el.type = 'password';", id="js-property"),
+        pytest.param("h('input', { type: \"password\" })", id="js-object"),
+        pytest.param("el.setAttribute('type', 'password');", id="set-attribute"),
+        pytest.param("const t = `<input type=\"password\">`;", id="template-markup"),
+    ],
+)
+def test_every_spelling_of_a_password_input_is_a_hit(line: str) -> None:
+    assert web_hits(line, "app/webapp/static/js/login.js") == ["password-input-vendored:1"]
+
+
+@pytest.mark.parametrize(
+    "line",
+    [
+        pytest.param("<input type=\"password-hint\">", id="longer-word"),
+        pytest.param("<input type=\"text\" placeholder=\"password\">", id="placeholder"),
+        pytest.param("const label = 'Password';", id="plain-word"),
+    ],
+)
+def test_a_line_that_only_mentions_passwords_is_not_a_hit(line: str) -> None:
+    assert web_hits(line) == []
+
+
+def test_the_vendored_component_tests_and_python_are_not_held_to_the_rule() -> None:
+    assert web_hits(_BESPOKE_MODAL, "app/webapp/static/_vendored/sign-in/sign-in.js") == []
+    assert web_hits(_BESPOKE_MODAL, "_vendored/sign-in/sign-in.js") == []
+    assert web_hits(_BESPOKE_MODAL, "tests/e2e/_fixtures/login.html") == []
+    assert web_hits(_BESPOKE_MODAL, "app/webapp/static/_vendored/sign-in-old/x.html") == [
+        "password-input-vendored:4"], "only the component's own folder is exempt"
+    assert hits('HTML = \'<input type="password">\'\n') == [], "the rule reads web files, not Python"
+    assert cr.in_scope("app/webapp/static/index.html", ALL, ())
+    assert not cr.in_scope("docs/sign-in.md", ALL, ())
+
+
+def test_the_web_rule_is_opt_in_and_the_python_rules_never_read_web_files() -> None:
+    python_only = cr.Config(cr.DEFAULT_BASELINE, ("no-window", "no-drive-path"))
+    assert web_hits(_BESPOKE_MODAL, cfg=python_only) == []
+    assert web_hits("const ROOT = 'E:/data/app';\n", "app/webapp/static/app.js") == []
+
+
+def test_a_web_exempt_marker_needs_the_rule_and_a_reason() -> None:
+    field = '<input type="password" name="pc-password">'
+    reason = "types into the remote PC's page, not this app's own sign-in"
+    assert web_hits(f"<!-- password-input-vendored-exempt: {reason} -->\n{field}\n") == []
+    assert web_hits(f"// password-input-vendored-exempt: {reason}\nel.type = 'password';\n", "a/b.js") == []
+    assert web_hits(f"/*\n * password-input-vendored-exempt: {reason}\n */\nel.type = 'password';\n", "a/b.js") == []
+    assert web_hits(f"{field} <!-- password-input-vendored-exempt: {reason} -->\n") == []
+    assert web_hits(f"<!-- password-input-vendored-exempt -->\n{field}\n") == [
+        "password-input-vendored:2"], "a bare marker exempts nothing"
+    assert web_hits(f"<!-- no-window-exempt: wrong rule -->\n{field}\n") == ["password-input-vendored:2"]
+    assert web_hits(f"<!-- password-input-vendored-exempt: {reason} -->\n<p>gap</p>\n{field}\n") == [
+        "password-input-vendored:3"], "the marker covers only the line right below its comment block"
     with pytest.raises(cr.NotConfirmed, match="does not parse"):
         cr.scan_source(b"x = 'caf\xe9'\n", "src/latin.py", frozenset())
 
@@ -317,6 +396,26 @@ def test_excluded_and_vendored_files_are_not_scanned(repo: Path) -> None:
         encoding="utf-8",
     )
     assert run_mode(repo) == cr.EXIT_PASS
+
+
+def test_a_bespoke_password_modal_fails_the_gate_beyond_its_baseline(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    git(tmp_path, "init", "-q")
+    (tmp_path / ".fleet.toml").write_text(
+        '[conventions_ratchet]\nenabled = true\nrules = ["password-input-vendored"]\n', encoding="utf-8"
+    )
+    write(tmp_path, "app/webapp/static/index.html", _BESPOKE_MODAL)
+    write(tmp_path, "app/webapp/static/_vendored/sign-in/sign-in.js", "el.type = 'password';\n")
+    assert run_mode(tmp_path, init=True) == cr.EXIT_PASS
+    assert baseline_text(tmp_path).count('"password-input-vendored": 1') == 1, "today's app is baselined, the component is not"
+    assert run_mode(tmp_path) == cr.EXIT_PASS
+
+    write(tmp_path, "app/webapp/static/settings.html", _BESPOKE_MODAL)
+    capsys.readouterr()
+    assert run_mode(tmp_path) == cr.EXIT_RISE
+    assert ("app/webapp/static/settings.html:4: [password-input-vendored] password input outside the vendored "
+            "sign-in component (_vendored/sign-in/)") in capsys.readouterr().out
 
 
 def test_no_baseline_is_ever_read_as_evidence(repo: Path, capsys: pytest.CaptureFixture[str]) -> None:
