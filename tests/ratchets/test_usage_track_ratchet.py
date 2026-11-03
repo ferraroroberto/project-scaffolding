@@ -527,6 +527,41 @@ def test_a_wired_app_passes_and_the_vendored_copies_are_not_scanned(repo: Path) 
     assert run_mode(repo) == ut.EXIT_PASS
 
 
+ADAPTER_VENDORED = VENDORED + 'usage_log_starlette = { dest = "src/usage_log_starlette.py" }\n'
+ADAPTER_BODY = "def usage_route(db_path):\n    app.include_router(usage_router(db_path))\n"
+
+
+def test_an_app_on_the_vendored_starlette_adapter_counts_as_wired(repo: Path) -> None:
+    (repo / ".fleet.toml").write_text(WIRED_TABLE + ADAPTER_VENDORED, encoding="utf-8")
+    write(repo, "app/webapp/static/_vendored/usage-log/usage-log.js", "export function initUsageLog() {}\n")
+    write(repo, "app/webapp/static/app.js", "const usage = initUsageLog();\n")
+    write(repo, "src/usage_log.py", "def usage_router(path):\n    return path\n")
+    run_mode(repo, init=True)
+    assert run_mode(repo) == ut.EXIT_RISE, "the adapter is not there yet"
+    write(repo, "src/usage_log_starlette.py", ADAPTER_BODY)
+    assert run_mode(repo) == ut.EXIT_PASS, "the only usage_router( call is in the vendored adapter"
+
+
+def test_a_declared_adapter_that_never_calls_the_router_is_not_wired(
+    repo: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    (repo / ".fleet.toml").write_text(WIRED_TABLE + ADAPTER_VENDORED, encoding="utf-8")
+    write(repo, "app/webapp/static/app.js", "const usage = initUsageLog();\n")
+    write(repo, "src/usage_log_starlette.py", "def usage_route(db_path):\n    return db_path\n")
+    run_mode(repo, init=True)
+    capsys.readouterr()
+    assert run_mode(repo) == ut.EXIT_RISE
+    assert "no tracked Python file calls `usage_router(`" in capsys.readouterr().out
+
+
+def test_a_vendored_file_other_than_the_adapter_is_still_not_scanned(repo: Path) -> None:
+    (repo / ".fleet.toml").write_text(WIRED_TABLE + ADAPTER_VENDORED, encoding="utf-8")
+    write(repo, "app/webapp/static/app.js", "const usage = initUsageLog();\n")
+    write(repo, "src/usage_log.py", "x = usage_router(path)\n")
+    run_mode(repo, init=True)
+    assert run_mode(repo) == ut.EXIT_RISE
+
+
 # ------------------------------------------------------- not confirmed
 
 @pytest.mark.parametrize(
@@ -571,7 +606,7 @@ def test_main_rejects_allow_additions_without_update(capsys: pytest.CaptureFixtu
 # ------------------------------------------------------------ self-adoption
 
 def test_scaffold_adopts_the_stage_and_commits_a_parseable_baseline() -> None:
-    cfg, _, _ = ut.load_config(REPO_ROOT)
+    cfg, _, _, _ = ut.load_config(REPO_ROOT)
     assert cfg is not None, "the scaffold adopts its own stage first"
     assert ut.WIRED not in cfg.rules, "the scaffold is not a web app, so it does not claim the wiring"
     assert (REPO_ROOT / cfg.baseline).is_file()

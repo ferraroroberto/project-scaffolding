@@ -75,7 +75,7 @@ A parameter, a property (`e.detail.tab`), a concatenation, a table lookup or a l
 
 > every fleet web app initialises `usage-log` and mounts its routes
 
-A repo-level check, never baselined, run in the check mode only: it passes when `[vendored]` declares both `usage-log` (the client) and `usage_log` (the server), a file in `paths` calls `initUsageLog(`, and a tracked Python file (vendored copies and tests aside) calls `usage_router(`. Each missing piece is printed on its own line and fails the gate, whatever the baseline says. Like the structure ratchet's root layout, it cannot be baselined away.
+A repo-level check, never baselined, run in the check mode only: it passes when `[vendored]` declares both `usage-log` (the client) and `usage_log` (the server), a file in `paths` calls `initUsageLog(`, and a tracked Python file (vendored copies and tests aside) calls `usage_router(`. The one vendored file that counts is the Starlette adapter, when `[vendored]` declares `usage_log_starlette` and its file calls `usage_router(`: an app without FastAPI mounts the log through it and has no call of its own. Each missing piece is printed on its own line and fails the gate, whatever the baseline says. Like the structure ratchet's root layout, it cannot be baselined away.
 
 A repo declares itself a web app by enabling this table; the table is the declaration. The fleet-wide cross-check that every repo whose `## UX surface` says `design spec applies: yes` has it enabled belongs to `fleet-config`'s drift test, not to this stage.
 
