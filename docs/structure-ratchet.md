@@ -78,7 +78,7 @@ A folder in `extra_roots` that is tracked and that the shape's preset does not l
 
 ### Second-level placement
 
-A shape may declare `homes` (path patterns: `dir/` is the folder and everything below it, `dir/*.py` a file directly in `dir`). A file under one of the roots the homes name that matches no home is misplaced. The ratchet counts misplaced files per folder (`place:<folder>`) and fails on a new folder or a higher count, naming the homes. Only `webapp-tray` declares homes; the other shapes follow if it proves useful.
+A shape may declare `homes` (path patterns: `dir/` is the folder and everything below it, `dir/*.py` a file directly in `dir`). A file under one of the roots the homes name that matches no home is misplaced. The ratchet counts misplaced files per folder (`place:<folder>`) and fails on a new folder or a higher count, naming the homes. A shape may also name `surface_parents`: a folder directly under one (`webapp-tray`: `app/webapp/<package>/`) that tracks its own `server.py` is a home too, with everything below it, so a second, separately bound HTTP surface needs no deviation. A sibling folder without `server.py` stays misplaced. Only `webapp-tray` declares homes; the other shapes follow if it proves useful.
 
 ```
 structure ratchet: 1 finding(s) above the baseline:

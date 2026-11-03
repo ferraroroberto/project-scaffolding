@@ -85,6 +85,36 @@ def test_a_py_pattern_matches_a_direct_child_only() -> None:
     assert layout.misplaced(["app/webapp/x.py"], "webapp-tray") == {}
 
 
+SURFACE = (
+    "app/webapp/player/server.py", "app/webapp/player/static/app.js", "app/webapp/player/api/deep/x.py",
+    "app/webapp/player/index.html",
+)
+
+
+def test_a_folder_with_its_own_server_is_a_surface_home_with_everything_below_it() -> None:
+    assert layout.misplaced(list(SURFACE), "webapp-tray") == {}
+    assert layout.surface_packages(list(SURFACE), "webapp-tray") == {"app/webapp/player"}
+
+
+def test_a_sibling_folder_without_a_server_stays_misplaced() -> None:
+    paths = [*SURFACE, "app/webapp/middleware/auth.py", "app/webapp/middleware/log.py"]
+    assert layout.misplaced(paths, "webapp-tray") == {"app/webapp/middleware": 2}
+
+
+def test_a_server_deeper_than_one_level_does_not_make_a_surface() -> None:
+    paths = ["app/webapp/a/b/server.py", "app/webapp/a/b/x.py", "app/webapp/a/y.py"]
+    assert layout.misplaced(paths, "webapp-tray") == {"app/webapp/a/b": 2, "app/webapp/a": 1}
+
+
+def test_a_server_outside_the_surface_parent_does_not_make_a_surface() -> None:
+    assert layout.misplaced(["app/other/server.py", "app/other/x.py"], "webapp-tray") == {"app/other": 2}
+
+
+def test_surface_packages_leave_routers_and_static_meaning_unchanged() -> None:
+    paths = [*SURFACE, "app/webapp/routers/chat.py", "app/webapp/static/x.js", "app/webapp/templates/i.html"]
+    assert layout.misplaced(paths, "webapp-tray") == {"app/webapp/templates": 1}
+
+
 def test_shapes_without_homes_check_nothing() -> None:
     assert all(shape.home_roots == frozenset() for name, shape in layout.SHAPES.items() if name != "webapp-tray")
     assert layout.misplaced(["app/helpers/x.py"], "streamlit") == {}
@@ -186,7 +216,23 @@ def test_a_new_misplaced_folder_fails_and_names_the_homes_and_the_doc_section(
     assert "app/webapp/routers/" in out
     assert "app/webapp/static/" in out
     assert "src/" in out
+    assert "app/webapp/<package>/ holding its own server.py" in out
     assert "docs/repo-layout.md#second-level-placement" in out
+
+
+def test_a_surface_package_leaves_no_placement_entry(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    make_repo(tmp_path, "webapp-tray", (*WEBAPP, *SURFACE))
+    capsys.readouterr()
+    assert run(tmp_path) == sr.EXIT_PASS
+    assert not [e for e in recorded(tmp_path)["entries"] if str(e["key"]).startswith("place:")]  # type: ignore[index, union-attr]
+
+
+def test_adding_a_server_to_a_baselined_folder_makes_the_entry_vanish(tmp_path: Path) -> None:
+    make_repo(tmp_path, "webapp-tray", (*WEBAPP, "app/webapp/player/x.py"))
+    assert {"key": "place:app/webapp/player", "files": 1} in recorded(tmp_path)["entries"]  # type: ignore[operator]
+    write(tmp_path, "app/webapp/player/server.py", "x = 1\n")
+    git(tmp_path, "add", "-A")
+    assert run(tmp_path) == sr.EXIT_PASS
 
 
 def test_moving_the_file_home_passes_and_update_drops_the_entry(tmp_path: Path) -> None:
