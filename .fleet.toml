@@ -483,6 +483,31 @@ enabled = true
 [usage_track_ratchet]
 enabled = true
 rules   = ["untracked-control", "untracked-sheet", "dynamic-id"]
+# Excluded: the component preview pages (demo.html and each component's own
+# <name>.html fragment) are specimens a reader opens, not app UI, and adopters vendor
+# the component's css/js, never its preview. The three .js builders are vendored but
+# build a control whose id belongs to the caller (the adopter's call site stamps
+# `data-track`), so the constant cannot live in this file.
+exclude = [
+  "app/webapp/static/_vendored/action-row/action-row.html",
+  "app/webapp/static/_vendored/button/button.html",
+  "app/webapp/static/_vendored/day-marks/day-marks.html",
+  "app/webapp/static/_vendored/day-row/day-row.html",
+  "app/webapp/static/_vendored/demo.html",
+  "app/webapp/static/_vendored/disclosure/disclosure.html",
+  "app/webapp/static/_vendored/empty-state/empty-state.js",
+  "app/webapp/static/_vendored/home-head/home-head.html",
+  "app/webapp/static/_vendored/icon-button/icon-button.html",
+  "app/webapp/static/_vendored/modal/modal.html",
+  "app/webapp/static/_vendored/range-tab/range-tab.html",
+  "app/webapp/static/_vendored/row-menu/row-menu.html",
+  "app/webapp/static/_vendored/row-menu/row-menu.js",
+  "app/webapp/static/_vendored/segmented/segmented.html",
+  "app/webapp/static/_vendored/select-native/select-native.html",
+  "app/webapp/static/_vendored/switch/switch.html",
+  "app/webapp/static/_vendored/switch/switch.js",
+  "app/webapp/static/_vendored/text-size/text-size.html",
+]
 
 # ---------------------------------------------------------------------------
 # Screenshot baseline. scripts/verify-before-ship.ps1 runs
