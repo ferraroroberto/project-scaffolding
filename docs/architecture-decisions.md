@@ -29,3 +29,35 @@ Why: the owner judges UX from usage statistics and time-spent figures, and untra
 Enforcement: the [usage track ratchet](usage-track-ratchet.md) fails the ship on a new untracked control, an untracked `<dialog>`, a tracking id built at run time, or a web app that does not vendor, start and mount its usage log; existing gaps sit in each app's baseline and only shrink. The client records a `data-track-view` sheet on open and hands back the view on close, and `tests/usage_log/test_usage_log_time_spent.py` holds the time-spent minutes exact through the real client and server.
 
 Issue: https://github.com/ferraroroberto/project-scaffolding/issues/561
+
+### LLM access goes through the local-llm-hub
+
+Downstream apps reach Claude, Gemini and open-weight models through the hub's Anthropic-shape and OpenAI-shape endpoints on `127.0.0.1:8000`, and audio through its transcription and translation endpoints, using standard SDKs. No app wraps `claude -p`, `codex exec` or `gemini -p` itself or hard-codes a whisper port; when the hub lacks a feature, the answer is a plan for the hub to add it.
+
+Why: the hub owns subprocess management, prompt assembly, multi-turn flattening, host routing and observability, and a whisper port is a host-local detail that may not listen on this machine.
+
+Issue: https://github.com/ferraroroberto/project-scaffolding/issues/567
+
+### Every repo declares its map card in `.fleet.toml`
+
+Every fleet repo carries a root `.fleet.toml` with its architecture-map card (`layer`, `icon`, `description`, and optional `display_name`, `port`, `chips`, `tag`), and updates it in the same PR as any material change to its port, layer, role, description or exposed services. The system map aggregates these files; the central file is only a fallback.
+
+Why: a central hand-kept list goes stale and fights the rule that conventions flow up, while a card beside the code is updated by the people changing it and a new repo appears on the map with no central edit.
+
+Issue: https://github.com/ferraroroberto/project-scaffolding/issues/568
+
+### Plans live as GitHub issues, never as files
+
+Plans, roadmaps and proposed features are GitHub issues, one per topic and self-contained enough to hand off cold; `docs/` holds durable present-tense reference only, with topic filenames and no plans, TODOs or dated retrospectives. The issue, the closing PR and `git log` are the changelog.
+
+Why: files in the tree go stale and pile up, while an issue can be assigned, tracked, superseded and closed.
+
+Issue: https://github.com/ferraroroberto/project-scaffolding/issues/569
+
+### Model tiers come from one doc
+
+Lane and sub-agent models are chosen by tier (`easy`, `hard`, `extreme`) and resolved to a model and effort per host from fleet-config's `docs/model-tiers.md`, the single source; skills reference it rather than restating a table. A tier's human-review requirement holds whichever model handles it.
+
+Why: hard-coded model names do not survive a new model or host, while one table changes in one place.
+
+Issue: https://github.com/ferraroroberto/project-scaffolding/issues/570
