@@ -421,7 +421,7 @@ _NAV_TARGETS = (
 _COMPONENTS_TARGETS = (
     "tests/e2e/test_vendored_components.py tests/e2e/test_vendored_day.py "
     "tests/e2e/test_vendored_font_inherit.py tests/e2e/test_vendored_home_head.py "
-    "tests/e2e/test_vendored_nav.py tests/e2e/test_vendored_page_foot.py "
+    "tests/e2e/test_vendored_mic_notice.py tests/e2e/test_vendored_nav.py tests/e2e/test_vendored_page_foot.py "
     "tests/e2e/test_vendored_rec_wave.py tests/e2e/test_vendored_row_menu.py tests/e2e/test_vendored_row_menu_placement.py")
 
 
