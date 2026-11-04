@@ -14,7 +14,17 @@ An architecture decision record (ADR) here is one GitHub issue in this repo labe
 
 ### Ratchets are the default way to enforce a convention
 
-A convention that can be checked mechanically is enforced by a baseline-and-ratchet script in the scaffold family, run as its own stage of each app's gate, rather than by a prose rule, a review step or a one-off lint. Every ratchet is built the same way (one stdlib script, a `.fleet.toml` table, a committed baseline, exit 3 for not confirmed); a rule that cannot be checked mechanically stays prose and says why.
+A convention that can be checked mechanically is enforced by a baseline-and-ratchet script in the scaffold family, run as its own stage of each app's gate, rather than by a prose rule, a review step or a one-off lint. Every ratchet is built the same way; only its perimeter and scope differ:
+
+- one stdlib script, `scripts/<name>_ratchet.py`, vendored byte-for-byte into adopters and declared in `[vendored]`;
+- a `[<name>_ratchet]` table in `.fleet.toml` (`enabled`, `baseline`, scope options);
+- a committed `.<name>-ratchet-baseline.json`: `--update-baseline` only shrinks it, `--allow-additions` adds and shows in review;
+- exit 0 pass, 1 a measure rose, 2 bad config, 3 not confirmed (fails the gate, never a skip);
+- its own stage in `verify-before-ship`, never path-routed;
+- a `docs/<name>-ratchet.md` explaining the rule and how to fix a hit;
+- a legitimate single exception carries `<rule>-exempt: <reason>`.
+
+A new convention arrives as a ratchet PR here, then `/propagate-vendored`; adopters go in green on an `--init` baseline and burn it down. A one-off lint, hook or checklist item needs a stated reason it cannot be a ratchet. A rule that cannot be checked mechanically stays prose and says why.
 
 Why: prose rules and review steps drift, while a ratchet is deterministic, baselines existing debt instead of blocking on it, and fails the ship the moment a measure rises.
 
