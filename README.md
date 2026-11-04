@@ -31,6 +31,7 @@ Clone this directory, rename it, and start building.
 - `src/pooled_http.py` — vendor-verbatim pooled outbound HTTP client (manifest key `pooled_http`): keep-alive session + single-retry dispatch. See `CLAUDE.md` ("Outbound-connection discipline").
 - `src/usage_log.py` + `scripts/usage_summary.py` — vendor-verbatim server half of the local-only usage log (manifest key `usage_log`). See `CLAUDE.md` ("Usage log").
 - `src/usage_log_starlette.py` — vendor-verbatim Starlette route for the usage log, with `GET` limited to the owner (manifest key `usage_log_starlette`). See the usage-log [README](app/webapp/static/_vendored/usage-log/README.md) ("Starlette apps").
+- `app/webapp/serve.py` — vendor-verbatim HTTP/2 launch module (manifest key `webapp_serve`): `python -m app.webapp.serve` serves the app with hypercorn (`h2` + `http/1.1` by ALPN over the TLS cert) and keeps `--server uvicorn` as the HTTP/1.1 fallback. See [`docs/webapp-pwa-conventions.md`](docs/webapp-pwa-conventions.md) ("Webapp PWA HTTP/2 launch").
 - `src/compression.py` — vendor-verbatim stream-safe gzip middleware (manifest key `compression`). See [`docs/webapp-pwa-conventions.md`](docs/webapp-pwa-conventions.md).
 - `src/login_lockout.py` — vendor-verbatim per-client login lock-out: `429` + `Retry-After` after repeated wrong passwords, one owner alert per guessing streak (manifest key `login_lockout`). See the sign-in sheet's [README](app/webapp/static/_vendored/sign-in/README.md) ("Server side").
 - `src/no_window.py` — vendor-verbatim `CREATE_NO_WINDOW` subprocess-flag definition (manifest key `no_window`); a file copied byte-identical into adopters (e.g. `_browser_sweep.py`, `classify_e2e.py`) keeps its own local flag instead, since importing this module would not resolve there. See `CLAUDE.md` ("Windows console-subprocess suppression").
@@ -113,6 +114,7 @@ app/
   tray/single_instance.py   vendor-verbatim named-mutex primitive for tray apps
   tray/watchdog.py          vendor-verbatim tray self-heal primitives (spawn retry/backoff, health watchdog, breadcrumb log)
   site/static/_vendored/    vendor-verbatim web-page (static site) components (site-tokens/, site-base/, site-header/, site-section/, site-image/, site-video/, site-button/, site-card/, site-testimonial/, site-carousel/, site-product/, site-pen/, site-footer/, site-consent/)
+  webapp/serve.py           vendor-verbatim HTTP/2 launch module (hypercorn + uvicorn fallback, selector loop pinned)
   webapp/static/_vendored/  vendor-verbatim web-app UI components (base/, nav/, icons/, card/, disclosure/, modal/, empty-state/, switch/, icon-tile/, button/, range-tab/, page-foot/, home-head/, select-native/, action-row/, text-size/, toast/, rec-wave/, mic-notice/, row-menu/, icon-button/, day-row/, day-marks/, segmented/, usage-log/ + demo.html gallery)
 src/
   config.py                 paths + env-driven settings

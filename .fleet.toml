@@ -81,6 +81,12 @@ tier       = "static"
 prefix     = "app/webapp/static/_vendored/"
 extensions = ["html"]
 
+# The HTTP/2 launch module is a server process with no browser surface of its own:
+# tests/test_serve.py boots it as a real process. Must precede the app/webapp/ rule.
+[[e2e.rule]]
+tier = "none"
+path = "app/webapp/serve.py"
+
 # Real browser surface -> full dual coverage.
 [[e2e.rule]]
 tier   = "full"
@@ -602,6 +608,9 @@ site-product     = { src = "app/site/static/_vendored/site-product" }
 site-pen         = { src = "app/site/static/_vendored/site-pen" }
 site-footer      = { src = "app/site/static/_vendored/site-footer" }
 site-consent     = { src = "app/site/static/_vendored/site-consent" }
+
+# The one launch line of a web app: hypercorn over HTTP/2 with the uvicorn fallback, selector loop pinned.
+webapp_serve    = { src = "app/webapp/serve.py" }
 
 # Windows tray primitives -- docs/windows-tray.md (gotchas #4, #5).
 single_instance = { src = "app/tray/single_instance.py" }

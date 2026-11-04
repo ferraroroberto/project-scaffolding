@@ -479,6 +479,11 @@ def test_real_surfaces_route_representative_paths() -> None:
     assert route("src/usage_log.py", "tests/usage_log/test_usage_log.py") == (
         "surface", "tests/e2e/test_vendored_usage_log.py")
 
+    # The HTTP/2 launch module is a server process proven by its own unit file, so a
+    # rule ahead of the app/webapp/ prefix keeps it out of the browser suite.
+    assert route("app/webapp/serve.py", "tests/test_serve.py", "tests/_fixtures/serve_app.py")[0] == "skip"
+    assert route("app/webapp/server.py")[0] == "full"
+
     # The screenshot baseline: the comparison (a full rule ahead of scripts/ ->
     # none), its proof and a re-baselined PNG all run only that proof.
     assert route("scripts/shot_baseline.py") == ("surface", "tests/e2e/test_shot_capture.py")

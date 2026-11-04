@@ -38,21 +38,29 @@ Set this app's identity before anything else: update `.fleet.toml` (its architec
 **Launch (foreground / dev).** Before the tray exists, run the webapp directly to confirm it boots. The webapp serves HTTPS once `webapp/certificates/cert.pem` exists (section 2 below), otherwise plain HTTP:
 
 ```powershell
-& .\.venv\Scripts\python.exe -m uvicorn app.webapp.server:app --host 0.0.0.0 --port <PORT> `
+& .\.venv\Scripts\python.exe -m app.webapp.serve --host 0.0.0.0 --port <PORT> `
     --ssl-keyfile webapp/certificates/key.pem --ssl-certfile webapp/certificates/cert.pem
 ```
 
 The signal that the new code is actually live is a product-specific render (e.g. the card grid populating), **not** a `/healthz` 200 — a stale process answers health checks fine. Pick that signal per app and write it into the app's own `CLAUDE.md` `## This repository`.
 
-**Pin the selector event loop — every uvicorn spawn, from the first boot.** On Windows, asyncio's default **proactor** event loop closes its listening socket the moment `accept()` raises any `OSError` (CPython's `proactor_events.py:_start_serving` accept loop) — a client aborting a connection mid-handshake (a browser dropping the socket, a phone roaming off Wi-Fi) surfaces as exactly such an error (`WinError 64`), and one aborted client wedges the listener: the process stays alive but every subsequent connection fails until a manual restart. The **selector** event loop has no such failure mode. The bug wedged `app-launcher`'s phone-facing webapp; verified empirically there that a bare `SelectorEventLoop` server survived 800 concurrent aborted connections while a `ProactorEventLoop` server died after ~20.
+**One launch module, from the first boot — HTTP/2 over the TLS cert.** Copy this scaffold's `app/webapp/serve.py` byte-for-byte (manifest key `webapp_serve`) and make it the only way the app is started: the tray's `manager.py` command, `webapp.bat`, a CLI command and the e2e autoboot all run `python -m app.webapp.serve`, never `-m uvicorn` and never `uvicorn.run()`. Over HTTP/1.1 a browser opens at most six connections to a host, so a phone's cold boot of ~130 static modules queues behind them; hypercorn negotiates `h2` by ALPN over the same certificate and multiplexes them on one connection, which took the perf-review phone cold load from about 2.3 s to about 1.0 s with the same build.
 
-Copy `app-launcher`'s `app/webapp/event_loop.py` (`selector_loop_factory`) verbatim into a new app's `app/webapp/` and wire it into **every** uvicorn spawn point via `--loop`/`loop=`:
+- **Flags** keep uvicorn's names: `--host`, `--port`, `--ssl-certfile`, `--ssl-keyfile`, `--log-level`. The per-app parts are flags, never an edit to the file: `--app module:attr` (default `app.webapp.server:app`) and `--loop module:factory` (an event-loop factory; default below).
+- **Requirement.** `hypercorn>=0.18` joins the app's `requirements.txt`; `uvicorn` stays, for the proxy-header middleware and the fallback. Run `pip install -r requirements.txt` in the app's `.venv` before its tray restart, or the tray cannot spawn the webapp.
+- **Fallback.** `--server uvicorn` serves the same app on the same loop, TLS and ping interval over HTTP/1.1 only, and imports nothing from hypercorn. Have the tray pick it from a `webapp.server` key in the app's config so it can be flipped without a code change. A launch where hypercorn is missing fails with a message naming this flag, never silently on the other server.
+- **Plain HTTP.** Browsers only speak HTTP/2 over TLS, so an app served without a certificate gets nothing from this and runs HTTP/1.1 under either server.
+- **What it keeps working.** Server-sent events, websockets (pings every 20 s), gzip, and any bearer or auth middleware are unchanged behind it; `tests/test_serve.py` drives each against the real process. A Cloudflare tunnel dials the origin over HTTP/1.1, which stays offered, so the gain is on the direct tailnet path.
+- **Client address.** The app is served behind uvicorn's `ProxyHeadersMiddleware`, trusting `X-Forwarded-For` from loopback only (cloudflared dials from this PC), so a tailnet caller cannot pose as the PC.
+
+Full convention and proof: [`webapp-pwa-conventions.md`](webapp-pwa-conventions.md) → "Webapp PWA HTTP/2 launch".
+
+**The selector event loop is pinned inside it.** On Windows, asyncio's default **proactor** event loop closes its listening socket the moment `accept()` raises any `OSError` (CPython's `proactor_events.py:_start_serving` accept loop) — a client aborting a connection mid-handshake (a browser dropping the socket, a phone roaming off Wi-Fi) surfaces as exactly such an error (`WinError 64`), and one aborted client wedges the listener: the process stays alive but every subsequent connection fails until a manual restart. The **selector** event loop has no such failure mode. The bug wedged `app-launcher`'s phone-facing webapp; verified empirically there that a bare `SelectorEventLoop` server survived 800 concurrent aborted connections while a `ProactorEventLoop` server died after ~20.
+
+`serve.py` runs under `asyncio.Runner(loop_factory=...)` and defaults to the selector loop, so a new app gets the pin by launching through it. An app that tunes the loop itself (`app-launcher` lowers the GIL switch interval) passes its own factory, which must return an *instantiated* loop, not a loop class:
 
 ```python
-# app/webapp/event_loop.py — must return an instantiated loop, not a loop class:
-# uvicorn imports a custom --loop/loop= dotted-path target and calls it directly
-# as the final zero-arg factory (no use_subprocess= indirection like its
-# built-in names get).
+# app/webapp/event_loop.py
 def selector_loop_factory() -> asyncio.AbstractEventLoop:
     if sys.platform == "win32":
         return asyncio.SelectorEventLoop()
@@ -60,13 +68,8 @@ def selector_loop_factory() -> asyncio.AbstractEventLoop:
 ```
 
 ```powershell
-# CLI invocation (webapp.bat, WebappManager._build_command, e2e autoboot spawn):
+# the launch line, in webapp.bat, WebappManager._build_command and the e2e autoboot spawn:
 --loop app.webapp.event_loop:selector_loop_factory
-```
-
-```python
-# programmatic uvicorn.run() (e.g. app/cli/commands/webapp_cmd.py):
-uvicorn.run(..., loop="app.webapp.event_loop:selector_loop_factory")
 ```
 
 Do this at scaffold time, not after the first phone-roaming wedge — see the `CLAUDE.md` rule under the webapp/PWA conventions.
@@ -110,12 +113,12 @@ An installed PWA needs HTTPS (Service Workers + Web Push are HTTPS-only), and a 
 & .\.venv\Scripts\python.exe scripts\gen_tailscale_cert.py
 ```
 
-The generator auto-detects this machine's MagicDNS name from `tailscale status --json`, runs `tailscale cert`, and writes `cert.pem` / `key.pem` into `webapp/certificates/` — the same dir the launcher passes to uvicorn (section 1). Pass an explicit hostname (`gen_tailscale_cert.py <host>.ts.net`) to override the auto-detect.
+The generator auto-detects this machine's MagicDNS name from `tailscale status --json`, runs `tailscale cert`, and writes `cert.pem` / `key.pem` into `webapp/certificates/` — the same dir the launcher passes to `app.webapp.serve` (section 1). Pass an explicit hostname (`gen_tailscale_cert.py <host>.ts.net`) to override the auto-detect.
 
-> **Auto-renew on startup is mandatory, not optional.** The Let's Encrypt leaf is **~90 days** — far shorter than a self-signed root's 10 years — so a manual re-issue *will* eventually be forgotten and the app *will* one day serve an expired cert. The generator ships a `--check` mode that renews the cert **only** if it is a `.ts.net` leaf expiring within ~30 days; it **no-ops a self-signed cert** and never blocks startup on an error. Wire `--check` into the app's own webapp launcher so a stale cert self-heals on the next boot, **before uvicorn binds**:
+> **Auto-renew on startup is mandatory, not optional.** The Let's Encrypt leaf is **~90 days** — far shorter than a self-signed root's 10 years — so a manual re-issue *will* eventually be forgotten and the app *will* one day serve an expired cert. The generator ships a `--check` mode that renews the cert **only** if it is a `.ts.net` leaf expiring within ~30 days; it **no-ops a self-signed cert** and never blocks startup on an error. Wire `--check` into the app's own webapp launcher so a stale cert self-heals on the next boot, **before the server binds**:
 >
 > ```bat
-> REM In the app's own webapp launcher (e.g. webapp.bat), before the uvicorn line:
+> REM In the app's own webapp launcher (e.g. webapp.bat), before the serve line:
 > "%VENV_PY%" "%SCRIPT_DIR%scripts\gen_tailscale_cert.py" --check
 > ```
 >
