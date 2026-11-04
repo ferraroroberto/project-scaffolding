@@ -291,7 +291,7 @@ New code follows the tree from the day this page lands. Existing code moves only
 
 The scaffold is a `streamlit` repo and conforms to that section. It also publishes the web-app and tray components every `webapp-tray` repo vendors, so it carries these declared exceptions. This section stands in for its `docs/layout.md`.
 
-- `app/tray/` and `app/webapp/static/_vendored/`: component sources for `webapp-tray` adopters, with no tray or server of their own.
+- `app/tray/`, `app/webapp/serve.py` and `app/webapp/static/_vendored/`: component sources for `webapp-tray` adopters, with no tray or server of their own.
 - `app/log_panel.py`: the live log panel the views render, kept beside `app.py`.
 - `tray.bat.template` and `launch_server.{bat,sh}`: copy-to-adapt launchers.
 - `src/` is flat (under 40 modules) with two domain packages, `src/notify/` and `src/doc_capture/`.
