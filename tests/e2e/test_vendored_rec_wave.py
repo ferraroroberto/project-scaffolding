@@ -136,6 +136,9 @@ def test_reduced_motion_meter_has_no_transition(gallery: Page) -> None:
 
 
 def test_starts_on_a_stream_and_stop_releases_the_context(gallery: Page) -> None:
+    # The gallery's own legs (rec-wave and mic-notice) are mounted by demo-capture.js.
+    gallery.wait_for_selector("#demoMicNoLabel .rec-wave")
+    own_legs = gallery.locator(".rec-wave").count()
     _fake(gallery).evaluate(_ATTACH, {"reducedMotion": False})
     fake = gallery.evaluate("() => ({ ...window.__fake })")
     assert (fake["created"], fake["connected"], fake["resumed"]) == (1, 1, 1)
@@ -148,7 +151,7 @@ def test_starts_on_a_stream_and_stop_releases_the_context(gallery: Page) -> None
     assert gallery.evaluate("() => window.__fake.closed") == 1  # closed once, not twice
     assert _state(gallery) is None
     assert _glyph_display(gallery) != "none"
-    assert gallery.locator(".rec-wave").count() == 4  # only the gallery's own legs remain
+    assert gallery.locator(".rec-wave").count() == own_legs  # only the gallery's own legs remain
 
 
 def test_quiet_input_goes_silent_then_signal_clears_it(gallery: Page) -> None:
