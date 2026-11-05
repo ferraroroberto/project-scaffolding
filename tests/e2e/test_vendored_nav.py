@@ -632,3 +632,24 @@ def test_badge_geometry_does_not_scale_with_text_size(nav: Page) -> None:
     nav.evaluate("() => { document.documentElement.style.fontSize = '22px'; }")
     assert _style(nav, ".tab-badge", "fontSize") == "12px"
     assert _style(nav, ".tab-badge", "height") == "16px"
+
+
+def test_pill_inactive_label_clears_aa_on_the_composited_bar_in_both_themes(
+    nav_mobile: Page,
+) -> None:
+    """Inactive pill labels clear 4.5:1 on the bar glass composited over the canvas (WCAG 1.4.3).
+
+    The bar fill (`--tabbar-bg`) is translucent, so the label is judged against
+    the fill composited over the page canvas, the surface a `/design-review`
+    reads. Dark `--tabbar-bg` over `#0d1117` composites to `#1d2127`, where the
+    secondary text colour (`#7d8590`) is only 4.34:1.
+    """
+    for theme in ("light", "dark"):
+        _set_theme(nav_mobile, theme)
+        # `.tab` transitions colour (0.2s); read the label only once it settles.
+        nav_mobile.wait_for_function("() => document.getAnimations().length === 0")
+        canvas = _style(nav_mobile, "body", "backgroundColor")
+        label = _style(nav_mobile, ".tab:not(.active) .tab-label", "color")
+        bar = _style(nav_mobile, ".tabs", "backgroundColor")
+        ratio = _contrast(label, bar, canvas)
+        assert ratio >= 4.5, f"{theme}: inactive pill label {ratio:.2f}:1 on the glass"
