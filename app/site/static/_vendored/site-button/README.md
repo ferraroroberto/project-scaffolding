@@ -1,6 +1,6 @@
 # `site-button` — the button
 
-One control height (`--control`), one radius, ink fill with paper text; `.btn.secondary` is paper with an ink border; a disabled button is dashed and muted. Buttons sit in a `p.btns`. [`site-card`](../site-card/) restyles a card's button as its title with an arrow; [`site-product`](../site-product/) puts Buy directly under the price.
+One control height (`--control`), one radius, ink fill with paper text; `.btn.secondary` is paper with an ink border; a disabled button is dashed and muted. Buttons sit in a `p.btns`, which wraps and keeps `--gap` between its buttons, so stacked buttons never touch on a phone. The hover fill is `--ink-hover`. [`site-card`](../site-card/) restyles a card's button as its title with an arrow; [`site-product`](../site-product/) puts Buy directly under the price.
 
 ## Markup
 

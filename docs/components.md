@@ -35,6 +35,7 @@ A fleet **web page** is a public, static, content-first site served as a folder 
 | `site-pen` | `app/site/static/_vendored/site-pen/` | The drawn marker, underline and strike. |
 | `site-footer` | `app/site/static/_vendored/site-footer/` | The dark footer band. |
 | `site-consent` | `app/site/static/_vendored/site-consent/` | The non-modal consent bar: equal Accept and Reject, one cookie, a `consent:change` event (CSS + JS). |
+| `site-theme` | `app/site/static/_vendored/site-theme/` | The light/dark switch: system default, saved choice before the first paint, static Lucide icons (CSS + JS + a blocking boot line). |
 | `site_images` | `scripts/site_images.py` | Build-time WebP variants per role, a 1200 px social JPEG, cut-out and drawing detection, the grey-paper swap. Needs Pillow. |
 | `site_routes` | `scripts/site_routes.py` | The static host's URL rules (`/about` from `about.html`, exact-match `_redirects`). |
 | `site_serve` | `scripts/site_serve.py` | Preview server with those rules; `--host` for a phone over the tailnet. Needs `site_routes`. |

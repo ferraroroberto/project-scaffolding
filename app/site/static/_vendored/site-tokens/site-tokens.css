@@ -14,6 +14,10 @@
   --line-strong: #8c8c8c;   /* 3.4:1 form-field borders (non-text needs 3:1) */
   --accent: #ffcc00;        /* the pen only: never text, border, button or fill */
   --footer-band: #595959;   /* the footer band, the --ink-2 grey; white on it 7.0:1, the labels 6.0:1 */
+  --ink-hover: #333;        /* the primary button's hover fill; --paper text on it 12.6:1 */
+  --band-ink: #fff;         /* text on the footer band: white in both themes, never the page colour */
+  --band-label: #ededed;    /* uppercase labels on the band */
+  --band-rule: rgba(255, 255, 255, 0.5);  /* link underlines on the band, decorative */
 
   /* Type: Poppins 400, 400 italic and 500 */
   --font: "Poppins", system-ui, -apple-system, "Segoe UI", sans-serif;

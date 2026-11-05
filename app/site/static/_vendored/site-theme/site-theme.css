@@ -1,0 +1,22 @@
+/* site-theme: the light/dark switch, the colour scheme it drives and the header's right end.
+ *
+ * VENDORED VERBATIM from project-scaffolding (app/site/static/_vendored/). Do NOT edit
+ * this file per-site: a site's brand is token values in its own stylesheet, loaded
+ * after this one. Contract: README.md beside this file.
+ */
+
+/* The system setting decides until the visitor chooses; data-theme on <html> is that choice.
+   A site's dark values are light-dark() tokens, which follow color-scheme. */
+:root { color-scheme: light dark; --theme-moon: inline; --theme-sun: none; }
+:root[data-theme="light"] { color-scheme: light; }
+:root[data-theme="dark"] { color-scheme: dark; --theme-moon: none; --theme-sun: inline; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { --theme-moon: none; --theme-sun: inline; }
+}
+
+/* The navigation, the switch and the phone menu button share the header's right end. */
+.site-header-end { display: flex; align-items: center; gap: var(--s2); }
+.theme-toggle { display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; border: 0; border-radius: var(--radius); background: none; color: inherit; cursor: pointer; }
+.theme-toggle:hover { background: var(--line); }
+.theme-toggle .moon { display: var(--theme-moon); }
+.theme-toggle .sun { display: var(--theme-sun); }

@@ -1,6 +1,6 @@
 # `site-footer` — the footer
 
-The dark band that ends every page: white text at 7:1 or better on `--footer-band`, label heads at 4.5:1 or better, and 44 px link rows. On a phone the first column spans the width and the two link columns sit side by side, their links starting level; from 768 px the row is `2fr 1fr 1fr`.
+The dark band that ends every page, coloured by `--footer-band`, `--band-ink`, `--band-label` and `--band-rule` (white and light grey in both themes, never the page colour): white text at 7:1 or better on `--footer-band`, label heads at 4.5:1 or better, and 44 px link rows. On a phone the first column spans the width and the two link columns sit side by side, their links starting level; from 768 px the row is `2fr 1fr 1fr`.
 
 ## Markup
 
