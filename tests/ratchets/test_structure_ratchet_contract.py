@@ -80,6 +80,26 @@ def test_any_other_root_file_is_loose(shape: str, name: str) -> None:
     assert layout.loose_root_files([name, "src/x.py"], shape) == [name]
 
 
+@pytest.mark.parametrize(
+    ("shape", "name"),
+    [
+        ("webapp-tray", "config.example.json"), ("webapp-tray", "sessions.example.yaml"),
+        ("webapp-tray", "mailboxes.sample.json"), ("streamlit", "config.json.example"),
+        ("streamlit", "vendors.json.example"), ("streamlit", "config.example.json"),
+    ],
+)
+def test_a_config_template_beside_its_ignored_file_is_allowed_where_its_shape_keeps_one(shape: str, name: str) -> None:
+    assert layout.loose_root_files([name, "src/x.py"], shape) == []
+
+
+@pytest.mark.parametrize(
+    ("shape", "name"),
+    [("pipeline-cli", "config.example.json"), ("webapp-tray", "vendors.json.example"), ("streamlit", "notes.sample.md")],
+)
+def test_a_config_template_is_loose_in_a_shape_whose_preset_does_not_take_it(shape: str, name: str) -> None:
+    assert layout.loose_root_files([name, "src/x.py"], shape) == [name]
+
+
 def test_redundant_entries_are_the_ones_the_preset_already_allows() -> None:
     names = layout.redundant_names("webapp-tray", ("webapp", "docs", "spike"), ("tray.bat", "README.md", "odd.py"))
     assert names == ["README.md", "docs/", "tray.bat", "webapp/"]

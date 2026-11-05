@@ -34,6 +34,8 @@ Every exception is a to-do, not a permission. **An `extra_roots` or `extra_root_
 
 *Enforced, shrink-only.* A file directly at the root is one the common set or the shape's contract table lists, as a name or a glob. Anything else (a loose script, a second README, a one-off launcher) goes into a folder the shape lists: `scripts/` for a tool, `docs/` for a document, `config/` for a sample. A root file a repo must keep (a framework reads it there, a scheduled job calls it by path) is declared in `extra_root_files` in `.fleet.toml` with its reason in a comment beside it, and is recorded in the baseline like an extra root.
 
+A config template (`*.example.*`, `*.sample.*`, `*.json.example`) is the committed copy of a gitignored machine-local file the app reads from the root, so it sits beside that file; the `webapp-tray` and `streamlit` presets list the forms their repos use.
+
 | Common root files (every shape) |
 |---|
 | `README.md`, `CLAUDE.md`, `AGENTS.md`, `LICENSE`, `.fleet.toml`, `.gitignore`, `.gitattributes`, `.ignore`, `.env.example`, `.*-baseline.json`, `requirements*.txt`, `pyproject.toml`, `pytest.ini`, `package*.json` |
@@ -75,7 +77,7 @@ A FastAPI + static PWA app owned by a Windows tray.
 | Contract | |
 |---|---|
 | Root folders | required `app`, `src`, `tests`, `docs`; also `scripts`, `data`, `brand`, `assets`, `config`, `webapp` |
-| Root files | the common set, plus `tray.bat`, `webapp.bat`, `launcher.py`, `setup.bat`, `webapp_tunnel_named.bat`, `start.bat`, `launch_app.bat`, `config.example.json` |
+| Root files | the common set, plus `tray.bat`, `webapp.bat`, `launcher.py`, `setup.bat`, `webapp_tunnel_named.bat`, `start.bat`, `launch_app.bat`, `*.example.*`, `*.sample.*` |
 | Folder types | the common set, plus `app/` `code`, `app/webapp/` `web` |
 | Homes | `app/*.py`, `app/cli/`, `app/tray/`, `app/webapp/*.py`, `app/webapp/routers/`, `app/webapp/static/`, `src/`, and a surface package `app/webapp/<package>/` |
 
@@ -140,7 +142,7 @@ A Streamlit app with Python pipelines.
 | Contract | |
 |---|---|
 | Root folders | required `app`, `src`, `tests`; also `scripts`, `data`, `brand`, `config` |
-| Root files | the common set, plus `launch_app.bat`, `launch_app.sh`, `launch_server.bat`, `launch_server.sh`, `config.json.example`, `tray.bat.template` |
+| Root files | the common set, plus `launch_app.bat`, `launch_app.sh`, `launch_server.bat`, `launch_server.sh`, `*.example.*`, `*.json.example`, `tray.bat.template` |
 | Folder types | the common set, plus `app/` `code`, `app/styles/` `css` |
 | Homes | `app/*.py`, `app/views/`, `app/styles/`, `app/.streamlit/` |
 
