@@ -530,3 +530,147 @@ def test_an_ignored_file_is_still_skipped(repo: Path) -> None:
     write(repo, ".gitignore", "docs/ignored.md\n")
     write(repo, "docs/ignored.md", 'Then run `scripts/missing.py`.\n', track=False)
     assert run_mode(repo) == dr.EXIT_PASS
+
+
+# ------------------------------------------------------------ retired names
+
+RETIRED_TOML = (
+    '[doc_refs_ratchet]\nenabled = true\n'
+    'retired = [{ term = "--old-flag", why = "flag removed; use --new-flag" }, { term = "/old-skill", why = "use /new-skill" }]\n'
+)
+OLD_FLAG = dr.Retired("--old-flag", "flag removed; use --new-flag")
+
+
+def retired_keys(text: str, *terms: dr.Retired, refs: bool = True) -> list[str]:
+    return [r.key for r in dr.scan_text(text, "README.md", TOP, retired=terms, check_refs=refs)]
+
+
+def test_a_retired_entry_is_parsed_into_term_and_why() -> None:
+    cfg = dr.parse_config(RETIRED_TOML)
+    assert cfg is not None
+    assert cfg.retired == (OLD_FLAG, dr.Retired("/old-skill", "use /new-skill"))
+
+
+@pytest.mark.parametrize(
+    "retired",
+    [
+        pytest.param('[{ term = "--x", why = "y", extra = 1 }]', id="unknown-key"),
+        pytest.param('[{ term = "", why = "y" }]', id="empty-term"),
+        pytest.param('[{ term = "  ", why = "y" }]', id="blank-term"),
+        pytest.param('[{ why = "y" }]', id="missing-term"),
+        pytest.param('[{ term = "--x" }]', id="missing-why"),
+        pytest.param('[{ term = "--x", why = "" }]', id="empty-why"),
+        pytest.param('[{ term = "--x", why = "y" }, { term = "--x", why = "z" }]', id="duplicate-term"),
+        pytest.param('["--x"]', id="not-a-table"),
+        pytest.param('"--x"', id="not-a-list"),
+    ],
+)
+def test_a_malformed_retired_entry_fails_loud_and_exits_two(retired: str, tmp_path: Path) -> None:
+    body = f"[doc_refs_ratchet]\nenabled = true\nretired = {retired}\n"
+    with pytest.raises(dr.ConfigError):
+        dr.parse_config(body)
+    (tmp_path / ".fleet.toml").write_text(body, encoding="utf-8")
+    assert run_mode(tmp_path) == dr.EXIT_CONFIG
+
+
+def test_a_retired_term_is_a_hit_in_prose_a_code_span_and_a_fence() -> None:
+    text = "Pass --old-flag now.\nOr `--old-flag`.\n```sh\ntool --old-flag\n```\n"
+    assert retired_keys(text, OLD_FLAG) == ["retired:--old-flag"] * 3
+
+
+def test_a_longer_word_or_kebab_name_containing_the_term_is_not_a_hit() -> None:
+    text = "`--old-flag-extra`, `--old-flags`, `x--old-flag`, `--old-flag_v2`.\n"
+    assert retired_keys(text, OLD_FLAG) == []
+    assert retired_keys("Use `--old-flag`, then (--old-flag) or --old-flag.\n", OLD_FLAG) == ["retired:--old-flag"] * 3
+
+
+def test_a_skill_name_is_not_matched_inside_a_path_or_a_longer_skill() -> None:
+    skill = dr.Retired("/old-skill", "use /new-skill")
+    assert retired_keys("run /old-skill now; docs/old-skill.md; /old-skill-v2; src/old-skill\n", skill) == ["retired:/old-skill"]
+
+
+def test_a_retired_term_inside_an_html_comment_is_hidden() -> None:
+    assert retired_keys("<!-- --old-flag -->\nkept\n", OLD_FLAG) == []
+
+
+def test_no_retired_terms_means_no_retired_hits() -> None:
+    assert retired_keys("--old-flag\n") == []
+
+
+def test_skill_files_are_read_for_retired_terms_and_nothing_else() -> None:
+    text = "`scripts/missing.py` and --old-flag\n"
+    assert retired_keys(text, OLD_FLAG, refs=False) == ["retired:--old-flag"]
+    assert retired_keys(text, OLD_FLAG, refs=True) == ["retired:--old-flag", "scripts/missing.py"]
+
+
+def retired_repo(tmp_path: Path, toml: str = RETIRED_TOML) -> Path:
+    git(tmp_path, "init", "-q")
+    (tmp_path / ".fleet.toml").write_text(toml, encoding="utf-8")
+    write(tmp_path, "README.md", "Clean.\n")
+    return tmp_path
+
+
+def test_a_seeded_retired_term_fails_and_names_the_term_and_its_why(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    root = retired_repo(tmp_path)
+    assert run_mode(root, init=True) == dr.EXIT_PASS
+    write(root, "docs/a.md", "Line one.\nRun it with --old-flag.\n")
+    assert run_mode(root) == dr.EXIT_RISE
+    out = capsys.readouterr().out
+    assert "docs/a.md:2: retired name `--old-flag`: flag removed; use --new-flag" in out
+
+
+def test_the_compliant_form_passes_and_a_longer_word_does_not_trip_it(tmp_path: Path) -> None:
+    root = retired_repo(tmp_path)
+    write(root, "docs/a.md", "Run it with --new-flag, not --old-flagged or --old-flag-x.\n")
+    assert run_mode(root, init=True) == dr.EXIT_PASS
+    assert baseline_text(root) == '{\n  "version": 1,\n  "entries": []\n}\n'
+    assert run_mode(root) == dr.EXIT_PASS
+
+
+def test_removing_the_term_clears_it_and_update_baseline_only_shrinks(tmp_path: Path) -> None:
+    root = retired_repo(tmp_path)
+    write(root, "docs/a.md", "--old-flag here.\n")
+    assert run_mode(root, init=True) == dr.EXIT_PASS
+    assert '"refs": ["retired:--old-flag"]' in baseline_text(root)
+    assert run_mode(root) == dr.EXIT_PASS  # baselined debt does not block
+    write(root, "docs/a.md", "--old-flag here and --old-flag again.\n")
+    assert run_mode(root) == dr.EXIT_RISE  # a second occurrence is a new hit
+    assert run_mode(root, update=True) == dr.EXIT_RISE
+    write(root, "docs/a.md", "--new-flag here.\n")
+    assert run_mode(root) == dr.EXIT_PASS
+    assert run_mode(root, update=True) == dr.EXIT_PASS
+    assert baseline_text(root) == '{\n  "version": 1,\n  "entries": []\n}\n'
+
+
+def test_allow_refs_can_keep_a_retired_term_out(tmp_path: Path) -> None:
+    root = retired_repo(tmp_path, RETIRED_TOML + 'allow_refs = ["retired:/old-skill"]\n')
+    write(root, "docs/a.md", "Run /old-skill.\n")
+    assert run_mode(root, init=True) == dr.EXIT_PASS
+    assert baseline_text(root) == '{\n  "version": 1,\n  "entries": []\n}\n'
+
+
+def test_skill_files_and_the_markdown_they_link_to_are_scanned_with_retired_set(tmp_path: Path) -> None:
+    root = retired_repo(tmp_path)
+    write(root, ".claude/skills/demo/SKILL.md", "See [notes](notes.md). Uses `scripts/missing.py`.\n")
+    write(root, ".claude/skills/demo/notes.md", "Pass --old-flag.\n")
+    write(root, ".claude/skills/demo/unlinked.md", "Pass --old-flag.\n")
+    assert run_mode(root, init=True) == dr.EXIT_PASS
+    text = baseline_text(root)
+    assert ".claude/skills/demo/notes.md" in text
+    assert "unlinked.md" not in text
+    assert "scripts/missing.py" not in text  # a skill file is read for retired names only
+
+
+def test_skill_files_are_ignored_while_the_list_is_empty(tmp_path: Path) -> None:
+    root = retired_repo(tmp_path, "[doc_refs_ratchet]\nenabled = true\n")
+    write(root, ".claude/skills/demo/SKILL.md", "Pass --old-flag, see `scripts/missing.py`.\n")
+    assert run_mode(root, init=True) == dr.EXIT_PASS
+    assert baseline_text(root) == '{\n  "version": 1,\n  "entries": []\n}\n'
+
+
+def test_an_unclosed_fence_in_a_skill_file_is_not_confirmed(tmp_path: Path) -> None:
+    root = retired_repo(tmp_path)
+    write(root, "skills/demo/SKILL.md", "```sh\nnever closes\n")
+    assert run_mode(root, init=True) == dr.EXIT_NOT_CONFIRMED

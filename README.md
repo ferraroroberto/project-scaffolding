@@ -144,7 +144,7 @@ scripts/
   usage_track_ratchet.py      gate stage: untracked controls and sheets, and built tracking ids, may not rise above a committed baseline
   usage_track_scan.py         usage_track_ratchet's sibling: the HTML and JS readers
   dead_code_ratchet.py        gate stage: unreferenced functions, classes and methods may not rise above a committed baseline
-  doc_refs_ratchet.py         gate stage: doc references to missing paths, modules or ports may not rise above a committed baseline
+  doc_refs_ratchet.py         gate stage: doc references to missing paths, modules or ports, and uses of a declared retired name, may not rise above a committed baseline
   docs_ratchet.py              gate stage: README byte budget + docs history markers may not rise above a committed baseline
   gen_tailscale_cert.py       copy-to-adapt HTTPS cert generator via `tailscale cert`
   gen_verify_skill.py         generates a web app's own verify-<app> skill (Launch/Doctor/Drive/Evidence/Cleanup/Maintain)
