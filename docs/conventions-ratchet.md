@@ -4,7 +4,7 @@
 
 Before it, each convention was guarded by a one-off test in whichever repo last hit the bug: a no-window spawn test here, a constant-time compare test in one app, a raw-git check in another. This stage is the one vendored copy of those guards. A repo that adopts it can delete its local duplicate once the matching rule is enabled and its baseline is committed.
 
-It reuses the shape of the [dead code ratchet](dead-code-ratchet.md): an opt-in `.fleet.toml` table, a committed baseline, the same flags, and exit 3 for "not confirmed". It is stdlib-only and imports nothing it scans.
+It reuses the shape of the [dead code ratchet](dead-code-ratchet.md): an opt-in `.fleet.toml` table, a committed baseline, the same flags, and exit 3 for "not confirmed". It is stdlib-only and imports nothing it scans. It is two files: the ratchet (configuration, scanning, baseline) and `scripts/conventions_readers.py`, the pure readers (syntax-tree predicates and the web and text line rules), which keeps both under the structure limits.
 
 ## The rules
 
@@ -76,13 +76,13 @@ Commit the baseline in the same PR as the `rules` change. From then on a new dri
 
 There is **no global-instruction line** for this rule. It enforces a convention the repo declares by naming its helper: every constant-time comparison goes through one function, which compares bytes rather than `str`, because `hmac.compare_digest` raises `TypeError` on a non-ASCII `str`. Several fleet repos keep a local test for exactly this.
 
-A hit is a call to `hmac.compare_digest` or `secrets.compare_digest`, through any import alias, outside the files listed in `secret_helpers`. The rule refuses to run without `secret_helpers`.
+A hit is a call to `hmac.compare_digest` or `secrets.compare_digest`, through any import alias, outside the files listed in `secret_helpers`. The rule refuses to run without `secret_helpers`. It is a [`must-use`](#must-use) policy with the call set built in.
 
 ### `git-wrapper`
 
 > Every `git` spawn goes through the tier's `run_git`, and any repo reading git state fleet-wide needs that static gate over its own tree.
 
-A hit is a spawn (the same calls as `no-window`) whose program is literally `git` or `git.exe`: the first item of a list or tuple argument, or the first word of a string command, any directory stripped. It is not reported in the files listed in `git_wrappers`, and the rule refuses to run without `git_wrappers`. A program computed at run time is not seen.
+A hit is a spawn (the same calls as `no-window`) whose program is literally `git` or `git.exe`: the first item of a list or tuple argument, or the first word of a string command, any directory stripped. It is not reported in the files listed in `git_wrappers`, and the rule refuses to run without `git_wrappers`. A program computed at run time is not seen. It is a [`must-use`](#must-use) policy with the spawn calls and the program built in.
 
 ### `password-input-vendored`
 
@@ -160,6 +160,63 @@ The rule does not see a command split across lines, a quoted `pwsh` that is not 
 
 **Enabling it in a repo that has hits today.** Add `"no-pwsh-stub"` to `rules` and record today's hits with `--update-baseline --allow-additions` (or `--init` when there is no baseline yet). Fix them in a follow-up: each fixed line shrinks the baseline with `--update-baseline`. Reading these file types makes every tracked `.md`, `.json` and `.yml` file part of the scan, but only while the rule is listed; a repo that does not list it reads the same files as before. A baseline file is never read as a hit.
 
+### `must-use`
+
+There is **no global-instruction line** for this rule. It enforces a convention the repo's own `CLAUDE.md` states by naming one home for a job: a pooled HTTP session, one SQLite connection dependency, one static-file class, one atomic-write helper. The scaffold's own `CLAUDE.md` names several (outbound-connection discipline, the `get_db` dependency, `CachingStaticFiles`).
+
+Re-implementing a canonical helper is the most common duplication finding the audits report, and `jscpd` misses it because the copies are rarely byte-identical. This rule checks the thing that is stable instead: a call to the primitive the helper wraps, made outside the helper. It is data, not code. A repo lists one table per helper in its own `.fleet.toml`, and listing the first entry is what turns the rule on (it need not be named in `rules`):
+
+```toml
+[[conventions_ratchet.must_use]]
+call   = ["requests.get", "requests.post"]    # a dotted name, or a list of them
+helper = ["src/pooled_http.py"]                # the file(s) or folders that may make the call
+why    = "CLAUDE.md: outbound-connection discipline, one pooled session"
+paths  = ["app/", "src/"]                      # optional: only these paths are held to it (default the whole repo)
+```
+
+| Key | Required | Meaning |
+|---|---|---|
+| `call` | yes | One dotted name (`module.function`) or a list of them. Each must contain a dot. |
+| `helper` | yes | Non-empty list of repo-relative files or folders where the call is allowed. |
+| `why` | yes | The convention, in a few words. It is printed with every hit. |
+| `paths` | no | Repo-relative files or folders the entry binds. Omitted, it binds every scanned `.py` file. |
+
+A missing `helper`, `call` or `why`, an unknown key, a `call` that is not dotted, a value of the wrong type, or `must-use` in `rules` with no entry is a configuration error: exit 2, in every mode.
+
+A hit is a call whose name, resolved through the module's imports, equals one of the entry's `call` names, in a file that is neither under a `helper` path nor outside `paths`. The name is resolved the way `secret-compare` resolves its own: `import sqlite3` and `sqlite3.connect(...)`, `import sqlite3 as sq` and `sq.connect(...)`, `from sqlite3 import connect` and `connect(...)`, and a dotted module such as `urllib.request.urlopen` through `import urllib.request`, `from urllib import request` or `from urllib.request import urlopen`. It is not reported:
+
+- in a test module (any file under a `tests/` or `test/` folder, `test_*.py`, `*_test.py`, `conftest.py`);
+- for a relative import (`from .requests import get` is a sibling module, not the library);
+- for a name the scanner cannot resolve to an import: a method on an instance (`conn.connect`, `Path.replace`), a name rebound by assignment, a computed callable.
+
+Every entry in a repo counts under the one rule name `must-use`, so the baseline holds a per-file total, as for every other rule. A call that is a documented exception, such as a CLI script that is meant to open its own connection, carries a reasoned marker:
+
+```python
+# must-use-exempt: one-shot CLI script; no pool to share
+resp = requests.get(url, timeout=10)
+```
+
+`secret-compare` and `git-wrapper` run through the same code path: each is a built-in entry whose call set is fixed and whose helper is read from `secret_helpers` or `git_wrappers`. They keep their rule names, config keys and baseline keys.
+
+**Entries worth declaring.** An entry names the repo's own home for the job, so the scaffold can only recommend the ones whose home it defines. Both below were dry-run over the fleet and checked by hand (see the table at the end); `paths` keeps the first off one-shot scripts:
+
+```toml
+[[conventions_ratchet.must_use]]
+call   = ["requests.get", "requests.post", "requests.put", "requests.patch", "requests.delete", "requests.head", "requests.request"]
+helper = ["src/pooled_http.py"]
+why    = "CLAUDE.md: outbound-connection discipline, one pooled session"
+paths  = ["app/", "src/"]
+
+[[conventions_ratchet.must_use]]
+call   = ["fastapi.staticfiles.StaticFiles", "starlette.staticfiles.StaticFiles"]
+helper = ["src/static_versioning.py"]
+why    = "CLAUDE.md: static assets go through CachingStaticFiles"
+```
+
+`sqlite3.connect` and `os.replace` suit the same shape, but their home is a different file in every repo (`db.py`, `connection.py`, `store.py`, an atomic-write helper), so each repo names its own `helper` and decides its own `paths`; the scaffold ships no ready-made entry for them.
+
+**Enabling an entry in a repo that has hits today.** Add the table, then record today's hits with `--update-baseline --allow-additions` (or `--init` when there is no baseline yet). Fix them in a follow-up: each fixed call shrinks the baseline with `--update-baseline`, and the goal is a baseline with no `must-use` entries left, not a standing ledger. A call that should stay takes the marker above.
+
 ### Exempting one call
 
 A call that must break a rule keeps a reasoned marker on one of its own lines, or in the comment block directly above it:
@@ -186,7 +243,7 @@ Only Python source, web files and (for `no-pwsh-stub`) the text files above are 
 |---|---|---|
 | `0` | Pass (no rule count above the baseline), or the stage is **not enabled** | continues |
 | `1` | A file's count for a rule rose, or the baseline file is missing | fails |
-| `2` | Bad `[conventions_ratchet]` table (unknown key or rule, no rules, a helper rule with no helper), unreadable baseline, bad arguments | fails |
+| `2` | Bad `[conventions_ratchet]` table (unknown key or rule, no rules, a helper rule with no helper, a `must_use` entry with an unknown key or no `call`, `helper` or `why`), unreadable baseline, bad arguments | fails |
 | `3` | **NOT CONFIRMED**: `git` unusable, a tracked `.py` file that does not parse, or a scanned file that cannot be read. The message names the file and line | fails |
 
 Exit 3 is its own state and never folded into a pass: a file the scanner cannot parse may hold a violation, so skipping it would report a clean tree it never saw.
@@ -221,7 +278,7 @@ A failing check prints every hit of the risen rule in the file, as `<path>:<line
 
 Re-vendoring the script never breaks a repo that has not opted in: an absent `[conventions_ratchet]` table, or `enabled = false`, prints `conventions ratchet: not enabled` and exits 0 (declared, not inferred).
 
-1. Vendor `scripts/conventions_ratchet.py` byte-for-byte (`/propagate-vendored conventions_ratchet`; manifest key `conventions_ratchet`) and declare it in the repo's `[vendored]` table. It needs Python 3.11+ (`tomllib`) and `git`; it parses code with the running interpreter's grammar, so run it with the interpreter the project targets.
+1. Vendor `scripts/conventions_ratchet.py` and its sibling `scripts/conventions_readers.py` byte-for-byte (`/propagate-vendored conventions_ratchet,conventions_readers`; manifest keys `conventions_ratchet` and `conventions_readers`) and declare both in the repo's `[vendored]` table. The ratchet loads the sibling by path and exits 3 when it is missing. It needs Python 3.11+ (`tomllib`) and `git`; it parses code with the running interpreter's grammar, so run it with the interpreter the project targets.
 2. Add to the repo's own `.fleet.toml`, enabling only the rules that apply:
 
    ```toml
@@ -233,9 +290,14 @@ Re-vendoring the script never breaks a repo that has not opted in: an absent `[c
    print_paths    = ["app/", "src/"]                        # logging-not-print scope (default)
    secret_helpers = ["src/secret_compare.py"]               # required by secret-compare
    git_wrappers   = ["src/git_run.py"]                      # required by git-wrapper
+
+   [[conventions_ratchet.must_use]]                         # one table per helper; see `must-use`
+   call   = ["requests.get", "requests.post"]
+   helper = ["src/pooled_http.py"]
+   why    = "CLAUDE.md: outbound-connection discipline, one pooled session"
    ```
 
-   A Windows-only or cross-platform app enables `no-window`; a Linux-only service does not. `secret-compare` and `git-wrapper` only make sense once the repo has the helper.
+   A Windows-only or cross-platform app enables `no-window`; a Linux-only service does not. `secret-compare`, `git-wrapper` and every `must_use` entry only make sense once the repo has the helper.
 3. Declare every vendored copy in `[vendored]` first (an undeclared copy of a scaffold ratchet reports its own `git` spawn as yours). Then run `python scripts/conventions_ratchet.py --init`, review the baseline, and commit it. Each entry is either a violation worth a follow-up fix or a legitimate exception worth an exempt marker. **Adoption never requires the fixes first.**
 4. Add a gate stage that runs `python scripts/conventions_ratchet.py` and fails on any non-zero exit. The scaffold's `scripts/verify-before-ship.ps1` places it after the dead code ratchet and before `mypy`. **Do not path-route it**: it is cheap, and a rule added to `rules` must see the whole tree.
 5. Delete the repo's local guard test for a rule once that rule is enabled here with a baseline of zero for it; keep the test while the baseline still carries debt, because the test is zero-tolerance and the ratchet is not.
@@ -260,6 +322,7 @@ A promotion issue names the rule, plus the repo, pull request and check path for
 |---|---|
 | is a pattern in Python source that stdlib `ast` can see without importing the scanned code | a new rule in this stage |
 | is already reported by `ruff` or `jscpd` | a rule family in the [static ratchet](static-ratchet.md) |
+| is a call to one primitive that the repo's `CLAUDE.md` gives a single home | a `[[conventions_ratchet.must_use]]` entry in the adopting repo's `.fleet.toml`, no new code here |
 | is a one-line pattern in web or text files (a regex per line, a marker on the line or above it) | a new rule in this stage, as `password-input-vendored` and `no-pwsh-stub` are |
 | measures a size, or needs its own perimeter or baseline semantics rather than matching a pattern | a new ratchet with the same contract: opt-in table, committed baseline, shrink-only `--update-baseline`, visible `--allow-additions`, exit 3 for not confirmed |
 
@@ -279,6 +342,9 @@ A read-only dry run with **every rule on** over every fleet checkout (42 repos),
 | `secret-compare` | 32 | 14 | all | 32 of 32 raw calls; 2 are the repos' own helpers and drop out once declared |
 | `git-wrapper` | 24 | 11 | all | 24 of 24 raw `git` spawns; 4 are the repos' own wrappers and 10 are the scaffold's vendored scripts, which adopters exclude through `[vendored]`. Of the three repos that have a wrapper today, one real hit remains: an undeclared vendored copy |
 | `login-lockout` | 11 | 11 (of 44) | all | 11 of 11 unguarded password routes, one per web app with a password sign-in: nine with no limit, two with a hand-rolled counter the vendored module replaces. Run alone, 0.3 to 1.2 s per repo |
+| `must-use` `requests.<verb>` outside `src/pooled_http.py`, `paths = ["app/", "src/"]` | 14 (57 with no `paths`) | 8 (13) | all 14 in scope; the 43 outside it are one-shot scripts and were not checked | 7 of 14: 4 per-request API calls, a link fetch, a pagination loop and a health probe. 7 are a kind a marker covers: 3 tray one-shots posting once to the app's own port, 3 calls in a benchmark script, 1 repo's own loopback wrapper that is its helper |
+| `must-use` `StaticFiles` outside the app's static-versioning module | 2 | 2 | all | 2 of 2: a PWA server mounting stock static files with no cache-busting |
+| `must-use` `sqlite3.connect` outside a `db.py` or `database.py` | 48 (37 under `app/` and `src/`) | 18 (16) | none | not established: the repo's connection home is rarely named `db.py` (`connection.py`, `store.py`, `_sqlite.py`), so the count is an upper bound and the scaffold ships no entry for it |
 | `no-pwsh-stub` | 28 | 5 (of 44) | all | 24 of 28 are the stub run as a command in a gate or restart line: the gate command in `CLAUDE.md` and the README, `docs/` pages, and `scripts/*.ps1` usage banners. 4 are a kind a marker covers: 3 `run: pwsh -File` steps in CI workflows, where a hosted runner has a real `pwsh`, and 1 `Get-Command pwsh` lookup. 8 more sit under `tests/` folders, which the rule skips. |
 
 Before the platform-branch and system-folder rules, the dry run also reported `open`/`xdg-open`/`pbcopy`/`xclip` branches (`no-window`), `C:/ProgramData/pip/pip.ini` and a bare `"C:\\"` drive root (`no-drive-path`). Each became a rule above.
@@ -292,3 +358,5 @@ The false-positive kinds that remain:
 ## Tests
 
 `tests/ratchets/test_conventions_ratchet.py`: for each rule, a seeded violation that fails by name and the compliant form that passes. Also covered: import aliases, the `**kwargs` miss, every platform-branch form and the early return, the CLI-module and file-write exceptions, the system-folder and drive-root exceptions, docstrings versus f-strings, helpers and wrappers, every spelling of a login `post` route and the routes that take no password, every text format and argv spelling of a `pwsh` command against the absolute path, prose, shell-name lists and lookups that are not hits, the test-module scope, and exempt markers (a reason is needed, and the marker must name this rule). On throwaway git repos it runs every mode and exit code: a new violation failing by rule, file and line; a second violation of a baselined rule; shrink-only updates; `--allow-additions`; vendored and excluded files, a new untracked file failing and an ignored one skipped; a tracked baseline and another ratchet's baseline never read as evidence; and exit 3 for an unparseable file and an unusable `git`, in every mode. A missing prerequisite is a hard failure there, never `pytest.skip`. The scaffold's own gate stage doubles as the guard that its committed baseline is current.
+
+`tests/ratchets/test_conventions_must_use.py` covers `must-use`: the entry shape and every config error, import aliases and dotted modules, the helper, `paths` and test-module scope, several entries counted under one rule, the two built-in policies reporting beside a declared one, and the gate on a throwaway repo (a new hit failing by rule, file and line, a baseline burned down to zero, a bad entry exiting 2 in every mode).

@@ -28,7 +28,7 @@ A new convention arrives as a ratchet PR here, then `/propagate-vendored`; adopt
 
 Why: prose rules and review steps drift, while a ratchet is deterministic, baselines existing debt instead of blocking on it, and fails the ship the moment a measure rises.
 
-Enforcement: a convention that is one pattern joins the [conventions ratchet](conventions-ratchet.md) as an opt-in rule, even when it reads text files rather than Python (`no-pwsh-stub` refuses the 0-byte `pwsh` stub run as a command in `.md`, `.ps1`, `.bat`, `.toml`, `.yml` and `.py` files); one that needs its own perimeter, baseline semantics or size measure becomes a new ratchet.
+Enforcement: a convention that is one pattern joins the [conventions ratchet](conventions-ratchet.md) as an opt-in rule, even when it reads text files rather than Python (`no-pwsh-stub` refuses the 0-byte `pwsh` stub run as a command in `.md`, `.ps1`, `.bat`, `.toml`, `.yml` and `.py` files); one that needs its own perimeter, baseline semantics or size measure becomes a new ratchet. A convention that gives a job one home (a pooled HTTP session, one connection dependency, one static-file class) is a `[[conventions_ratchet.must_use]]` entry in the adopting repo's `.fleet.toml`: the `must-use` rule fails a call to the primitive made outside the declared helper, so a new single-home helper needs a data entry, not new code in the scaffold.
 
 Issue: https://github.com/ferraroroberto/project-scaffolding/issues/560
 

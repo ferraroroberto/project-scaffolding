@@ -13,11 +13,16 @@ Three layers, mirroring `test_dead_code_ratchet.py`:
 
 from __future__ import annotations
 
+import os
+import shutil
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
 
 from scripts import conventions_ratchet as cr
+from src.no_window import NO_WINDOW
 from tests._git_repo import git, write
 from tests._ratchet_not_confirmed import (
     GIT_FAILURES,
@@ -653,6 +658,21 @@ def test_git_that_cannot_list_the_tree_is_not_confirmed(
     )
 
 
+def test_a_ratchet_vendored_without_its_readers_is_not_confirmed(tmp_path: Path) -> None:
+    alone = tmp_path / "scripts" / "conventions_ratchet.py"
+    alone.parent.mkdir()
+    shutil.copyfile(REPO_ROOT / "scripts" / "conventions_ratchet.py", alone)
+    done = subprocess.run([sys.executable, "-P", str(alone)], capture_output=True, text=True, encoding="utf-8",
+                          env={**os.environ, "PYTHONUTF8": "1"}, creationflags=NO_WINDOW, timeout=60, check=False)
+    assert done.returncode == cr.EXIT_NOT_CONFIRMED
+    assert "conventions_readers.py is missing beside this script" in done.stdout
+    shutil.copyfile(REPO_ROOT / "scripts" / "conventions_readers.py", alone.with_name("conventions_readers.py"))
+    again = subprocess.run([sys.executable, "-P", str(alone), "--root", str(tmp_path)], capture_output=True, text=True,
+                           encoding="utf-8", env={**os.environ, "PYTHONUTF8": "1"}, creationflags=NO_WINDOW,
+                           timeout=60, check=False)
+    assert again.returncode == cr.EXIT_CONFIG  # it ran: there is no .fleet.toml to read
+
+
 def test_main_rejects_allow_additions_without_update(capsys: pytest.CaptureFixture[str]) -> None:
     with pytest.raises(SystemExit) as exc:
         cr.main(["--allow-additions"])
@@ -669,6 +689,13 @@ def test_scaffold_adopts_the_stage_and_commits_a_parseable_baseline() -> None:
     cr.read_baseline(REPO_ROOT / cfg.baseline)
 
 
+def test_scaffold_holds_itself_to_the_pooled_http_must_use_entry() -> None:
+    cfg, _ = cr.load_config(REPO_ROOT)
+    assert cfg is not None
+    assert "must-use" in cfg.rules
+    assert any("requests.get" in e.calls and e.helper == ("src/pooled_http.py",) for e in cfg.must_use)
+
+
 def test_gate_runs_the_stage_after_the_dead_code_ratchet_and_before_mypy() -> None:
     text = (REPO_ROOT / "scripts" / "verify-before-ship.ps1").read_text(encoding="utf-8")
     before, stage, mypy = (
@@ -682,7 +709,9 @@ def test_gate_runs_the_stage_after_the_dead_code_ratchet_and_before_mypy() -> No
 def test_the_script_is_catalogued_so_it_is_mypy_gated_and_drift_checked() -> None:
     from scripts.vendored_catalog import load_catalog
 
-    assert load_catalog(REPO_ROOT)["conventions_ratchet"] == {"src": "scripts/conventions_ratchet.py"}
+    catalog = load_catalog(REPO_ROOT)
+    assert catalog["conventions_ratchet"] == {"src": "scripts/conventions_ratchet.py"}
+    assert catalog["conventions_readers"] == {"src": "scripts/conventions_readers.py"}
 
 
 def test_every_rule_is_documented_with_the_line_it_enforces() -> None:
