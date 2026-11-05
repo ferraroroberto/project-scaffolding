@@ -1,6 +1,6 @@
 # Conventions ratchet
 
-`scripts/conventions_ratchet.py` is a baseline-and-ratchet stage for the pre-ship gate. It holds a small set of fleet conventions as stdlib `ast` rules (and one markup rule over web files), counts each enabled rule's hits per tracked file, and **fails when a file's count for a rule rises** above the committed baseline. Existing debt never blocks work; it cannot grow either.
+`scripts/conventions_ratchet.py` is a baseline-and-ratchet stage for the pre-ship gate. It holds a small set of fleet conventions as stdlib `ast` rules (plus rules over lines of web files and text files), counts each enabled rule's hits per tracked file, and **fails when a file's count for a rule rises** above the committed baseline. Existing debt never blocks work; it cannot grow either.
 
 Before it, each convention was guarded by a one-off test in whichever repo last hit the bug: a no-window spawn test here, a constant-time compare test in one app, a raw-git check in another. This stage is the one vendored copy of those guards. A repo that adopts it can delete its local duplicate once the matching rule is enabled and its baseline is committed.
 
@@ -125,6 +125,41 @@ A password route whose lock-out lives elsewhere (an auth middleware in front of 
 
 **Enabling it in an app with an unguarded route today.** Add `"login-lockout"` to `rules` and record today's hit with `--update-baseline --allow-additions`. Wiring the module in removes the hit, and `--update-baseline` shrinks the baseline to zero.
 
+### `no-pwsh-stub`
+
+> **Windows PowerShell in spawned commands (any agent)** — use the absolute `C:/Windows/System32/WindowsPowerShell/v1.0/powershell.exe`, never the 0-byte `pwsh` stub.
+
+On the fleet's main machine `pwsh` resolves to a 0-byte alias, so a gate or restart command written as `pwsh -File ...` does not run. The failure reads as a broken script, not a wrong interpreter, and agents copy the gate command from `CLAUDE.md`, the README and a script's usage banner.
+
+It reads lines of text rather than a syntax tree, in `.md`, `.ps1`, `.bat`, `.cmd`, `.toml`, `.json`, `.yml`, `.yaml` and `.py` files (a Python string or comment is a line of text). A hit is `pwsh` or `pwsh.exe` used as a command:
+
+- followed by a switch: `pwsh -File x.ps1`, `pwsh -NoProfile -Command ...`, `pwsh --version`, in prose, a code fence, a table, a `run:` value or a usage banner; or
+- the first quoted item of an argv list: `["pwsh", "-File", "x.ps1"]`, `('pwsh.exe', ...)`.
+
+It is not a hit:
+
+- with a path before it, which is an absolute path to a real install (`C:/Program Files/PowerShell/7/pwsh.exe -File x.ps1`) and, above all, the mandated `C:/Windows/System32/WindowsPowerShell/v1.0/powershell.exe`;
+- in prose that names the stub without a switch (`never the 0-byte pwsh stub`), as `shell: pwsh` in a workflow, or as `shutil.which("pwsh")`;
+- as a shell name in the middle of a list or set (`{"bash", "pwsh", "cmd"}`), which is a name and not a command;
+- in a test module or under a `tests/` or `test/` folder, where a fixture legitimately spells the command.
+
+A line that must name the command keeps a reasoned marker on the **same line or the line right above it**, in the file's own comment syntax. The line above counts only when it is not itself a hit, so one marker never covers a second command. The three kinds that need one:
+
+- prose or a banner that names the stub to forbid it;
+- a lookup that only checks whether the stub exists (`Get-Command pwsh -ErrorAction SilentlyContinue`);
+- a step in a GitHub Actions workflow: a hosted `windows-2025` runner ships a real `pwsh`, so `run: pwsh -File ...` works there. The same script on the fleet machine is still run through the absolute path.
+
+```markdown
+<!-- no-pwsh-stub-exempt: names the stub to forbid it -->
+Never run `pwsh -File scripts/verify-before-ship.ps1`; use the absolute Windows PowerShell path.
+```
+
+Replace the command with `C:/Windows/System32/WindowsPowerShell/v1.0/powershell.exe -File scripts/verify-before-ship.ps1`. That binary is PowerShell 5.1, so a script it runs must not use PowerShell 7 parameters.
+
+The rule does not see a command split across lines, a quoted `pwsh` that is not the first item of its list, or `pwsh` followed by a bare script path (`pwsh x.ps1`).
+
+**Enabling it in a repo that has hits today.** Add `"no-pwsh-stub"` to `rules` and record today's hits with `--update-baseline --allow-additions` (or `--init` when there is no baseline yet). Fix them in a follow-up: each fixed line shrinks the baseline with `--update-baseline`. Reading these file types makes every tracked `.md`, `.json` and `.yml` file part of the scan, but only while the rule is listed; a repo that does not list it reads the same files as before. A baseline file is never read as a hit.
+
 ### Exempting one call
 
 A call that must break a rule keeps a reasoned marker on one of its own lines, or in the comment block directly above it:
@@ -134,16 +169,16 @@ A call that must break a rule keeps a reasoned marker on one of its own lines, o
 return subprocess.run(cmd, cwd=str(PROJECT_ROOT)).returncode
 ```
 
-In a web file the marker sits in that file's comment syntax (`<!-- ... -->`, `// ...`, `/* ... */`), on the hit's line or in the comment block right above it. The marker names one rule (`<rule>-exempt`) and needs text after it. A bare `# no-window-exempt` exempts nothing, and a marker for another rule does not cover this one. This is the same marker the scaffold's own `tests/test_no_window_convention.py` reads.
+`no-pwsh-stub` takes its marker on the hit's line or the line right above (see its section). In a web file the marker sits in that file's comment syntax (`<!-- ... -->`, `// ...`, `/* ... */`), on the hit's line or in the comment block right above it. The marker names one rule (`<rule>-exempt`) and needs text after it. A bare `# no-window-exempt` exempts nothing, and a marker for another rule does not cover this one. This is the same marker the scaffold's own `tests/test_no_window_convention.py` reads.
 
 ## Scope
 
-Every `.py` file git lists (tracked, or untracked and not ignored), and every web file for `password-input-vendored`, except:
+Every `.py` file git lists (tracked, or untracked and not ignored), every web file for `password-input-vendored`, and every `.md`, `.ps1`, `.bat`, `.cmd`, `.toml`, `.json`, `.yml` and `.yaml` file for `no-pwsh-stub` (only while that rule is listed), except:
 
 - files under the repo's `[vendored]` destinations: a vendored copy's debt belongs to the repo it came from;
 - the `exclude` globs, plus `node_modules`, `.venv` and `venv` anywhere.
 
-Only Python source and web files are read. A baseline (this stage's or any other ratchet's) is JSON and is never read as a hit or as evidence about one.
+Only Python source, web files and (for `no-pwsh-stub`) the text files above are read. A baseline (this stage's or any other ratchet's, a file named `*-ratchet-baseline.json` or the configured `baseline`) is JSON and is never read as a hit or as evidence about one.
 
 ## Exit codes
 
@@ -225,7 +260,8 @@ A promotion issue names the rule, plus the repo, pull request and check path for
 |---|---|
 | is a pattern in Python source that stdlib `ast` can see without importing the scanned code | a new rule in this stage |
 | is already reported by `ruff` or `jscpd` | a rule family in the [static ratchet](static-ratchet.md) |
-| reads non-Python files, or measures a size rather than matching a pattern | a new ratchet with the same contract: opt-in table, committed baseline, shrink-only `--update-baseline`, visible `--allow-additions`, exit 3 for not confirmed |
+| is a one-line pattern in web or text files (a regex per line, a marker on the line or above it) | a new rule in this stage, as `password-input-vendored` and `no-pwsh-stub` are |
+| measures a size, or needs its own perimeter or baseline semantics rather than matching a pattern | a new ratchet with the same contract: opt-in table, committed baseline, shrink-only `--update-baseline`, visible `--allow-additions`, exit 3 for not confirmed |
 
 ### Landing it
 
@@ -243,6 +279,7 @@ A read-only dry run with **every rule on** over every fleet checkout (42 repos),
 | `secret-compare` | 32 | 14 | all | 32 of 32 raw calls; 2 are the repos' own helpers and drop out once declared |
 | `git-wrapper` | 24 | 11 | all | 24 of 24 raw `git` spawns; 4 are the repos' own wrappers and 10 are the scaffold's vendored scripts, which adopters exclude through `[vendored]`. Of the three repos that have a wrapper today, one real hit remains: an undeclared vendored copy |
 | `login-lockout` | 11 | 11 (of 44) | all | 11 of 11 unguarded password routes, one per web app with a password sign-in: nine with no limit, two with a hand-rolled counter the vendored module replaces. Run alone, 0.3 to 1.2 s per repo |
+| `no-pwsh-stub` | 28 | 5 (of 44) | all | 24 of 28 are the stub run as a command in a gate or restart line: the gate command in `CLAUDE.md` and the README, `docs/` pages, and `scripts/*.ps1` usage banners. 4 are a kind a marker covers: 3 `run: pwsh -File` steps in CI workflows, where a hosted runner has a real `pwsh`, and 1 `Get-Command pwsh` lookup. 8 more sit under `tests/` folders, which the rule skips. |
 
 Before the platform-branch and system-folder rules, the dry run also reported `open`/`xdg-open`/`pbcopy`/`xclip` branches (`no-window`), `C:/ProgramData/pip/pip.ini` and a bare `"C:\\"` drive root (`no-drive-path`). Each became a rule above.
 
@@ -254,4 +291,4 @@ The false-positive kinds that remain:
 
 ## Tests
 
-`tests/ratchets/test_conventions_ratchet.py`: for each rule, a seeded violation that fails by name and the compliant form that passes. Also covered: import aliases, the `**kwargs` miss, every platform-branch form and the early return, the CLI-module and file-write exceptions, the system-folder and drive-root exceptions, docstrings versus f-strings, helpers and wrappers, every spelling of a login `post` route and the routes that take no password, the test-module scope, and exempt markers (a reason is needed, and the marker must name this rule). On throwaway git repos it runs every mode and exit code: a new violation failing by rule, file and line; a second violation of a baselined rule; shrink-only updates; `--allow-additions`; vendored and excluded files, a new untracked file failing and an ignored one skipped; a tracked baseline and another ratchet's baseline never read as evidence; and exit 3 for an unparseable file and an unusable `git`, in every mode. A missing prerequisite is a hard failure there, never `pytest.skip`. The scaffold's own gate stage doubles as the guard that its committed baseline is current.
+`tests/ratchets/test_conventions_ratchet.py`: for each rule, a seeded violation that fails by name and the compliant form that passes. Also covered: import aliases, the `**kwargs` miss, every platform-branch form and the early return, the CLI-module and file-write exceptions, the system-folder and drive-root exceptions, docstrings versus f-strings, helpers and wrappers, every spelling of a login `post` route and the routes that take no password, every text format and argv spelling of a `pwsh` command against the absolute path, prose, shell-name lists and lookups that are not hits, the test-module scope, and exempt markers (a reason is needed, and the marker must name this rule). On throwaway git repos it runs every mode and exit code: a new violation failing by rule, file and line; a second violation of a baselined rule; shrink-only updates; `--allow-additions`; vendored and excluded files, a new untracked file failing and an ignored one skipped; a tracked baseline and another ratchet's baseline never read as evidence; and exit 3 for an unparseable file and an unusable `git`, in every mode. A missing prerequisite is a hard failure there, never `pytest.skip`. The scaffold's own gate stage doubles as the guard that its committed baseline is current.

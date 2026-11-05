@@ -28,6 +28,8 @@ A new convention arrives as a ratchet PR here, then `/propagate-vendored`; adopt
 
 Why: prose rules and review steps drift, while a ratchet is deterministic, baselines existing debt instead of blocking on it, and fails the ship the moment a measure rises.
 
+Enforcement: a convention that is one pattern joins the [conventions ratchet](conventions-ratchet.md) as an opt-in rule, even when it reads text files rather than Python (`no-pwsh-stub` refuses the 0-byte `pwsh` stub run as a command in `.md`, `.ps1`, `.bat`, `.toml`, `.yml` and `.py` files); one that needs its own perimeter, baseline semantics or size measure becomes a new ratchet.
+
 Issue: https://github.com/ferraroroberto/project-scaffolding/issues/560
 
 ### Every UX control is tracked in usage-log
