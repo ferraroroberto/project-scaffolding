@@ -670,8 +670,9 @@ def layout_baselined(paths: list[str], cfg: Config, vendored: tuple[str, ...]) -
     """The baselined findings of the repo-shape contract (`structure_layout.baselined`); none without a `shape`."""
     if cfg.shape is None:
         return {}
-    # A component this repo publishes lives at its adopters' path, where their tree holds the copy.
-    held = [path for path in paths if not any(_under(path, src) for src in cfg.published)]
+    # A component this repo publishes, and the channel folder holding it, live at its adopters' path.
+    skipped = layout.publisher_roots(cfg.published)
+    held = [path for path in paths if not any(_under(path, root) for root in skipped)]
     typed = [path for path in held if not excluded(path, cfg, vendored)]  # every extension, unlike the size checks
     found = layout.baselined(paths, held, typed, cfg.shape, cfg.extra_roots, cfg.extra_root_files)
     return {key: Finding(key, *value) for key, value in found.items()}

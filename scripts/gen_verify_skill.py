@@ -71,11 +71,11 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))  # a script's own dir is sys.path[0], not the repo root
 
+from scripts.verify_skill_templates import TEMPLATES  # noqa: E402
 from src.runtime_data import app_dir_env_var  # noqa: E402
 
 logger = logging.getLogger("gen_verify_skill")
 
-TEMPLATES = Path(__file__).resolve().parent / "verify_skill_templates"
 E2E_DIR = "tests/e2e"
 DEFAULT_READY_PATH = "/healthz"
 FILL = "FILL:"
@@ -338,7 +338,7 @@ def build_model(repo: Path, app: str) -> Model:
 
 
 def fill_template(name: str, values: dict[str, str]) -> str:
-    text = (TEMPLATES / name).read_text(encoding="utf-8").replace("\r\n", "\n")
+    text = TEMPLATES[name]
 
     def sub(match: re.Match[str]) -> str:
         key = match.group(1)
@@ -380,7 +380,7 @@ def render_feature(model: Model, view: View) -> str:
             "reach it as described above; to make it testable, add a test that opens it and calls `surface()`."
         )
     return fill_template(
-        "feature.md.tmpl",
+        "feature.md",
         {"view": view.slug, "seed": seed, "reach": reach, "table": _feature_table(view), "drive": drive},
     )
 
@@ -464,7 +464,7 @@ def render_skill(model: Model) -> str:
     table.extend(f"| {v.slug} | `features/{v.slug}.md` | {len(v.subs)} | {len(v.nodes)} |" for v in model.views)
     files = sorted({n.split("::")[0] for n in model.nodes})
     return fill_template(
-        "SKILL.md.tmpl",
+        "SKILL.md",
         {
             "app": model.app,
             "data_env": str(model.verify["data_dir_env"]),
@@ -487,7 +487,7 @@ def render_skill(model: Model) -> str:
 def render_all(model: Model) -> dict[str, str]:
     outputs = {"SKILL.md": render_skill(model)}
     index, context = _index(model)
-    outputs["features/README.md"] = fill_template("features_README.md.tmpl", {"app": model.app, "index_table": index, "context": context})
+    outputs["features/README.md"] = fill_template("features/README.md", {"app": model.app, "index_table": index, "context": context})
     for v in model.views:
         outputs[f"features/{v.slug}.md"] = render_feature(model, v)
     return outputs

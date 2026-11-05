@@ -247,15 +247,28 @@ def test_a_vendored_or_excluded_file_is_never_typed(tmp_path: Path) -> None:
     assert contract(tmp_path)["folder_types"] == {"src/other": 1, "tests": 1}
 
 
-def test_a_published_component_source_is_never_typed_or_placed(tmp_path: Path) -> None:
+def test_a_published_component_and_its_channel_are_never_typed_or_placed(tmp_path: Path) -> None:
     git(tmp_path, "init", "-q")
-    fleet_toml(tmp_path, "streamlit", tail='[components]\nnav = { src = "app/webapp/static/_vendored/nav" }\n')
-    for rel in (*STREAMLIT, "app/webapp/static/_vendored/nav/nav.html", "app/webapp/static/_vendored/README.md"):
+    tail = '[components]\nnav = { src = "app/webapp/static/_vendored/nav" }\nserve = { src = "app/webapp/serve.py" }\n'
+    fleet_toml(tmp_path, "streamlit", tail=tail)
+    channel = ("nav/nav.html", "README.md", "demo.html", "demo-nav.js")
+    for rel in (*STREAMLIT, *(f"app/webapp/static/_vendored/{name}" for name in channel), "app/webapp/serve.py",
+                "app/webapp/static/app.html", "app/webapp/routes.py"):
         write(tmp_path, rel, "x\n")
     assert sr.run(tmp_path, init=True, update=False, allow_additions=False) == sr.EXIT_PASS
-    assert contract(tmp_path)["folder_types"] == {}
+    assert contract(tmp_path)["folder_types"] == {"app/webapp/static": 1}, "outside the channel, a file is typed"
     entries = json.loads((tmp_path / sr.DEFAULT_BASELINE).read_text(encoding="utf-8"))["entries"]
-    assert [e["key"] for e in entries] == ["place:app/webapp/static/_vendored"], "a file no component owns stays held"
+    assert [e["key"] for e in entries] == ["place:app/webapp", "place:app/webapp/static"], "a file no component owns stays held"
+
+
+@pytest.mark.parametrize(("srcs", "roots"), [
+    (("app/webapp/static/_vendored/nav", "app/site/static/_vendored/site-base"),
+     ("app/site/static/_vendored", "app/webapp/static/_vendored")),
+    (("app/tray/watchdog.py", "src/notify"), ("app/tray/watchdog.py", "src/notify")),
+    (("app/_vendored",), ("app/_vendored",)),  # the source is the channel itself, not inside one
+])
+def test_publisher_roots_widen_a_source_to_the_channel_holding_it(srcs: tuple[str, ...], roots: tuple[str, ...]) -> None:
+    assert layout.publisher_roots(srcs) == roots
 
 
 def test_a_new_redundant_entry_fails_and_deleting_it_passes(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
@@ -401,8 +414,9 @@ def test_the_common_sets_and_the_type_table_match_the_script() -> None:
         assert listed == takes, name
 
 
-def test_the_scaffold_declares_its_root_file_exception_and_records_its_contract() -> None:
+def test_the_scaffold_conforms_to_its_shape_with_no_recorded_exception() -> None:
     cfg, _ = sr.load_config(REPO_ROOT)
-    assert cfg is not None and cfg.extra_root_files == ("tray.bat.template",)
-    assert contract(REPO_ROOT)["root_files"] == ["tray.bat.template"]
-    assert contract(REPO_ROOT)["redundant"] == []
+    assert cfg is not None and cfg.extra_roots == () and cfg.extra_root_files == ()
+    assert contract(REPO_ROOT) == {"root_files": [], "redundant": [], "folder_types": {}}
+    entries = json.loads((REPO_ROOT / sr.DEFAULT_BASELINE).read_text(encoding="utf-8"))["entries"]
+    assert [e["key"] for e in entries if e["key"].startswith("place:")] == []

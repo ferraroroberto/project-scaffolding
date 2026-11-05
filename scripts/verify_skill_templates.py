@@ -1,4 +1,11 @@
----
+"""The templates `gen_verify_skill.py` renders a web app's `verify-<app>` skill from.
+
+Keyed by the output file each one renders; `{{name}}` is a placeholder the generator fills,
+and an unknown one is an error. Raw strings, so a backslash in the text stays literal.
+"""
+
+TEMPLATES: dict[str, str] = {
+    "SKILL.md": r"""---
 name: verify-{{app}}
 description: Launch {{app}} from an empty data directory, health-check it, drive each feature in a real browser against a disposable instance, and keep the feature map honest. Written for an agent that has never seen the app.
 ---
@@ -91,3 +98,33 @@ Keep the feature map true to the source and the live app. Run from the project-s
 ## Gotchas
 
 _None recorded yet._ Add one line per trap you hit while driving the app: the symptom, then the fix. Regeneration never touches this section.
+""",
+    "feature.md": r"""# {{view}}
+
+<!-- gen:begin feature -->
+**Seeded from:** {{seed}}
+
+**How a user reaches it**
+
+{{reach}}
+
+{{table}}
+
+**Drive:** {{drive}}
+<!-- gen:end feature -->
+
+## Gotchas
+
+_None recorded yet._ Add one line per trap: the symptom, then the fix. Regeneration never touches this section.
+""",
+    "features/README.md": r"""# {{app}} feature map
+
+One file per view. Seeded from the repo's committed inventories, never hand-written: the e2e suite's `surface()` names first, then `[[design.review.extra_steps]]`, then the `## UX surface` key views in `CLAUDE.md`. Regenerate with project-scaffolding's `scripts/gen_verify_skill.py`; add traps to a view's `## Gotchas`, the only hand-written part.
+
+<!-- gen:begin index -->
+{{index_table}}
+
+{{context}}
+<!-- gen:end index -->
+""",
+}

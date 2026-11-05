@@ -196,8 +196,8 @@ def test_real_rules_route_representative_paths() -> None:
     assert tier(".conventions-ratchet-baseline.json") == "skip"
     assert tier(".usage-track-ratchet-baseline.json") == "skip"
     # A fixture adopter's dotfile has no extension to match, so its folder is declared inert.
-    assert tier("tests/_fixtures/verify_skill/repo/.fleet.toml") == "skip"
-    assert tier("scripts/verify_skill_templates/SKILL.md.tmpl") == "skip"
+    assert tier("tests/fixtures/verify_skill/repo/.fleet.toml") == "skip"
+    assert tier("scripts/verify_skill_templates.py") == "skip"
 
     # Mixed real diff (static asset + backend) -> static; add a page -> full.
     assert tier("app/webapp/static/icons/foo.svg", "src/x.py") == "static"
@@ -469,7 +469,7 @@ def test_real_surfaces_route_representative_paths() -> None:
         "tests/e2e/test_vendored_nav.py tests/e2e/test_vendored_row_menu.py")
     # The layout lint: the helper, its proof and its fixture page run only that proof.
     assert route("tests/e2e/_layout_lint.py") == ("surface", "tests/e2e/test_layout_lint.py")
-    assert route("tests/e2e/_fixtures/layout/sheet.html") == ("surface", "tests/e2e/test_layout_lint.py")
+    assert route("tests/e2e/fixtures/layout/sheet.html") == ("surface", "tests/e2e/test_layout_lint.py")
     # The usage log (#349): the client, its router under src/ (a full rule ahead
     # of src/ -> none) and its harness all run only that harness.
     assert route("app/webapp/static/_vendored/usage-log/usage-log.js") == (
@@ -485,7 +485,7 @@ def test_real_surfaces_route_representative_paths() -> None:
 
     # The HTTP/2 launch module is a server process proven by its own unit file, so a
     # rule ahead of the app/webapp/ prefix keeps it out of the browser suite.
-    assert route("app/webapp/serve.py", "tests/test_serve.py", "tests/_fixtures/serve_app.py")[0] == "skip"
+    assert route("app/webapp/serve.py", "tests/test_serve.py", "tests/fixtures/serve_app.py")[0] == "skip"
     assert route("app/webapp/server.py")[0] == "full"
 
     # The screenshot baseline: the comparison (a full rule ahead of scripts/ ->

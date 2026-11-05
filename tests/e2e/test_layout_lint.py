@@ -1,6 +1,6 @@
 """The layout lint's own suite: broken fixture fails by name, fixed twin passes.
 
-`_fixtures/layout/sheet.html` carries three deliberate defects (a reason line
+`fixtures/layout/sheet.html` carries three deliberate defects (a reason line
 overflowing a phone sheet, a clipped chip label, an overlapping button);
 `?fixed=1` repairs them. Each test node runs one `capture_states` call, which
 covers phone and desktop in light and dark, so the matrix costs one node per
@@ -21,7 +21,7 @@ from playwright.sync_api import Browser, Page
 from tests.e2e._layout_lint import Finding, capture_states, proof_dir
 from tests.e2e.conftest import serve_directory
 
-_FIXTURES = Path(__file__).resolve().parent / "_fixtures" / "layout"
+_FIXTURES = Path(__file__).resolve().parent / "fixtures" / "layout"
 
 
 @pytest.fixture(scope="module")

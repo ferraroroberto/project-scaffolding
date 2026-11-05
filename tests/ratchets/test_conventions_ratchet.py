@@ -323,7 +323,7 @@ def test_a_line_that_only_mentions_passwords_is_not_a_hit(line: str) -> None:
 def test_the_vendored_component_tests_and_python_are_not_held_to_the_rule() -> None:
     assert web_hits(_BESPOKE_MODAL, "app/webapp/static/_vendored/sign-in/sign-in.js") == []
     assert web_hits(_BESPOKE_MODAL, "_vendored/sign-in/sign-in.js") == []
-    assert web_hits(_BESPOKE_MODAL, "tests/e2e/_fixtures/login.html") == []
+    assert web_hits(_BESPOKE_MODAL, "tests/e2e/fixtures/login.html") == []
     assert web_hits(_BESPOKE_MODAL, "app/webapp/static/_vendored/sign-in-old/x.html") == [
         "password-input-vendored:4"], "only the component's own folder is exempt"
     assert hits('HTML = \'<input type="password">\'\n') == [], "the rule reads web files, not Python"

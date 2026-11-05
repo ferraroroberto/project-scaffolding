@@ -1,6 +1,6 @@
 """The rendered-geometry helper's own suite (issue #157).
 
-Drives `_geometry.py` against the hermetic twins in `_fixtures/geometry/`:
+Drives `_geometry.py` against the hermetic twins in `fixtures/geometry/`:
 every check must PASS on `compliant.html` and FAIL on `violating.html` at
 every 320/390/430/772px x light/dark matrix leg. Each leg carries a theme
 boot-check (the computed background actually flipped) so a matrix leg that
@@ -43,7 +43,7 @@ from tests.e2e._geometry import (
 )
 from tests.e2e.conftest import serve_directory
 
-_FIXTURES = Path(__file__).resolve().parent / "_fixtures" / "geometry"
+_FIXTURES = Path(__file__).resolve().parent / "fixtures" / "geometry"
 
 # demo.html's --bg per theme — the boot-check that a leg's theme actually took.
 _EXPECTED_BG = {"light": "rgb(255, 255, 255)", "dark": "rgb(13, 17, 23)"}
@@ -51,7 +51,7 @@ _EXPECTED_BG = {"light": "rgb(255, 255, 255)", "dark": "rgb(13, 17, 23)"}
 
 @pytest.fixture(scope="session")
 def geometry_server() -> Iterator[str]:
-    """Serve tests/e2e/_fixtures/geometry over HTTP for the session."""
+    """Serve tests/e2e/fixtures/geometry over HTTP for the session."""
     with serve_directory(_FIXTURES) as base_url:
         yield base_url
 
