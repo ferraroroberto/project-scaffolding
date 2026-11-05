@@ -11,10 +11,13 @@ The names and roles are the contract; some values are the brand. The values ship
 | `--paper`, `--ink`, `--ink-2`, `--line`, `--line-strong` | paper, text, secondary text, hairline, field border |
 | `--accent` | the pen colour only: never text, border, button or fill |
 | `--footer-band` | the footer band; white on it at 7:1 or better |
+| `--ink-hover`, `--band-ink`, `--band-label`, `--band-rule` | the primary button's hover fill, and the text, labels and link underlines on the footer band |
 | `--font` | the one sans family (the site ships its own `@font-face` rules) |
 | `--pen-*` | the drawn SVGs, whose colours are baked into each data URI |
 
 Everything else is contract: change it here, for every site.
+
+**This file is the only place a colour value lives.** Every other component reads a token, so a dark theme or a brand change reaches it through the site's own stylesheet; `tests/site/test_site_tokens_only.py` fails a hex, `rgb()`-family or named colour in any other component file. A component that needs a new colour gets a token here first.
 
 ## Image roles
 

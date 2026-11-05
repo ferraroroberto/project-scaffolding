@@ -6,11 +6,11 @@
  */
 
 /* Footer: the dark band that ends every page */
-.site-footer .band { padding: var(--s8) 0; background: var(--footer-band); color: var(--paper); }
+.site-footer .band { padding: var(--s8) 0; background: var(--footer-band); color: var(--band-ink); }
 .site-footer :is(h1, h2, h3) { font-size: var(--fs-h3); line-height: 1.4; }
 .site-footer p { font-size: var(--fs-small); }
-.site-footer strong { font-size: var(--fs-label); font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; color: #ededed; }
-.site-footer a { text-decoration-color: rgba(255, 255, 255, 0.5); }
+.site-footer strong { font-size: var(--fs-label); font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; color: var(--band-label); }
+.site-footer a { text-decoration-color: var(--band-rule); }
 .site-footer .col:not(:first-child) a { display: inline-flex; align-items: center; min-height: 44px; text-decoration: none; }
 .site-footer .col:not(:first-child) a:hover { text-decoration: underline; }
 @media (max-width: 767px) {
