@@ -3,21 +3,9 @@
   "band": {"files": 3, "functions": 2},
   "root_extras": [],
   "shape_contract": {
-    "root_files": ["tray.bat.template"],
+    "root_files": [],
     "redundant": [],
-    "folder_types": {
-      "app/webapp/static/_vendored": 1,
-      "scripts/verify_skill_templates": 3,
-      "tests/_fixtures/verify_skill/expected/features": 1,
-      "tests/_fixtures/verify_skill/repo": 1,
-      "tests/e2e/_fixtures/geometry": 2,
-      "tests/e2e/_fixtures/layout": 1,
-      "tests/e2e/_fixtures/surface": 1
-    }
+    "folder_types": {}
   },
-  "entries": [
-    {"key": "place:app/site/static/_vendored", "files": 1},
-    {"key": "place:app/tray", "files": 1},
-    {"key": "place:app/webapp/static/_vendored", "files": 4}
-  ]
+  "entries": []
 }

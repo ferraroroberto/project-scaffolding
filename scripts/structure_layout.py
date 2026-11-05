@@ -34,6 +34,8 @@ ALWAYS_ALLOWED = ("docs",)
 DEFAULT_LAYERS = (("src", "app"),)
 #: The file that makes a folder a surface package: its own app and listener.
 SURFACE_ENTRY = "server.py"
+#: The folder name of a component channel (`app/webapp/static/_vendored/`): the components, their readme and gallery.
+CHANNEL = "_vendored"
 
 #: Root files every shape allows, as names or globs: instructions, licence, tool config, the ratchet baselines.
 COMMON_ROOT_FILES = (
@@ -65,7 +67,7 @@ ANY_FOLDER_NAMES = ("README.md",)
 #: `tests/e2e/shots` is the vendored `shot_baseline` default, where the screenshot baselines live.
 COMMON_FOLDER_TYPES = (
     ("docs", "doc"), ("scripts", "code+shell"), ("src", "code"), ("tests", "code+shell"), ("tests/fixtures", "any"),
-    ("tests/e2e/shots", "image"), ("config", "config"),
+    ("tests/e2e/shots", "image"), ("tests/e2e/fixtures", "any"), ("config", "config"),
 )
 
 
@@ -118,7 +120,8 @@ SHAPES = {
     "streamlit": Shape(
         ("app", "src", "tests"), ("scripts", "data", "brand", "config"), DEFAULT_LAYERS,
         ("app/*.py", "app/views/", "app/styles/", "app/.streamlit/"), (),
-        ("launch_app.bat", "launch_app.sh", "launch_server.bat", "launch_server.sh", "config.json.example"),
+        ("launch_app.bat", "launch_app.sh", "launch_server.bat", "launch_server.sh", "config.json.example",
+         "tray.bat.template"),
         (("app", "code"), ("app/styles", "css")),
     ),
     "pipeline-cli": Shape(
@@ -195,6 +198,20 @@ def published(data: dict[str, object]) -> tuple[str, ...]:
         if isinstance(row, dict) and isinstance(row.get("src"), str) and row["src"].strip("/")
     }
     return tuple(sorted(found))
+
+
+def publisher_roots(published_srcs: tuple[str, ...]) -> tuple[str, ...]:
+    """The trees a publisher's placement and folder types skip: each source, or the `CHANNEL` folder holding it.
+
+    A component lives at its adopters' path, where that tree holds the copy. A channel folder is that path's
+    too: its readme and gallery sit beside the components they document and exercise.
+    """
+    roots = set()
+    for src in published_srcs:
+        parts = src.split("/")
+        cut = parts.index(CHANNEL) + 1 if CHANNEL in parts[:-1] else len(parts)
+        roots.add("/".join(parts[:cut]))
+    return tuple(sorted(roots))
 
 
 # ---------------------------------------------------------------- checks

@@ -18,7 +18,7 @@ def test_no_two_collected_test_modules_share_a_basename() -> None:
     by_name: dict[str, list[str]] = defaultdict(list)
     for path in sorted(TESTS.rglob("test_*.py")):
         rel = path.relative_to(TESTS)
-        if rel.parts[0] == "_fixtures":  # conftest.collect_ignore: synthetic adopter repos, never collected
+        if rel.parts[0] == "fixtures":  # conftest.collect_ignore: synthetic adopter repos, never collected
             continue
         by_name[path.name].append(rel.as_posix())
     clashes = {name: paths for name, paths in by_name.items() if len(paths) > 1}

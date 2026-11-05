@@ -1,6 +1,6 @@
 """The design-surface capture hook's own suite (issue #408).
 
-Drives `_surface.py` against the hermetic static page in `_fixtures/surface/`
+Drives `_surface.py` against the hermetic static page in `fixtures/surface/`
 with a stub in-page script, so nothing here depends on fleet-config. Pins the
 contract the hook's docstring makes: a true no-op when `DESIGN_SURFACE_CAPTURE`
 is unset, both themes flipped in place and restored, first-call-wins, name
@@ -27,7 +27,7 @@ from tests.e2e._surface import (
 )
 from tests.e2e.conftest import serve_directory
 
-_FIXTURES = Path(__file__).resolve().parent / "_fixtures" / "surface"
+_FIXTURES = Path(__file__).resolve().parent / "fixtures" / "surface"
 
 # The page's --bg per theme, as computed on <body>.
 _LIGHT_BG, _DARK_BG = "rgb(255, 255, 255)", "rgb(13, 17, 23)"
@@ -48,7 +48,7 @@ _STUB_SCRIPT = """(params) => {
 
 @pytest.fixture(scope="session")
 def surface_server() -> Iterator[str]:
-    """Serve tests/e2e/_fixtures/surface over HTTP for the session."""
+    """Serve tests/e2e/fixtures/surface over HTTP for the session."""
     with serve_directory(_FIXTURES) as base_url:
         yield base_url
 

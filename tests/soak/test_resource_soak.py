@@ -1,6 +1,6 @@
 """The resource soak fails a leaking fixture app and passes the fixed one.
 
-Each case boots ``tests/_fixtures/soak_app.py`` as a real subprocess, so the
+Each case boots ``tests/fixtures/soak_app.py`` as a real subprocess, so the
 counts are those of a live process serving real requests.
 """
 
@@ -18,7 +18,7 @@ from src.no_window import NO_WINDOW
 from src.resource_probe import SampleUnavailable
 from tests.soak import _resource_soak as soak
 
-FIXTURE = Path(__file__).parent.parent / "_fixtures" / "soak_app.py"
+FIXTURE = Path(__file__).parent.parent / "fixtures" / "soak_app.py"
 ROUTES = ["/api/poll", "/api/status"]
 
 

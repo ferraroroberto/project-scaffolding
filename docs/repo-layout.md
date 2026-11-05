@@ -40,7 +40,7 @@ Every exception is a to-do, not a permission. **An `extra_roots` or `extra_root_
 
 ### Folder types
 
-*Enforced, shrink-only.* A typed folder takes files of its type only, so a script cannot sit in `docs/`, a notebook in `src/` or a binary in `tests/`. The longest typed folder holding a file sets its type, so `tests/fixtures/` (any type) overrides `tests/` (code), and `tests/e2e/shots/` (the screenshot baselines the vendored `shot_baseline` writes) takes images. A folder no row names is untyped: `data/`, `assets/`, `brand/`, `content/` and `site/` take anything. Everywhere, a file named `README.md`, and any path with a hidden segment (`.gitkeep`, `app/.streamlit/`), is allowed. Extensions compare lowercased.
+*Enforced, shrink-only.* A typed folder takes files of its type only, so a script cannot sit in `docs/`, a notebook in `src/` or a binary in `tests/`. The longest typed folder holding a file sets its type, so `tests/fixtures/` and `tests/e2e/fixtures/` (the pages an e2e suite serves) take any type over `tests/` (code), and `tests/e2e/shots/` (the screenshot baselines the vendored `shot_baseline` writes) takes images. A folder no row names is untyped: `data/`, `assets/`, `brand/`, `content/` and `site/` take anything. Everywhere, a file named `README.md`, and any path with a hidden segment (`.gitkeep`, `app/.streamlit/`), is allowed. Extensions compare lowercased.
 
 | Type | Extensions |
 |---|---|
@@ -58,7 +58,7 @@ Every exception is a to-do, not a permission. **An `extra_roots` or `extra_root_
 
 | Common folder types (every shape) |
 |---|
-| `docs/` `doc`, `scripts/` `code+shell`, `src/` `code`, `tests/` `code+shell`, `tests/fixtures/` `any`, `tests/e2e/shots/` `image`, `config/` `config` |
+| `docs/` `doc`, `scripts/` `code+shell`, `src/` `code`, `tests/` `code+shell`, `tests/fixtures/` `any`, `tests/e2e/shots/` `image`, `tests/e2e/fixtures/` `any`, `config/` `config` |
 
 ### Second-level placement
 
@@ -140,7 +140,7 @@ A Streamlit app with Python pipelines.
 | Contract | |
 |---|---|
 | Root folders | required `app`, `src`, `tests`; also `scripts`, `data`, `brand`, `config` |
-| Root files | the common set, plus `launch_app.bat`, `launch_app.sh`, `launch_server.bat`, `launch_server.sh`, `config.json.example` |
+| Root files | the common set, plus `launch_app.bat`, `launch_app.sh`, `launch_server.bat`, `launch_server.sh`, `config.json.example`, `tray.bat.template` |
 | Folder types | the common set, plus `app/` `code`, `app/styles/` `css` |
 | Homes | `app/*.py`, `app/views/`, `app/styles/`, `app/.streamlit/` |
 
@@ -381,7 +381,7 @@ The scaffold is a `streamlit` repo and conforms to that section. It also publish
 
 - `app/tray/`, `app/webapp/serve.py` and `app/webapp/static/_vendored/`: component sources for `webapp-tray` adopters, with no tray or server of their own.
 - `app/log_panel.py`: the live log panel the views render, kept beside `app.py`.
-- `tray.bat.template` and `launch_server.{bat,sh}`: copy-to-adapt launchers. `tray.bat.template` is declared in `extra_root_files`, since no `streamlit` repo keeps a tray launcher.
-- The component sources under `app/` (`app/site/`, `app/tray/`, `app/webapp/`) are catalogued in `[components]`, so placement and folder types skip them: each lives at its adopters' path, where that tree holds the copy. The few files beside them that no component owns (the catalog readmes, the gallery page, `app/tray/__init__.py`) are recorded in the baseline as the scaffold's exceptions.
+- `tray.bat.template` and `launch_server.{bat,sh}`: copy-to-adapt launchers. The `streamlit` preset lists `tray.bat.template`, because every repo cloned from the scaffold starts with it at the root.
+- The component sources under `app/` (`app/site/`, `app/tray/`, `app/webapp/`) are catalogued in `[components]`, so placement and folder types skip them: each lives at its adopters' path, where that tree holds the copy. Each `_vendored/` channel folder is skipped whole, so its readme and the gallery page (`demo.html` and its scripts) beside the components are skipped too. `app/tray/` and `app/webapp/` are namespace packages, with no `__init__.py` of their own.
 - `src/` is flat (under 40 modules) with two domain packages, `src/notify/` and `src/doc_capture/`.
-- `scripts/verify_skill_templates/`: templates for `scripts/gen_verify_skill.py`.
+- `scripts/verify_skill_templates.py`: the templates `scripts/gen_verify_skill.py` renders, as string constants, so the folder takes code only.

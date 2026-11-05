@@ -972,7 +972,7 @@ clean.
 
 The helper is proven by its own suite
 (`tests/e2e/test_geometry_helper.py`) against hermetic twin fixture
-pages (`tests/e2e/_fixtures/geometry/`): every check passes on
+pages (`tests/e2e/fixtures/geometry/`): every check passes on
 `compliant.html` and fails on `violating.html` at all eight matrix
 legs, on both engines. The fixtures bundle a test-only copy of
 Chart.js v4 (never served to any app; `_vendored/` remains the only
@@ -1053,7 +1053,7 @@ into the app's `tests/e2e/` and record it in the app's `.fleet.toml`
 stdlib, `pytest` and `playwright.sync_api`, and nothing from fleet-config,
 which supplies the script as a file. It is proven by
 `tests/e2e/test_surface_hook.py` against a static fixture page
-(`tests/e2e/_fixtures/surface/`), including the unset no-op, both themes,
+(`tests/e2e/fixtures/surface/`), including the unset no-op, both themes,
 restore, first-call-wins, name validation and the collection filter.
 
 ### Screenshot baseline
@@ -1239,7 +1239,7 @@ about 3 s static, about 5.5 s Streamlit. Cap the cost with
 only the states a change creates.
 
 **Proven here** by `tests/e2e/test_layout_lint.py` against
-`tests/e2e/_fixtures/layout/sheet.html`: loaded bare it carries a reason
+`tests/e2e/fixtures/layout/sheet.html`: loaded bare it carries a reason
 line in a `white-space: nowrap` span overflowing a phone sheet, an
 ellipsized chip label with no title, and a button laid over another, and
 fails with exactly those three findings by name (the sheet line fits at

@@ -115,7 +115,7 @@ flowchart TB
   SHOTBASE -.->|reads [shot_baseline] from| FLEETTOML
   SHOTBASE -.->|compares the PNGs written by| SHOT
   GENVERIFY -.->|reads [verify], [design.review], [e2e] from an adopter's| FLEETTOML
-  GENVERIFY -->|renders from| VERIFYTMPL["verify_skill_templates/\nSKILL.md.tmpl, feature.md.tmpl,\nfeatures_README.md.tmpl"]
+  GENVERIFY -->|renders from| VERIFYTMPL["verify_skill_templates.py\nSKILL.md, feature.md,\nfeatures/README.md templates"]
   VERIFY -->|derives its mypy --strict list from| CATALOG
   CATALOG -.->|reads [components] from| FLEETTOML
   CATALOG -.->|the same table read by| DRIFT["fleet-config skills/_lib/vendored_drift.py\n/propagate-vendored coverage: declared adopters\n+ undeclared carriers (#230)"]
@@ -129,18 +129,18 @@ flowchart TB
   subgraph testsdir["tests/"]
     UNIT["test_*.py\none file per src/ module, hermetic\n(incl. test_doc_capture.py — browserless\nplan/hash/readme/adapter contract;\ntest_watchdog.py — retry/edge-transition/breadcrumb,\nno sleeping, no threads)"]
     MASTERSYNC["test_claude_master_sync.py\nasserts docs/agents/CLAUDE.master.md's body\nis byte-identical to CLAUDE.md's\n(footer excluded) — #59/#211 drift guard"]
-    GENVERIFYTEST["test_gen_verify_skill.py (#412)\nhermetic: tests/_fixtures/verify_skill/ synthetic adopter,\ngolden feature files, idempotence, --check clean/changed/blocked,\nunreachable port + real pytest junit; tests/conftest.py\nkeeps _fixtures/ out of collection"]
+    GENVERIFYTEST["test_gen_verify_skill.py (#412)\nhermetic: tests/fixtures/verify_skill/ synthetic adopter,\ngolden feature files, idempotence, --check clean/changed/blocked,\nunreachable port + real pytest junit; tests/conftest.py\nkeeps fixtures/ out of collection"]
     CITEST["test_ci_template.py (#351)\nasserts the template's contract: windows-2025 runner,\nNode-24 action majors, one run per commit,\nread-only permissions, no secrets"]
     GATEWATCHTEST["test_main_gate_watch_template.py (#222)\nstill-a-template · failure+main-only · idempotency\n+ anti-false-coverage guard: a live watcher\nmust name a workflow that exists"]
     E2E["e2e/conftest.py + test_smoke.py\npytest-playwright, boots a disposable\nStreamlit via _streamlit_lifecycle.py\n(occupied port refused unless STREAMLIT_E2E_LIVE)\n+ test_vendored_components.py\n(drives _vendored/demo.html, light+dark)\n+ test_vendored_nav.py\n(mounts _vendored/nav skeleton, desktop+pill)\nboth via e2e/_color_assertions.py\n(style · set_theme · rgba, #208)\n+ e2e/_nav_graft.py (nav mount +\nphone context, #394)"]
     LIVEGUARD["e2e/_e2e_live_guard.py (vendor-verbatim)\nrequire_disposable_instance(port, flag_env_name):\npytest.exit(2) on an occupied port with no\nopt-in env var, never kills or adopts silently"]
     PORTPROBE["_port_probe.py (#208)\nlistening_pids(port): netstat / lsof\nthe ONE port-to-PID parse both\nlifecycle harnesses import"]
-    SOAK["soak/_resource_soak.py (vendor-verbatim)\nrun_soak(pid, url, routes): warm up, sample, drive poll routes,\nsample; leak = threads/handles past a per-cycle budget\nexit 0 pass · 1 leak · 3 NOT CONFIRMED\n+ soak/test_resource_soak.py + _fixtures/soak_app.py (leaking and clean twins)"]
+    SOAK["soak/_resource_soak.py (vendor-verbatim)\nrun_soak(pid, url, routes): warm up, sample, drive poll routes,\nsample; leak = threads/handles past a per-cycle budget\nexit 0 pass · 1 leak · 3 NOT CONFIRMED\n+ soak/test_resource_soak.py + fixtures/soak_app.py (leaking and clean twins)"]
     GITREPO["_git_repo.py\ngit() + write(): the throwaway-repo helpers\nthe comment, docs and structure ratchet tests import"]
-    GEOM["e2e/_geometry.py (vendor-verbatim, #157)\neffective 44px targets · overlap · overflow\nChart.js config reads · viewport x theme matrix\n+ test_geometry_helper.py\n+ _fixtures/geometry/ (hermetic twins + Chart.js)"]
-    SURF["e2e/_surface.py (vendor-verbatim, #408)\nsurface(page, name): no-op unless DESIGN_SURFACE_CAPTURE\nlight+dark flipped in place → png + json per surface\ncollection hook deselects tests that never call it\n+ test_surface_hook.py + _fixtures/surface/"]
+    GEOM["e2e/_geometry.py (vendor-verbatim, #157)\neffective 44px targets · overlap · overflow\nChart.js config reads · viewport x theme matrix\n+ test_geometry_helper.py\n+ fixtures/geometry/ (hermetic twins + Chart.js)"]
+    SURF["e2e/_surface.py (vendor-verbatim, #408)\nsurface(page, name): no-op unless DESIGN_SURFACE_CAPTURE\nlight+dark flipped in place → png + json per surface\ncollection hook deselects tests that never call it\n+ test_surface_hook.py + fixtures/surface/"]
     SHOT["e2e/_shot.py (vendor-verbatim)\ncapture_screen: phone + desktop x light + dark\npinned clock, time zone, locale; settle() then shot()\n+ test_shot_capture.py + shots/ (committed baseline)"]
-    LAYOUT["e2e/_layout_lint.py (vendor-verbatim)\ncapture_states: each state x phone/desktop x light/dark\nscreenshots to a proof folder outside the checkout\nlint: overflow · clipped · overlap · offscreen ·\ntap-target · contrast (warning) → manifest.json\n+ test_layout_lint.py + _fixtures/layout/"]
+    LAYOUT["e2e/_layout_lint.py (vendor-verbatim)\ncapture_states: each state x phone/desktop x light/dark\nscreenshots to a proof folder outside the checkout\nlint: overflow · clipped · overlap · offscreen ·\ntap-target · contrast (warning) → manifest.json\n+ test_layout_lint.py + fixtures/layout/"]
     SWEEP["e2e/_browser_sweep.py (vendor-verbatim, #203/#236)\npytest_sessionfinish + standalone CLI\nliveness = running · exited · wedged · unknown\n(an exit code is NOT an exit — GetProcessTimes\nexit time is the discriminator, #236)\nkill only running · orphaned · cwd-in-scope;\nzombies AND wedges reported, never killed\n+ test_browser_sweep.py"]
     CWDISO["e2e/test_helper_cwd_isolation.py (#236)\npins conftest._neutral_driver_cwd: neither the\nNode driver nor any helper may hold this\ncheckout as its cwd — a wedge would pin it forever"]
     TRAYBEHAVIOR["e2e/test_tray_lifecycle_behavior.py\nWindows-only, pytest.mark.slow, no browser\ndrives real tray.bat + the canonical tray_lifecycle.ps1\nvia _tray_harness.py's resolve_tray_lifecycle_path()\n+ _dummy_tray_app.py"]

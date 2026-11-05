@@ -152,7 +152,7 @@ def serve_directory(directory: Path) -> Iterator[str]:
     """Serve *directory* over loopback HTTP on an ephemeral port.
 
     Shared by `static_server` and any test module that needs its own tree
-    served (e.g. the geometry-helper fixtures under `tests/e2e/_fixtures/`).
+    served (e.g. the geometry-helper fixtures under `tests/e2e/fixtures/`).
     """
     handler = partial(_QuietHandler, directory=str(directory))
     server = ThreadingHTTPServer(("127.0.0.1", 0), handler)

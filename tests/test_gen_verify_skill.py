@@ -1,6 +1,6 @@
 """Tests for the verify-skill generator (project-scaffolding#412).
 
-Hermetic: a synthetic adopter under `tests/_fixtures/verify_skill/repo/` is read
+Hermetic: a synthetic adopter under `tests/fixtures/verify_skill/repo/` is read
 statically, nothing of it is imported or booted. Four layers:
 
 1. **Seeding** -- what the static parse finds in the fixture, and what it refuses
@@ -28,7 +28,7 @@ import pytest
 from scripts import gen_verify_skill as gen
 from src.no_window import NO_WINDOW
 
-FIXTURES = Path(__file__).resolve().parent / "_fixtures" / "verify_skill"
+FIXTURES = Path(__file__).resolve().parent / "fixtures" / "verify_skill"
 FIXTURE_REPO = FIXTURES / "repo"
 EXPECTED = FIXTURES / "expected"
 APP = "jobs-app"

@@ -1,7 +1,7 @@
 """The HTTP/2 launch module (`app/webapp/serve.py`), proven as the real process.
 
 The unit half pins the config and the argument handling. The rest boots
-``python -m app.webapp.serve`` against `tests/_fixtures/serve_app.py` over a
+``python -m app.webapp.serve`` against `tests/fixtures/serve_app.py` over a
 throwaway TLS cert, for both servers, and drives it as a client would: ALPN,
 gzip, the bearer gate, server-sent events that must leave before the stream
 ends, a websocket, the proxy-header trust, a graceful stop, and an abandoned
@@ -37,7 +37,7 @@ from app.webapp import serve
 from src.no_window import NO_WINDOW
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-FIXTURE_APP = "tests._fixtures.serve_app:app"
+FIXTURE_APP = "tests.fixtures.serve_app:app"
 TOKEN = "fleet-test-token"
 SERVERS = [serve.HYPERCORN, serve.UVICORN]
 BOOT_TIMEOUT_S = 20.0
