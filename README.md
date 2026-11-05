@@ -151,8 +151,8 @@ scripts/
   instruction_ratchet.py      gate stage: prompt-audit lint hits and size caps in instruction files may not rise above a committed baseline
   shot_baseline.py             gate stage: recaptured screenshots may not visibly drift from the committed baseline
   static_ratchet.py            gate stage: new duplicate code, unused names or bug/security patterns may not rise above a committed baseline
-  structure_ratchet.py        gate stage: oversized files/functions, flat directories, src->app imports, extra roots and misplaced files may not rise above a committed baseline
-  structure_layout.py         the structure ratchet's sibling: shape presets, extra roots, second-level placement (vendored with it)
+  structure_ratchet.py        gate stage: oversized files/functions, flat directories, src->app imports, extra roots, loose root files, mistyped and misplaced files and redundant exceptions may not rise above a committed baseline
+  structure_layout.py         the structure ratchet's sibling: the repo-shape contract (shape presets, root files, folder types, homes, exceptions; vendored with it)
   structure_band.py           the structure ratchet's sibling: the near-limit band and its never-failing warning lines (vendored with it)
   usage_summary.py           per-view / per-control / device summary of an app's usage.sqlite3, --time = foreground minutes (exit 2 = no data yet)
   vendored_catalog.py         reads .fleet.toml's [components] table, the vendor-verbatim component catalog

@@ -6,7 +6,7 @@ Shape ids (the exact `.fleet.toml` `shape` values): [`webapp-tray`](#webapp-tray
 
 ## Rules for every shape
 
-Five rules hold in every shape. The structure ratchet enforces the first four; the fifth is a convention. Existing offenders are baselined and may not grow; a new offender fails the gate. It also holds the root folders to the shape's tree: an undeclared one fails with no baseline, and a declared extra root is baselined and shrink-only (see the end of this page).
+These rules hold in every shape. The structure ratchet enforces all but the test mirror, which is a convention. Existing offenders are baselined and may not grow; a new offender fails the gate. It also holds the root folders to the shape's tree: an undeclared one fails with no baseline, and a declared extra root is baselined and shrink-only (see the end of this page). Each shape's section opens with its contract table: root folders, root files, folder types and homes, so the expected layout of any repo can be read from that table.
 
 ### File size
 
@@ -26,11 +26,43 @@ Five rules hold in every shape. The structure ratchet enforces the first four; t
 
 ### Extra roots
 
-*Enforced, shrink-only.* A root folder the shape's tree does not list goes in `extra_roots` in `.fleet.toml`, with its reason in `docs/layout.md`. The ratchet records every such folder in the baseline (`root_extras`) and fails on one that is not recorded, so the list can only go down. Before declaring one, check the three outcomes: the folder holds code that belongs under `src/` or `app/`, so move it; every repo of the shape may need it, so it joins the shape's allowed set (as `webapp/` did for `webapp-tray`); or it is required where it is (a framework loads it by name), so it is declared with its reason and recorded with `--update-baseline --allow-additions`.
+*Enforced, shrink-only.* A root folder the shape's tree does not list goes in `extra_roots` in `.fleet.toml`, with its reason in `docs/layout.md`. The ratchet records every such folder in the baseline (`root_extras`) and fails on one that is not recorded, so the list can only go down. Before declaring one, check the three outcomes: the folder holds code that belongs under `src/` or `app/`, so move it; more than one repo of the shape needs it, so it joins the shape's allowed set (as `webapp/` did for `webapp-tray`); or it is required where it is (a framework loads it by name), so it is declared with its reason and recorded with `--update-baseline --allow-additions`.
+
+Every exception is a to-do, not a permission. **An `extra_roots` or `extra_root_files` entry the preset already allows fails as redundant**: delete it from `.fleet.toml`. A folder or file several repos of one shape share is promoted into that shape's preset; one repo's quirk stays a recorded exception until it moves.
+
+### Root files
+
+*Enforced, shrink-only.* A file directly at the root is one the common set or the shape's contract table lists, as a name or a glob. Anything else (a loose script, a second README, a one-off launcher) goes into a folder the shape lists: `scripts/` for a tool, `docs/` for a document, `config/` for a sample. A root file a repo must keep (a framework reads it there, a scheduled job calls it by path) is declared in `extra_root_files` in `.fleet.toml` with its reason in a comment beside it, and is recorded in the baseline like an extra root.
+
+| Common root files (every shape) |
+|---|
+| `README.md`, `CLAUDE.md`, `AGENTS.md`, `LICENSE`, `.fleet.toml`, `.gitignore`, `.gitattributes`, `.ignore`, `.env.example`, `.*-baseline.json`, `requirements*.txt`, `pyproject.toml`, `pytest.ini`, `package*.json` |
+
+### Folder types
+
+*Enforced, shrink-only.* A typed folder takes files of its type only, so a script cannot sit in `docs/`, a notebook in `src/` or a binary in `tests/`. The longest typed folder holding a file sets its type, so `tests/fixtures/` (any type) overrides `tests/` (code), and `tests/e2e/shots/` (the screenshot baselines the vendored `shot_baseline` writes) takes images. A folder no row names is untyped: `data/`, `assets/`, `brand/`, `content/` and `site/` take anything. Everywhere, a file named `README.md`, and any path with a hidden segment (`.gitkeep`, `app/.streamlit/`), is allowed. Extensions compare lowercased.
+
+| Type | Extensions |
+|---|---|
+| `code` | `.py`, `.pyi`, `.js`, `.mjs`, `.cjs`, `.ts`, `.sql` |
+| `code+shell` | `code` plus `.ps1`, `.psm1`, `.sh`, `.bat`, `.cmd` |
+| `shell` | `.ps1`, `.psm1`, `.sh`, `.bat`, `.cmd` |
+| `config` | `.json`, `.yaml`, `.yml`, `.toml`, `.ini`, `.example`, `.sample` |
+| `doc` | `.md`, `.mmd`, `.html`, `.json` and images (`.png`, `.jpg`, `.jpeg`, `.gif`, `.svg`, `.webp`, `.ico`) |
+| `web` | `code`, the images (`.png`, `.jpg`, `.jpeg`, `.gif`, `.svg`, `.webp`, `.ico`), `.html`, `.css`, `.json`, `.webmanifest`, `.woff`, `.woff2`, `.ttf`, `.otf`, `.txt`, `.license` |
+| `image` | `.png`, `.jpg`, `.jpeg`, `.gif`, `.svg`, `.webp`, `.ico` |
+| `css` | `.css` |
+| `js` | `.js`, `.mjs` |
+| `tooling` | `code+shell`, `config`, `.md`, `.html`, `.txt` |
+| `any` | anything |
+
+| Common folder types (every shape) |
+|---|
+| `docs/` `doc`, `scripts/` `code+shell`, `src/` `code`, `tests/` `code+shell`, `tests/fixtures/` `any`, `tests/e2e/shots/` `image`, `config/` `config` |
 
 ### Second-level placement
 
-*Enforced for `webapp-tray`, shrink-only.* Under `app/` and `src/` a file lives in one of the shape's homes, so a web app's routers, static assets and domain code cannot scatter. The ratchet counts the files outside every home per folder and fails when a folder is new or holds more than its baseline. Existing outliers are baselined. The homes, with the rule for each, are in the [webapp-tray](#webapp-tray) section.
+*Enforced where a shape declares homes, shrink-only.* Under a home root a file lives in one of the shape's homes, so a web app's routers, static assets and domain code cannot scatter. The ratchet counts the files outside every home per folder and fails when a folder is new or holds more than its baseline. Existing outliers are baselined. A shape declares homes only where its repos agree; each shape's contract table lists them, or says why it has none.
 
 ### Test mirror
 
@@ -39,6 +71,13 @@ Five rules hold in every shape. The structure ratchet enforces the first four; t
 ## webapp-tray
 
 A FastAPI + static PWA app owned by a Windows tray.
+
+| Contract | |
+|---|---|
+| Root folders | required `app`, `src`, `tests`, `docs`; also `scripts`, `data`, `brand`, `assets`, `config`, `webapp` |
+| Root files | the common set, plus `tray.bat`, `webapp.bat`, `launcher.py`, `setup.bat`, `webapp_tunnel_named.bat`, `start.bat`, `launch_app.bat`, `config.example.json` |
+| Folder types | the common set, plus `app/` `code`, `app/webapp/` `web` |
+| Homes | `app/*.py`, `app/cli/`, `app/tray/`, `app/webapp/*.py`, `app/webapp/routers/`, `app/webapp/static/`, `src/`, and a surface package `app/webapp/<package>/` |
 
 ```
 launcher.py  tray.bat  webapp.bat  setup.bat
@@ -98,6 +137,13 @@ Allowed extra roots: `data/` (runtime input and output, gitignored contents), `b
 
 A Streamlit app with Python pipelines.
 
+| Contract | |
+|---|---|
+| Root folders | required `app`, `src`, `tests`; also `scripts`, `data`, `brand`, `config` |
+| Root files | the common set, plus `launch_app.bat`, `launch_app.sh`, `launch_server.bat`, `launch_server.sh`, `config.json.example` |
+| Folder types | the common set, plus `app/` `code`, `app/styles/` `css` |
+| Homes | `app/*.py`, `app/views/`, `app/styles/`, `app/.streamlit/` |
+
 ```
 launch_app.bat
 app/
@@ -124,6 +170,13 @@ Allowed extra roots: `data/`, `brand/`, `config/`.
 ## pipeline-cli
 
 A command-line tool or batch job with no UI. Two variants.
+
+| Contract | |
+|---|---|
+| Root folders | required `tests`; also `src`, `common`, `scripts`, `config`, `data` |
+| Root files | the common set, plus `main.py`, `launch_*.bat` |
+| Folder types | the common set, plus `common/` `code` |
+| Homes | none: a single tool keeps one package under src/, a multi-tool repo keeps one root package per tool, so no second-level rule fits both |
 
 ### Single tool
 
@@ -159,6 +212,13 @@ Allowed extra roots: `data/`, and in a multi-tool repo each declared tool packag
 
 Agent skills, hooks and the fleet's governance tooling.
 
+| Contract | |
+|---|---|
+| Root folders | required `skills`, `tests`; also `hooks`, `scripts`, `architecture` |
+| Root files | the common set, plus `install.ps1` |
+| Folder types | the common set, plus `skills/` `tooling`, `hooks/` `tooling` |
+| Homes | `skills/*/` |
+
 ```
 skills/<name>/SKILL.md
 skills/<name>/*.py          private to that one skill
@@ -181,6 +241,13 @@ Allowed extra roots: `architecture/` (generated maps).
 
 A Node.js project.
 
+| Contract | |
+|---|---|
+| Root folders | required `src`; also `test`, `scripts` |
+| Root files | the common set |
+| Folder types | the common set, plus `test/` `code` |
+| Homes | none: the one adopter keeps a flat src/, unlike the src/<area>/ tree below, so nothing is shared yet |
+
 ```
 src/<area>/
 test/                       Node's own convention, accepted as is
@@ -196,6 +263,13 @@ Allowed extra roots: none beyond the tree.
 ## static-site
 
 Hand-written HTML, CSS and JS with no build step.
+
+| Contract | |
+|---|---|
+| Root folders | required none; also `css`, `js`, `assets`, `games`, `content`, `site`, `scripts` |
+| Root files | the common set, plus `*.html` |
+| Folder types | the common set, plus `css/` `css`, `js/` `js` |
+| Homes | none: one adopter is hand-written at the root and the other is built from content/, so they share no second level |
 
 ```
 index.html  <page>.html
@@ -232,6 +306,13 @@ Allowed extra roots: none beyond the tree; `content`, `site` and `scripts` need 
 
 A repo an agent works in rather than code it ships: instructions, and skills under the agent's hidden folder, plus the gate's scripts. Tests live beside the code they test.
 
+| Contract | |
+|---|---|
+| Root folders | required none; also `scripts` |
+| Root files | the common set |
+| Folder types | the common set |
+| Homes | none: its code lives under .claude/, a hidden folder the layout never checks |
+
 ```
 CLAUDE.md  AGENTS.md         instructions; AGENTS.md points at CLAUDE.md
 .claude/skills/<name>/       one folder per skill, loaded by the repo's own sessions
@@ -250,6 +331,13 @@ Allowed extra roots: none beyond the tree. No folder is required: hidden folders
 ## service
 
 A long-lived local service: the service itself in `src/`, the admin web app it mounts in `app_web/`, and the Windows tray that owns it.
+
+| Contract | |
+|---|---|
+| Root folders | required `src`, `tests`, `app_web`, `tray`; also `scripts`, `config`, `launchers`, `assets` |
+| Root files | the common set, plus `tray.bat`, `run_*.bat`, `run_*.sh` |
+| Folder types | the common set, plus `app_web/` `web`, `tray/` `code+shell`, `launchers/` `shell` |
+| Homes | `app_web/*.py`, `app_web/routers/`, `app_web/static/`, `tray/*.py` |
 
 ```
 src/                        the service: server, routing, backends
@@ -293,6 +381,7 @@ The scaffold is a `streamlit` repo and conforms to that section. It also publish
 
 - `app/tray/`, `app/webapp/serve.py` and `app/webapp/static/_vendored/`: component sources for `webapp-tray` adopters, with no tray or server of their own.
 - `app/log_panel.py`: the live log panel the views render, kept beside `app.py`.
-- `tray.bat.template` and `launch_server.{bat,sh}`: copy-to-adapt launchers.
+- `tray.bat.template` and `launch_server.{bat,sh}`: copy-to-adapt launchers. `tray.bat.template` is declared in `extra_root_files`, since no `streamlit` repo keeps a tray launcher.
+- The component sources under `app/` (`app/site/`, `app/tray/`, `app/webapp/`) are catalogued in `[components]`, so placement and folder types skip them: each lives at its adopters' path, where that tree holds the copy. The few files beside them that no component owns (the catalog readmes, the gallery page, `app/tray/__init__.py`) are recorded in the baseline as the scaffold's exceptions.
 - `src/` is flat (under 40 modules) with two domain packages, `src/notify/` and `src/doc_capture/`.
 - `scripts/verify_skill_templates/`: templates for `scripts/gen_verify_skill.py`.

@@ -116,8 +116,9 @@ def test_surface_packages_leave_routers_and_static_meaning_unchanged() -> None:
 
 
 def test_shapes_without_homes_check_nothing() -> None:
-    assert all(shape.home_roots == frozenset() for name, shape in layout.SHAPES.items() if name != "webapp-tray")
-    assert layout.misplaced(["app/helpers/x.py"], "streamlit") == {}
+    homeless = ("pipeline-cli", "node", "static-site", "agent-workspace")
+    assert all(layout.SHAPES[name].home_roots == frozenset() for name in homeless)
+    assert layout.misplaced(["src/helpers/x.py", "test/x.png", "anything/deep/x.py"], "node") == {}
 
 
 def test_extra_root_names_skips_untracked_and_preset_folders() -> None:
@@ -252,7 +253,8 @@ def test_update_never_adds_a_misplaced_folder_and_allow_additions_does(tmp_path:
 
 
 def test_a_shape_without_homes_ignores_the_location_of_files(tmp_path: Path) -> None:
-    make_repo(tmp_path, "streamlit", ("app/helpers/x.py", "src/a.py", "tests/t.py"))
+    make_repo(tmp_path, "node", ("src/a.js", "test/a.js"))
+    write(tmp_path, "src/helpers/deep/x.js", "x\n")
     assert run(tmp_path) == sr.EXIT_PASS
 
 
