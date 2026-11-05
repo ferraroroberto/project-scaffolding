@@ -22,8 +22,12 @@ description = "Canonical master — the scaffold &amp; CLAUDE.md every project d
 # folder the shape does not list goes in `extra_roots = [...]`, with its reason in
 # docs/layout.md. Read by scripts/structure_ratchet.py; ids and presets:
 # docs/structure-ratchet.md. The scaffold is a streamlit repo with no extra roots.
-shape       = "streamlit"
-extra_roots = []
+# A root file the shape does not list goes in `extra_root_files`, each with its reason.
+shape            = "streamlit"
+extra_roots      = []
+extra_root_files = [
+  "tray.bat.template",  # the copy-to-adapt tray launcher webapp-tray adopters start from
+]
 
 # Wide views (fleet-config#1113, design.md Layout): page width follows the shape of a
 # view's content, per view. A one-dimensional view (settings, a form, one list, a
@@ -422,12 +426,16 @@ enabled = true
 # not exist (a port is checked against `port` above, when declared), beyond the
 # committed baseline. Opt-in per repo through this table, like
 # [instruction_ratchet]. `allow_refs` lists intentional pointers: here, the files
-# an adopter creates from the scaffold's templates and instructions.
+# an adopter creates from the scaffold's templates and instructions, and the
+# folders a shape's contract names in docs/repo-layout.md that this tree lacks.
 # Mechanism + limits: docs/doc-refs-ratchet.md.
 [doc_refs_ratchet]
 enabled    = true
 allow_refs = [
     "docs/layout.md",
+    "tests/fixtures",
+    "app/cli",
+    "app/webapp/routers",
     ".github/workflows/ci.yml",
     ".github/workflows/main-gate-watch.yml",
     "scripts/gen_icons.py",

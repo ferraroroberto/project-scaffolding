@@ -1,6 +1,6 @@
 # Structure ratchet
 
-`scripts/structure_ratchet.py` is a baseline-and-ratchet stage for the pre-ship gate. It enforces the [repo layout](repo-layout.md) with seven checks: **file size**, **function length**, **flat directories**, the **layer contract**, the **root layout**, **extra roots** and **second-level placement**. All but the root layout fail when a new offender appears, or when a baselined one grows; existing offenders never block work, and they cannot grow either. A **near-limit band** holds the files and functions just under their limits to a shrink-only count, so a split that stops at 990 lines fails the same way. A **warning band** lists every file, function and directory in that band on every check, without ever failing. The root layout is never baselined.
+`scripts/structure_ratchet.py` is a baseline-and-ratchet stage for the pre-ship gate. It enforces the [repo layout](repo-layout.md) with ten checks: **file size**, **function length**, **flat directories**, the **layer contract**, the **root layout**, **extra roots**, **root files**, **folder types**, **second-level placement** and **redundant exceptions**. All but the root layout fail when a new offender appears, or when a baselined one grows; existing offenders never block work, and they cannot grow either. A **near-limit band** holds the files and functions just under their limits to a shrink-only count, so a split that stops at 990 lines fails the same way. A **warning band** lists every file, function and directory in that band on every check, without ever failing. The root layout is never baselined.
 
 It reuses the shape of the [docs ratchet](docs-ratchet.md) and the [comment ratchet](comment-ratchet.md): an opt-in `.fleet.toml` table, a committed baseline, the same flags, and exit 3 for "not confirmed". It is its own script, and not a check inside the [static-analysis ratchet](static-ratchet.md), because that one needs Node and ruff; this one is stdlib-only and runs anywhere Python 3.11 does.
 
@@ -16,7 +16,10 @@ It reuses the shape of the [docs ratchet](docs-ratchet.md) and the [comment ratc
 | Near-limit band | The count of files at **900–1,000 lines** and of functions at **90–100 lines** may not rise | `band` → `files`, `functions` |
 | Root layout | A required root folder with no tracked file fails; so does a tracked root folder the declared `shape` and `extra_roots` do not list | none: not baselined |
 | Extra root | A tracked `extra_roots` folder the shape's preset does not list fails when not recorded | `root_extras` → the folder names (top-level list) |
+| Root files | A tracked root file neither the common set nor the shape lists fails when not recorded | `shape_contract.root_files` → the file names |
+| Folder types | A file whose extension its folder's type does not take fails when its folder is new or holds more than recorded | `shape_contract.folder_types` → `{folder: files}` |
 | Second-level placement | A file under a home root (`webapp-tray`: `app/`, `src/`) that sits in no home fails when its folder is new or holds more than recorded | `place:<folder>` → `files` |
+| Redundant exception | An `extra_roots` or `extra_root_files` entry the preset already allows fails when not recorded | `shape_contract.redundant` → the entries (`name/` for a folder) |
 
 Tests get the same limits as code. Each failure message names the rule, the limit, where the code goes instead, and the section of `docs/repo-layout.md` that says so:
 
@@ -26,7 +29,7 @@ structure ratchet: 1 finding(s) above the baseline:
       put the new module in a domain subpackage, src/<domain>/. See project-scaffolding docs/repo-layout.md#flat-directory
 ```
 
-The anchors (`#file-size`, `#function-length`, `#flat-directory`, `#layer-contract`, `#extra-roots`, `#second-level-placement`, and one per shape id for the root layout) are pinned by a test, so renaming a heading in `repo-layout.md` fails until the script follows.
+The anchors (`#file-size`, `#function-length`, `#flat-directory`, `#layer-contract`, `#extra-roots`, `#root-files`, `#folder-types`, `#second-level-placement`, and one per shape id for the root layout) are pinned by a test, so renaming a heading in `repo-layout.md` fails until the script follows.
 
 ## What is measured
 
@@ -50,7 +53,7 @@ A function expression takes the name it is bound to (`const mountHome = async ()
 
 ### Root layout
 
-The presets and the three layout checks live in the sibling `scripts/structure_layout.py`, which `structure_ratchet.py` loads by its own path (so `python -P`, which keeps `scripts/` off `sys.path`, finds it); a missing sibling is exit 3, never a skip. The check reads the top-level `shape` and `extra_roots` keys of the repo's own `.fleet.toml` (not the `[structure_ratchet]` table) and the root folders from the same file list as the other checks (`git ls-files --cached --others --exclude-standard`), so a new untracked folder counts as a root and an ignored one does not. A shape's preset lives in `structure_layout.py` (`SHAPES`), which keeps both scripts vendor-verbatim; this table is the same data, and a test compares the two.
+The presets and every layout check live in the sibling `scripts/structure_layout.py`, which `structure_ratchet.py` loads by its own path (so `python -P`, which keeps `scripts/` off `sys.path`, finds it); a missing sibling is exit 3, never a skip. The check reads the top-level `shape`, `extra_roots` and `extra_root_files` keys of the repo's own `.fleet.toml` (not the `[structure_ratchet]` table) and the root folders from the same file list as the other checks (`git ls-files --cached --others --exclude-standard`), so a new untracked folder counts as a root and an ignored one does not. A shape's preset lives in `structure_layout.py` (`SHAPES`), which keeps the scripts vendor-verbatim; this table is the same data, and a test compares the two. Each shape's root files, folder types and homes are in its contract table in [repo-layout.md](repo-layout.md), which a test compares with the script the same way.
 
 | `shape` | Required root folders | Also allowed | `layers` default |
 |---|---|---|---|
@@ -69,16 +72,34 @@ The presets and the three layout checks live in the sibling `scripts/structure_l
 - **A tracked root folder** that is in neither the preset nor `extra_roots` fails by name. The message names the shape, the folder and both fixes: move the code into a listed folder, or declare the folder in `extra_roots` with a line in the repo's `docs/layout.md`.
 - **A declared exception is recorded, not free**: removing a folder from `extra_roots` fails the next run if the folder is still tracked, and the undeclared-root finding itself is never baselined (see Extra roots).
 - **No `shape`** prints `layout check not applicable` and skips that one check; the other four still run, so re-vendoring never breaks a repo that has not declared one. This is a declared skip, never a pass: the PASS line names the shape only when the layout was checked.
-- **An unknown `shape`** is exit 3, not a skip: the layout cannot be checked against a tree that does not exist. A `shape` that is not a string, or an `extra_roots` that is not a list of single folder names, is exit 2.
+- **An unknown `shape`** is exit 3, not a skip: the layout cannot be checked against a tree that does not exist. A `shape` that is not a string, or an `extra_roots` or `extra_root_files` that is not a list of single names, is exit 2.
 - **`layers`**: when the table does not set it, a shape with a layer pair supplies it (`src` never imports `app` for `webapp-tray` and `streamlit`); a repo with no `shape` keeps the default pair.
 
 ### Extra roots
 
 A folder in `extra_roots` that is tracked and that the shape's preset does not list is a deviation. `--init` records the deviations in the baseline's top-level `root_extras` list. The check fails on a deviation that is not in the list; `--update-baseline` drops a name once the folder is gone or promoted into the preset, and adding one takes `--allow-additions`. A name the preset already lists is no deviation, whatever `.fleet.toml` still says, so promoting a folder into a preset needs no baseline edit. The reason for each declared folder is a comment beside it in `.fleet.toml` and a line in `docs/layout.md`.
 
+### Root files
+
+A tracked file directly at the root that neither the common set nor the shape's list allows (names or globs, `fnmatch` case-sensitive) is a loose root file. Each one is recorded by name in the baseline's `shape_contract.root_files`, declared or not, so the list only shrinks: a new one fails by name, and recording it takes `--allow-additions`. A file a repo must keep at the root is declared in `extra_root_files` in `.fleet.toml`, with its reason in a comment beside it; the failure message says whether a file is declared, and the declaration is what the redundancy check reads.
+
+```
+structure ratchet: 1 finding(s) above the baseline:
+  [root file] build_report.py is a root file outside the pipeline-cli tree (is not declared); not baselined
+      move it into a folder the shape lists (scripts/ for a tool, docs/ for a document, config/ for a sample); ... See project-scaffolding docs/repo-layout.md#root-files
+```
+
+### Folder types
+
+Each shape maps folders to a type (the common set: `docs/` documents, `scripts/` and `tests/` code and shell, `src/` code, `config/` config, `tests/fixtures/` anything), and each type to its extensions; the table is in [repo-layout.md](repo-layout.md#folder-types). The longest typed folder holding a file sets its type. A file whose lowercased extension the type does not take is counted per parent folder (`shape_contract.folder_types`) and ratcheted like placement: a new folder, or a higher count, fails, naming the extensions found. A `README.md`, and any path with a hidden segment, is never typed. Folder types read the same scope as the size checks: `exclude` globs and vendored dests are skipped, so a vendored component's files are its publisher's call. The publisher skips them too: every `src` in the repo's own `[components]` catalog (the scaffold's) is left out of folder types and placement, because a component lives at its adopters' path, where that tree holds the copy.
+
+### Redundant exceptions
+
+An `extra_roots` entry the preset already lists, or an `extra_root_files` entry the common set or the shape already allows, is redundant: the exception says nothing. Each is recorded in `shape_contract.redundant` (`webapp/` for a folder, the name for a file) and fails when new; the fix is to delete it from `.fleet.toml`. Promoting a folder or file into a preset therefore makes the entry redundant in every repo that declared it, and the promotion's rollout deletes those entries in the same change.
+
 ### Second-level placement
 
-A shape may declare `homes` (path patterns: `dir/` is the folder and everything below it, `dir/*.py` a file directly in `dir`). A file under one of the roots the homes name that matches no home is misplaced. The ratchet counts misplaced files per folder (`place:<folder>`) and fails on a new folder or a higher count, naming the homes. A shape may also name `surface_parents`: a folder directly under one (`webapp-tray`: `app/webapp/<package>/`) that tracks its own `server.py` is a home too, with everything below it, so a second, separately bound HTTP surface needs no deviation. A sibling folder without `server.py` stays misplaced. Only `webapp-tray` declares homes; the other shapes follow if it proves useful.
+A shape may declare `homes` (path patterns: `dir/` is the folder and everything below it, and a segment may be a glob, so `skills/*/` is every subfolder of `skills/`; `dir/*.py` is a file directly in `dir`). A file under one of the roots the homes name that matches no home is misplaced. The ratchet counts misplaced files per folder (`place:<folder>`) and fails on a new folder or a higher count, naming the homes. A shape may also name `surface_parents`: a folder directly under one (`webapp-tray`: `app/webapp/<package>/`) that tracks its own `server.py` is a home too, with everything below it, so a second, separately bound HTTP surface needs no deviation. A sibling folder without `server.py` stays misplaced. `webapp-tray`, `streamlit`, `skills-governance` and `service` declare homes, derived from where their adopters agree; `pipeline-cli`, `node`, `static-site` and `agent-workspace` declare none, and each one's contract table in [repo-layout.md](repo-layout.md) says why.
 
 ```
 structure ratchet: 1 finding(s) above the baseline:
@@ -86,7 +107,7 @@ structure ratchet: 1 finding(s) above the baseline:
       move it into one of this shape's homes (app/<module>.py, app/cli/, app/tray/, ...), or into a domain subpackage of src/. See project-scaffolding docs/repo-layout.md#second-level-placement
 ```
 
-**A baseline written before this existed** has no `root_extras`. It loads unchanged: the check passes on both and prints that they are not recorded yet, so no adopter fails on the day it re-vendors. The next `--update-baseline` (no `--allow-additions` needed) records today's state, and from then on it may only shrink.
+**A baseline written before these checks existed** has no `root_extras`, or no `shape_contract`. It loads unchanged: each missing field takes today's findings of its kinds as the record, the check prints that they are not recorded yet, and no adopter fails on the day it re-vendors. A missing `shape_contract` also takes today's placement count for a folder the baseline does not hold yet, since four shapes gained homes with it; a folder already recorded keeps its count and still may not grow. The next `--update-baseline` (no `--allow-additions` needed) records today's state, and from then on it may only shrink.
 
 ### Limits
 
@@ -160,6 +181,13 @@ Committed, sorted JSON, one entry per line, with no line numbers:
   "version": 1,
   "band": {"files": 6, "functions": 31},
   "root_extras": ["spike"],
+  "shape_contract": {
+    "root_files": ["build_report.py"],
+    "redundant": ["webapp/"],
+    "folder_types": {
+      "docs": 1
+    }
+  },
   "entries": [
     {"key": "dir:tests", "modules": 52},
     {"key": "fn:app/webapp/static/composer.js:mountComposer", "lines": 500},
@@ -169,7 +197,7 @@ Committed, sorted JSON, one entry per line, with no line numbers:
 }
 ```
 
-Each entry records the count at the last baseline write. A check fails when the count rises above it; a count that falls passes with a hint, and the next `--update-baseline` lowers the entry, or drops it once the offender is back under the limit. Raising the limits in the table drops the entries under the new limit the same way. The `band` object holds the two near-limit counts and follows the same rules; a baseline without it is one written before the band existed, never an error.
+Each entry records the count at the last baseline write; `root_extras` and `shape_contract` hold the layout records the same way. A check fails when the count rises above it; a count that falls passes with a hint, and the next `--update-baseline` lowers the entry, or drops it once the offender is back under the limit. Raising the limits in the table drops the entries under the new limit the same way. The `band` object holds the two near-limit counts and follows the same rules; a baseline without it is one written before the band existed, never an error.
 
 ## Modes
 
@@ -201,14 +229,15 @@ Re-vendoring the script never breaks a repo that has not opted in: an absent `[s
    exclude            = ["tests/fixtures/**"]                # globs; default none
    ```
 
-   and, at the top level of the same file, the layout check's two keys (leave `shape` out to skip that check until the repo is ready):
+   and, at the top level of the same file, the layout keys (leave `shape` out to skip the layout checks until the repo is ready):
 
    ```toml
-   shape       = "streamlit"                                     # one id from the table above
-   extra_roots = ["custom_components"]                           # root folders the shape does not list; default none
+   shape            = "streamlit"                                # one id from the table above
+   extra_roots      = ["custom_components"]                      # root folders the shape does not list; default none
+   extra_root_files = ["manage.py"]                              # root files the shape does not list; default none
    ```
 
-3. Run `python scripts/structure_ratchet.py --init` and commit the baseline. Review it: the first baseline records every existing offender. **Adoption never requires the split first.** Then declare `shape` and run the check once: a root folder it lists as drift is either moved or declared in `extra_roots`.
+3. Run `python scripts/structure_ratchet.py --init` and commit the baseline. Review it: the first baseline records every existing offender. **Adoption never requires the split first.** Then declare `shape` and run the check once: a root folder it lists as drift is either moved or declared in `extra_roots`, and `--update-baseline` records the root files, folder types and placement it finds.
 4. Add a gate stage that runs `python scripts/structure_ratchet.py` and fails on any non-zero exit. The scaffold's `scripts/verify-before-ship.ps1` places it after the docs ratchet and before `mypy`. **Do not path-route it**: a directory count needs the whole tree.
 5. If the repo uses diff-proportionate e2e routing, add a `tier = "none"` rule for the baseline file to `.fleet.toml` `[e2e]` and a matching assertion in `tests/test_classify_e2e.py`.
 
@@ -221,5 +250,7 @@ One pass reads every in-scope file once and parses each Python file once; the AS
 ## Tests
 
 `tests/ratchets/test_structure_ratchet.py`: Python and JS spans on fixture strings (nesting, methods, arrows, a closure of several hundred lines, braces inside strings, templates, comments and regexes, an unterminated function), the layer match and what it must not match, directory counts, and the full ratchet matrix per check on throwaway git repos (a new offender fails, a baselined one passes at its size, growth fails, a shrink lowers the entry, `--update-baseline` never adds, `--allow-additions` adds), the failure message per rule, scope and vendored exclusion, and every exit code. A missing prerequisite is a hard failure, never `pytest.skip`. Root-layout tests cover each shape's required set, an undeclared root, a declared extra root, no `shape` and an unknown `shape`. The self-adoption tests pin the gate order, the catalog entry, the anchors and limits in `docs/repo-layout.md`, and that the presets in the script match the table above.
+
+`tests/ratchets/test_structure_ratchet_contract.py`: the repo-shape contract. On path lists: the common and per-shape root files and globs, the redundant entries, the longest-folder type with readmes, hidden paths, untyped folders and case, and the homes of every shape that has them. On throwaway git repos: each new check fails when new and names its anchor, `--update-baseline` never adds and `--allow-additions` does, a baseline without `shape_contract` passes, records and then ratchets (a recorded placement count still may not grow meanwhile), a vendored file is never typed, and malformed config or records are exit 2. Against the docs: every shape's contract table in `docs/repo-layout.md`, the common sets and the type table match the script.
 
 `tests/ratchets/test_structure_ratchet_band.py`: the near-limit band on throwaway git repos: the ratio's default, range and rounding; a new file or function in the band fails with its split target; a split that lands just under the limit fails; one leaving lets `--update-baseline` lower the count; one entering while another leaves passes; `--allow-additions` raises it; a baseline from before the band passes, then is recorded and ratcheted; a malformed `band` is a baseline error; the scaffold records its own band; and the warning band lists files, functions and directories in the band without changing the exit code on a pass or a failure, prints a clear band with zero counts, and reports an unmeasured function's band as unknown.

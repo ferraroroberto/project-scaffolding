@@ -693,7 +693,7 @@ def test_ignored_folders_and_root_files_are_not_roots(tmp_path: Path, capsys: py
     shape_repo(tmp_path, "streamlit", ("app", "src", "tests"))
     write(tmp_path, ".gitignore", "scratch/\n")
     write(tmp_path, "scratch/x.txt", "x\n", track=False)
-    write(tmp_path, "main.py", "x = 1\n")
+    write(tmp_path, "launch_app.bat", "x\n")  # a root file the shape lists: not a root folder
     assert_layout_passes(tmp_path, "streamlit", capsys)
 
 
