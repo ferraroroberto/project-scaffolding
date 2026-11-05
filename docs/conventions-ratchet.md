@@ -160,6 +160,23 @@ The rule does not see a command split across lines, a quoted `pwsh` that is not 
 
 **Enabling it in a repo that has hits today.** Add `"no-pwsh-stub"` to `rules` and record today's hits with `--update-baseline --allow-additions` (or `--init` when there is no baseline yet). Fix them in a follow-up: each fixed line shrinks the baseline with `--update-baseline`. Reading these file types makes every tracked `.md`, `.json` and `.yml` file part of the scan, but only while the rule is listed; a repo that does not list it reads the same files as before. A baseline file is never read as a hit.
 
+### `subprocess-timeout`
+
+> **Execution** — any command meant for unattended/scheduled execution must run synchronously (foreground) or poll to completion in the same turn; nothing wakes a headless session that is waiting on a child that never exits.
+
+A blocking spawn with no `timeout=` can hang forever, and in a scheduled run nothing reports it. `ruff` has `S113` for an HTTP request with no timeout but no rule for a subprocess, so this is the same check for `subprocess`.
+
+A hit is a call to `subprocess.run`, `call`, `check_call` or `check_output`, through any import alias, with no `timeout=` keyword. It is not reported when:
+
+- the call passes `**kwargs`, which may carry the timeout (a miss, never a guess);
+- it is `Popen`, `asyncio.create_subprocess_exec` or `asyncio.create_subprocess_shell`, which return at once, so their lifetime is managed by the caller.
+
+A call that is meant to block for the child's whole life (a foreground dev runner) takes the exempt marker, with the reason. `timeout=None` counts as a timeout the author chose, so it is not a hit; a literal `None` is not told apart from a variable.
+
+A fix passes a named constant (`timeout=GIT_TIMEOUT_S`) and handles `subprocess.TimeoutExpired` as its own failure, distinct from the child's non-zero exit: a hung child and a failed child are different conditions.
+
+**Enabling it in a repo that has hits today.** Add `"subprocess-timeout"` to `rules` and record today's hits with `--update-baseline --allow-additions` (or `--init` when there is no baseline yet). Fix them in a follow-up, so the baseline reaches zero and is not kept as a standing ledger. A copy of a scaffold script that predates its timeout (`scripts/gen_tailscale_cert.py`, `scripts/classify_e2e.py`) is cleared by re-vendoring it, not by editing the copy.
+
 ### `must-use`
 
 There is **no global-instruction line** for this rule. It enforces a convention the repo's own `CLAUDE.md` states by naming one home for a job: a pooled HTTP session, one SQLite connection dependency, one static-file class, one atomic-write helper. The scaffold's own `CLAUDE.md` names several (outbound-connection discipline, the `get_db` dependency, `CachingStaticFiles`).
@@ -347,6 +364,8 @@ A read-only dry run with **every rule on** over every fleet checkout (42 repos),
 | `must-use` `sqlite3.connect` outside a `db.py` or `database.py` | 48 (37 under `app/` and `src/`) | 18 (16) | none | not established: the repo's connection home is rarely named `db.py` (`connection.py`, `store.py`, `_sqlite.py`), so the count is an upper bound and the scaffold ships no entry for it |
 | `no-pwsh-stub` | 28 | 5 (of 44) | all | 24 of 28 are the stub run as a command in a gate or restart line: the gate command in `CLAUDE.md` and the README, `docs/` pages, and `scripts/*.ps1` usage banners. 4 are a kind a marker covers: 3 `run: pwsh -File` steps in CI workflows, where a hosted runner has a real `pwsh`, and 1 `Get-Command pwsh` lookup. 8 more sit under `tests/` folders, which the rule skips. |
 
+| `subprocess-timeout` | 128 (24 are in scaffold scripts: 18 in adopters' copies of `gen_tailscale_cert.py`, 5 in `classify_e2e.py` (the scaffold's own 2 since fixed) and 1 in a `gen_ssl_cert.py`) | 21 (of 44) | 14 of the 104 hits outside the scaffold-script copies, every 7th, source read | 12 of 14: a `git`, `ffmpeg`, `ffprobe`, `clip`, `systemctl`, `launchctl` or Ghostscript call that waits on a child with no bound. 2 are a kind a marker covers: foreground runners that block for the child's life. The issue's own hand sample found 8 of 10 real, 2 deliberate. Vendored destinations and test modules are not read. |
+
 Before the platform-branch and system-folder rules, the dry run also reported `open`/`xdg-open`/`pbcopy`/`xclip` branches (`no-window`), `C:/ProgramData/pip/pip.ini` and a bare `"C:\\"` drive root (`no-drive-path`). Each became a rule above.
 
 The false-positive kinds that remain:
@@ -357,6 +376,6 @@ The false-positive kinds that remain:
 
 ## Tests
 
-`tests/ratchets/test_conventions_ratchet.py`: for each rule, a seeded violation that fails by name and the compliant form that passes. Also covered: import aliases, the `**kwargs` miss, every platform-branch form and the early return, the CLI-module and file-write exceptions, the system-folder and drive-root exceptions, docstrings versus f-strings, helpers and wrappers, every spelling of a login `post` route and the routes that take no password, every text format and argv spelling of a `pwsh` command against the absolute path, prose, shell-name lists and lookups that are not hits, the test-module scope, and exempt markers (a reason is needed, and the marker must name this rule). On throwaway git repos it runs every mode and exit code: a new violation failing by rule, file and line; a second violation of a baselined rule; shrink-only updates; `--allow-additions`; vendored and excluded files, a new untracked file failing and an ignored one skipped; a tracked baseline and another ratchet's baseline never read as evidence; and exit 3 for an unparseable file and an unusable `git`, in every mode. A missing prerequisite is a hard failure there, never `pytest.skip`. The scaffold's own gate stage doubles as the guard that its committed baseline is current.
+`tests/ratchets/test_conventions_ratchet.py`: for each rule, a seeded violation that fails by name and the compliant form that passes. Also covered: import aliases, the `**kwargs` miss (for `no-window` and `subprocess-timeout`), `Popen` and the async spawns never a timeout hit, every platform-branch form and the early return, the CLI-module and file-write exceptions, the system-folder and drive-root exceptions, docstrings versus f-strings, helpers and wrappers, every spelling of a login `post` route and the routes that take no password, every text format and argv spelling of a `pwsh` command against the absolute path, prose, shell-name lists and lookups that are not hits, the test-module scope, and exempt markers (a reason is needed, and the marker must name this rule). On throwaway git repos it runs every mode and exit code: a new violation failing by rule, file and line; a second violation of a baselined rule; shrink-only updates; `--allow-additions`; vendored and excluded files, a new untracked file failing and an ignored one skipped; a tracked baseline and another ratchet's baseline never read as evidence; and exit 3 for an unparseable file and an unusable `git`, in every mode. A missing prerequisite is a hard failure there, never `pytest.skip`. The scaffold's own gate stage doubles as the guard that its committed baseline is current.
 
 `tests/ratchets/test_conventions_must_use.py` covers `must-use`: the entry shape and every config error, import aliases and dotted modules, the helper, `paths` and test-module scope, several entries counted under one rule, the two built-in policies reporting beside a declared one, and the gate on a throwaway repo (a new hit failing by rule, file and line, a baseline burned down to zero, a bad entry exiting 2 in every mode).

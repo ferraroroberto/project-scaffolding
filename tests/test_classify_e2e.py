@@ -16,8 +16,12 @@ from __future__ import annotations
 
 import ast
 import re
+import subprocess
 from pathlib import Path
 
+import pytest
+
+from scripts import classify_e2e
 from scripts.classify_e2e import (
     Category,
     E2EConfig,
@@ -793,3 +797,17 @@ def test_classifier_fits_the_strictest_adopter_line_length() -> None:
         if len(line) > 100
     ]
     assert long_lines == []
+
+
+def test_a_wedged_git_call_is_bounded_and_reads_as_no_answer(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A hung git must not hang the gate: it times out and the diff is unknown, which routes to full."""
+    seen: list[object] = []
+
+    def wedged(*args: object, **kwargs: object) -> object:
+        seen.append(kwargs.get("timeout"))
+        raise subprocess.TimeoutExpired(cmd="git", timeout=1)
+
+    monkeypatch.setattr(classify_e2e.subprocess, "run", wedged)
+    assert classify_e2e._run_git(["status"]) == []
+    assert classify_e2e._git_text(["show", "HEAD:x"]) is None
+    assert seen == [classify_e2e._GIT_TIMEOUT_S] * 2

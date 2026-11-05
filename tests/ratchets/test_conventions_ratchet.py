@@ -31,7 +31,11 @@ from tests._ratchet_not_confirmed import (
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-ALL = cr.Config(cr.DEFAULT_BASELINE, cr.RULES, (), cr.DEFAULT_PRINT_PATHS, ("src/secret_compare.py",), ("src/git_run.py",))
+# Every rule but `subprocess-timeout`, whose own tests below enable it alone: the other rules' fixtures spawn
+# without a `timeout=` and should stay about the rule they exercise.
+ALL = cr.Config(cr.DEFAULT_BASELINE, tuple(r for r in cr.RULES if r != "subprocess-timeout"), (),
+                cr.DEFAULT_PRINT_PATHS, ("src/secret_compare.py",), ("src/git_run.py",))
+TIMEOUT = cr.Config(cr.DEFAULT_BASELINE, ("subprocess-timeout",))
 
 
 def hits(src: str, path: str = "src/a.py", cfg: cr.Config = ALL) -> list[str]:
@@ -210,6 +214,62 @@ def test_an_exempt_marker_needs_the_rule_and_a_reason() -> None:
 def test_a_file_that_does_not_parse_is_not_confirmed() -> None:
     with pytest.raises(cr.NotConfirmed, match="does not parse"):
         cr.scan_source(b"def broken(:\n", "src/a.py", frozenset(cr.RULES))
+
+
+# -------------------------------------------------------- subprocess-timeout
+
+def timeout_hits(src: str, path: str = "src/a.py") -> list[str]:
+    return hits(src, path, TIMEOUT)
+
+
+@pytest.mark.parametrize("call", ["run", "call", "check_call", "check_output"])
+def test_a_blocking_subprocess_call_without_a_timeout_fails_and_with_one_passes(call: str) -> None:
+    assert timeout_hits(f"import subprocess\nsubprocess.{call}(['x'])\n") == ["subprocess-timeout:2"]
+    assert timeout_hits(f"import subprocess\nsubprocess.{call}(['x'], timeout=30)\n") == []
+
+
+def test_a_kwargs_splat_may_carry_the_timeout_so_it_is_a_miss_not_a_hit() -> None:
+    assert timeout_hits("import subprocess\nsubprocess.run(['x'], **opts)\n") == []
+
+
+def test_popen_and_the_async_spawns_are_never_a_subprocess_timeout_hit() -> None:
+    src = ("import asyncio, subprocess\nsubprocess.Popen(['x'])\n"
+           "async def f():\n    await asyncio.create_subprocess_exec('x')\n"
+           "    await asyncio.create_subprocess_shell('x')\n")
+    assert timeout_hits(src) == []
+
+
+@pytest.mark.parametrize(
+    "src",
+    [
+        pytest.param("import subprocess as sp\nsp.run(['x'])\n", id="module-alias"),
+        pytest.param("from subprocess import check_output\ncheck_output(['x'])\n", id="from-import"),
+        pytest.param("from subprocess import run as go\ngo(['x'])\n", id="from-import-alias"),
+    ],
+)
+def test_subprocess_timeout_follows_import_aliases(src: str) -> None:
+    assert [h.split(":")[0] for h in timeout_hits(src)] == ["subprocess-timeout"]
+
+
+def test_a_subprocess_timeout_exempt_marker_needs_the_rule_and_a_reason() -> None:
+    call = "subprocess.run(['x'])"
+    assert timeout_hits(f"import subprocess\n{call}  # subprocess-timeout-exempt: foreground runner\n") == []
+    assert timeout_hits(f"import subprocess\n# subprocess-timeout-exempt: blocks for the child's life\n{call}\n") == []
+    assert timeout_hits(f"import subprocess\n{call}  # subprocess-timeout-exempt\n") == ["subprocess-timeout:2"]
+    assert timeout_hits(f"import subprocess\n{call}  # no-window-exempt: wrong rule\n") == ["subprocess-timeout:2"]
+
+
+def test_subprocess_timeout_is_opt_in_and_test_modules_are_not_held_to_it() -> None:
+    src = "import subprocess\nsubprocess.run(['x'])\n"
+    assert hits(src, cfg=cr.Config(cr.DEFAULT_BASELINE, ("no-window",))) == ["no-window:2"]
+    for path in ("tests/test_x.py", "conftest.py", "src/x_test.py"):
+        assert timeout_hits(src, path) == [], path
+
+
+def test_subprocess_timeout_is_independent_of_no_window() -> None:
+    both = cr.Config(cr.DEFAULT_BASELINE, ("no-window", "subprocess-timeout"))
+    src = "import subprocess\nsubprocess.run(['x'], creationflags=0)\nsubprocess.run(['x'], timeout=5)\n"
+    assert hits(src, cfg=both) == ["subprocess-timeout:2", "no-window:3"]
 
 
 # ------------------------------------------------------- password-input-vendored
