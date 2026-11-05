@@ -1,6 +1,6 @@
 # Doc references ratchet
 
-`scripts/doc_refs_ratchet.py` is a baseline-and-ratchet stage for the pre-ship gate. It reads `README.md`, `CLAUDE.md` and `docs/**/*.md`, picks out every reference to a repo path, a `python -m` module or a loopback port, and resolves each one against the tracked tree and `.fleet.toml`. It fails on a **dangling** reference that the committed baseline does not already record. Existing debt never blocks work; it cannot grow either.
+`scripts/doc_refs_ratchet.py` is a baseline-and-ratchet stage for the pre-ship gate. It reads `README.md`, `CLAUDE.md` and `docs/**/*.md`, picks out every reference to a repo path, a `python -m` module or a loopback port, and resolves each one against the tracked tree and `.fleet.toml`. It also flags every use of a **retired name** the repo declares. It fails on a **dangling** reference or a retired name that the committed baseline does not already record. Existing debt never blocks work; it cannot grow either.
 
 A doc that names a script that moved or a port the app no longer binds sends the next reader, agent or human, down a dead end, and nothing else fails when the code moves. This is the mechanical share of the stale-documentation findings `/codebase-audit` files.
 
@@ -16,6 +16,7 @@ Read outside fenced code blocks and HTML comments, line by line:
 | `module` | The token after `-m` in an inline code span, when its first segment is a tracked top-level folder or a root `.py` file | `` `python -m scripts.classify_e2e` `` |
 | `link` | A relative Markdown link or image target, a reference definition, an `href` or `src` attribute, resolved from the doc's own folder | `[guide](../README.md)` |
 | `port` | `localhost:N`, `127.0.0.1:N`, `0.0.0.0:N` or `[::1]:N` anywhere on the line, or an inline code span that is only `:N` | `` `127.0.0.1:8447` ``, `` `:8447` `` |
+| `retired` | A term the repo lists in `retired`, anywhere in the text: prose, inline code and fenced blocks alike. It is never resolved; every occurrence is a hit | `--old-flag`, `/old-skill`, `OLD_ENV_VAR` |
 
 Before resolving, a path drops its `./` prefix and any line, symbol or test-id suffix (`:12`, `:12-30`, `#L12`, `:func`, `::test_x[param]`); backslashes become slashes. A link drops its `#fragment` and `?query` and is URL-decoded.
 
@@ -36,7 +37,7 @@ The tree of record is `git ls-files --cached --others --exclude-standard` (spawn
 | Placeholders, globs and variables | `<`, `>`, `*`, `?`, `{}`, `[]`, `$`, `%`, `\|`, `=`, `…` or `...` in the token |
 | Absolute, home and drive paths, URLs, `..` segments in a span | Machine-local, or not a claim about this tree |
 | A link that leaves the repo | `../../other-repo/x.md` points at a sibling checkout this stage cannot see |
-| Fenced code blocks | Example trees, sample config and command transcripts are full of paths the reader creates; the cost is that a stale command inside a fence is not caught |
+| Fenced code blocks (for paths, modules, links and ports) | Example trees, sample config and command transcripts are full of paths the reader creates; the cost is that a stale command inside a fence is not caught |
 | Skills, slash commands, environment variables | Their source of truth is outside the repo (user-scope skill folders, the shell) |
 | `stdlib` and installed modules | `python -m pytest` names someone else's module |
 
@@ -47,6 +48,26 @@ The tree of record is `git ls-files --cached --others --exclude-standard` (spawn
 - **An intentional pointer cannot be told from a stale one.** A doc that tells the reader to create a file (`docs/layout.md` in an adopter, a workflow copied from a template) names a path that does not exist on purpose. Put it in `allow_refs`.
 - **Code spans do not continue across lines.** A backtick run with no partner on its own line is literal text.
 - **Indented code blocks are read as prose.** They cannot be told from list continuation.
+
+## Retired names
+
+A removed flag, skill, environment variable or config key leaves prose behind that path resolution cannot see. The repo lists each one in `.fleet.toml`, with what to use instead:
+
+```toml
+[doc_refs_ratchet]
+retired = [
+  { term = "--old-flag", why = "flag removed; use --new-flag" },
+  { term = "/old-skill", why = "skill removed; use /new-skill" },
+]
+```
+
+- **Add the entry in the same PR that removes the thing.** The PR then fixes every current mention, and no later PR can bring the name back without the stage failing it. A name removed with no entry is invisible to this stage.
+- **Whole names only.** A term matches when no letter, digit, underscore or hyphen touches either end, so `--old-flag` does not match `--old-flag-extra` or `--old-flags`, and `/old-skill` does not match inside a longer path such as `x/old-skill`. Matching is case-sensitive.
+- **Everywhere in the text, fences included.** A stale flag in a command example misleads as much as one in a sentence. Only HTML comments are skipped.
+- **Each hit prints its `why`**: `README.md:2: retired name `--old-flag`: flag removed; use --new-flag`. Every entry needs a non-empty `term` and `why`; an unknown key, an empty value or a repeated `term` exits 2.
+- **Counts like any other hit.** The baseline records `retired:<term>` per file, so a second occurrence fails and `--update-baseline` only shrinks. A legitimate mention (a doc that must name the removed thing) goes in `allow_refs` as `retired:<term>`.
+- **Scope widens to skills.** While `retired` is non-empty, every tracked `SKILL.md` and each Markdown file it links to is read as well, wherever it sits and whether or not `include` covers it, because that is where retired skill names linger. Those files are read for retired names only; their paths, links and ports are not checked. `exclude` and the vendored destinations still apply.
+- **Off when the list is empty**: no retired scan runs and no skill file is read.
 
 ## Allowed references
 
@@ -62,7 +83,7 @@ Files come from `git ls-files --cached --others --exclude-standard`: the root `R
 |---|---|---|
 | `0` | Pass (no dangling reference beyond the baseline), or the stage is **not enabled** | continues |
 | `1` | A dangling reference not in the baseline, or the baseline file is missing | fails |
-| `2` | Bad `[doc_refs_ratchet]` table, a malformed `port`, unreadable baseline, bad arguments | fails |
+| `2` | Bad `[doc_refs_ratchet]` table (including a malformed `retired` entry), a malformed `port`, unreadable baseline, bad arguments | fails |
 | `3` | **NOT CONFIRMED**: `git` unusable (`ls-files` or `check-ignore`), a file that is not UTF-8, or a fenced block or HTML comment that never closes. The message names the file and the line the block opened on | fails |
 
 Exit 3 is its own state and never folded into a pass. An unclosed fence is not skipped because CommonMark runs it to the end of the file, which would silently hide every reference below it.
@@ -108,6 +129,7 @@ Re-vendoring the script never breaks a repo that has not opted in: an absent `[d
    include    = ["README.md", "CLAUDE.md", "docs/"] # path prefixes; the default
    exclude    = ["docs/reports/**"]                 # globs, e.g. generated per-run reports
    allow_refs = [":8000", ":8090"]                  # globs; another service's port, a file adopters create
+   retired    = [{ term = "--old-flag", why = "flag removed; use --new-flag" }]  # optional; see Retired names
    ```
 
 3. If the repo serves an app, list the ports of the other services its docs name in `allow_refs` first: a fleet web app names one to seven of them, the hub repo eighteen. Then run `python scripts/doc_refs_ratchet.py --init`, review the baseline, and commit it. Each entry is either a real stale reference worth a follow-up fix or an intentional pointer worth an `allow_refs` line. **Adoption never requires the fixes first.**
@@ -130,4 +152,4 @@ Of the 2,500 hits the first draft reported, about 2,000 came from bare file name
 
 ## Tests
 
-`tests/ratchets/test_doc_refs_ratchet.py`: extraction on fixture strings (what counts as a path, module, link or port; the placeholders, qualifiers, URLs, fences and comments that do not), resolution (files, folders, `.py` shorthand, symbols in modules and packages, module forms, the declared port), scope, and every mode and exit code on throwaway git repos, including ignored paths and folders, `allow_refs` globs and the port check. A missing prerequisite is a hard failure there, never `pytest.skip`. The scaffold's own gate stage doubles as the guard that its committed baseline is current, and a test pins that this page carries no dangling reference itself.
+`tests/ratchets/test_doc_refs_ratchet.py`: extraction on fixture strings (what counts as a path, module, link or port; the placeholders, qualifiers, URLs, fences and comments that do not), resolution (files, folders, `.py` shorthand, symbols in modules and packages, module forms, the declared port), scope, and every mode and exit code on throwaway git repos, including ignored paths and folders, `allow_refs` globs and the port check. A missing prerequisite is a hard failure there, never `pytest.skip`. The scaffold's own gate stage doubles as the guard that its committed baseline is current, and a test pins that this page carries no dangling reference itself. The retired-name tests seed a retired flag and a retired skill name (hit, with its `why`) beside the compliant form and a longer word that contains the term (no hit), and cover the malformed entries, the baseline shrink, `allow_refs`, and the `SKILL.md` scope.
