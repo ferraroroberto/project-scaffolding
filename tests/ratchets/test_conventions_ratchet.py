@@ -90,6 +90,9 @@ def test_malformed_table_fails_loud(body: str) -> None:
                      "from src.secret_compare import equal\nok = equal(a, b)\n", id="secret-compare"),
         pytest.param("git-wrapper", "import subprocess\nsubprocess.run(['git', 'status'], creationflags=0)\n",
                      "from src.git_run import run_git\nrun_git(['status'])\n", id="git-wrapper"),
+        pytest.param("no-pwsh-stub", "CMD = 'pwsh -File scripts/gate.ps1'\n",
+                     "CMD = 'C:/Windows/System32/WindowsPowerShell/v1.0/powershell.exe -File scripts/gate.ps1'\n",
+                     id="no-pwsh-stub"),
     ],
 )
 def test_each_rule_fails_by_name_on_a_violation_and_passes_the_compliant_form(rule: str, bad: str, good: str) -> None:
@@ -260,7 +263,7 @@ def test_the_vendored_component_tests_and_python_are_not_held_to_the_rule() -> N
         "password-input-vendored:4"], "only the component's own folder is exempt"
     assert hits('HTML = \'<input type="password">\'\n') == [], "the rule reads web files, not Python"
     assert cr.in_scope("app/webapp/static/index.html", ALL, ())
-    assert not cr.in_scope("docs/sign-in.md", ALL, ())
+    assert not cr.in_scope("docs/sign-in.txt", ALL, ())
 
 
 def test_the_web_rule_is_opt_in_and_the_python_rules_never_read_web_files() -> None:
@@ -368,6 +371,94 @@ def test_the_login_rule_is_opt_in() -> None:
     src = _ROUTER + "\n@router.post('/api/login')\nasync def login(request):\n    return {}\n"
     only_window = cr.Config(cr.DEFAULT_BASELINE, ("no-window",))
     assert cr.scan_source(src, "app/a.py", cr.rules_for("app/a.py", only_window)) == []
+
+
+# -------------------------------------------------------------- no-pwsh-stub
+
+_ABS_PS = "C:/Windows/System32/WindowsPowerShell/v1.0/powershell.exe"
+
+
+def text_hits(src: str, path: str = "README.md", cfg: cr.Config = ALL) -> list[str]:
+    """`rule:line` of every hit in one in-memory text (non-Python) file."""
+    return [f"{h.rule}:{h.line}" for h in cr.scan_text(src, path, cr.rules_for(path, cfg))]
+
+
+@pytest.mark.parametrize(
+    ("path", "src"),
+    [
+        pytest.param("README.md", "Run `pwsh -File scripts/verify-before-ship.ps1` before shipping.\n", id="md-file"),
+        pytest.param("docs/verification.md", "pwsh -NoProfile -Command ./gate.ps1\n", id="md-noprofile"),
+        pytest.param("scripts/run.ps1", "& pwsh -Command Get-Date\n", id="ps1-call-operator"),
+        pytest.param("tray.bat", "start /b pwsh.exe -File x.ps1\n", id="bat-exe"),
+        pytest.param("tray.cmd", "PWSH -File x.ps1\n", id="cmd-upper-case"),
+        pytest.param(".fleet.toml", '[verify]\nboot = "pwsh -File scripts/boot.ps1"\n', id="toml-value"),
+        pytest.param("claude.json", '{"command": "pwsh -File hook.ps1"}\n', id="json-value"),
+        pytest.param(".github/workflows/ci.yml", "      - run: pwsh -File gate.ps1\n", id="yml-run"),
+        pytest.param("ci.yaml", "run: pwsh --version\n", id="yaml-long-switch"),
+        pytest.param("README.md", 'cmd = ["pwsh", "-File", "x.ps1"]\n', id="argv-list"),
+        pytest.param("README.md", "args = ['pwsh.exe' , '-NoProfile']\n", id="argv-list-exe"),
+        pytest.param("README.md", 'run(("pwsh", "-File", "x.ps1"))\n', id="argv-tuple"),
+    ],
+)
+def test_pwsh_as_a_command_is_a_hit_in_every_text_format(path: str, src: str) -> None:
+    assert text_hits(src, path)[-1].startswith("no-pwsh-stub:")
+    assert len(text_hits(src, path)) == 1
+
+
+@pytest.mark.parametrize(
+    "line",
+    [
+        pytest.param(f"& {_ABS_PS} -File x.ps1", id="absolute-windows-powershell"),
+        pytest.param('"C:/Program Files/PowerShell/7/pwsh.exe" -File x.ps1', id="absolute-real-install"),
+        pytest.param("/usr/local/bin/pwsh -File x.ps1", id="absolute-posix"),
+        pytest.param("      shell: pwsh", id="actions-shell-key"),
+        pytest.param("Never use the 0-byte `pwsh` stub.", id="prose-without-a-switch"),
+        pytest.param("shutil.which('pwsh')", id="lookup"),
+        pytest.param("my-pwsh -File x", id="longer-name"),
+        pytest.param("pwshell -File x", id="longer-word"),
+        pytest.param('NESTED_SHELLS = {"bash", "sh", "pwsh", "cmd"}', id="shell-name-set"),
+        pytest.param('names = ["bash", "pwsh", "cmd"]', id="shell-name-list"),
+    ],
+)
+def test_the_absolute_path_and_prose_that_only_names_the_stub_are_not_hits(line: str) -> None:
+    assert text_hits(line + "\n") == []
+
+
+def test_pwsh_in_a_python_string_or_comment_is_a_hit_and_other_rules_still_run() -> None:
+    src = "import subprocess\n# restart: pwsh -File x.ps1\nsubprocess.run(['pwsh', '-File', 'x.ps1'])\n"
+    assert hits(src) == ["no-pwsh-stub:2", "no-pwsh-stub:3", "no-window:3"]
+
+
+def test_a_pwsh_exempt_marker_needs_a_reason_on_the_line_or_the_line_above() -> None:
+    reason = "names the stub to forbid it"
+    bad = "Never run `pwsh -File x.ps1`."
+    assert text_hits(f"{bad} <!-- no-pwsh-stub-exempt: {reason} -->\n") == []
+    assert text_hits(f"<!-- no-pwsh-stub-exempt: {reason} -->\n{bad}\n") == []
+    assert text_hits(f"# no-pwsh-stub-exempt: {reason}\nx = 'pwsh -File a'\n", "run.ps1") == []
+    assert text_hits(f"<!-- no-pwsh-stub-exempt -->\n{bad}\n") == ["no-pwsh-stub:2"], "a bare marker exempts nothing"
+    assert text_hits(f"<!-- no-window-exempt: {reason} -->\n{bad}\n") == ["no-pwsh-stub:2"], "wrong rule"
+    assert text_hits(f"<!-- no-pwsh-stub-exempt: {reason} -->\n\n{bad}\n") == ["no-pwsh-stub:3"], "a gap ends it"
+    assert text_hits(f"{bad}\n{bad} <!-- no-pwsh-stub-exempt: {reason} -->\n") == ["no-pwsh-stub:1"]
+    assert text_hits(f"{bad} <!-- no-pwsh-stub-exempt: {reason} -->\n{bad}\n") == [
+        "no-pwsh-stub:2"], "a marker covers its own hit, not the next hit"
+
+
+def test_the_pwsh_rule_is_opt_in_and_test_folders_and_other_text_are_not_held_to_it() -> None:
+    other = cr.Config(cr.DEFAULT_BASELINE, ("no-window",))
+    assert text_hits("pwsh -File x\n", cfg=other) == []
+    assert not cr.in_scope("README.md", other, ()), "text files are read only when a text rule is on"
+    assert cr.in_scope("README.md", ALL, ())
+    assert cr.in_scope("scripts/run.bat", ALL, ())
+    assert not cr.in_scope("notes.txt", ALL, ())
+    assert text_hits("pwsh -File x\n", "tests/e2e/fixtures/gate.md") == []
+    assert hits("X = 'pwsh -File x'\n", "tests/test_x.py") == []
+    assert not cr.in_scope("docs/vendor/README.md", ALL, ("docs/vendor",)), "a vendored copy's debt is its source's"
+
+
+def test_a_baseline_file_is_never_read_for_pwsh() -> None:
+    assert not cr.in_scope(".dead-code-ratchet-baseline.json", ALL, ())
+    assert not cr.in_scope(".conventions-ratchet-baseline.json", ALL, ())
+    assert not cr.in_scope("state/custom-baseline-name.json", cr.Config("state/custom-baseline-name.json", cr.RULES), ())
 
 
 # ------------------------------------------------------- ratchet on a git repo
@@ -513,6 +604,27 @@ def test_no_baseline_is_ever_read_as_evidence(repo: Path, capsys: pytest.Capture
     assert "PASS (1 baselined hit(s) in 1 file(s), none new" in capsys.readouterr().out
     assert run_mode(repo, update=True) == cr.EXIT_PASS
     assert '{"key": "src/a.py", "counts": {"no-drive-path": 1}}' in baseline_text(repo)
+
+
+def test_a_pwsh_command_in_a_new_text_file_fails_the_gate_beyond_its_baseline(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    git(tmp_path, "init", "-q")
+    write(tmp_path, ".fleet.toml", '[conventions_ratchet]\nenabled = true\nrules = ["no-pwsh-stub"]\n')
+    write(tmp_path, "README.md", f"Gate: `{_ABS_PS} -File scripts/gate.ps1`\n")
+    assert run_mode(tmp_path, init=True) == cr.EXIT_PASS
+    assert run_mode(tmp_path) == cr.EXIT_PASS
+    write(tmp_path, "docs/verification.md", "Gate: `pwsh -File scripts/gate.ps1`\n")
+    write(tmp_path, "tests/fixture.md", "pwsh -File x\n")
+    capsys.readouterr()
+    assert run_mode(tmp_path) == cr.EXIT_RISE
+    out = capsys.readouterr().out
+    assert "docs/verification.md:1: [no-pwsh-stub] `pwsh` is a 0-byte stub" in out
+    assert "tests/fixture.md" not in out
+    assert run_mode(tmp_path, update=True, allow=True) == cr.EXIT_PASS
+    assert '{"key": "docs/verification.md", "counts": {"no-pwsh-stub": 1}}' in baseline_text(tmp_path)
+    assert "README.md" not in baseline_text(tmp_path), "the compliant form is never baselined"
+    assert run_mode(tmp_path) == cr.EXIT_PASS
 
 
 # ------------------------------------------------------- not confirmed
