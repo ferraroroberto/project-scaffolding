@@ -137,7 +137,7 @@ scripts/
   box_lock_gate.ps1           vendor-verbatim wrapper: dot-sourced by verify-before-ship.ps1 to hold fleet-config's shared box load lock for the run
   brand_gen.py               render_set() — generates favicon/apple-touch/maskable/tray/Stream-Deck icons from a brand master
   classify_e2e.py             routes the e2e browser phase to skip/static/full from `.fleet.toml`'s [e2e] table
-  comment_ratchet.py          gate stage: #NNN comment references may not rise above a committed baseline
+  comment_ratchet.py          gate stage: #NNN comment references (and opt-in docstring refs, history phrases) may not rise above a committed baseline
   conventions_ratchet.py      gate stage: fleet-convention rule hits may not rise above a committed baseline
   runtime_write_ratchet.py    gate stage: write targets under code folders may not rise; probes the test run for runtime files there
   runtime_write_resolve.py    runtime_write_ratchet's sibling: resolves where each write target points
