@@ -132,7 +132,7 @@ def test_a_malformed_extra_root_files_is_a_config_error(tmp_path: Path, value: s
         ("streamlit", "app/styles/base.css"), ("streamlit", "data/raw.bin"), ("streamlit", "scripts/run.ps1"),
         ("webapp-tray", "app/webapp/static/icons/a.png"), ("webapp-tray", "app/webapp/player/index.html"),
         ("service", "launchers/start.sh"), ("static-site", "css/site.css"), ("skills-governance", "skills/a/SKILL.md"),
-        ("streamlit", "config/app.json.example"),
+        ("streamlit", "config/app.json.example"), ("node", "patches/left-pad+1.0.0.patch"),
     ],
 )
 def test_a_file_its_folder_type_takes_is_not_mistyped(shape: str, path: str) -> None:
@@ -146,7 +146,8 @@ def test_a_file_its_folder_type_takes_is_not_mistyped(shape: str, path: str) -> 
         ("streamlit", "tests/data/a.csv", "tests/data", ".csv"), ("streamlit", "app/styles/x.png", "app/styles", ".png"),
         ("streamlit", "app/index.html", "app", ".html"), ("webapp-tray", "app/cli/logo.png", "app/cli", ".png"),
         ("service", "launchers/start.py", "launchers", ".py"), ("static-site", "js/app.css", "js", ".css"),
-        ("node", "test/snap", "test", "(none)"),
+        ("node", "test/snap", "test", "(none)"), ("node", "patches/fix.js", "patches", ".js"),
+        ("node", "scripts/fix.patch", "scripts", ".patch"),
     ],
 )
 def test_a_file_its_folder_type_does_not_take_is_counted_per_folder(
@@ -161,6 +162,12 @@ def test_the_longest_typed_folder_sets_the_type() -> None:
     assert layout.folder_type("app/webapp/static/a.css", "webapp-tray") == "web"
     assert layout.folder_type("app/tray/a.py", "webapp-tray") == "code"
     assert layout.folder_type("assets/a.png", "webapp-tray") is None
+
+
+def test_a_node_repo_keeps_dependency_patches_in_a_root_patches_folder(tmp_path: Path) -> None:
+    make_repo(tmp_path, "node", ("src/a.js", "test/a.js", "patches/left-pad+1.0.0.patch", "README.md"))
+    assert contract(tmp_path) == {"root_files": [], "redundant": [], "folder_types": {}}
+    assert layout.layout_findings(["src/a.js", "patches/x.patch"], "node", ()) == []
 
 
 def test_every_folder_type_names_a_known_type() -> None:
