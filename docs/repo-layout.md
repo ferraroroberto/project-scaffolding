@@ -56,6 +56,7 @@ A config template (`*.example.*`, `*.sample.*`, `*.json.example`) is the committ
 | `css` | `.css` |
 | `js` | `.js`, `.mjs` |
 | `tooling` | `code+shell`, `config`, `.md`, `.html`, `.txt` |
+| `patch` | `.patch` |
 | `any` | anything |
 
 | Common folder types (every shape) |
@@ -245,15 +246,16 @@ A Node.js project.
 
 | Contract | |
 |---|---|
-| Root folders | required `src`; also `test`, `scripts` |
+| Root folders | required `src`; also `test`, `scripts`, `patches` |
 | Root files | the common set |
-| Folder types | the common set, plus `test/` `code` |
+| Folder types | the common set, plus `test/` `code`, `patches/` `patch` |
 | Homes | none: the one adopter keeps a flat src/, unlike the src/<area>/ tree below, so nothing is shared yet |
 
 ```
 src/<area>/
 test/                       Node's own convention, accepted as is
 scripts/
+patches/                    dependency patches (`patch-package` writes `.patch` files here)
 package.json                its "verify" script is the gate
 docs/layout.md
 ```
