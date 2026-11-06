@@ -482,7 +482,7 @@ allow   = [
 # the one file the repo names for it), beyond the committed baseline. Opt-in per
 # repo and per rule through this table, like [dead_code_ratchet]. The scaffold has
 # no secret-compare helper or git wrapper, so it enforces the four rules that need
-# none, plus one must_use entry.
+# none, plus two must_use entries.
 # Mechanism + limits: docs/conventions-ratchet.md.
 [conventions_ratchet]
 enabled = true
@@ -493,6 +493,14 @@ rules   = ["no-window", "logging-not-print", "no-drive-path", "password-input-ve
 call   = ["requests.get", "requests.post", "requests.put", "requests.patch", "requests.delete", "requests.head", "requests.request"]
 helper = ["src/pooled_http.py"]
 why    = "CLAUDE.md: outbound-connection discipline, one pooled session"
+paths  = ["app/", "src/"]
+
+# A SQLite connection is opened in one module, not per handler. The scaffold has no FastAPI app, so its
+# one store (the vendored usage log) is the home; a derived app names the module that defines `get_db`.
+[[conventions_ratchet.must_use]]
+call   = "sqlite3.connect"
+helper = ["src/usage_log.py"]
+why    = "CLAUDE.md: one get_db dependency owns the connection"
 paths  = ["app/", "src/"]
 
 # ---------------------------------------------------------------------------
