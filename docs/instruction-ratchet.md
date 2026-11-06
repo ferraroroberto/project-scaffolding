@@ -46,6 +46,16 @@ So in a typical repo, whose `AGENTS.md` points at `CLAUDE.md`, the counted rules
 
 Fenced code blocks, inline code spans and frontmatter are not linted (R-36 reads inline code, because that is what gets copied). The count is per file and per rule, so a new hit in one file cannot hide behind a removal in another.
 
+### File-shape rules (opt-in)
+
+Three rules check the shape of the instruction files rather than their lines. Each is **off until the repo's `[instruction_ratchet]` table turns it on**, so re-vendoring the script never turns an adopter red. Once on, a finding is baselined like any other count (key = the file it is about, even a missing one), may only shrink, and its report line names the fix.
+
+| Rule | Option | Counts |
+|---|---|---|
+| S-01 | `ci_expectations = true` | A repo with any file under `.github/workflows/` (a `*.yml.template` included) whose root `CLAUDE.md` has no `CI expectations` heading outside a code fence, or has no `CLAUDE.md`. `/issue-finish` reads that section to decide whether to wait for CI and falls back to always watching without it. One hit, on `CLAUDE.md`. |
+| S-02 | `agents_pointer = true` | An `AGENTS.md` that is missing, does not name `CLAUDE.md`, or has more than 10 non-blank lines (a copy rather than a pointer). One hit, on `AGENTS.md`. |
+| S-03 | `claude_md_max_lines = N` | The root `CLAUDE.md` past `N` lines, counted as the number of lines over, so the baseline falls as the file shrinks. Set it for an app repo (fleet apps use 120); R-14's 200-line cap still applies to every repo. Only the root file is measured, not an `extra_files` entry or a rules file. |
+
 ### Not enforced
 
 | Rule | Why it stays with the weekly audit |
@@ -107,7 +117,7 @@ A failing check names each file, the rule and its title, the count against its b
 
 Re-vendoring the script never breaks a repo that has not opted in: an absent `[instruction_ratchet]` table, or `enabled = false`, prints `instruction ratchet: not enabled` and exits 0 (declared, not inferred).
 
-1. Vendor `scripts/instruction_ratchet.py` byte-for-byte (`/propagate-vendored instruction_ratchet`; manifest key `instruction_ratchet`) and declare it in the repo's `[vendored]` table. It needs Python 3.11+ (`tomllib`).
+1. Vendor `scripts/instruction_ratchet.py` and its sibling `scripts/instruction_frontmatter.py` byte-for-byte (`/propagate-vendored instruction_ratchet,instruction_frontmatter`; manifest keys of the same names) and declare both in the repo's `[vendored]` table. A script without its sibling exits 3, never a pass. It needs Python 3.11+ (`tomllib`).
 2. Add to the repo's own `.fleet.toml`:
 
    ```toml
@@ -116,6 +126,9 @@ Re-vendoring the script never breaks a repo that has not opted in: an absent `[i
    baseline    = ".instruction-ratchet-baseline.json"   # default
    skill_dirs  = [".claude/skills"]                      # default; each holds <name>/SKILL.md
    extra_files = []                                      # more instruction files, e.g. a global CLAUDE.md
+   ci_expectations     = true                            # S-01, optional, default off
+   agents_pointer      = true                            # S-02, optional, default off
+   claude_md_max_lines = 120                             # S-03, optional, default off; an app repo
    ```
 
    A repo that ships skills from another folder lists it in `skill_dirs` (fleet-config: `["skills", ".claude/skills"]`, with `extra_files = ["global-CLAUDE.md"]`).
@@ -131,8 +144,8 @@ The rule logic is a port of the prompt audit's `prompt_audit/lint.py` and its he
 
 ## Cost
 
-Over 287 instruction files in the fleet's repos the port gave the same hits as the audit's engine on every file. A run takes about 0.1 s on this scaffold (two files), 0.2 s on a repo with 26 instruction files and about 1 s on fleet-config (70 files). This scaffold's own baseline is empty: its `CLAUDE.md` and `AGENTS.md` carry no violation-cap hit, and `CLAUDE.md` is under its 200-line cap.
+Over 287 instruction files in the fleet's repos the port gave the same hits as the audit's engine on every file. A run takes about 0.1 s on this scaffold (two files), 0.2 s on a repo with 26 instruction files and about 1 s on fleet-config (70 files). This scaffold's own baseline is empty: its `CLAUDE.md` and `AGENTS.md` carry no violation-cap hit, `CLAUDE.md` is within its 200-line cap and has a `CI expectations` section, and `AGENTS.md` is a pointer.
 
 ## Tests
 
-`tests/ratchets/test_instruction_ratchet.py`: the configuration contract, the reader rules (pointer, rules files, scope-marker sections, other-vendor rules), every enforced rule family and what must not count (fences, inline code, frontmatter, R-13, R-37), the size caps per kind with CRLF normalisation, every "not confirmed" cause, every mode and exit code on throwaway git repos, the scaffold's own adoption and gate wiring, and the drift guard against the prompt audit.
+`tests/ratchets/test_instruction_shape.py` covers the three file-shape rules (options, what each counts and ignores, the ratchet and the fix named in the report, the sibling and the scaffold's own adoption). `tests/ratchets/test_instruction_ratchet.py`: the configuration contract, the reader rules (pointer, rules files, scope-marker sections, other-vendor rules), every enforced rule family and what must not count (fences, inline code, frontmatter, R-13, R-37), the size caps per kind with CRLF normalisation, every "not confirmed" cause, every mode and exit code on throwaway git repos, the scaffold's own adoption and gate wiring, and the drift guard against the prompt audit.
