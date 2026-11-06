@@ -46,8 +46,8 @@ def _load_sibling(name: str) -> ModuleType:
         spec.loader.exec_module(module)
         return module
     except (ImportError, OSError, SyntaxError):
-        print(f"instruction ratchet: NOT CONFIRMED: {name}.py is missing beside this script -- vendor both "
-              "(manifest keys instruction_ratchet and instruction_frontmatter)")
+        print(f"instruction ratchet: NOT CONFIRMED: {name}.py is missing beside this script -- vendor the siblings "
+              "with it (manifest keys instruction_ratchet, instruction_frontmatter and instruction_repeats)")
         sys.exit(3)
 
 
@@ -68,7 +68,7 @@ EXIT_PASS, EXIT_RISE, EXIT_CONFIG, EXIT_NOT_CONFIRMED = 0, 1, 2, 3
 _NO_WINDOW = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
 
 _CONFIG_KEYS = {"enabled", "baseline", "skill_dirs", "extra_files", "ci_expectations", "agents_pointer",
-                "claude_md_max_lines"}
+                "claude_md_max_lines", "repeated_text_words", "repeated_text_global"}
 
 #: R-14 -- (unit, limit) per file kind; a skill reference doc has no cap.
 SIZE_CAPS: dict[str, tuple[str, int]] = {
@@ -115,8 +115,10 @@ SHAPE_RULES: dict[str, str] = {
     "S-01": "A CI expectations section beside .github/workflows/",
     "S-02": "AGENTS.md is a short pointer to CLAUDE.md",
     "S-03": "CLAUDE.md lines over the app cap",
+    "S-04": "CLAUDE.md text repeated from docs/ or the global instructions",
 }
 POINTER_MAX_LINES = 10  # non-blank lines; the fleet's pointer is one, a heading and a sentence is two
+REPEAT_MIN_WORDS = 5  # the floor for `repeated_text_words`: below it a shared run is a common phrase, not a copy
 _CI_HEADING = re.compile(r"^#{1,6}\s+CI expectations\b", re.I)
 
 NEUTRAL = "neutral"
@@ -209,6 +211,8 @@ class Config:
     ci_expectations: bool = False  # S-01
     agents_pointer: bool = False  # S-02
     claude_md_max_lines: int | None = None  # S-03: the root CLAUDE.md of an app repo
+    repeated_text_words: int | None = None  # S-04: a run of this many shared words is one hit
+    repeated_text_global: bool = False  # S-04: also compare against the owner's global CLAUDE.md
 
 
 @dataclass(frozen=True)
@@ -282,8 +286,13 @@ def parse_config(toml_text: str) -> Config | None:
     cap = table.get("claude_md_max_lines")
     if cap is not None and (isinstance(cap, bool) or not isinstance(cap, int) or cap < 1):
         raise ConfigError("[instruction_ratchet] claude_md_max_lines must be a whole number of lines, 1 or more")
+    words, use_global = table.get("repeated_text_words"), table.get("repeated_text_global", False)
+    if words is not None and (isinstance(words, bool) or not isinstance(words, int) or words < REPEAT_MIN_WORDS):
+        raise ConfigError(f"[instruction_ratchet] repeated_text_words must be a whole number of words, {REPEAT_MIN_WORDS} or more")
+    if not isinstance(use_global, bool) or (use_global and words is None):
+        raise ConfigError("[instruction_ratchet] repeated_text_global must be true or false, and needs repeated_text_words")
     return Config(baseline, _str_list(table, "skill_dirs", DEFAULT_SKILL_DIRS), extra,
-                  bool(flags["ci_expectations"]), bool(flags["agents_pointer"]), cap)
+                  bool(flags["ci_expectations"]), bool(flags["agents_pointer"]), cap, words, use_global)
 
 
 def load_config(root: Path) -> Config | None:
@@ -721,6 +730,43 @@ def shape_hits(root: Path, cfg: Config) -> dict[str, list[Hit]]:
     return out
 
 
+def global_instructions_path() -> Path:
+    """The owner's user-scope CLAUDE.md, the source `repeated_text_global` compares against."""
+    return Path.home() / ".claude" / "CLAUDE.md"
+
+
+def repeat_hits(root: Path, cfg: Config, docs: list[Doc]) -> dict[str, list[Hit]]:
+    """S-04 findings: runs of `repeated_text_words` words a CLAUDE.md shares with `docs/` (or the global file)."""
+    n = cfg.repeated_text_words
+    claude = [d for d in docs if d.kind == "claude-md"]
+    if n is None or not claude:
+        return {}
+    repeats = _load_sibling("instruction_repeats")
+    skip = {d.path for d in docs}  # an instruction file under docs/ is compared, never a source
+    sources: dict[str, list[tuple[int, str]]] = {}
+    for p in tracked_files(root):
+        if p.startswith("docs/") and p.endswith(".md") and p not in skip and (root / p).is_file():
+            try:
+                sources[p] = instruction_lines(_read_text(root, p))
+            except NotConfirmed as exc:
+                raise NotConfirmed(f"{p}: {exc}") from exc
+    index = repeats.index_sources(sources, n)
+    with_global, own = index, None
+    if cfg.repeated_text_global:
+        where = global_instructions_path()
+        if not where.is_file():
+            raise NotConfirmed(f"repeated_text_global is set but the global instructions file {where} cannot be read")
+        own = where
+        with_global = repeats.index_sources({**sources, "the global CLAUDE.md": instruction_lines(_read_text(where.parent, where.name))}, n)
+    out: dict[str, list[Hit]] = {}
+    for doc in claude:
+        is_global = own is not None and (root / doc.path).exists() and os.path.samefile(root / doc.path, own)
+        for run in repeats.repeated_runs(instruction_lines(doc.text), index if is_global else with_global, n):
+            out.setdefault(doc.path, []).append(Hit("S-04", run.line, 1, f"{run.words} words repeated from {run.source}; "
+                                                    "point to it instead of restating it", "violation"))
+    return out
+
+
 def scan_tree(root: Path, cfg: Config) -> Scan:
     docs = inventory(root, cfg)
     hits: dict[str, list[Hit]] = {}
@@ -735,7 +781,7 @@ def scan_tree(root: Path, cfg: Config) -> Scan:
             hits[doc.path] = violations
         if size is not None:
             sizes[doc.path] = size
-    for path, found_shape in shape_hits(root, cfg).items():
+    for path, found_shape in [*shape_hits(root, cfg).items(), *repeat_hits(root, cfg, docs).items()]:
         hits.setdefault(path, []).extend(found_shape)
     return Scan(len(docs), hits, sizes)
 

@@ -48,13 +48,23 @@ Fenced code blocks, inline code spans and frontmatter are not linted (R-36 reads
 
 ### File-shape rules (opt-in)
 
-Three rules check the shape of the instruction files rather than their lines. Each is **off until the repo's `[instruction_ratchet]` table turns it on**, so re-vendoring the script never turns an adopter red. Once on, a finding is baselined like any other count (key = the file it is about, even a missing one), may only shrink, and its report line names the fix.
+Four rules check the shape of the instruction files rather than their lines (S-04 has its own section below). Each is **off until the repo's `[instruction_ratchet]` table turns it on**, so re-vendoring the script never turns an adopter red. Once on, a finding is baselined like any other count (key = the file it is about, even a missing one), may only shrink, and its report line names the fix.
 
 | Rule | Option | Counts |
 |---|---|---|
 | S-01 | `ci_expectations = true` | A repo with any file under `.github/workflows/` (a `*.yml.template` included) whose root `CLAUDE.md` has no `CI expectations` heading outside a code fence, or has no `CLAUDE.md`. `/issue-finish` reads that section to decide whether to wait for CI and falls back to always watching without it. One hit, on `CLAUDE.md`. |
 | S-02 | `agents_pointer = true` | An `AGENTS.md` that is missing, does not name `CLAUDE.md`, or has more than 10 non-blank lines (a copy rather than a pointer). One hit, on `AGENTS.md`. |
 | S-03 | `claude_md_max_lines = N` | The root `CLAUDE.md` past `N` lines, counted as the number of lines over, so the baseline falls as the file shrinks. Set it for an app repo (fleet apps use 120); R-14's 200-line cap still applies to every repo. Only the root file is measured, not an `extra_files` entry or a rules file. |
+| S-04 | `repeated_text_words = N`, `repeated_text_global = true` | Text a `CLAUDE.md` repeats from `docs/` or the global file; see the next section. |
+
+### Repeated text (S-04, opt-in)
+
+`CLAUDE.md` should point to a doc rather than restate it; restated text costs every session its tokens and drifts from the original. S-04 counts the runs of `repeated_text_words = N` or more consecutive words that a `CLAUDE.md` shares with a source. It is **off until the table sets that key** (a whole number, 5 or more; the fleet default is 12), so re-vendoring never turns an adopter red; once on, hits are baselined per file like any other count and may only shrink.
+
+- **Sources.** Every tracked `docs/**/*.md`, plus the owner's global `~/.claude/CLAUDE.md` when `repeated_text_global = true`. An instruction file under `docs/` is compared, never a source, and a file is never compared with itself (a repo that carries the global file as `extra_files` is checked against `docs/` only).
+- **Compared text.** The prose of each file: frontmatter, fenced blocks and inline code are dropped, then words are lowercased alphanumerics, so wrapping, markdown marks and punctuation do not hide a copy.
+- **Counted.** One hit per maximal run, so a pasted paragraph is one hit however long it is, and two separate copies are two. The report line names the first line of the run, its length and the source; the fix is to replace the text with a pointer to the source.
+- **Not confirmed.** `repeated_text_global = true` with no readable global file is exit 3, never a pass: the global file exists only on the owner's machine, so a repo that runs this gate in CI leaves `repeated_text_global` off. The option needs the `instruction_repeats` sibling; a script without it exits 3 only when the option is on.
 
 ### Not enforced
 
@@ -117,7 +127,7 @@ A failing check names each file, the rule and its title, the count against its b
 
 Re-vendoring the script never breaks a repo that has not opted in: an absent `[instruction_ratchet]` table, or `enabled = false`, prints `instruction ratchet: not enabled` and exits 0 (declared, not inferred).
 
-1. Vendor `scripts/instruction_ratchet.py` and its sibling `scripts/instruction_frontmatter.py` byte-for-byte (`/propagate-vendored instruction_ratchet,instruction_frontmatter`; manifest keys of the same names) and declare both in the repo's `[vendored]` table. A script without its sibling exits 3, never a pass. It needs Python 3.11+ (`tomllib`).
+1. Vendor `scripts/instruction_ratchet.py` and its siblings `scripts/instruction_frontmatter.py` and `scripts/instruction_repeats.py` byte-for-byte (`/propagate-vendored instruction_ratchet,instruction_frontmatter,instruction_repeats`; manifest keys of the same names) and declare all three in the repo's `[vendored]` table. A script without `instruction_frontmatter` exits 3, never a pass; without `instruction_repeats` it exits 3 only once `repeated_text_words` is set. It needs Python 3.11+ (`tomllib`).
 2. Add to the repo's own `.fleet.toml`:
 
    ```toml
@@ -129,6 +139,8 @@ Re-vendoring the script never breaks a repo that has not opted in: an absent `[i
    ci_expectations     = true                            # S-01, optional, default off
    agents_pointer      = true                            # S-02, optional, default off
    claude_md_max_lines = 120                             # S-03, optional, default off; an app repo
+   repeated_text_words = 12                              # S-04, optional, default off; a run of 12 shared words is a hit
+   repeated_text_global = false                          # S-04, optional; true also compares ~/.claude/CLAUDE.md (owner's machine only)
    ```
 
    A repo that ships skills from another folder lists it in `skill_dirs` (fleet-config: `["skills", ".claude/skills"]`, with `extra_files = ["global-CLAUDE.md"]`).
@@ -148,4 +160,4 @@ Over 287 instruction files in the fleet's repos the port gave the same hits as t
 
 ## Tests
 
-`tests/ratchets/test_instruction_shape.py` covers the three file-shape rules (options, what each counts and ignores, the ratchet and the fix named in the report, the sibling and the scaffold's own adoption). `tests/ratchets/test_instruction_ratchet.py`: the configuration contract, the reader rules (pointer, rules files, scope-marker sections, other-vendor rules), every enforced rule family and what must not count (fences, inline code, frontmatter, R-13, R-37), the size caps per kind with CRLF normalisation, every "not confirmed" cause, every mode and exit code on throwaway git repos, the scaffold's own adoption and gate wiring, and the drift guard against the prompt audit.
+`tests/ratchets/test_instruction_shape.py` covers the three file-shape rules S-01 to S-03 (options, what each counts and ignores, the ratchet and the fix named in the report, the sibling and the scaffold's own adoption). `tests/ratchets/test_instruction_repeats.py` covers S-04: the finder (merged runs, the word floor, formatting-blind matching), the options, the `docs/` and global sources, self-comparison, the "not confirmed" causes and the sibling. `tests/ratchets/test_instruction_ratchet.py`: the configuration contract, the reader rules (pointer, rules files, scope-marker sections, other-vendor rules), every enforced rule family and what must not count (fences, inline code, frontmatter, R-13, R-37), the size caps per kind with CRLF normalisation, every "not confirmed" cause, every mode and exit code on throwaway git repos, the scaffold's own adoption and gate wiring, and the drift guard against the prompt audit.

@@ -148,8 +148,9 @@ scripts/
   docs_ratchet.py              gate stage: README byte budget + docs history markers may not rise above a committed baseline
   gen_tailscale_cert.py       copy-to-adapt HTTPS cert generator via `tailscale cert`
   gen_verify_skill.py         generates a web app's own verify-<app> skill (Launch/Doctor/Drive/Evidence/Cleanup/Maintain)
-  instruction_ratchet.py      gate stage: prompt-audit lint hits, size caps and (opt-in) CI-expectations, AGENTS.md-pointer and CLAUDE.md-length findings in instruction files may not rise above a committed baseline
+  instruction_ratchet.py      gate stage: prompt-audit lint hits, size caps and (opt-in) CI-expectations, AGENTS.md-pointer, CLAUDE.md-length and repeated-text findings in instruction files may not rise above a committed baseline
   instruction_frontmatter.py  the instruction ratchet's sibling: the SKILL.md frontmatter reader (vendored with it)
+  instruction_repeats.py      the instruction ratchet's sibling: the repeated-text finder behind the opt-in S-04 rule (vendored with it)
   shot_baseline.py             gate stage: recaptured screenshots may not visibly drift from the committed baseline
   static_ratchet.py            gate stage: new duplicate code, unused names or bug/security patterns may not rise above a committed baseline
   structure_ratchet.py        gate stage: oversized files/functions, flat directories, src->app imports, extra roots, loose root files, mistyped and misplaced files and redundant exceptions may not rise above a committed baseline
