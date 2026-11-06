@@ -140,6 +140,18 @@ def test_reduced_motion_meter_has_no_transition(gallery: Page) -> None:
 # ---------------------------------------------------------------- lifecycle
 
 
+def test_format_elapsed_is_exported_and_prints_m_ss_from_milliseconds(gallery: Page) -> None:
+    got = gallery.evaluate(
+        """
+        async () => {
+          const { formatElapsed } = await import('./rec-wave/rec-wave.js');
+          return [0, 999, 65000, 3600000, 3665000].map(formatElapsed);
+        }
+        """
+    )
+    assert got == ["0:00", "0:00", "1:05", "60:00", "61:05"]
+
+
 def test_starts_on_a_stream_and_stop_releases_the_context(gallery: Page) -> None:
     # The gallery's own legs (rec-wave and mic-notice) are mounted by demo-capture.js.
     gallery.wait_for_selector("#demoMicNoLabel .rec-wave")
