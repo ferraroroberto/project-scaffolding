@@ -79,8 +79,9 @@ def test_ruff_rules_default_to_the_curated_set_and_may_be_emptied() -> None:
     assert cfg is not None and cfg.ruff_rules == ()
 
 
-def test_every_curated_code_is_a_bug_or_security_code_and_listed_once() -> None:
-    assert all(code[0] in "BS" for code in sr.DEFAULT_RULES)
+def test_every_curated_code_is_a_bug_security_or_import_order_code_and_listed_once() -> None:
+    assert all(code[0] in "BS" or code == sr.IMPORT_ORDER_RULE for code in sr.DEFAULT_RULES)
+    assert sr.IMPORT_ORDER_RULE in sr.DEFAULT_RULES
     assert len(set(sr.DEFAULT_RULES)) == len(sr.DEFAULT_RULES)
     assert sr.TEST_IGNORED_RULES <= set(sr.DEFAULT_RULES)
 
@@ -208,6 +209,24 @@ def test_bug_or_security_key_is_the_source_line_and_survives_a_line_shift(tmp_pa
     (tmp_path / "m.py").write_text("x = 1\n\n\n    r = requests.get(url)  \n", encoding="utf-8")
     (g,) = sr.parse_ruff([ruff_item("S113", "m.py", msg, row=4)], tmp_path, ())
     assert g.key == f.key
+
+
+def test_import_order_key_is_the_block_head_in_its_own_key_space(tmp_path: Path) -> None:
+    (tmp_path / "m.py").write_text('"""doc."""\n\nimport sys\nimport os\n', encoding="utf-8")
+    msg = "Import block is un-sorted or un-formatted"
+    (f,) = sr.parse_ruff([ruff_item("I001", "m.py", msg, row=3)], tmp_path, ())
+    assert f.key == "order:I001:m.py:import sys"
+    assert f.kind == "order"
+    (tmp_path / "m.py").write_text('"""doc."""\n\n\nimport sys\nimport os\n', encoding="utf-8")
+    (g,) = sr.parse_ruff([ruff_item("I001", "m.py", msg, row=4)], tmp_path, ())
+    assert g.key == f.key
+
+
+def test_import_order_is_reported_in_tests_too(tmp_path: Path) -> None:
+    (tmp_path / "tests").mkdir()
+    (tmp_path / "tests" / "test_a.py").write_text("import sys\nimport os\n", encoding="utf-8")
+    items = [ruff_item("I001", "tests/test_a.py", "Import block is un-sorted or un-formatted")]
+    assert [f.key for f in sr.parse_ruff(items, tmp_path, ())] == ["order:I001:tests/test_a.py:import sys"]
 
 
 def test_shell_and_exec_codes_are_not_reported_in_tests_but_bug_codes_are(tmp_path: Path) -> None:
@@ -654,3 +673,38 @@ def test_every_curated_code_is_known_to_the_installed_ruff(tmp_path: Path) -> No
     (tmp_path / "ok.py").write_text("x = 1\n", encoding="utf-8")
     cfg = sr.Config(sr.DEFAULT_BASELINE, 10, 100, ())
     assert sr.run_ruff(tmp_path, cfg) == []  # an unknown code makes ruff exit 2 -> NotConfirmed
+
+
+# ------------------------------------------------ import order (I001), real ruff
+
+def test_a_new_unsorted_import_block_fails_by_name_and_names_the_fix(tree: Path) -> None:
+    assert ratchet(tree, "--init").returncode == 0
+    (tree / "order.py").write_text("import sys\nimport os\n\nprint(os.name, sys.argv)\n", encoding="utf-8")
+    result = ratchet(tree)
+    assert result.returncode == sr.EXIT_NEW, result.stdout
+    assert "[import order] order.py" in result.stdout
+    assert "I001" in result.stdout
+    assert "--fix" in result.stdout
+
+
+def test_stdlib_then_third_party_then_local_passes(tree: Path) -> None:
+    assert ratchet(tree, "--init").returncode == 0
+    (tree / "ordered.py").write_text(
+        "import os\nimport sys\n\nimport requests\n\nimport one\n\n"
+        "print(os.name, sys.argv, requests.__name__, one.__name__)\n",
+        encoding="utf-8",
+    )
+    assert ratchet(tree).returncode == 0
+
+
+def test_a_baselined_unsorted_block_passes_and_a_second_one_fails(tree: Path) -> None:
+    body = "import sys\nimport os\n\nprint(os.name, sys.argv)\n"
+    (tree / "order.py").write_text(body, encoding="utf-8")
+    assert ratchet(tree, "--init").returncode == 0
+    assert "order:I001:order.py:import sys" in sr.read_baseline(tree / sr.DEFAULT_BASELINE)
+    assert ratchet(tree).returncode == 0
+    more = "\n\ndef f() -> None:\n    import json\n    import abc\n    print(json, abc)\n"
+    (tree / "order.py").write_text(body + more, encoding="utf-8")
+    result = ratchet(tree)
+    assert result.returncode == sr.EXIT_NEW, result.stdout
+    assert "import json" in result.stdout

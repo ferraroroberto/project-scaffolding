@@ -5,7 +5,7 @@ re-finds them. This stage turns that into structure: it computes the current
 set of findings, compares it with a committed baseline, and fails only on a
 finding that is *new* -- so existing debt never blocks work but cannot grow.
 
-Three detectors, one key space:
+Four detectors, one baseline file:
 
   * **Duplicate blocks** (Python and JS together) -- `jscpd`, pinned to an exact
     version and run through `npx`. One tool covers both languages; a stdlib JS
@@ -18,12 +18,16 @@ Three detectors, one key space:
     ruff `B` (flake8-bugbear) and `S` (flake8-bandit) codes, `DEFAULT_RULES`,
     run in the same ruff call. Each code is one a reviewer fixes rather than
     argues with; the codes left out, and why, are in docs/static-ratchet.md.
+  * **Import order** (Python only) -- ruff `I001`, in the same call: the global
+    "stdlib, third-party, local" rule, auto-fixable with `ruff check --select
+    I001 --fix`, so a repo can burn its baseline to zero in one pass.
 
 Findings are reduced to line-number-free keys so the baseline survives edits
 above a finding: a duplicate is `dup:<sha1 of the whitespace-normalised
 fragment>:<file>|<file>` (strict: editing the cloned block reads as one hit
 gone plus one new), an unused name is `unused:<rule>:<file>:<symbol>`, a bug or
-security finding is `lint:<rule>:<file>:<stripped source line>`; repeats of one
+security finding is `lint:<rule>:<file>:<stripped source line>`, an unsorted
+import block is `order:I001:<file>:<its first line>`; repeats of one
 key in a file get a `#2`, `#3`... ordinal. jscpd reports a clone as an
 ordered pair, and the fragment hashed is the first file's, so the key is stable
 for as long as that order is -- it is deterministic for an unchanged tree.
@@ -37,7 +41,7 @@ repo that has not opted in:
     min_lines  = 10                                  # default
     min_tokens = 100                                 # default
     exclude    = ["**/_vendored/**"]                 # added to the built-in set
-    ruff_rules = ["B006", "S113"]                    # replaces DEFAULT_RULES; [] = none
+    ruff_rules = ["B006", "S113", "I001"]            # replaces DEFAULT_RULES; [] = none
 
 Every `dest` in the repo's own `[vendored]` table is excluded as well: a
 vendor-verbatim copy is checked once, where it lives, and an adopter cannot edit
@@ -97,8 +101,10 @@ BUILTIN_EXCLUDES = (
 JSCPD_FORMATS = "python,javascript"
 #: Always selected: the unused-name detector, keyed `unused:`.
 UNUSED_RULES = ("F401", "F841")
-#: Bug (flake8-bugbear) and security (flake8-bandit) codes run unless the
-#: adopter's `ruff_rules` replaces them, keyed `lint:`.
+#: The import-order code, keyed `order:` and reported in its own category.
+IMPORT_ORDER_RULE = "I001"
+#: Bug (flake8-bugbear) and security (flake8-bandit) codes, keyed `lint:`, plus
+#: the import-order code, run unless the adopter's `ruff_rules` replaces them.
 DEFAULT_RULES = (
     "B002",  # `++n` is two unary pluses, not an increment
     "B003",  # rebinding `os.environ` does not reach child processes
@@ -133,6 +139,7 @@ DEFAULT_RULES = (
     "S604",  # the same, through a non-subprocess call taking `shell=True`
     "S605",  # `os.system`/`os.popen` always go through a shell
     "S701",  # Jinja2 with autoescape off renders HTML injection
+    IMPORT_ORDER_RULE,  # stdlib, third-party, local: the global import rule, auto-fixable
 )
 #: In tests, running code or a shell command is the test's own job on fixture
 #: input, not an injection path, so these codes are not reported there.
@@ -170,7 +177,7 @@ class Config:
 @dataclass(frozen=True)
 class Finding:
     key: str
-    kind: str  # "dup" | "unused" | "lint"
+    kind: str  # "dup" | "unused" | "lint" | "order"
     files: tuple[str, ...]
     detail: str  # snippet or symbol, for the failure message only
 
@@ -327,7 +334,7 @@ _SYMBOL = re.compile(r"`([^`]+)`")
 
 
 def parse_ruff(items: object, root: Path, excludes: tuple[str, ...]) -> list[Finding]:
-    """`ruff --output-format json` -> unused-name and bug/security findings."""
+    """`ruff --output-format json` -> unused-name, bug/security and import-order findings."""
     if not isinstance(items, list):
         raise NotConfirmed("ruff output is not a JSON list")
     raw: list[tuple[str, int, Finding]] = []
@@ -346,8 +353,9 @@ def parse_ruff(items: object, root: Path, excludes: tuple[str, ...]) -> list[Fin
                 continue
             # The source line, not the message: one message repeats for every hit.
             line = _source_line(root / filename, row) or message
-            key = f"lint:{rule}:{filename}:{line}"
-            raw.append((key, row, Finding(key, "lint", (filename,), f"{rule} {message}: {line}")))
+            kind = "order" if rule == IMPORT_ORDER_RULE else "lint"
+            key = f"{kind}:{rule}:{filename}:{line}"
+            raw.append((key, row, Finding(key, kind, (filename,), f"{rule} {message}: {line}")))
             continue
         match = _SYMBOL.search(message)
         symbol = match.group(1) if match else _source_line(root / filename, row)
@@ -503,9 +511,11 @@ def _report_new(new: list[Finding]) -> None:
     print(f"static ratchet: {len(new)} NEW finding(s) not in the baseline:")
     for f in new:
         where = " <-> ".join(f.files)
-        label = {"dup": "duplicate block", "unused": "unused", "lint": "bug/security"}[f.kind]
+        label = {"dup": "duplicate block", "unused": "unused", "lint": "bug/security", "order": "import order"}[f.kind]
         print(f"  [{label}] {where}")
         print(f"      {f.detail}")
+        if f.kind == "order":
+            print(f"      fix: ruff check --select {IMPORT_ORDER_RULE} --fix {f.files[0]}")
 
 
 def run(root: Path, *, init: bool, update: bool, allow_additions: bool) -> int:

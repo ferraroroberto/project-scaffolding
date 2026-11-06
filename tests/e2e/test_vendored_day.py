@@ -15,7 +15,6 @@ from tests.e2e._color_assertions import set_theme as _set_theme
 from tests.e2e._color_assertions import style as _style
 from tests.e2e._geometry import assert_min_target
 
-
 _AA = 4.5
 _TRANSPARENT = "rgba(0, 0, 0, 0)"
 _DAY_ROWS = "#demoDayRows"

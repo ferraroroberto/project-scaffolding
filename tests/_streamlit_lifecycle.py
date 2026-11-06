@@ -19,9 +19,9 @@ import sys
 import time
 import urllib.error
 import urllib.request
-from datetime import datetime, UTC
-from pathlib import Path
 from collections.abc import Callable
+from datetime import UTC, datetime
+from pathlib import Path
 
 from src.no_window import NO_WINDOW
 from tests._port_probe import listening_pids

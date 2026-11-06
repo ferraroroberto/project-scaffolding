@@ -13,8 +13,8 @@
       2. ruff          — lint the whole repo (ruff defaults + pyupgrade)
       3. static ratchet — scripts/static_ratchet.py: fails only on a duplicate
                          block (jscpd, Python + JS), unused import/variable
-                         (ruff F401/F841) or curated bug/security pattern
-                         (ruff B/S) NEW relative to the committed baseline;
+                         (ruff F401/F841), curated bug/security pattern
+                         (ruff B/S) or unsorted import block (ruff I001) NEW relative to the committed baseline;
                          opt-in via .fleet.toml [static_ratchet]; exit 3 =
                          "not confirmed" (Node/ruff unusable), a failure, never
                          a pass (docs/static-ratchet.md)
