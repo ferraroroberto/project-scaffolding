@@ -1,6 +1,6 @@
 # Static-analysis ratchet
 
-`scripts/static_ratchet.py` is a baseline-and-ratchet stage for the pre-ship gate. It computes the current duplicated-code, unused-code and likely-bug/security findings, compares them with a committed baseline, and **fails only on a finding that is new**. Existing debt never blocks work; it cannot grow either.
+`scripts/static_ratchet.py` is a baseline-and-ratchet stage for the pre-ship gate. It computes the current duplicated-code, unused-code, likely-bug/security and import-order findings, compares them with a committed baseline, and **fails only on a finding that is new**. Existing debt never blocks work; it cannot grow either.
 
 Why a ratchet rather than a weekly audit: an audit re-finds the same duplication every run, and the fix lives in someone's head. A gate stage encodes the lesson in structure (the pstack principle "encode lessons in structure").
 
@@ -11,9 +11,10 @@ Why a ratchet rather than a weekly audit: an audit re-finds the same duplication
 | Duplicate blocks | `jscpd` | `jscpd` (same run) |
 | Unused imports / variables | `ruff check --select F401,F841` | not covered |
 | Likely bugs and security patterns | curated ruff `B` / `S` codes (same ruff call) | not covered |
+| Import order (stdlib, third-party, local) | ruff `I001` (same ruff call) | not covered |
 
 - **`jscpd` is pinned to an exact version** (`JSCPD_VERSION` in the script, currently `5.4.0`) and run through `npx --yes jscpd@<version>`. One tool covers both languages; a stdlib JS tokenizer (regex literals, template strings) would be a bug farm of its own. The cost is that **Node is a prerequisite for an adopter that opts in**. jscpd 5 ships its own `--baseline`; this script does not use it, so that duplicates and unused names share one baseline file, one key scheme and one set of modes.
-- **ruff** is invoked as `python -m ruff` from the interpreter running the script, with `--select F401,F841` plus the repo's `ruff_rules` (default: the curated `B`/`S` set below), in one call. That replaces the rule *selection* only: the repo's own ruff config (excludes, `per-file-ignores`) and inline `# noqa` still apply. An adopter that has no ruff in its venv gets a **not confirmed** exit, not a pass.
+- **ruff** is invoked as `python -m ruff` from the interpreter running the script, with `--select F401,F841` plus the repo's `ruff_rules` (default: the curated `B`/`S` set below plus `I001`), in one call. That replaces the rule *selection* only: the repo's own ruff config (excludes, `per-file-ignores`) and inline `# noqa` still apply. An adopter that has no ruff in its venv gets a **not confirmed** exit, not a pass.
 - **No JS unused-code check.** eslint would be a second Node tool plus per-repo config. JS is covered for duplication only.
 
 ## Curated bug and security rules
@@ -52,6 +53,14 @@ The bar for a code: a new hit is something a reviewer fixes rather than argues w
 An adopter that wants a different set replaces it with `ruff_rules` (below); `ruff_rules = []` keeps only the unused-name check. A code ruff does not know makes ruff exit 2, which the stage reports as **not confirmed**, never as a pass.
 
 **Measured over the fleet** with the curated set: 36 reported hits across 9 checkouts (`S113` 19, `B033` 8, `B034` 2, `B006` 2, `B017` 2, `S602` 1, `S102` 1, `S307` 1), all read by hand; 32 are real (16 requests without a timeout, 8 duplicated set items, the rest one each of the patterns above). The other 4 are deliberate: 3 `httpx` streaming clients with an explicit `timeout=None`, which `S113` also flags, and one snippet runner whose job is `exec`. The 5 hits the test-path rule drops were all test harnesses.
+
+## Import order (`I001`)
+
+`I001` holds the global rule "imports: stdlib, then third-party, then local". It runs in the default `ruff_rules`, keyed `order:I001:<file>:<first line of the block>` and reported as `[import order]` with the fix command (`ruff check --select I001 --fix <file>`). Unlike the bug and security codes it is applied to test files too, and it is auto-fixable, so a repo reaches zero in one mechanical PR rather than carrying a baseline.
+
+What counts as first-party comes from the repo's own ruff `isort` settings, so a module that is imported bare because its folder is put on `sys.path` (a Streamlit `views/` package, say) is declared in `[tool.ruff.lint.isort] known-first-party`, or ruff sorts it as third-party. Set `line-length` to the repo's real width too: ruff wraps an import that passes its 88-column default, and `E501` being unselected does not stop that.
+
+An adopter that sets its own `ruff_rules` list does not get `I001` unless it lists it.
 
 ## The three outcomes of a run
 
@@ -117,7 +126,7 @@ Re-vendoring the script never breaks a repo that has not opted in: an absent `[s
    min_lines  = 10                                  # default
    min_tokens = 100                                 # default
    exclude    = ["**/_vendored/**"]                 # added to the built-in set
-   ruff_rules = ["B006", "S113"]                    # optional: replaces the curated B/S set; [] = none
+   ruff_rules = ["B006", "S113", "I001"]            # optional: replaces the curated B/S/I001 set; [] = none
    ```
 
    Always excluded: `node_modules`, `.venv`, `venv`, `.git`, `__pycache__`, `*.min.js`. `exclude` globs are anchored at the repo root; `**/` means "any depth". An adopter excludes `**/_vendored/**` because vendor-verbatim copies are duplicates by design and cannot be fixed downstream; the scaffold itself does not, since it owns them. `jscpd` also honours `.gitignore`.
@@ -125,7 +134,7 @@ Re-vendoring the script never breaks a repo that has not opted in: an absent `[s
    **Vendored files are left out automatically.** Every `dest` in the repo's own `[vendored]` table (a file or a folder) is excluded from both detectors on top of `exclude`, so the vendored ratchet scripts never report against each other or against the adopter's code and nothing about them is baselined. Vendored code is checked once, in this scaffold where it is owned; a future vendored component is covered the day it is declared. The scaffold has no `[vendored]` table, so its own copies stay in scope, except the ratchet scripts themselves: each is stdlib-only and vendored on its own, so they repeat their config, glob and git-listing helpers by contract, and the scaffold excludes `scripts/*_ratchet.py` the way an adopter's table would. A `[vendored]` entry without a `dest` excludes nothing.
 4. Run `python scripts/static_ratchet.py --init` and commit the baseline.
 
-   **An existing adopter re-vendoring the script** keeps its baseline: `dup:` and `unused:` keys are unchanged, and nothing in `.fleet.toml` has to change (an absent `ruff_rules` means the curated set). Its first check reports today's curated hits as new `lint:` findings, so run `python scripts/static_ratchet.py --update-baseline --allow-additions` once and commit the added `lint:` lines in the re-vendor PR; that diff is the review of the inherited debt. A repo that is not ready sets `ruff_rules = []` instead.
+   **An existing adopter re-vendoring the script** keeps its baseline: `dup:` and `unused:` keys are unchanged, and nothing in `.fleet.toml` has to change (an absent `ruff_rules` means the curated set). Its first check reports today's curated hits as new `lint:` and `order:` findings. Run `ruff check --select I001 --fix` first (the `order:` hits are mechanical), then `python scripts/static_ratchet.py --update-baseline --allow-additions` once and commit the added `lint:` lines in the re-vendor PR; that diff is the review of the inherited debt. A repo that is not ready sets `ruff_rules = []` instead.
 5. Add a gate stage that runs `python scripts/static_ratchet.py` and fails on any non-zero exit. The scaffold's `scripts/verify-before-ship.ps1` places it after `ruff` and before `mypy`; a Python acceptance runner calls the same script. **Do not path-route it**: duplication needs the whole tree.
 6. If the repo uses diff-proportionate e2e routing, add a `tier = "none"` rule for the baseline file to `.fleet.toml` `[e2e]` (the file at the repo root otherwise fails safe to the full browser suite) and a matching assertion in `tests/test_classify_e2e.py`.
 
@@ -145,7 +154,7 @@ The first `npx` call downloads jscpd once. Treat roughly **30 s** as the line at
 
 `min_lines = 10` / `min_tokens = 100` are the starting defaults, to be tuned against real output. Lowering them finds many more, smaller clones (at 6 lines / 50 tokens the scaffold alone reports eight).
 
-Adding the curated `B`/`S` codes to the same ruff call adds no measurable time: on the 17 adopters, repeated runs of the wider call stay within about 0.05 s of the unused-only one (ruff takes 0.1 to 0.2 s either way).
+Adding the curated `B`/`S` codes and `I001` to the same ruff call adds no measurable time: on the 17 adopters, repeated runs of the wider call stay within about 0.05 s of the unused-only one (ruff takes 0.1 to 0.2 s either way).
 
 ## Limits
 

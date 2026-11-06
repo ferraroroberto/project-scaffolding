@@ -11,7 +11,6 @@ from playwright.sync_api import Page, expect
 from tests.e2e._color_assertions import set_theme as _set_theme
 from tests.e2e._color_assertions import style as _style
 
-
 _ROW_MENU_KEBAB = "#demoRowMenuKebab"
 _ROW_MENU = ".row-menu"
 _ROW_MENU_CHOSEN = "#demoRowMenuChosen"

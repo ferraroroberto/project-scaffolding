@@ -34,8 +34,8 @@ from pathlib import Path
 # shared CREATE_NO_WINDOW flag; src/no_window.py is stdlib-only by design.
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from src.no_window import NO_WINDOW  # noqa: E402 -- needs the sys.path line above
 from app.tray.single_instance import SingleInstance  # noqa: E402 -- same
+from src.no_window import NO_WINDOW  # noqa: E402 -- needs the sys.path line above
 
 
 def _git_head(cwd: str) -> str:
