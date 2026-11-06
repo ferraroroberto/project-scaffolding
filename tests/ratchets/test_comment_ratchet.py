@@ -13,6 +13,7 @@ Three layers, mirroring `test_static_ratchet.py`:
 
 from __future__ import annotations
 
+import warnings
 from pathlib import Path
 
 import pytest
@@ -548,6 +549,198 @@ def test_main_rejects_allow_additions_without_update(capsys: pytest.CaptureFixtu
         cr.main(["--allow-additions"])
     assert exc.value.code == 2
     assert "--allow-additions" in capsys.readouterr().err
+
+
+# --------------------------------------------- docstring references and history phrases
+
+DOC_CFG = cr.Config(cr.DEFAULT_BASELINE, (), (), docstrings=True)
+HIST_CFG = cr.Config(cr.DEFAULT_BASELINE, (), (), history_phrases=True)
+BOTH_CFG = cr.Config(cr.DEFAULT_BASELINE, (), (), docstrings=True, history_phrases=True)
+
+
+def scan(text: str, language: str, cfg: cr.Config) -> dict[str, int]:
+    return {key: len(refs) for key, refs in cr.scan_file(text, language, cfg).items()}
+
+
+def test_new_rules_are_off_unless_the_adopter_opts_in() -> None:
+    cfg = cr.parse_config("[comment_ratchet]\nenabled = true\n")
+    assert cfg is not None and not cfg.docstrings and not cfg.history_phrases
+    src = 'def f():\n    """Fixed in #12. It used to be slow."""\n'
+    assert scan(src, "py", cfg) == {}
+
+
+def test_config_reads_the_two_flags_and_rejects_non_booleans() -> None:
+    cfg = cr.parse_config("[comment_ratchet]\nenabled = true\ndocstrings = true\nhistory_phrases = true\n")
+    assert cfg is not None and cfg.docstrings and cfg.history_phrases
+    for body in ('docstrings = "yes"\n', "history_phrases = 1\n"):
+        with pytest.raises(cr.ConfigError):
+            cr.parse_config("[comment_ratchet]\nenabled = true\n" + body)
+
+
+def test_docstring_refs_are_counted_in_module_class_function_and_async_docstrings() -> None:
+    src = (
+        '"""Module story (#10)."""\n'
+        "class C:\n"
+        '    """Class story #11."""\n'
+        "    def m(self) -> None:\n"
+        '        """Method story #12 and repo#13."""\n'
+        "async def f() -> None:\n"
+        '    """Async story #14."""\n'
+    )
+    refs = cr.scan_file(src, "py", DOC_CFG)[cr.DOCSTRING_SUFFIX]
+    assert [r.line for r in refs] == [1, 3, 5, 5, 7]
+
+
+def test_docstring_rule_counts_only_docstrings_never_plain_strings_or_comments() -> None:
+    src = (
+        'x = "see #20"\n'
+        "y = 1  # since #21\n"
+        "def f() -> str:\n"
+        '    s = """not a docstring #22"""\n'
+        "    return s\n"
+    )
+    found = cr.scan_file(src, "py", DOC_CFG)
+    assert cr.DOCSTRING_SUFFIX not in found
+    assert [r.line for r in found[""]] == [2]  # the comment rule keeps its own key
+
+
+@pytest.mark.parametrize(
+    ("doc", "expected"),
+    [
+        ("step #1 of the flow", 1),  # a single digit counts: the stricter of the two local forks
+        ("an entity &#39; and ##12", 0),
+        ("see https://example.com/page#123", 0),
+        ("number #123456", 0),
+        ("#12, #13 and owner/repo#14", 3),
+    ],
+)
+def test_docstring_reference_shape_matches_the_comment_rule(doc: str, expected: int) -> None:
+    src = f'def f() -> None:\n    """{doc}"""\n'
+    assert scan(src, "py", DOC_CFG).get(cr.DOCSTRING_SUFFIX, 0) == expected
+
+
+def test_docstring_rule_ignores_non_python_files() -> None:
+    assert scan("/** since #12 */\nconst a = 1;\n", "js", DOC_CFG) == {"": 1}
+
+
+def test_unparseable_python_is_not_confirmed_when_docstrings_are_on() -> None:
+    with pytest.raises(cr.NotConfirmed):
+        cr.scan_file("def f(:\n", "py", DOC_CFG)
+
+
+@pytest.mark.parametrize(
+    "phrase",
+    ["used to be", "formerly", "extracted verbatim", "pure code move", "previously recorded", "had drifted"],
+)
+def test_each_curated_phrase_counts_in_a_comment_and_a_docstring(phrase: str) -> None:
+    assert scan(f"x = 1  # this {phrase} elsewhere\n", "py", HIST_CFG) == {cr.HISTORY_SUFFIX: 1}
+    assert scan(f'def f() -> None:\n    """This {phrase.upper()} elsewhere."""\n', "py", HIST_CFG) == {cr.HISTORY_SUFFIX: 1}
+
+
+def test_history_phrases_count_in_js_css_powershell_and_yaml_comments() -> None:
+    assert scan("// it used to be a table\n", "js", HIST_CFG) == {cr.HISTORY_SUFFIX: 1}
+    assert scan("/* extracted verbatim from base.css */\n", "css", HIST_CFG) == {cr.HISTORY_SUFFIX: 1}
+    assert scan("# pure code move\n", "ps", HIST_CFG) == {cr.HISTORY_SUFFIX: 1}
+    assert scan("# had drifted\n", "yaml", HIST_CFG) == {cr.HISTORY_SUFFIX: 1}
+
+
+def test_history_phrases_in_code_strings_and_ordinary_prose_do_not_count() -> None:
+    src = (
+        'MARKERS = ["used to be", "had drifted"]\n'
+        'print("formerly known as x")\n'
+        "x = 1  # a present-tense why: it is used to bound the retry loop\n"
+        "z = 3  # words like unformerly or reused tobe never match a whole phrase\n"
+    )
+    assert scan(src, "py", HIST_CFG) == {}
+
+
+def test_a_docstring_phrase_wrapped_over_two_lines_still_counts() -> None:
+    assert scan('"""It used\n  to be a loop."""\n', "py", HIST_CFG) == {cr.HISTORY_SUFFIX: 1}
+
+
+def test_a_phrase_wrapped_over_two_comment_lines_is_the_documented_blind_spot() -> None:
+    assert scan("# it used to\n# be a loop\n", "py", HIST_CFG) == {}
+
+
+def test_both_new_rules_and_the_comment_rule_keep_separate_counts() -> None:
+    src = (
+        '"""Fixed in #12; it used to be slow."""\n'
+        "x = 1  # see #13 and note it had drifted\n"
+    )
+    found = cr.scan_file(src, "py", BOTH_CFG)
+    assert {k: len(v) for k, v in found.items()} == {"": 1, cr.DOCSTRING_SUFFIX: 1, cr.HISTORY_SUFFIX: 2}
+    assert [r.line for r in found[cr.HISTORY_SUFFIX]] == [1, 2]
+
+
+def test_parsing_an_adopters_file_never_leaks_its_syntax_warnings() -> None:
+    src = 'import re\nPAT = re.compile("\\d+")\n'  # an invalid escape in the adopter's source, not ours to report
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        assert scan(src, "py", DOC_CFG) == {}
+
+
+@pytest.fixture
+def repo_new_rules(tmp_path: Path) -> Path:
+    git(tmp_path, "init", "-q")
+    (tmp_path / ".fleet.toml").write_text(
+        "[comment_ratchet]\nenabled = true\ndocstrings = true\nhistory_phrases = true\n", encoding="utf-8"
+    )
+    write(tmp_path, "src/a.py", 'def f() -> None:\n    """Story #5; it used to be slow."""\n')
+    return tmp_path
+
+
+def test_init_writes_suffixed_keys_per_rule(repo_new_rules: Path) -> None:
+    assert run_mode(repo_new_rules, init=True) == cr.EXIT_PASS
+    assert baseline_text(repo_new_rules) == (
+        '{\n  "version": 1,\n  "entries": [\n'
+        '    {"key": "src/a.py::docstring", "count": 1},\n    {"key": "src/a.py::history", "count": 1}\n  ]\n}\n'
+    )
+
+
+def test_a_new_docstring_ref_fails_and_names_the_rule(repo_new_rules: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    run_mode(repo_new_rules, init=True)
+    write(repo_new_rules, "src/a.py", 'def f() -> None:\n    """Story #5 and #6; it used to be slow."""\n')
+    assert run_mode(repo_new_rules) == cr.EXIT_RISE
+    out = capsys.readouterr().out
+    assert "src/a.py::docstring: 2 (baseline 1)" in out
+    assert "src/a.py::history" not in out
+
+
+def test_a_new_history_phrase_fails_even_when_a_docstring_ref_was_removed(
+    repo_new_rules: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    run_mode(repo_new_rules, init=True)
+    write(repo_new_rules, "src/a.py", 'def f() -> None:\n    """It used to be slow; it had drifted."""\n')
+    assert run_mode(repo_new_rules) == cr.EXIT_RISE  # one ref removed cannot pay for one phrase added
+    assert "src/a.py::history: 2 (baseline 1)" in capsys.readouterr().out
+
+
+def test_rewording_lowers_the_new_rule_baselines(repo_new_rules: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    run_mode(repo_new_rules, init=True)
+    write(repo_new_rules, "src/a.py", 'def f() -> None:\n    """Fast path."""\n')
+    assert run_mode(repo_new_rules) == cr.EXIT_PASS
+    assert "--update-baseline" in capsys.readouterr().out
+    assert run_mode(repo_new_rules, update=True) == cr.EXIT_PASS
+    assert baseline_text(repo_new_rules).count('"key"') == 0
+
+
+def test_a_baseline_written_before_the_new_rules_still_passes_with_them_off(repo: Path) -> None:
+    run_mode(repo, init=True)
+    write(repo, "src/b.py", 'def f() -> None:\n    """Story #5; it used to be slow."""\n')
+    assert run_mode(repo) == cr.EXIT_PASS  # the flags are opt-in: re-vendoring changes nothing
+
+
+def test_enabling_a_rule_on_an_existing_baseline_demands_baselining_its_debt(repo: Path) -> None:
+    run_mode(repo, init=True)
+    write(repo, "src/b.py", 'def f() -> None:\n    """Story #5."""\n')
+    (repo / ".fleet.toml").write_text("[comment_ratchet]\nenabled = true\ndocstrings = true\n", encoding="utf-8")
+    assert run_mode(repo) == cr.EXIT_RISE
+    assert run_mode(repo, update=True, allow=True) == cr.EXIT_PASS
+    assert run_mode(repo) == cr.EXIT_PASS
+
+
+def test_unparseable_python_is_not_confirmed_for_the_new_rules(repo_new_rules: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    assert_unreadable_file_not_confirmed(cr, run_mode, repo_new_rules, "src/bad.py", b"def f(:\n", "rejected the file", capsys)
 
 
 # ------------------------------------------------------------ self-adoption

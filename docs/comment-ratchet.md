@@ -1,6 +1,6 @@
 # Comment ratchet
 
-`scripts/comment_ratchet.py` is a baseline-and-ratchet stage for the pre-ship gate. It counts `#NNN` issue references inside product-code **comments**, per file, compares them with a committed baseline, and **fails when a file's count rises**. Existing history comments never block work; they cannot grow either.
+`scripts/comment_ratchet.py` is a baseline-and-ratchet stage for the pre-ship gate. It counts `#NNN` issue references inside product-code **comments**, per file, compares them with a committed baseline, and **fails when a file's count rises**. Two more rules are opt-in per adopter: `#NNN` references inside Python **docstrings**, and a short curated list of **history phrases** in comments and docstrings. Existing history comments never block work; they cannot grow either.
 
 The convention it enforces (a comment states why the code is the way it is now; how it got there lives in the issue, the PR and `git log`) is owned by the fleet-wide global instructions. This page does not restate the rule text; it documents the mechanism. It reuses the shape of the [static-analysis ratchet](static-ratchet.md): an opt-in `.fleet.toml` table, a committed baseline, the same flags, and exit 3 for "not confirmed".
 
@@ -18,7 +18,20 @@ Only comment text, extracted by a real scanner for each language. A regex over r
 
 A **reference** is `#` plus one to five digits, not preceded by `&` or `#`, ending on a word boundary. A reference to another repo's issue (`repo#<number>`, `owner/repo#<number>`) counts too (the same smell). `https://...` URLs inside a comment are blanked first, so an anchor never counts. Several references on one line count separately. Counting is per **reference**, not per comment line, and per **file**: a new reference in one file cannot hide behind a removal in another.
 
-Docstrings are string tokens, not comments, and HTML (`<script>`, `<!-- -->`) is not scanned. Both are out of scope.
+HTML (`<script>`, `<!-- -->`) is not scanned. A docstring is a string token, so the comment rule above never sees it; the two opt-in rules below do.
+
+## The two opt-in rules
+
+Both default to off, so re-vendoring changes nothing for an adopter that has not asked. Each is counted under its own baseline key, so a removal under one rule never pays for an addition under another: the comment rule keeps the bare path (existing baselines stay valid), the docstring rule uses `<path>::docstring`, the phrase rule `<path>::history`. Enabling a rule on an existing baseline reads as a rise until its current debt is recorded once with `--update-baseline --allow-additions`.
+
+| Key | Counts | Files |
+|---|---|---|
+| `docstrings = true` | `#NNN` references (the same shape as above, including a single digit and `repo#NNN`) in module, class, function and async-function docstrings, found with `ast` | `.py` only |
+| `history_phrases = true` | the phrases below, case-insensitive on whole words, in comments of every scanned language and in Python docstrings | every scanned language |
+
+The phrase list is `HISTORY_PHRASES` in the script: `used to be`, `formerly`, `extracted verbatim`, `pure code move`, `previously recorded`, `had drifted`. It is short on purpose. A sweep of every adopter's comments and docstrings found these read as history in practice, while broader candidates (`used to`, `no longer`, `previously`, `the old`, `originally`) mostly matched legitimate present-tense text, so they are not in the list. A phrase matches across a line break inside a docstring (the whitespace is joined), but not across two `#` comment lines, because each is its own comment. Phrases inside string literals that are not docstrings never count.
+
+A Python file the parser rejects is NOT CONFIRMED (exit 3) under either rule, the same as an unscannable file under the comment rule. A `SyntaxWarning` from an adopter's own source (an invalid escape, say) is silenced; it is not this stage's to report.
 
 ### Known false positive and blind spot
 
@@ -82,6 +95,8 @@ Re-vendoring the script never breaks a repo that has not opted in: an absent `[c
    baseline = ".comment-ratchet-baseline.json"   # default
    include  = ["app/", "src/"]                    # path prefixes; default: the whole tree
    exclude  = ["**/generated/**"]                 # globs, added to the built-in set
+   docstrings      = true                         # optional: `#NNN` inside Python docstrings
+   history_phrases = true                         # optional: curated history phrases
    ```
 
    `exclude` globs are anchored at the repo root; `**/` means "any depth".
@@ -99,4 +114,4 @@ A read-only dry run over a ~280-file Python/JS/CSS/PowerShell adopter (24 vendor
 
 ## Tests
 
-`tests/ratchets/test_comment_ratchet.py`: counting per language on fixture strings (including the strings, templates, regex literals, URLs and entities that must not count, and the two pinned limitations above), scope and exclusions, and every mode and exit code on throwaway git repos. A missing prerequisite is a hard failure there, never `pytest.skip`. The scaffold's own gate stage doubles as the guard that its committed baseline is current.
+`tests/ratchets/test_comment_ratchet.py`: counting per language on fixture strings (including the strings, templates, regex literals, URLs and entities that must not count, and the two pinned limitations above), the docstring and phrase rules (each phrase, wrapping, separate baseline keys, off by default), scope and exclusions, and every mode and exit code on throwaway git repos. A missing prerequisite is a hard failure there, never `pytest.skip`. The scaffold's own gate stage doubles as the guard that its committed baseline is current.

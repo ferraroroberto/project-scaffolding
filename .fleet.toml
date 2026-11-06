@@ -383,6 +383,10 @@ exclude = ["scripts/*_ratchet.py"]
 # The rule text is fleet-config#1517; procedure + limits: docs/comment-ratchet.md.
 # This scaffold owns the vendored copies, so it does not exclude `_vendored/`
 # (an adopter's `[vendored]` table excludes its copies automatically).
+# Two further rules are opt-in per adopter, each under its own baseline key:
+# `docstrings = true` (`#NNN` inside Python docstrings) and `history_phrases =
+# true` (a short curated list of decision-history phrases in comments and
+# docstrings). This scaffold has not turned them on yet.
 [comment_ratchet]
 enabled = true
 
