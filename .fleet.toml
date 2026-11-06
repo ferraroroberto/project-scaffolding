@@ -254,6 +254,7 @@ prefixes = [
     "app/webapp/static/_vendored/base/",
     "app/webapp/static/_vendored/button/",
     "app/webapp/static/_vendored/card/",
+    "app/webapp/static/_vendored/code-listing/",
     "app/webapp/static/_vendored/day-marks/",
     "app/webapp/static/_vendored/day-row/",
     "app/webapp/static/_vendored/disclosure/",
@@ -276,6 +277,7 @@ prefixes = [
 paths          = [
     "tests/e2e/test_vendored_action_row_avatar.py",
     "tests/e2e/test_vendored_base_color_scheme.py",
+    "tests/e2e/test_vendored_code_listing.py",
     "tests/e2e/test_vendored_components.py",
     "tests/e2e/test_vendored_day.py",
     "tests/e2e/test_vendored_font_inherit.py",
@@ -288,6 +290,7 @@ paths          = [
 pytest_targets = [
     "tests/e2e/test_vendored_action_row_avatar.py",
     "tests/e2e/test_vendored_base_color_scheme.py",
+    "tests/e2e/test_vendored_code_listing.py",
     "tests/e2e/test_vendored_components.py",
     "tests/e2e/test_vendored_day.py",
     "tests/e2e/test_vendored_font_inherit.py",
@@ -519,6 +522,7 @@ rules   = ["untracked-control", "untracked-sheet", "dynamic-id"]
 exclude = [
   "app/webapp/static/_vendored/action-row/action-row.html",
   "app/webapp/static/_vendored/button/button.html",
+  "app/webapp/static/_vendored/code-listing/code-listing.html",
   "app/webapp/static/_vendored/day-marks/day-marks.html",
   "app/webapp/static/_vendored/day-row/day-row.html",
   "app/webapp/static/_vendored/demo.html",
@@ -604,6 +608,8 @@ rec-wave        = { src = "app/webapp/static/_vendored/rec-wave" }
 mic-notice      = { src = "app/webapp/static/_vendored/mic-notice" }
 row-menu        = { src = "app/webapp/static/_vendored/row-menu" }
 icon-button     = { src = "app/webapp/static/_vendored/icon-button" }
+# A fenced block or a diff in its frame; its copy control is an unpainted icon-button.
+code-listing    = { src = "app/webapp/static/_vendored/code-listing" }
 # The date-keyed row (an action-row led by a date tile) and the day marks (#350).
 day-row         = { src = "app/webapp/static/_vendored/day-row" }
 day-marks       = { src = "app/webapp/static/_vendored/day-marks" }
