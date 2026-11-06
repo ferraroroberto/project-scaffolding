@@ -215,7 +215,7 @@ resp = requests.get(url, timeout=10)
 
 `secret-compare` and `git-wrapper` run through the same code path: each is a built-in entry whose call set is fixed and whose helper is read from `secret_helpers` or `git_wrappers`. They keep their rule names, config keys and baseline keys.
 
-**Entries worth declaring.** An entry names the repo's own home for the job, so the scaffold can only recommend the ones whose home it defines. Both below were dry-run over the fleet and checked by hand (see the table at the end); `paths` keeps the first off one-shot scripts:
+**Entries worth declaring.** An entry names the repo's own home for the job, so the scaffold can recommend the ones whose home it defines, and a shape for the ones whose home differs per repo. All three below were dry-run over the fleet (hit counts and what was checked by hand are in the table at the end); `paths` keeps the first and the third off one-shot scripts and migrations:
 
 ```toml
 [[conventions_ratchet.must_use]]
@@ -228,9 +228,17 @@ paths  = ["app/", "src/"]
 call   = ["fastapi.staticfiles.StaticFiles", "starlette.staticfiles.StaticFiles"]
 helper = ["src/static_versioning.py"]
 why    = "CLAUDE.md: static assets go through CachingStaticFiles"
+
+[[conventions_ratchet.must_use]]
+call   = "sqlite3.connect"
+helper = ["src/db.py"]                           # the module that defines get_db: replace with the repo's own
+why    = "CLAUDE.md: one get_db dependency owns the connection"
+paths  = ["app/", "src/"]
 ```
 
-`sqlite3.connect` and `os.replace` suit the same shape, but their home is a different file in every repo (`db.py`, `connection.py`, `store.py`, an atomic-write helper), so each repo names its own `helper` and decides its own `paths`; the scaffold ships no ready-made entry for them.
+The first two helpers are scaffold-vendored files at a fixed path. The `sqlite3.connect` helper is the repo's own, and its name differs (`db.py`, `connection.py`, `store.py`): name the file that holds `get_db`, or the folder when the connection is built in several modules of one package. `os.replace` suits the same shape with an atomic-write helper as its home.
+
+An entry is data in the adopting repo's own `.fleet.toml`. Re-vendoring `scripts/conventions_ratchet.py` never adds one, so no adopter turns red until its owner pastes the entry and records today's hits (below). The scaffold's own `.fleet.toml` declares the first and the third, with its usage log as the one `sqlite3.connect` home and a baseline of zero.
 
 **Enabling an entry in a repo that has hits today.** Add the table, then record today's hits with `--update-baseline --allow-additions` (or `--init` when there is no baseline yet). Fix them in a follow-up: each fixed call shrinks the baseline with `--update-baseline`, and the goal is a baseline with no `must-use` entries left, not a standing ledger. A call that should stay takes the marker above.
 
@@ -361,7 +369,7 @@ A read-only dry run with **every rule on** over every fleet checkout (42 repos),
 | `login-lockout` | 11 | 11 (of 44) | all | 11 of 11 unguarded password routes, one per web app with a password sign-in: nine with no limit, two with a hand-rolled counter the vendored module replaces. Run alone, 0.3 to 1.2 s per repo |
 | `must-use` `requests.<verb>` outside `src/pooled_http.py`, `paths = ["app/", "src/"]` | 14 (57 with no `paths`) | 8 (13) | all 14 in scope; the 43 outside it are one-shot scripts and were not checked | 7 of 14: 4 per-request API calls, a link fetch, a pagination loop and a health probe. 7 are a kind a marker covers: 3 tray one-shots posting once to the app's own port, 3 calls in a benchmark script, 1 repo's own loopback wrapper that is its helper |
 | `must-use` `StaticFiles` outside the app's static-versioning module | 2 | 2 | all | 2 of 2: a PWA server mounting stock static files with no cache-busting |
-| `must-use` `sqlite3.connect` outside a `db.py` or `database.py` | 48 (37 under `app/` and `src/`) | 18 (16) | none | not established: the repo's connection home is rarely named `db.py` (`connection.py`, `store.py`, `_sqlite.py`), so the count is an upper bound and the scaffold ships no entry for it |
+| `must-use` `sqlite3.connect` outside the repo's `get_db` home, no `paths`, every `[vendored]` copy and test module skipped | 45 (1 to 7 per repo, 7 each in two repos) | 21 (of 30 active) | none: the home differs per repo, so each hit counts until the repo names it | not established: the counts are an upper bound until each repo's `helper` is declared, which removes the home's own calls |
 | `no-pwsh-stub` | 28 | 5 (of 44) | all | 24 of 28 are the stub run as a command in a gate or restart line: the gate command in `CLAUDE.md` and the README, `docs/` pages, and `scripts/*.ps1` usage banners. 4 are a kind a marker covers: 3 `run: pwsh -File` steps in CI workflows, where a hosted runner has a real `pwsh`, and 1 `Get-Command pwsh` lookup. 8 more sit under `tests/` folders, which the rule skips. |
 
 | `subprocess-timeout` | 128 (24 are in scaffold scripts: 18 in adopters' copies of `gen_tailscale_cert.py`, 5 in `classify_e2e.py` (the scaffold's own 2 since fixed) and 1 in a `gen_ssl_cert.py`) | 21 (of 44) | 14 of the 104 hits outside the scaffold-script copies, every 7th, source read | 12 of 14: a `git`, `ffmpeg`, `ffprobe`, `clip`, `systemctl`, `launchctl` or Ghostscript call that waits on a child with no bound. 2 are a kind a marker covers: foreground runners that block for the child's life. The issue's own hand sample found 8 of 10 real, 2 deliberate. Vendored destinations and test modules are not read. |
