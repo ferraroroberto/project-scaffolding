@@ -428,6 +428,10 @@ enabled = true
 # scope. Mechanism + limits: docs/instruction-ratchet.md.
 [instruction_ratchet]
 enabled = true
+# File-shape rules, each off until listed (docs/instruction-ratchet.md). This scaffold is not an app repo,
+# so it sets no claude_md_max_lines.
+ci_expectations = true
+agents_pointer = true
 
 # ---------------------------------------------------------------------------
 # Doc references ratchet. scripts/verify-before-ship.ps1 runs
@@ -669,6 +673,8 @@ structure_ratchet = { src = "scripts/structure_ratchet.py" }
 structure_layout = { src = "scripts/structure_layout.py" }
 structure_band  = { src = "scripts/structure_band.py" }
 instruction_ratchet = { src = "scripts/instruction_ratchet.py" }
+# instruction_ratchet loads this sibling (the SKILL.md frontmatter reader): vendor both.
+instruction_frontmatter = { src = "scripts/instruction_frontmatter.py" }
 doc_refs_ratchet = { src = "scripts/doc_refs_ratchet.py" }
 dead_code_ratchet = { src = "scripts/dead_code_ratchet.py" }
 conventions_ratchet = { src = "scripts/conventions_ratchet.py" }

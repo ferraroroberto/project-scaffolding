@@ -186,15 +186,15 @@ Examples — adapt to the project's actual tooling. Windows / PowerShell: syntax
 ---
 
 ## This repository
-Starter scaffold for a Streamlit app + Python pipelines project — clone, rename, and build.
-See `README.md` for setup, layout, and usage.
+Starter scaffold for a Streamlit app + Python pipelines project — clone, rename, and build. See `README.md` for setup, layout, and usage.
+
+### CI expectations
+- No workflow runs here: `.github/workflows/` holds only the `*.yml.template` files adopters copy, so `/issue-finish` has no CI run to wait on. **Advisory, not required** — the local gate (`scripts/verify-before-ship.ps1`) is the contract.
 
 ### Internal architecture
-
 [`docs/architecture.mmd`](docs/architecture.mmd) is a hand-authored Mermaid diagram of this repo's internal structure (`app/`, `src/`, `scripts/`, `tests/`, `docs/`, external deps). Update it in the same PR as any material structural change (new view, new vendored component, script relocated) — same anti-staleness contract as `.fleet.toml`'s `description` field. Not auto-generated; not covered by `scripts/verify-before-ship.ps1`.
 
 ### The `[components]` catalog is this repo's alone
-
 `.fleet.toml`'s `[components]` table is the canonical `<manifest key> → <src path>` map of every vendor-verbatim component this scaffold publishes, read by `scripts/vendored_catalog.py` (#230). **Do not copy it into a derived project** — an adopter declares what it copied in its own `[vendored]` table; this one declares what the scaffold publishes, and only the scaffold publishes. Load-bearing in two places: `/propagate-vendored` reports coverage against it (declared adopters propagated vs undeclared carriers found), and `fleet-config`'s `skills/_lib/vendored_drift.py` hashes each fleet repo's copy of a catalogued path to name repos carrying an undeclared component (#228/#230). Add a component to the table in the same PR that adds it to the tree; `tests/test_vendored_catalog.py` is the anti-drift guard, and `scripts/verify-before-ship.ps1` derives its `mypy --strict` list from the same declaration so a new Python component is gated the day it lands.
 
 Standing up a new self-hosted **PWA** app (FastAPI + static PWA + Windows tray)? `docs/app-onboarding.md` is the canonical end-to-end playbook — bootstrap the app, issue + trust the self-signed-CA HTTPS cert (`certutil -user -addstore Root ca.pem` + full-Chrome-restart gotcha + leaf-cert expiry note), install the PWA on iPhone (`/install-ca` mobileconfig detour) / Android. Cross-links `docs/windows-tray.md` for tray lifecycle rather than duplicating it.
