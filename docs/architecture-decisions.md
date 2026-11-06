@@ -7,8 +7,13 @@ The register of every standing architecture decision in the fleet. Read it befor
 An architecture decision record (ADR) here is one GitHub issue in this repo labelled `adr`, written as Context / Decision / Consequences / Status. The issue holds the full reasoning; this page holds the decision in force, in a sentence or two, with its why and a link to the issue.
 
 - **Add one:** file the issue with the `adr` label, then add its entry below in the same PR that applies the decision.
-- **Supersede one:** file the new `adr` issue, comment on the old one linking the new, close the old one, and replace the entry here in the same PR. A superseded decision does not stay listed.
+- **Supersede one:** file the new `adr` issue, comment on the old one linking the new, close the old one as not planned, and replace the entry here in the same PR. A superseded decision does not stay listed.
 - **Keep it present tense:** an entry says what is true now. History lives in the issue and in `git log`.
+- **Keep it in sync:** `tests/test_adr_register.py` runs in the gate and fails when an `adr` issue that is not superseded is missing here, listed twice, or when an entry links no issue, several issues, a non-`adr` issue or a superseded one. It reads the committed snapshot `docs/architecture-decisions.issues.json`, so it runs offline; refresh the snapshot in the same PR whenever an `adr` issue is filed or closed:
+
+```
+gh issue list --label adr --state all --limit 500 --json number,title,state,stateReason | .venv/Scripts/python.exe -m json.tool --sort-keys - docs/architecture-decisions.issues.json
+```
 
 ## Decisions in force
 
@@ -73,3 +78,53 @@ Lane and sub-agent models are chosen by tier (`easy`, `hard`, `extreme`) and res
 Why: hard-coded model names do not survive a new model or host, while one table changes in one place.
 
 Issue: https://github.com/ferraroroberto/project-scaffolding/issues/570
+
+### CI is advisory; the local gate is the contract
+
+A repo's local gate (`scripts/verify-before-ship.ps1`, or `pytest + ruff + mypy`) decides whether a change ships; GitHub Actions is advisory. Each project declares a `## CI expectations` block in its `CLAUDE.md`, and the finish flow skips the CI wait when no declared e2e surface is touched and the local gate is green, reruns only the documented flaky leg and only once, never reruns a real failure, and always states its CI decision.
+
+Why: fleet repos have no branch protection and CI's only signal beyond the local gate is the browser e2e leg, the part that wedges on the hosted runner, so a blocking wait mostly bought delay.
+
+Issue: https://github.com/ferraroroberto/project-scaffolding/issues/635
+
+### Runtime data lives on a fast drive
+
+A long-lived process resolves its SQLite and other fsync-heavy state through the vendored `src/runtime_data.py`: `runtime_db_path(app, filename, env_var=...)` returns `<root>/<app>/<filename>`, the root being `FLEET_DATA_ROOT` or a fixed per-OS default. A repo-relative database path is a defect, fixed by changing the path and never by a junction; a harness that spawns the app sets `<APP>_DATA_DIR` to a per-run temp folder.
+
+Why: a path relative to the checkout ties the physical drive to wherever the repo was cloned, and a junction records nothing, cannot be tested and is walked by a recursive delete.
+
+Issue: https://github.com/ferraroroberto/project-scaffolding/issues/636
+
+### One `get_db` dependency owns each SQLite connection
+
+A FastAPI app backed by SQLite opens connections in one `get_db()` dependency (row factory, WAL, `try`/`finally` close), and handlers take it through `Depends(get_db)`, never calling `sqlite3.connect(...)` themselves. Stdlib `sqlite3` stays the default: no ORM, async driver or pool.
+
+Why: a connection opened per handler leaks when the handler raises, and its setup drifts between handlers.
+
+Issue: https://github.com/ferraroroberto/project-scaffolding/issues/637
+
+### Outbound HTTP goes through pooled sessions
+
+A long-lived process makes outbound HTTP calls through the vendored `src/pooled_http.py`, a keep-alive session built once, with one retry only for idempotent methods; a bare `requests.get`/`requests.post` in a poll loop, health check or fan-out is a defect. Failing targets are backed off, fan-out is capped and spawned children are not leaked.
+
+Why: a fresh connection per call leaves a `TIME_WAIT` port behind each time, and on Windows that drains the dynamic port range and takes every local web app down at once.
+
+Issue: https://github.com/ferraroroberto/project-scaffolding/issues/638
+
+### A dispatched agent works in a worktree, never the primary checkout
+
+Every agent spawned by fan-out tooling builds in an isolated sibling worktree (`<repo>-wt-<N>`, the primary's `.venv` junctioned in) for every repo, enforced by the claim helper on a flag or a dispatch marker rather than by prose; interactive human sessions keep claim-or-worktree. Teardown is each lane's terminal step and strips the `.venv` junction first, residue halts the run, and a live-e2e guard refusal is a hard stop.
+
+Why: a live webapp or tray served from the primary checkout publishes no claim, so a claim-based rule would let an unattended agent edit files out from under it.
+
+Issue: https://github.com/ferraroroberto/project-scaffolding/issues/639
+
+### Console subprocess spawns pass `CREATE_NO_WINDOW`
+
+Every console-tool spawn from a Windows process without its own console passes `creationflags=subprocess.CREATE_NO_WINDOW` (0 off Windows) through one helper, `src/no_window.py`, and never adds `DETACHED_PROCESS`; vendor-verbatim modules derive the flag locally. Keeping a child alive across a tray teardown is done by re-parenting, not by a flag.
+
+Why: each unsuppressed child flashes a console window, and `DETACHED_PROCESS` was measured to show one anyway and not to escape a subtree kill.
+
+Enforcement: the [conventions ratchet](conventions-ratchet.md)'s `no-window` rule.
+
+Issue: https://github.com/ferraroroberto/project-scaffolding/issues/640
