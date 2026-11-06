@@ -180,6 +180,7 @@
 <link rel="stylesheet" href="rec-wave/rec-wave.css">
 <link rel="stylesheet" href="mic-notice/mic-notice.css">
 <link rel="stylesheet" href="row-menu/row-menu.css">
+<link rel="stylesheet" href="code-listing/code-listing.css">
 </head>
 <body>
 <div class="gallery">
@@ -671,6 +672,27 @@
     </div>
   </div>
 
+  <h2>code-listing (a copy control that is a plain icon-button, inside a list item)</h2>
+  <!-- The listing sits in a list item on purpose: the design-review rule COMP-14 judges a
+       painted button against its nearest <li>. -->
+  <div class="card" id="demoCodeListing">
+    <ul style="list-style: none; margin: 0; padding: 0;">
+      <li>
+        <div class="code-listing">
+          <div class="code-listing-head">
+            <span class="code-listing-title">Command Prompt · PowerShell</span>
+            <span class="code-listing-status" role="status" aria-live="polite"></span>
+            <button type="button" class="icon-button code-listing-copy" aria-label="Copy" title="Copy">
+              <svg class="icon code-listing-copy-glyph" aria-hidden="true"><use href="#i-copy"></use></svg>
+              <svg class="icon code-listing-copied" aria-hidden="true"><use href="#i-circle-check"></use></svg>
+            </button>
+          </div>
+          <pre><code>setx ARCHIVE_ROOT D:\archive</code></pre>
+        </div>
+      </li>
+    </ul>
+  </div>
+
   <h2>usage-log (view switches + data-track taps, sent to this origin only)</h2>
   <div class="card" style="display: flex; flex-direction: column; gap: var(--space-sm);">
     <!-- Stands in for the nav: each segment switch is one trackView(id), the
@@ -698,6 +720,7 @@
   import { showToast } from './toast/toast.js';
   import { renderHeadStatus } from './home-head/home-head.js';
   import { createRowMenu } from './row-menu/row-menu.js';
+  import { bindCodeListing } from './code-listing/code-listing.js';
   import { dayRow } from './day-row/day-row.js';
   import { legendEl, markHtml } from './day-marks/day-marks.js';
 
@@ -807,6 +830,9 @@
     { label: 'Other app', brand: 'b-demo', disabled: true, hint: 'Not installed', onTap: demoChosen('Other app') },
   ], { header: 'Invented row · pid 4242' });
   demoSideMenu.endRender();
+
+  // code-listing: one delegated listener covers every listing on the page.
+  bindCodeListing();
 
   // Modal wiring.
   const dlg = document.getElementById('demoDialog');
