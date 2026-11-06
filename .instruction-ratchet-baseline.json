@@ -1,4 +1,6 @@
 {
   "version": 1,
-  "entries": []
+  "entries": [
+    {"key": "CLAUDE.md", "hits": {"S-04": 5}}
+  ]
 }

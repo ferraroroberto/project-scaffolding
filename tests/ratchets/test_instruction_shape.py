@@ -242,7 +242,7 @@ def test_without_the_option_the_general_cap_is_still_200(tmp_path: Path) -> None
 # ---------------------------------------------------------- shared behaviour
 
 def test_every_shape_rule_has_a_title_and_none_collides_with_a_lint_rule() -> None:
-    assert set(ir.SHAPE_RULES) == {"S-01", "S-02", "S-03"}
+    assert set(ir.SHAPE_RULES) == {"S-01", "S-02", "S-03", "S-04"}
     assert not set(ir.SHAPE_RULES) & set(ir.RULES)
 
 

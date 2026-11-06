@@ -432,6 +432,9 @@ enabled = true
 # so it sets no claude_md_max_lines.
 ci_expectations = true
 agents_pointer = true
+# Repeated text (S-04): a run of 12 shared words with docs/ is a hit. No `repeated_text_global`: the
+# global file exists only on the owner's machine, and this gate also runs in a fresh clone.
+repeated_text_words = 12
 
 # ---------------------------------------------------------------------------
 # Doc references ratchet. scripts/verify-before-ship.ps1 runs
@@ -683,6 +686,8 @@ structure_band  = { src = "scripts/structure_band.py" }
 instruction_ratchet = { src = "scripts/instruction_ratchet.py" }
 # instruction_ratchet loads this sibling (the SKILL.md frontmatter reader): vendor both.
 instruction_frontmatter = { src = "scripts/instruction_frontmatter.py" }
+# ...and, only when `repeated_text_words` is set (S-04), this one (the repeated-text finder).
+instruction_repeats = { src = "scripts/instruction_repeats.py" }
 doc_refs_ratchet = { src = "scripts/doc_refs_ratchet.py" }
 dead_code_ratchet = { src = "scripts/dead_code_ratchet.py" }
 conventions_ratchet = { src = "scripts/conventions_ratchet.py" }
