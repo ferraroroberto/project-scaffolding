@@ -87,6 +87,11 @@ def test_gallery_legs_render_their_states(gallery: Page) -> None:
         gallery.wait_for_function(
             "([h, s]) => document.querySelector(h).dataset.recWaveState === s", arg=[host, want]
         )
+    # The wave's own attribute is `data-signal`: `data-state` is the async
+    # lifecycle vocabulary (loading/ready/empty/stale/error) design_lint reads.
+    assert gallery.locator(".rec-wave[data-state]").count() == 0
+    assert gallery.locator("#demoRecSilentHost .rec-wave").get_attribute("data-signal") == "silent"
+    assert gallery.locator("#demoRecNoneHost .rec-wave").get_attribute("data-signal") == "unmeasured"
     # The wave replaces the glyph while it is on.
     assert _style(gallery, "#demoRecLiveHost svg", "display") == "none"
     assert gallery.locator("#demoRecLiveHost .rec-wave-bars > i").count() == 24
