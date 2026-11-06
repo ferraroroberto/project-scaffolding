@@ -26,7 +26,7 @@ from tests.e2e._color_assertions import contrast as _contrast
 from tests.e2e._color_assertions import rgba as _rgba
 from tests.e2e._color_assertions import set_theme as _set_theme
 from tests.e2e._color_assertions import style as _style
-from tests.e2e._geometry import EFFECTIVE_RECT_JS
+from tests.e2e._geometry import EFFECTIVE_RECT_JS, assert_min_target, effective_rect
 from tests.e2e._nav_graft import NAV_DIR, mount_nav, phone_nav
 
 # Desktop token values the assertions below key on (from demo.html's :root,
@@ -273,6 +273,29 @@ def test_mobile_pill_stacks_icon_over_label(nav_mobile: Page) -> None:
     assert nav_mobile.evaluate(f"matchMedia('(min-width: {_WIDE}px)').matches")
     bar = nav_mobile.locator(".tabs").bounding_box()
     assert bar is not None and bar["width"] > _RAIL and bar["height"] < 100, bar
+
+
+def test_touch_tabs_keep_the_44px_floor_at_every_width(nav_mobile: Page) -> None:
+    """A coarse pointer's tab is >= 44px tall wider than the phone pill too.
+
+    Above 520px a touch device (a tablet, an installed PWA on a large phone in
+    landscape) gets the inline segmented control, whose padding alone made the
+    tab 37px. Measured through the rendered-geometry helper, which counts a
+    pseudo-element expansion as well as the box. The phone widths take the pill
+    and stay at the pill's own height.
+    """
+    pill_height = _tab_height(nav_mobile)
+    for width in (320, 390, 430):
+        nav_mobile.set_viewport_size({"width": width, "height": 844})
+        assert _tab_height(nav_mobile) == pill_height, width
+    for width in (521, 772, 1100, 1440):
+        nav_mobile.set_viewport_size({"width": width, "height": 900})
+        assert_min_target(nav_mobile.locator(".tabs .tab"))
+        assert _tab_height(nav_mobile) >= 44, width
+
+
+def _tab_height(page: Page) -> float:
+    return float(effective_rect(page.locator("#tabHome")).effective.height)
 
 
 # --------------------------------------------------- pill vs the list beneath
