@@ -423,8 +423,8 @@ _NAV_TARGETS = (
     "tests/e2e/test_nav_offset.py tests/e2e/test_vendored_font_inherit.py "
     "tests/e2e/test_vendored_nav.py tests/e2e/test_vendored_row_menu_placement.py")
 _COMPONENTS_TARGETS = (
-    "tests/e2e/test_vendored_components.py tests/e2e/test_vendored_day.py "
-    "tests/e2e/test_vendored_font_inherit.py tests/e2e/test_vendored_home_head.py "
+    "tests/e2e/test_vendored_action_row_avatar.py tests/e2e/test_vendored_components.py "
+    "tests/e2e/test_vendored_day.py tests/e2e/test_vendored_font_inherit.py tests/e2e/test_vendored_home_head.py "
     "tests/e2e/test_vendored_mic_notice.py tests/e2e/test_vendored_nav.py tests/e2e/test_vendored_page_foot.py "
     "tests/e2e/test_vendored_rec_wave.py tests/e2e/test_vendored_row_menu.py tests/e2e/test_vendored_row_menu_placement.py")
 
@@ -464,7 +464,7 @@ def test_real_surfaces_route_representative_paths() -> None:
     assert route("tests/e2e/_geometry.py") == (
         "surface",
         "tests/e2e/test_geometry_helper.py tests/e2e/test_layout_lint.py "
-        "tests/e2e/test_vendored_components.py "
+        "tests/e2e/test_vendored_action_row_avatar.py tests/e2e/test_vendored_components.py "
         "tests/e2e/test_vendored_day.py tests/e2e/test_vendored_home_head.py "
         "tests/e2e/test_vendored_nav.py tests/e2e/test_vendored_row_menu.py")
     # The layout lint: the helper, its proof and its fixture page run only that proof.

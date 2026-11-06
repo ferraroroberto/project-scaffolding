@@ -274,6 +274,7 @@ prefixes = [
     "app/webapp/static/_vendored/toast/",
 ]
 paths          = [
+    "tests/e2e/test_vendored_action_row_avatar.py",
     "tests/e2e/test_vendored_components.py",
     "tests/e2e/test_vendored_day.py",
     "tests/e2e/test_vendored_font_inherit.py",
@@ -284,6 +285,7 @@ paths          = [
     "tests/e2e/test_vendored_row_menu.py",
 ]
 pytest_targets = [
+    "tests/e2e/test_vendored_action_row_avatar.py",
     "tests/e2e/test_vendored_components.py",
     "tests/e2e/test_vendored_day.py",
     "tests/e2e/test_vendored_font_inherit.py",
@@ -307,6 +309,7 @@ paths          = ["tests/e2e/_geometry.py", "tests/e2e/test_geometry_helper.py"]
 pytest_targets = [
     "tests/e2e/test_geometry_helper.py",
     "tests/e2e/test_layout_lint.py",
+    "tests/e2e/test_vendored_action_row_avatar.py",
     "tests/e2e/test_vendored_components.py",
     "tests/e2e/test_vendored_day.py",
     "tests/e2e/test_vendored_home_head.py",
