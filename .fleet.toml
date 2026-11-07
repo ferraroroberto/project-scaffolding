@@ -36,6 +36,21 @@ extra_root_files = []
 # [design]
 # wide_views = ["board", "table"]
 
+# Nightly CI on the Mac Mini (docs/mac-runner.md, "The [ci.nightly] table"). A
+# public repo opts in with this table plus one line in project-scaffolding's
+# .github/nightly-adopters.txt; scripts/nightly_matrix.py reads it from `main`
+# and refuses unknown keys or values outside a safe character set. The scaffold
+# itself has no web app to check, so it is not an adopter. Uncomment and edit:
+# [ci.nightly]
+# python         = "3.14"
+# requirements   = ["requirements.txt", "requirements-dev.txt"]
+# samples        = "config"                          # folder of committed *.sample.* config twins
+# unit           = ["tests", "--ignore=tests/e2e"]   # pytest arguments; Windows-only tests excluded by marker
+# e2e            = ["tests/e2e", "--e2e-autoboot"]   # pytest arguments for the WebKit e2e leg
+# views          = ["/"]                             # simulator smoke; needs [design.review.synthetic] command
+# exclude_marker = "not windows_only"                # the default
+# skip_reason    = "..."                             # instead of the keys above: listed but cannot run here
+
 # Diff-proportionate e2e routing (project-scaffolding#180). scripts/verify-
 # before-ship.ps1's browser phase classifies the branch's changed files
 # against the rules below (first match wins, in this order) instead of

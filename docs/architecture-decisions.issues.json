@@ -1,38 +1,44 @@
 [
     {
-        "number": 640,
+        "number": 661,
         "state": "OPEN",
         "stateReason": "",
+        "title": "ADR: the Mac Mini nightly is the fleet's one CI"
+    },
+    {
+        "number": 640,
+        "state": "CLOSED",
+        "stateReason": "COMPLETED",
         "title": "ADR: console subprocess spawns pass CREATE_NO_WINDOW through one helper"
     },
     {
         "number": 639,
-        "state": "OPEN",
-        "stateReason": "",
+        "state": "CLOSED",
+        "stateReason": "COMPLETED",
         "title": "ADR: a dispatched agent works in a worktree, never the primary checkout"
     },
     {
         "number": 638,
-        "state": "OPEN",
-        "stateReason": "",
+        "state": "CLOSED",
+        "stateReason": "COMPLETED",
         "title": "ADR: outbound HTTP goes through pooled sessions"
     },
     {
         "number": 637,
-        "state": "OPEN",
-        "stateReason": "",
+        "state": "CLOSED",
+        "stateReason": "COMPLETED",
         "title": "ADR: one get_db dependency owns each SQLite connection"
     },
     {
         "number": 636,
-        "state": "OPEN",
-        "stateReason": "",
+        "state": "CLOSED",
+        "stateReason": "COMPLETED",
         "title": "ADR: runtime data lives on a fast drive, resolved through runtime_data"
     },
     {
         "number": 635,
-        "state": "OPEN",
-        "stateReason": "",
+        "state": "CLOSED",
+        "stateReason": "COMPLETED",
         "title": "ADR: CI is advisory; the local gate is the contract"
     },
     {

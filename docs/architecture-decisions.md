@@ -128,3 +128,13 @@ Why: each unsuppressed child flashes a console window, and `DETACHED_PROCESS` wa
 Enforcement: the [conventions ratchet](conventions-ratchet.md)'s `no-window` rule.
 
 Issue: https://github.com/ferraroroberto/project-scaffolding/issues/640
+
+### The Mac Mini nightly is the fleet's one CI
+
+Each public repo's `main` is checked nightly on the Mac Mini self-hosted runner (`nightly-mac.yml`): unit with `windows_only` tests excluded, WebKit e2e and an iOS Simulator smoke, for every adopter whose `main` moved since its last green night and for every adopter on Sunday. Opt-in is a `[ci.nightly]` table in the repo's `.fleet.toml` plus one line in `.github/nightly-adopters.txt`. A failed test is retried once; a pass on the retry is recorded as flaky, a second failure is red. The local gate stays the per-change contract, hosted Actions gates are retired per repo after three consecutive green nights, and the runner's safety rules (schedule and dispatch only, read-only, no secrets, results stay on the Mac, pull-only delivery) stay as they are. Private repos keep their hosted CI until a private runner registration is decided.
+
+Why: one engine, one result format and no hosted minutes for the whole fleet, running only where something changed, with flakes counted rather than hidden.
+
+Enforcement: `tests/ci/test_nightly_mac_workflow.py` (the safety rules) and `scripts/nightly_matrix.py` (the table contract, selection and retry); contract in [mac-runner.md](mac-runner.md).
+
+Issue: https://github.com/ferraroroberto/project-scaffolding/issues/661
