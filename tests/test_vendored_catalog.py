@@ -20,6 +20,7 @@ that, one component at a time.
 
 from __future__ import annotations
 
+import tomllib
 from pathlib import Path
 
 import pytest
@@ -141,6 +142,18 @@ def test_every_vendored_ui_component_is_declared(real_catalog: dict[str, dict[st
         f"undeclared UI components: {sorted(on_disk - declared)}; "
         f"declared but absent: {sorted(declared - on_disk)}"
     )
+
+
+def test_every_requires_names_a_declared_component(real_catalog: dict[str, dict[str, str]]) -> None:
+    """`/propagate-vendored` expands a component with its `requires`; a name that
+    is not in the catalog would send a wave looking for a file that does not exist."""
+    table = tomllib.loads((REPO_ROOT / ".fleet.toml").read_text(encoding="utf-8"))["components"]
+    requires = {k: v["requires"] for k, v in table.items() if "requires" in v}
+    assert requires.get("conventions_ratchet") == ["conventions_readers"], (
+        "conventions_ratchet imports scripts/conventions_readers.py; re-vendoring it alone exits 3"
+    )
+    unknown = sorted(d for deps in requires.values() for d in deps if d not in real_catalog)
+    assert not unknown, f"`requires` names components the catalog does not declare: {unknown}"
 
 
 def test_mypy_gate_still_covers_every_historically_gated_module(
