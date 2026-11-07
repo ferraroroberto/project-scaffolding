@@ -102,6 +102,24 @@ gh api -X POST repos/ferraroroberto/project-scaffolding/actions/runners/<id>/lab
 
 Then run the workflow once by hand: Actions → `nightly-mac` → "Run workflow", or `gh workflow run nightly-mac.yml -R ferraroroberto/project-scaffolding`. A queued run that never starts means no runner with all four labels is online.
 
+## Remote (SSH) setup
+
+A runner that is registered but offline can be brought back from another machine, with no login at the Mac, as long as the runner user is logged in at the console (auto-login, below). Over SSH as the runner user:
+
+```sh
+cd ~/actions-runner && ./svc.sh status      # "not installed" means it was only ever started by hand
+./svc.sh install && ./svc.sh start && ./svc.sh status
+```
+
+A runner started with `./run.sh` is not a service: it goes offline when that terminal closes. `svc.sh` installs a **LaunchAgent**, which starts only once the runner user is logged in, so a reboot recovers the runner only if the Mac auto-logs-in that user. Check both from the same SSH session:
+
+```sh
+defaults read /Library/Preferences/com.apple.loginwindow autoLoginUser   # prints the user when auto-login is on
+pmset -g | grep -E '^ *(sleep|displaysleep|autorestart)'                  # sleep 0, autorestart 1
+```
+
+Auto-login is turned on in System Settings → Users & Groups → Automatically log in as, which needs the user's password, so it is a step at the Mac, not over SSH. `sudo pmset -a sleep 0 disablesleep 1` covers the sleep prerequisite. The registered name is whatever the registration used (a UI-registered runner is named after the user, not `mac-mini`); the workflow selects on labels only.
+
 ## Re-register or remove
 
 ```sh
