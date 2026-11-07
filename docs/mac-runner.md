@@ -41,6 +41,11 @@ Done once, from an admin account:
 3. **A dedicated standard (non-admin) user** for the runner, e.g. `ghrunner`. The runner executes adopter code, so it gets no admin rights and no personal data.
 4. **Automatic login for that user**: System Settings → Users & Groups → "Automatically log in as" → the runner user. The runner installs as a LaunchAgent, which starts in the user's GUI session, and the iOS Simulator needs that session. Automatic login is unavailable while FileVault is on; with FileVault on, log the runner user in by hand after each reboot.
 5. Disable sleep for the Mac (System Settings → Energy → "Prevent automatic sleeping when the display is off").
+6. **A writable `/Users/runner`**, from an admin account:
+   ```sh
+   sudo mkdir -p /Users/runner && sudo chown <runner-user> /Users/runner
+   ```
+   `actions/setup-python` on macOS ignores `AGENT_TOOLSDIRECTORY` and always installs into `/Users/runner/hostedtoolcache` (the hosted images' user). Without the folder every run fails in the `setup-python` step with `mkdir: /Users/runner: Permission denied`.
 
 ## Registration token
 

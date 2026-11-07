@@ -52,7 +52,9 @@ preflight() {
     log "creating an iPhone simulator for this user"
     xcrun simctl create "nightly iPhone" "$model" "$runtime" >/dev/null
   fi
-  log "ok: macOS arm64, simctl, an available iPhone simulator"
+  [ -w /Users/runner ] \
+    || die "/Users/runner is missing or not writable, which actions/setup-python needs: sudo mkdir -p /Users/runner && sudo chown $(id -un) /Users/runner"
+  log "ok: macOS arm64, simctl, an available iPhone simulator, writable /Users/runner"
 }
 
 install() {
