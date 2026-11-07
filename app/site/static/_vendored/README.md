@@ -10,7 +10,7 @@ The rules were first built and proven on the fleet's first web page and extracte
 | --- | --- |
 | [`site-tokens/`](site-tokens/) | The token contract: 4 px space scale, type scale by role, one radius and one hairline, `--content`, `--measure`, the image roles and the pen SVGs. Ships the reference brand values; a site overrides only its brand tokens. |
 | [`site-base/`](site-base/) | The reset, type by role, links, one focus ring, one left edge, reduced motion. |
-| [`site-header/`](site-header/) | Brand left, text nav right; a full-width phone menu under 1024 px. Never a `backdrop-filter` on the header. |
+| [`site-header/`](site-header/) | Brand left, text nav right; a full-width phone menu under `--nav-breakpoint` (1024 px by default). Never a `backdrop-filter` on the header. |
 | [`site-section/`](site-section/) | White bands separated by the drawn rule; the row layout with one left edge and media columns at their role's width; the phone order. |
 | [`site-image/`](site-image/) | One frame and radius for every content image; drawings `contain`, photos `cover`, cut-outs keep their shape. |
 | [`site-video/`](site-video/) | A thumbnail until tapped; the nocookie YouTube player loads only then. |

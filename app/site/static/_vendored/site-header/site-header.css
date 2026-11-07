@@ -13,6 +13,8 @@
 .site-header { position: sticky; top: 0; z-index: 10; background: var(--paper); border-bottom: 1px solid transparent; }
 .site-header.scrolled { border-bottom-color: var(--line); }
 .site-header-inner { max-width: calc(var(--content) + 2 * var(--gutter)); margin: 0 auto; padding: 0 var(--gutter); height: var(--header); display: flex; align-items: center; justify-content: space-between; gap: var(--s4); }
+/* The brand never gives up width to the nav: a shrunk flex item with a fixed image height squashes the image. */
+.logo { flex: none; }
 .logo img { width: auto; height: 32px; }
 .menu-toggle { display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; margin-right: -10px; border: 0; background: none; color: inherit; cursor: pointer; }
 .menu-toggle .icon:last-child, .menu-open .menu-toggle .icon:first-child { display: none; }
@@ -34,4 +36,11 @@
   .site-nav { display: block; }
   .site-nav ul { display: flex; gap: clamp(14px, 1.5vw, 24px); }
   .site-nav a { display: inline-flex; align-items: center; min-height: 44px; font-size: 0.9375rem; }
+}
+/* A site whose nav needs more room sets --nav-breakpoint above 1024px; site-header.js marks the header data-nav="menu" below it
+   and the phone menu stays. :where() keeps this at the specificity of the rules it undoes, so the open panel above still wins. */
+@media (min-width: 1024px) {
+  :where(.site-header[data-nav="menu"]) .menu-toggle { display: inline-flex; }
+  :where(.site-header[data-nav="menu"]) .site-nav { display: none; }
+  :where(.site-header[data-nav="menu"]) .site-nav ul { display: block; }
 }

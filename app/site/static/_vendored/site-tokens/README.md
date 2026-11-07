@@ -1,6 +1,6 @@
 # `site-tokens` — the token contract
 
-Every custom property the other site components read, on `:root`: the 4 px space scale (`--s1`..`--s9`, `--gutter`, `--gap`, `--section`), the type scale by role (`--fs-title`, `--fs-h2`, `--fs-h3`, `--fs-lead`, `--fs-body`, `--fs-card`, `--fs-small`, `--fs-label`), one radius and one hairline frame (`--radius`, `--frame`), `--control`, `--header`, the layout width (`--content`, `--measure`), the image roles (`--img-feature`, `--img-tile`, `--img-thumb`, re-set at 768 and 1024 px) and the pen (`--pen-rule`, `--pen-marker`, `--pen-underline`, `--pen-quote`, `--pen-strike`).
+Every custom property the other site components read, on `:root`: the 4 px space scale (`--s1`..`--s9`, `--gutter`, `--gap`, `--section`), the type scale by role (`--fs-title`, `--fs-h2`, `--fs-h3`, `--fs-lead`, `--fs-body`, `--fs-card`, `--fs-small`, `--fs-label`), one radius and one hairline frame (`--radius`, `--frame`), `--control`, `--header`, `--nav-breakpoint`, the layout width (`--content`, `--measure`), the image roles (`--img-feature`, `--img-tile`, `--img-thumb`, re-set at 768 and 1024 px) and the pen (`--pen-rule`, `--pen-marker`, `--pen-underline`, `--pen-quote`, `--pen-strike`).
 
 ## Contract and brand
 
@@ -13,6 +13,7 @@ The names and roles are the contract; some values are the brand. The values ship
 | `--footer-band` | the footer band; white on it at 7:1 or better |
 | `--ink-hover`, `--band-ink`, `--band-label`, `--band-rule` | the primary button's hover fill, and the text, labels and link underlines on the footer band |
 | `--font` | the one sans family (the site ships its own `@font-face` rules) |
+| `--nav-breakpoint` | the width from which the header shows the text nav instead of the phone menu: a px length of 1024px or more, sized to the site's nav |
 | `--pen-*` | the drawn SVGs, whose colours are baked into each data URI |
 
 Everything else is contract: change it here, for every site.

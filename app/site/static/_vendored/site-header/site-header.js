@@ -27,4 +27,17 @@ document.addEventListener('keydown', (e) => {
     toggle?.focus();
   }
 });
-window.matchMedia('(min-width: 1024px)').addEventListener('change', (e) => e.matches && setMenu(false));
+
+// The text nav shows from --nav-breakpoint (a px length, never below the 1024px the stylesheet's media query sets).
+const FLOOR = 1024;
+function navBreakpoint() {
+  const match = /^\s*(\d+(?:\.\d+)?)px\s*$/.exec(getComputedStyle(root).getPropertyValue('--nav-breakpoint'));
+  return match ? Math.max(FLOOR, Number(match[1])) : FLOOR;
+}
+const wide = window.matchMedia(`(min-width: ${navBreakpoint()}px)`);
+function onNavMode() {
+  header?.setAttribute('data-nav', wide.matches ? 'inline' : 'menu');
+  if (wide.matches) setMenu(false);
+}
+wide.addEventListener('change', onNavMode);
+onNavMode();
