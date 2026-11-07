@@ -52,7 +52,7 @@ Most hits name a fleet location: a sibling repo, a helper in another checkout, a
 ```python
 from src.fleet_root import fleet_root
 
-helper = fleet_root() / "fleet-config" / "skills" / "_lib" / "send_file.py"
+helper = fleet_root() / "shared-tools" / "bin" / "send_file.py"
 ```
 
 `fleet_root()` returns the directory holding the fleet's repos, resolved in this order:
@@ -303,7 +303,7 @@ A failing check prints every hit of the risen rule in the file, as `<path>:<line
 
 Re-vendoring the script never breaks a repo that has not opted in: an absent `[conventions_ratchet]` table, or `enabled = false`, prints `conventions ratchet: not enabled` and exits 0 (declared, not inferred).
 
-1. Vendor `scripts/conventions_ratchet.py` and its sibling `scripts/conventions_readers.py` byte-for-byte (`/propagate-vendored conventions_ratchet,conventions_readers`; manifest keys `conventions_ratchet` and `conventions_readers`) and declare both in the repo's `[vendored]` table. The ratchet loads the sibling by path and exits 3 when it is missing. It needs Python 3.11+ (`tomllib`) and `git`; it parses code with the running interpreter's grammar, so run it with the interpreter the project targets.
+1. Vendor `scripts/conventions_ratchet.py` and its sibling `scripts/conventions_readers.py` byte-for-byte (`python scripts/adopt_ratchets.py <repo> --ratchets conventions` from a scaffold checkout copies and declares them, see [adopting-ratchets.md](adopting-ratchets.md); inside the fleet, `/propagate-vendored conventions_ratchet,conventions_readers`; manifest keys `conventions_ratchet` and `conventions_readers`) and declare both in the repo's `[vendored]` table. The ratchet loads the sibling by path and exits 3 when it is missing. It needs Python 3.11+ (`tomllib`) and `git`; it parses code with the running interpreter's grammar, so run it with the interpreter the project targets.
 2. Add to the repo's own `.fleet.toml`, enabling only the rules that apply:
 
    ```toml
@@ -326,7 +326,7 @@ Re-vendoring the script never breaks a repo that has not opted in: an absent `[c
 3. Declare every vendored copy in `[vendored]` first (an undeclared copy of a scaffold ratchet reports its own `git` spawn as yours). Then run `python scripts/conventions_ratchet.py --init`, review the baseline, and commit it. Each entry is either a violation worth a follow-up fix or a legitimate exception worth an exempt marker. **Adoption never requires the fixes first.**
 4. Add a gate stage that runs `python scripts/conventions_ratchet.py` and fails on any non-zero exit. The scaffold's `scripts/verify-before-ship.ps1` places it after the dead code ratchet and before `mypy`. **Do not path-route it**: it is cheap, and a rule added to `rules` must see the whole tree.
 5. Delete the repo's local guard test for a rule once that rule is enabled here with a baseline of zero for it; keep the test while the baseline still carries debt, because the test is zero-tolerance and the ratchet is not.
-6. If the repo uses diff-proportionate e2e routing, add a `tier = "none"` rule for the baseline file to `.fleet.toml` `[e2e]` and a matching assertion in `tests/test_classify_e2e.py`.
+6. Only if the repo uses this scaffold's diff-proportionate e2e routing ([e2e-routing.md](e2e-routing.md)), add a `tier = "none"` rule for the baseline file to `.fleet.toml` `[e2e]` and a matching assertion in `tests/test_classify_e2e.py`.
 
 The script spawns `git` with `CREATE_NO_WINDOW`, derived locally (it is vendor-verbatim, so it cannot import `src/no_window.py`), and with `GIT_OPTIONAL_LOCKS=0`. It shares its config, glob and baseline helpers with the sibling ratchets by copy, because each vendored file must be self-contained.
 

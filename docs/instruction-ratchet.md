@@ -4,7 +4,7 @@
 
 It reuses the shape of the [docs ratchet](docs-ratchet.md) and the [structure ratchet](structure-ratchet.md): an opt-in `.fleet.toml` table, a committed baseline, the same flags, and exit 3 for "not confirmed". It is stdlib-only.
 
-The rules themselves (what each one means, why the vendor guides ask for it, and the fix shape) live in fleet-config's `.claude/skills/prompt-audit/rules.md`. This page covers only the mechanism.
+"What is counted" below summarises what each rule catches. The rules come from the fleet's own prompt audit, whose full rule text is not public; this page covers the mechanism, and the summary is enough to fix a hit.
 
 ## What is counted
 
@@ -127,7 +127,7 @@ A failing check names each file, the rule and its title, the count against its b
 
 Re-vendoring the script never breaks a repo that has not opted in: an absent `[instruction_ratchet]` table, or `enabled = false`, prints `instruction ratchet: not enabled` and exits 0 (declared, not inferred).
 
-1. Vendor `scripts/instruction_ratchet.py` and its siblings `scripts/instruction_frontmatter.py` and `scripts/instruction_repeats.py` byte-for-byte (`/propagate-vendored instruction_ratchet,instruction_frontmatter,instruction_repeats`; manifest keys of the same names) and declare all three in the repo's `[vendored]` table. A script without `instruction_frontmatter` exits 3, never a pass; without `instruction_repeats` it exits 3 only once `repeated_text_words` is set. It needs Python 3.11+ (`tomllib`).
+1. Vendor `scripts/instruction_ratchet.py` and its siblings `scripts/instruction_frontmatter.py` and `scripts/instruction_repeats.py` byte-for-byte (`python scripts/adopt_ratchets.py <repo> --ratchets instruction` from a scaffold checkout copies and declares them, see [adopting-ratchets.md](adopting-ratchets.md); inside the fleet, `/propagate-vendored instruction_ratchet,instruction_frontmatter,instruction_repeats`; manifest keys of the same names) and declare all three in the repo's `[vendored]` table. A script without `instruction_frontmatter` exits 3, never a pass; without `instruction_repeats` it exits 3 only once `repeated_text_words` is set. It needs Python 3.11+ (`tomllib`).
 2. Add to the repo's own `.fleet.toml`:
 
    ```toml
@@ -143,10 +143,10 @@ Re-vendoring the script never breaks a repo that has not opted in: an absent `[i
    repeated_text_global = false                          # S-04, optional; true also compares ~/.claude/CLAUDE.md (owner's machine only)
    ```
 
-   A repo that ships skills from another folder lists it in `skill_dirs` (fleet-config: `["skills", ".claude/skills"]`, with `extra_files = ["global-CLAUDE.md"]`).
+   A repo that ships skills from another folder lists it in `skill_dirs` (for example `["skills", ".claude/skills"]`, with `extra_files = ["global-CLAUDE.md"]`).
 3. Run `python scripts/instruction_ratchet.py --init` and commit the baseline. Review it: it records every existing violation-cap hit and every over-cap file at today's size. **Adoption never requires the cleanup first**; burn-down issues lower it.
 4. Add a gate stage that runs `python scripts/instruction_ratchet.py` and fails on any non-zero exit. The scaffold's `scripts/verify-before-ship.ps1` places it after the structure ratchet and before `mypy`. **Do not path-route it**: the reader of one file depends on another (`AGENTS.md`), and a skill's reference docs live outside its folder.
-5. If the repo uses diff-proportionate e2e routing, add a `tier = "none"` rule for the baseline file to `.fleet.toml` `[e2e]` and a matching assertion in `tests/test_classify_e2e.py`.
+5. Only if the repo uses this scaffold's diff-proportionate e2e routing ([e2e-routing.md](e2e-routing.md)), add a `tier = "none"` rule for the baseline file to `.fleet.toml` `[e2e]` and a matching assertion in `tests/test_classify_e2e.py`.
 
 The script spawns `git` with `CREATE_NO_WINDOW`, derived locally (it is vendor-verbatim, so it cannot import `src/no_window.py`).
 

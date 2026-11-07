@@ -119,7 +119,7 @@ A failing check prints `<doc>:<line>: <kind> `<reference>` does not exist` with 
 
 Re-vendoring the script never breaks a repo that has not opted in: an absent `[doc_refs_ratchet]` table, or `enabled = false`, prints `doc refs ratchet: not enabled` and exits 0 (declared, not inferred).
 
-1. Vendor `scripts/doc_refs_ratchet.py` byte-for-byte (`/propagate-vendored doc_refs_ratchet`; manifest key `doc_refs_ratchet`) and declare it in the repo's `[vendored]` table. It needs Python 3.11+ (`tomllib`) and `git`.
+1. Vendor `scripts/doc_refs_ratchet.py` byte-for-byte (`python scripts/adopt_ratchets.py <repo> --ratchets doc_refs` from a scaffold checkout copies and declares them, see [adopting-ratchets.md](adopting-ratchets.md); inside the fleet, `/propagate-vendored doc_refs_ratchet`; manifest key `doc_refs_ratchet`) and declare it in the repo's `[vendored]` table. It needs Python 3.11+ (`tomllib`) and `git`.
 2. Add to the repo's own `.fleet.toml`:
 
    ```toml
@@ -134,7 +134,7 @@ Re-vendoring the script never breaks a repo that has not opted in: an absent `[d
 
 3. If the repo serves an app, list the ports of the other services its docs name in `allow_refs` first: a fleet web app names one to seven of them, the hub repo eighteen. Then run `python scripts/doc_refs_ratchet.py --init`, review the baseline, and commit it. Each entry is either a real stale reference worth a follow-up fix or an intentional pointer worth an `allow_refs` line. **Adoption never requires the fixes first.**
 4. Add a gate stage that runs `python scripts/doc_refs_ratchet.py` and fails on any non-zero exit. The scaffold's `scripts/verify-before-ship.ps1` places it after the instruction ratchet and before `mypy`. **Do not path-route it**: a code change can strand a doc reference without touching the doc.
-5. If the repo uses diff-proportionate e2e routing, add a `tier = "none"` rule for the baseline file to `.fleet.toml` `[e2e]` and a matching assertion in `tests/test_classify_e2e.py`.
+5. Only if the repo uses this scaffold's diff-proportionate e2e routing ([e2e-routing.md](e2e-routing.md)), add a `tier = "none"` rule for the baseline file to `.fleet.toml` `[e2e]` and a matching assertion in `tests/test_classify_e2e.py`.
 
 The script spawns `git` with `CREATE_NO_WINDOW`, derived locally (it is vendor-verbatim, so it cannot import `src/no_window.py`). It shares its config, glob, Markdown-block and baseline helpers with the sibling ratchets by copy, because each vendored file must be self-contained.
 

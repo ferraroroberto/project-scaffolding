@@ -42,6 +42,14 @@ repo that has not opted in:
     min_tokens = 100                                 # default
     exclude    = ["**/_vendored/**"]                 # added to the built-in set
     ruff_rules = ["B006", "S113", "I001"]            # replaces DEFAULT_RULES; [] = none
+    duplicates = true                                # default; false = no jscpd, no Node needed
+    ruff       = true                                # default; false = no ruff detectors
+
+`duplicates = false` / `ruff = false` turn one half off where its tool cannot
+run (a locked-down machine with no Node or no network for `npx`). An off check
+is reported as OFF on every run, never as clean, and its baselined entries are
+kept untouched -- switching a check off must not read as having paid its debt.
+Both off is a configuration error: nothing would be checked.
 
 Every `dest` in the repo's own `[vendored]` table is excluded as well: a
 vendor-verbatim copy is checked once, where it lives, and an adopter cannot edit
@@ -52,8 +60,8 @@ Exit codes (a state is never folded into a pass):
   0  pass, or the stage is not enabled (declared, not inferred)
   1  a new finding, or the baseline file is missing / a mode was refused
   2  bad configuration, baseline or arguments -- fail loud
-  3  NOT CONFIRMED: a detector could not run (no Node, no network on first
-     `npx`, ruff missing, unparseable output). The gate fails on it.
+  3  NOT CONFIRMED: an enabled detector could not run (no Node, no network on
+     first `npx`, ruff missing, unparseable output). The gate fails on it.
 
 Modes: `check` (default; what the gate runs), `--init` (write the first
 baseline, refuses to overwrite), `--update-baseline` (drop stale entries; exits 1
@@ -154,7 +162,9 @@ EXIT_PASS, EXIT_NEW, EXIT_CONFIG, EXIT_NOT_CONFIRMED = 0, 1, 2, 3
 # would not resolve in a consumer tree), the documented exception.
 _NO_WINDOW = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
 
-_FLEET_KEYS = {"enabled", "baseline", "min_lines", "min_tokens", "exclude", "ruff_rules"}
+_FLEET_KEYS = {"enabled", "baseline", "min_lines", "min_tokens", "exclude", "ruff_rules", "duplicates", "ruff"}
+#: Which detector produced a key, by its prefix: the half a `duplicates`/`ruff` switch owns.
+_RUFF_PREFIXES = ("unused:", "lint:", "order:")
 
 
 class ConfigError(RuntimeError):
@@ -172,6 +182,15 @@ class Config:
     min_tokens: int
     exclude: tuple[str, ...]
     ruff_rules: tuple[str, ...] = DEFAULT_RULES
+    duplicates: bool = True
+    ruff: bool = True
+
+    def owns(self, key: str) -> bool:
+        """True when `key` belongs to a detector this config runs."""
+        return self.ruff if key.startswith(_RUFF_PREFIXES) else self.duplicates
+
+    def off_checks(self) -> list[str]:
+        return [name for name, on in (("duplicates", self.duplicates), ("ruff", self.ruff)) if not on]
 
 
 @dataclass(frozen=True)
@@ -219,7 +238,17 @@ def parse_config(toml_text: str) -> Config | None:
     rules = table.get("ruff_rules", list(DEFAULT_RULES))
     if not isinstance(rules, list) or not all(isinstance(r, str) and _RULE_CODE.match(r) for r in rules):
         raise ConfigError('[static_ratchet] ruff_rules must be a list of ruff rule codes such as "S113"')
-    return Config(baseline, ints["min_lines"], ints["min_tokens"], tuple(exclude), tuple(rules))
+    switches: dict[str, bool] = {}
+    for name in ("duplicates", "ruff"):
+        value = table.get(name, True)
+        if not isinstance(value, bool):
+            raise ConfigError(f"[static_ratchet] {name} must be true or false")
+        switches[name] = value
+    if not any(switches.values()):
+        raise ConfigError("[static_ratchet] duplicates and ruff are both false -- nothing would be checked; "
+                          "set enabled = false instead")
+    return Config(baseline, ints["min_lines"], ints["min_tokens"], tuple(exclude), tuple(rules),
+                  switches["duplicates"], switches["ruff"])
 
 
 def vendored_globs(toml_text: str) -> tuple[str, ...]:
@@ -437,7 +466,7 @@ def run_ruff(root: Path, cfg: Config) -> list[Finding]:
 
 
 def collect(root: Path, cfg: Config) -> dict[str, Finding]:
-    found = run_jscpd(root, cfg) + run_ruff(root, cfg)
+    found = (run_jscpd(root, cfg) if cfg.duplicates else []) + (run_ruff(root, cfg) if cfg.ruff else [])
     return {f.key: f for f in found}
 
 
@@ -498,11 +527,22 @@ def render_baseline(findings: dict[str, Finding], tools: dict[str, str]) -> str:
     )
 
 
-def diff(current: dict[str, Finding], baseline: dict[str, tuple[str, ...]]) -> tuple[list[Finding], list[str]]:
-    """(new findings, baselined keys no longer found), both sorted."""
+def diff(
+    current: dict[str, Finding], baseline: dict[str, tuple[str, ...]], cfg: Config | None = None,
+) -> tuple[list[Finding], list[str]]:
+    """(new findings, baselined keys no longer found), both sorted.
+
+    A baselined key owned by a check that is off was not looked for, so it is
+    never "gone".
+    """
     new = [current[k] for k in sorted(current.keys() - baseline.keys())]
-    gone = sorted(baseline.keys() - current.keys())
+    gone = sorted(k for k in baseline.keys() - current.keys() if cfg is None or cfg.owns(k))
     return new, gone
+
+
+def kept_entries(baseline: dict[str, tuple[str, ...]], cfg: Config) -> dict[str, Finding]:
+    """Baselined entries of an off check, carried over unchanged on a rewrite."""
+    return {k: Finding(k, "kept", files, "") for k, files in baseline.items() if not cfg.owns(k)}
 
 
 # -------------------------------------------------------------------- CLI
@@ -531,6 +571,8 @@ def run(root: Path, *, init: bool, update: bool, allow_additions: bool) -> int:
         print("static ratchet: not enabled (no [static_ratchet] enabled = true in .fleet.toml)")
         return EXIT_PASS
     baseline_path = root / cfg.baseline
+    for name in cfg.off_checks():
+        print(f"static ratchet: {name}: OFF ({name} = false in .fleet.toml) -- not checked, not clean")
 
     baseline: dict[str, tuple[str, ...]] = {}
     if init:
@@ -559,12 +601,13 @@ def run(root: Path, *, init: bool, update: bool, allow_additions: bool) -> int:
         print(f"static ratchet: wrote {cfg.baseline} with {len(current)} baselined finding(s)")
         return EXIT_PASS
 
-    new, gone = diff(current, baseline)
+    new, gone = diff(current, baseline, cfg)
     if update:
         if new and not allow_additions:
             _report_new(new)
             print("static ratchet: nothing written -- fix them, or add them to the baseline with --allow-additions")
             return EXIT_NEW
+        current = {**kept_entries(baseline, cfg), **current}
         baseline_path.write_text(render_baseline(current, tool_versions()), encoding="utf-8", newline="\n")
         print(f"static ratchet: {cfg.baseline} now has {len(current)} entr(ies) "
               f"({len(gone)} dropped, {len(new)} added)")
@@ -575,7 +618,9 @@ def run(root: Path, *, init: bool, update: bool, allow_additions: bool) -> int:
         print("  Remove the duplication / unused name / flagged pattern, or (reviewed) re-baseline with "
               "`--update-baseline --allow-additions`.")
         return EXIT_NEW
-    print(f"static ratchet: PASS ({len(current)} baselined finding(s), none new)")
+    off = cfg.off_checks()
+    scope = f"; {', '.join(off)} OFF" if off else ""
+    print(f"static ratchet: PASS ({len(current)} baselined finding(s), none new{scope})")
     if gone:
         print(f"  {len(gone)} baselined finding(s) are gone -- run "
               f"`python scripts/static_ratchet.py --update-baseline` to shrink the baseline")

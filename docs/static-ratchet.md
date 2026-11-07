@@ -115,8 +115,8 @@ Normal use can only shrink the baseline. Adding entries needs `--allow-additions
 
 Re-vendoring the script never breaks a repo that has not opted in: an absent `[static_ratchet]` table, or `enabled = false`, prints `static ratchet: not enabled` and exits 0 (declared, not inferred).
 
-1. Vendor `scripts/static_ratchet.py` byte-for-byte (`/propagate-vendored static_ratchet`; manifest key `static_ratchet`), and declare it in the repo's `[vendored]` table.
-2. Make sure `npx` (Node) and `ruff` (in the venv that runs the gate) are available; on CI, install both before the gate.
+1. Vendor `scripts/static_ratchet.py` byte-for-byte (`python scripts/adopt_ratchets.py <repo> --ratchets static` from a scaffold checkout copies and declares them, see [adopting-ratchets.md](adopting-ratchets.md); inside the fleet, `/propagate-vendored static_ratchet`; manifest key `static_ratchet`), and declare it in the repo's `[vendored]` table.
+2. Make sure `npx` (Node) and `ruff` (in the venv that runs the gate) are available; on CI, install both before the gate. Where one cannot be installed (a locked-down machine, no network for `npx`), turn its half off with `duplicates = false` or `ruff = false` below: the run then prints `duplicates: OFF ... not checked, not clean` on every pass and keeps that half's baselined entries untouched. Without the switch a missing tool stays exit 3; both switches off is a configuration error.
 3. Add to the repo's own `.fleet.toml`:
 
    ```toml
@@ -127,6 +127,8 @@ Re-vendoring the script never breaks a repo that has not opted in: an absent `[s
    min_tokens = 100                                 # default
    exclude    = ["**/_vendored/**"]                 # added to the built-in set
    ruff_rules = ["B006", "S113", "I001"]            # optional: replaces the curated B/S/I001 set; [] = none
+   duplicates = true                                # default; false = no jscpd, so no Node needed
+   ruff       = true                                # default; false = no ruff detectors
    ```
 
    Always excluded: `node_modules`, `.venv`, `venv`, `.git`, `__pycache__`, `*.min.js`. `exclude` globs are anchored at the repo root; `**/` means "any depth". An adopter excludes `**/_vendored/**` because vendor-verbatim copies are duplicates by design and cannot be fixed downstream; the scaffold itself does not, since it owns them. `jscpd` also honours `.gitignore`.
@@ -136,7 +138,7 @@ Re-vendoring the script never breaks a repo that has not opted in: an absent `[s
 
    **An existing adopter re-vendoring the script** keeps its baseline: `dup:` and `unused:` keys are unchanged, and nothing in `.fleet.toml` has to change (an absent `ruff_rules` means the curated set). Its first check reports today's curated hits as new `lint:` and `order:` findings. Run `ruff check --select I001 --fix` first (the `order:` hits are mechanical), then `python scripts/static_ratchet.py --update-baseline --allow-additions` once and commit the added `lint:` lines in the re-vendor PR; that diff is the review of the inherited debt. A repo that is not ready sets `ruff_rules = []` instead.
 5. Add a gate stage that runs `python scripts/static_ratchet.py` and fails on any non-zero exit. The scaffold's `scripts/verify-before-ship.ps1` places it after `ruff` and before `mypy`; a Python acceptance runner calls the same script. **Do not path-route it**: duplication needs the whole tree.
-6. If the repo uses diff-proportionate e2e routing, add a `tier = "none"` rule for the baseline file to `.fleet.toml` `[e2e]` (the file at the repo root otherwise fails safe to the full browser suite) and a matching assertion in `tests/test_classify_e2e.py`.
+6. Only if the repo uses this scaffold's diff-proportionate e2e routing ([e2e-routing.md](e2e-routing.md)), add a `tier = "none"` rule for the baseline file to `.fleet.toml` `[e2e]` (the file at the repo root otherwise fails safe to the full browser suite) and a matching assertion in `tests/test_classify_e2e.py`.
 
 The script spawns `npx` and ruff with `CREATE_NO_WINDOW`, derived locally (it is vendor-verbatim, so it cannot import `src/no_window.py`).
 
