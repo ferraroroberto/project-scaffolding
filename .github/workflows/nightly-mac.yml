@@ -32,6 +32,8 @@ on:
     # 04:00 in summer (CEST, UTC+2): inside the 02:00-05:00 local quiet hours
     # either way, when the hub is not placing whisper jobs on the Mac.
     - cron: "0 2 * * *"
+  # A manual run outside the quiet hours slows the Mac's speech-to-text for the
+  # seconds its WebKit suite runs (docs/mac-runner.md, "Speech-to-text latency").
   workflow_dispatch:
 
 permissions:

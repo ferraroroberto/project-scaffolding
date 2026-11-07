@@ -44,6 +44,28 @@ The puller itself is tracked in `local-llm-hub`; this repo owns the folder layou
 
 The Mac is also a whisper host. The hub places whisper on the gaming PC first, then the Mac, so the nightly pass runs in the quiet hours: cron `0 2 * * *` is **UTC**, which is 03:00 in Madrid in winter (CET) and 04:00 in summer (CEST), inside 02:00–05:00 local either way. Concurrency is 1 at every level: the runner takes one job, the workflow's `concurrency` group queues a second run, and the matrix runs adopters one after another (`max-parallel: 1`). A wedged run is capped at 90 minutes.
 
+### Speech-to-text latency during a run
+
+What the Mac serves is the hub's `audio_transcribe` role: parakeet on the Neural Engine, with whisper only as the fallback when parakeet is down. `scripts/audio_latency_probe.py` measures it through the hub's audio route only: `probe` sends short synthetic tone clips (no recording of anyone) at a fixed spacing and records each round trip with the host and model that served it, and `compare` judges a during-run window against a baseline. Negligible means up to +10 % at p95 plus 150 ms; anything unestablished (a failed request, fewer than 20 samples, a different serving host or model) is `unknown`, exit 3, never a pass.
+
+Measured on a manual `workflow_dispatch` run of the one current adopter (the job took 2 min 22 s), 4 s clips every 5 s, all served by the Mac's parakeet and all answered 200:
+
+| Window | Clips | p50 | p95 | Max |
+|---|---|---|---|---|
+| Baseline, Mac idle | 40 | 350 ms | 382 ms | 414 ms |
+| During the job | 23 | 316 ms | 6,355 ms | 6,763 ms |
+
+The median does not move; the tail does. The six slow requests (1.3 s to 6.8 s) all fall inside the WebKit e2e leg; the dependency install before it and the simulator smoke after it show none, and the 77 clips outside the job window are all fast. A run therefore delays speech-to-text by seconds while its WebKit suite runs, which is far past the +10 % bound, so the quiet-hours schedule above is the mitigation and stays. A "yield to whisper" check before starting would need the workflow to call the hub, and the workflow makes no outbound call. A manual dispatch during the day shows the same delay, so run it when nobody is dictating.
+
+Re-measure after any change to the runner's concurrency, an adopter's suite, or the hub's placement of the transcribe role:
+
+```sh
+python scripts/audio_latency_probe.py probe --label baseline --count 40 --interval-s 5 --out baseline.json
+# start a run, then probe across it
+python scripts/audio_latency_probe.py probe --label during --count 100 --interval-s 5 --out during.json
+python scripts/audio_latency_probe.py compare baseline.json during.json --from <job start, unix> --to <job end, unix>
+```
+
 ## Mac prerequisites
 
 Done once, from an admin account:
