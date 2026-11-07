@@ -15,7 +15,7 @@ It is load-bearing in two more places:
 
 Add a component to the table in the same PR that adds it to the tree. `tests/test_vendored_catalog.py` is the anti-drift guard that fails otherwise.
 
-A component that loads a sibling at run time declares it with `requires = ["<key>", ...]` on its entry (`conventions_ratchet` requires `conventions_readers`). `/propagate-vendored` expands a named component with its `requires`, so a wave never re-vendors one without the other. Every `requires` name must be a declared key.
+A component that loads a sibling at run time declares it with `requires = ["<key>", ...]` on its entry (`conventions_ratchet` requires `conventions_readers`; `tests/test_vendored_catalog.py` fails a script that loads a sibling through `_load_sibling` without listing it). `/propagate-vendored` expands a named component with its `requires`, so a wave never re-vendors one without the other. Every `requires` name must be a declared key.
 
 ## The web-page (static site) set
 

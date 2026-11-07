@@ -20,6 +20,7 @@ that, one component at a time.
 
 from __future__ import annotations
 
+import ast
 import tomllib
 from pathlib import Path
 
@@ -154,6 +155,41 @@ def test_every_requires_names_a_declared_component(real_catalog: dict[str, dict[
     )
     unknown = sorted(d for deps in requires.values() for d in deps if d not in real_catalog)
     assert not unknown, f"`requires` names components the catalog does not declare: {unknown}"
+
+
+def _loaded_siblings(script: Path) -> set[str]:
+    """Module names a script loads through its `_load_sibling("<name>")` helper."""
+    tree = ast.parse(script.read_text(encoding="utf-8"))
+    return {
+        node.args[0].value
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == "_load_sibling"
+        and node.args
+        and isinstance(node.args[0], ast.Constant)
+        and isinstance(node.args[0].value, str)
+    }
+
+
+def test_every_loaded_sibling_is_required() -> None:
+    """A script that loads a sibling through `_load_sibling` exits 3 when the sibling is
+    missing beside it, so its entry must `requires` the sibling or `/propagate-vendored`
+    re-vendors the script alone and the adopter's gate goes red."""
+    table = tomllib.loads((REPO_ROOT / ".fleet.toml").read_text(encoding="utf-8"))["components"]
+    by_src = {v["src"]: k for k, v in table.items()}
+    missing: list[str] = []
+    for key, entry in sorted(table.items()):
+        script = REPO_ROOT / entry["src"]
+        if script.suffix != ".py" or not script.is_file():
+            continue
+        for sibling in sorted(_loaded_siblings(script)):
+            sibling_key = by_src.get(f"scripts/{sibling}.py")
+            if sibling_key is None:
+                missing.append(f"{key} loads scripts/{sibling}.py, which the catalog does not declare")
+            elif sibling_key not in entry.get("requires", []):
+                missing.append(f'{key} loads {sibling_key} but its entry has no requires = ["{sibling_key}"]')
+    assert not missing, "\n".join(missing)
 
 
 def test_mypy_gate_still_covers_every_historically_gated_module(
