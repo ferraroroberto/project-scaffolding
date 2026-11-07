@@ -20,7 +20,10 @@
 # RESULTS STAY PRIVATE. Logs of a public repo are public, so the run log and
 # the step summary carry pass/fail lines only. Screenshots, traces and failure
 # images go to a folder in the runner user's home on the Mac, outside the
-# checkout, and are never uploaded as an artifact.
+# checkout, and are never uploaded as an artifact. Delivery to the owner is
+# pull-only: a trusted host reads a finished run folder (marked READY) over SSH.
+# The runner holds no delivery credential, gets no write-back and this workflow
+# makes no outbound call (docs/mac-runner.md, "Delivering results").
 name: nightly-mac
 
 on:
@@ -168,3 +171,20 @@ jobs:
             echo
             echo "Screenshots and failure traces are kept on the runner host, not uploaded."
           } >> "$GITHUB_STEP_SUMMARY"
+
+      # Written last: the pulling host takes a run folder only once READY exists,
+      # so it never reads a half-written run. Outcomes only, no host or path.
+      - name: Mark the run folder ready for the trusted puller
+        if: ${{ !cancelled() }}
+        env:
+          E2E: ${{ steps.e2e.outcome }}
+          SMOKE: ${{ steps.smoke.outcome }}
+        run: |
+          mkdir -p "$RESULTS"
+          {
+            echo "run=${{ github.run_id }}"
+            echo "repo=${{ matrix.repo }}"
+            echo "e2e=${E2E:-not run}"
+            echo "smoke=${SMOKE:-not run}"
+          } > "$RESULTS/READY.tmp"
+          mv "$RESULTS/READY.tmp" "$RESULTS/READY"
