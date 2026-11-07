@@ -86,7 +86,7 @@ A failing check names each file with its count and baseline, and lists every ref
 
 Re-vendoring the script never breaks a repo that has not opted in: an absent `[comment_ratchet]` table, or `enabled = false`, prints `comment ratchet: not enabled` and exits 0 (declared, not inferred).
 
-1. Vendor `scripts/comment_ratchet.py` byte-for-byte (`/propagate-vendored comment_ratchet`; manifest key `comment_ratchet`), and declare it in the repo's `[vendored]` table. It is stdlib-only and needs Python 3.11+ (`tomllib`).
+1. Vendor `scripts/comment_ratchet.py` byte-for-byte (`python scripts/adopt_ratchets.py <repo> --ratchets comment` from a scaffold checkout copies and declares them, see [adopting-ratchets.md](adopting-ratchets.md); inside the fleet, `/propagate-vendored comment_ratchet`; manifest key `comment_ratchet`), and declare it in the repo's `[vendored]` table. It is stdlib-only and needs Python 3.11+ (`tomllib`).
 2. Add to the repo's own `.fleet.toml`:
 
    ```toml
@@ -102,7 +102,7 @@ Re-vendoring the script never breaks a repo that has not opted in: an absent `[c
    `exclude` globs are anchored at the repo root; `**/` means "any depth".
 3. Run `python scripts/comment_ratchet.py --init` and commit the baseline. Review it: the first baseline records all existing debt.
 4. Add a gate stage that runs `python scripts/comment_ratchet.py` and fails on any non-zero exit. The scaffold's `scripts/verify-before-ship.ps1` places it after the static ratchet and before `mypy`. **Do not path-route it**: a count needs the whole tree.
-5. If the repo uses diff-proportionate e2e routing, add a `tier = "none"` rule for the baseline file to `.fleet.toml` `[e2e]` (the file at the repo root otherwise fails safe to the full browser suite) and a matching assertion in `tests/test_classify_e2e.py`.
+5. Only if the repo uses this scaffold's diff-proportionate e2e routing ([e2e-routing.md](e2e-routing.md)), add a `tier = "none"` rule for the baseline file to `.fleet.toml` `[e2e]` (the file at the repo root otherwise fails safe to the full browser suite) and a matching assertion in `tests/test_classify_e2e.py`.
 
 The script spawns `git` with `CREATE_NO_WINDOW`, derived locally (it is vendor-verbatim, so it cannot import `src/no_window.py`).
 

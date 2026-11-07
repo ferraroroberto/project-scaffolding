@@ -91,7 +91,7 @@ A failing check prints `<path>:<line>: <kind> `<qualname>` is never referenced (
 
 Re-vendoring the script never breaks a repo that has not opted in: an absent `[dead_code_ratchet]` table, or `enabled = false`, prints `dead code ratchet: not enabled` and exits 0 (declared, not inferred).
 
-1. Vendor `scripts/dead_code_ratchet.py` byte-for-byte (`/propagate-vendored dead_code_ratchet`; manifest key `dead_code_ratchet`) and declare it in the repo's `[vendored]` table. It needs Python 3.11+ (`tomllib`) and `git`; it parses code with the running interpreter's grammar, so run it with the interpreter the project targets.
+1. Vendor `scripts/dead_code_ratchet.py` byte-for-byte (`python scripts/adopt_ratchets.py <repo> --ratchets dead_code` from a scaffold checkout copies and declares them, see [adopting-ratchets.md](adopting-ratchets.md); inside the fleet, `/propagate-vendored dead_code_ratchet`; manifest key `dead_code_ratchet`) and declare it in the repo's `[vendored]` table. It needs Python 3.11+ (`tomllib`) and `git`; it parses code with the running interpreter's grammar, so run it with the interpreter the project targets.
 2. Add to the repo's own `.fleet.toml`:
 
    ```toml
@@ -107,7 +107,7 @@ Re-vendoring the script never breaks a repo that has not opted in: an absent `[d
 
 3. Declare every vendored copy in `[vendored]` first (an undeclared copy reports the vendor's unused API as yours). Then run `python scripts/dead_code_ratchet.py --init`, review the baseline, and commit it. Each entry is either dead code worth a follow-up deletion or an entry point worth an `allow` or `entry_decorators` line. **Adoption never requires the deletions first.**
 4. Add a gate stage that runs `python scripts/dead_code_ratchet.py` and fails on any non-zero exit. The scaffold's `scripts/verify-before-ship.ps1` places it after the doc references ratchet and before `mypy`. **Do not path-route it**: deleting the last caller in one file strands a definition in another.
-5. If the repo uses diff-proportionate e2e routing, add a `tier = "none"` rule for the baseline file to `.fleet.toml` `[e2e]` and a matching assertion in `tests/test_classify_e2e.py`.
+5. Only if the repo uses this scaffold's diff-proportionate e2e routing ([e2e-routing.md](e2e-routing.md)), add a `tier = "none"` rule for the baseline file to `.fleet.toml` `[e2e]` and a matching assertion in `tests/test_classify_e2e.py`.
 
 The script spawns `git` with `CREATE_NO_WINDOW`, derived locally (it is vendor-verbatim, so it cannot import `src/no_window.py`), and with `GIT_OPTIONAL_LOCKS=0`. It shares its config, glob and baseline helpers with the sibling ratchets by copy, because each vendored file must be self-contained.
 

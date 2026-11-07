@@ -44,7 +44,7 @@ Clone this directory, rename it, and start building.
 - `brand/` + `scripts/brand_gen.py` — the fleet icon/brand generator (favicon, PWA icons, tray `.ico`, Stream Deck button). See [`docs/brand-icons.md`](docs/brand-icons.md).
 - `CLAUDE.md` so AI coding agents can extend the project safely; `AGENTS.md` is a one-line pointer to it for non-Claude tools.
 - `.fleet.toml` — this repo's card on the fleet architecture map. **After cloning, replace its values** with your repo's own. Schema: `fleet-config/architecture/README.md`.
-- `scripts/*_ratchet.py` (static, comment, docs, structure, instruction, doc refs, dead code, conventions, runtime write, usage track) — opt-in, vendor-verbatim baseline-and-ratchet gate stages; each fails only on a new hit past its committed baseline. See [`docs/static-ratchet.md`](docs/static-ratchet.md), [`docs/comment-ratchet.md`](docs/comment-ratchet.md), [`docs/docs-ratchet.md`](docs/docs-ratchet.md), [`docs/structure-ratchet.md`](docs/structure-ratchet.md), [`docs/instruction-ratchet.md`](docs/instruction-ratchet.md), [`docs/doc-refs-ratchet.md`](docs/doc-refs-ratchet.md), [`docs/dead-code-ratchet.md`](docs/dead-code-ratchet.md), [`docs/conventions-ratchet.md`](docs/conventions-ratchet.md), [`docs/runtime-write-ratchet.md`](docs/runtime-write-ratchet.md), [`docs/usage-track-ratchet.md`](docs/usage-track-ratchet.md).
+- `scripts/*_ratchet.py` (static, comment, docs, structure, instruction, doc refs, dead code, conventions, runtime write, usage track) — opt-in, vendor-verbatim baseline-and-ratchet gate stages; each fails only on a new hit past its committed baseline. See [`docs/static-ratchet.md`](docs/static-ratchet.md), [`docs/comment-ratchet.md`](docs/comment-ratchet.md), [`docs/docs-ratchet.md`](docs/docs-ratchet.md), [`docs/structure-ratchet.md`](docs/structure-ratchet.md), [`docs/instruction-ratchet.md`](docs/instruction-ratchet.md), [`docs/doc-refs-ratchet.md`](docs/doc-refs-ratchet.md), [`docs/dead-code-ratchet.md`](docs/dead-code-ratchet.md), [`docs/conventions-ratchet.md`](docs/conventions-ratchet.md), [`docs/runtime-write-ratchet.md`](docs/runtime-write-ratchet.md), [`docs/usage-track-ratchet.md`](docs/usage-track-ratchet.md). Adopting them in any repo, fleet or not, with `scripts/adopt_ratchets.py` and the cross-platform `scripts/run_ratchets.py`: [`docs/adopting-ratchets.md`](docs/adopting-ratchets.md).
 - `scripts/box_lock_gate.ps1` — vendor-verbatim wrapper that runs the gate under `fleet-config`'s shared box load lock, so a CPU-burn proof waits instead of starving the browser stage. See [Verification gate](#verification-gate).
 - `scripts/gen_verify_skill.py` + `scripts/verify_skill_templates.py` — generator for a web app's own `verify-<app>` skill. See [`docs/verify-skill.md`](docs/verify-skill.md).
 - `.fleet.toml`'s `[components]` table + `scripts/vendored_catalog.py` — the canonical catalog of every vendor-verbatim component this scaffold publishes. See [`docs/components.md`](docs/components.md).
@@ -135,6 +135,7 @@ src/
   pipelines/                one run() per file
 brand/                      curated, vendor-verbatim Lucide SVG masters + catalog.json (fleet icon identity)
 scripts/
+  adopt_ratchets.py           copies chosen ratchets + siblings into any repo, declares them in .fleet.toml, writes first baselines
   box_lock_gate.ps1           vendor-verbatim wrapper: dot-sourced by verify-before-ship.ps1 to hold fleet-config's shared box load lock for the run
   brand_gen.py               render_set() — generates favicon/apple-touch/maskable/tray/Stream-Deck icons from a brand master
   classify_e2e.py             routes the e2e browser phase to skip/static/full from `.fleet.toml`'s [e2e] table
@@ -152,6 +153,7 @@ scripts/
   instruction_ratchet.py      gate stage: prompt-audit lint hits, size caps and (opt-in) CI-expectations, AGENTS.md-pointer, CLAUDE.md-length and repeated-text findings in instruction files may not rise above a committed baseline
   instruction_frontmatter.py  the instruction ratchet's sibling: the SKILL.md frontmatter reader (vendored with it)
   instruction_repeats.py      the instruction ratchet's sibling: the repeated-text finder behind the opt-in S-04 rule (vendored with it)
+  run_ratchets.py             cross-platform runner of every enabled ratchet, with the runtime write probe around a test command
   shot_baseline.py             gate stage: recaptured screenshots may not visibly drift from the committed baseline
   static_ratchet.py            gate stage: new duplicate code, unused names or bug/security patterns may not rise above a committed baseline
   structure_ratchet.py        gate stage: oversized files/functions, flat directories, src->app imports, extra roots, loose root files, mistyped and misplaced files and redundant exceptions may not rise above a committed baseline

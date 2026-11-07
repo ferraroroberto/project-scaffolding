@@ -5,8 +5,8 @@ session that reads an instruction file. The weekly prompt audit finds those a we
 refuses a new one at ship time, per file and per rule, against a committed baseline: it fails only when
 a count *rises*.
 
-It counts the audit's lint-tier rules (`RULES`; rule text and fix shapes in fleet-config's
-`.claude/skills/prompt-audit/rules.md`) over the root `CLAUDE.md` and `AGENTS.md`, `.claude/rules/*.md`,
+It counts the audit's lint-tier rules (`RULES`; what each one catches is tabled in
+docs/instruction-ratchet.md "What is counted") over the root `CLAUDE.md` and `AGENTS.md`, `.claude/rules/*.md`,
 `<skill_dir>/*/SKILL.md`, `extra_files` and the `.md` files a skill references (scope is `git ls-files
 --cached --others --exclude-standard`). Only hits that reach *violation* for the file's reader count: a
 single-vendor rule is advisory in an agent-neutral file. R-14 is the size cap (`SIZE_CAPS`); an over-cap
@@ -77,7 +77,7 @@ SIZE_CAPS: dict[str, tuple[str, int]] = {
 }
 ALWAYS_ON_KINDS = frozenset({"claude-md", "agents-md", "rules"})
 
-#: Enforced rules -> (vendor tag, file scope, title), as tagged in rules.md.
+#: Enforced rules -> (vendor tag, file scope, title), as tagged in the prompt audit's rule list.
 RULES: dict[str, tuple[str, str, str]] = {
     "R-01": ("anthropic", "any", "No ALL-CAPS pressure"),
     "R-02": ("anthropic", "any", "No blanket tool defaults"),
@@ -949,7 +949,7 @@ def run(root: Path, *, init: bool, update: bool, allow_additions: bool) -> int:
 
     if rose:
         _report_rose(rose, scan, current, baseline)
-        print("  An R-rule's reason and fix shape: fleet-config's .claude/skills/prompt-audit/rules.md; an S-rule's line names "
+        print("  What an R-rule catches: docs/instruction-ratchet.md \"What is counted\"; an S-rule's line names "
               "its fix. Over a size cap, move scoped detail into a skill, rule or referenced doc (an @import does not "
               "shrink it); or (reviewed) raise the baseline with `--update-baseline --allow-additions`.")
         return EXIT_RISE

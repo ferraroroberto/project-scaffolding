@@ -214,7 +214,7 @@ The fix for a failure is to put the code where the layout says. `--allow-additio
 
 Re-vendoring the script never breaks a repo that has not opted in: an absent `[structure_ratchet]` table, or `enabled = false`, prints `structure ratchet: not enabled` and exits 0 (declared, not inferred).
 
-1. Vendor `scripts/structure_ratchet.py` and its siblings `scripts/structure_layout.py` and `scripts/structure_band.py` byte-for-byte (`/propagate-vendored structure_ratchet,structure_layout,structure_band`; manifest keys `structure_ratchet`, `structure_layout` and `structure_band`) and declare all three in the repo's `[vendored]` table. It is stdlib-only and needs Python 3.11+ (`tomllib`).
+1. Vendor `scripts/structure_ratchet.py` and its siblings `scripts/structure_layout.py` and `scripts/structure_band.py` byte-for-byte (`python scripts/adopt_ratchets.py <repo> --ratchets structure` from a scaffold checkout copies and declares them, see [adopting-ratchets.md](adopting-ratchets.md); inside the fleet, `/propagate-vendored structure_ratchet,structure_layout,structure_band`; manifest keys `structure_ratchet`, `structure_layout` and `structure_band`) and declare all three in the repo's `[vendored]` table. It is stdlib-only and needs Python 3.11+ (`tomllib`).
 2. Add to the repo's own `.fleet.toml`:
 
    ```toml
@@ -239,7 +239,7 @@ Re-vendoring the script never breaks a repo that has not opted in: an absent `[s
 
 3. Run `python scripts/structure_ratchet.py --init` and commit the baseline. Review it: the first baseline records every existing offender. **Adoption never requires the split first.** Then declare `shape` and run the check once: a root folder it lists as drift is either moved or declared in `extra_roots`, and `--update-baseline` records the root files, folder types and placement it finds.
 4. Add a gate stage that runs `python scripts/structure_ratchet.py` and fails on any non-zero exit. The scaffold's `scripts/verify-before-ship.ps1` places it after the docs ratchet and before `mypy`. **Do not path-route it**: a directory count needs the whole tree.
-5. If the repo uses diff-proportionate e2e routing, add a `tier = "none"` rule for the baseline file to `.fleet.toml` `[e2e]` and a matching assertion in `tests/test_classify_e2e.py`.
+5. Only if the repo uses this scaffold's diff-proportionate e2e routing ([e2e-routing.md](e2e-routing.md)), add a `tier = "none"` rule for the baseline file to `.fleet.toml` `[e2e]` and a matching assertion in `tests/test_classify_e2e.py`.
 
 The script spawns `git` with `CREATE_NO_WINDOW`, derived locally (it is vendor-verbatim, so it cannot import `src/no_window.py`). For the same reason it repeats the config, glob and `git ls-files` helpers of the other vendored ratchets instead of importing them; the scaffold's static-ratchet baseline carries those duplicate pairs because it owns the sources.
 

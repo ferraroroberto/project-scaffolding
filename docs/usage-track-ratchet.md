@@ -157,7 +157,7 @@ A failing check prints every hit of the risen rule in the file, as `<path>:<line
 
 Re-vendoring the script never breaks a repo that has not opted in: an absent `[usage_track_ratchet]` table, or `enabled = false`, prints `usage track ratchet: not enabled` and exits 0.
 
-1. Vendor `scripts/usage_track_ratchet.py` and its sibling reader `scripts/usage_track_scan.py` byte-for-byte (`/propagate-vendored usage_track_ratchet,usage_track_scan`; manifest keys `usage_track_ratchet` and `usage_track_scan`), together with the current `usage-log` client, whose sheet watch the `untracked-sheet` rule relies on. Declare all three in `[vendored]`. The ratchet loads the sibling by path and exits 3 when it is missing. It needs Python 3.11+ (`tomllib`) and `git`.
+1. Vendor `scripts/usage_track_ratchet.py` and its sibling reader `scripts/usage_track_scan.py` byte-for-byte (`python scripts/adopt_ratchets.py <repo> --ratchets usage_track` from a scaffold checkout copies and declares them, see [adopting-ratchets.md](adopting-ratchets.md); inside the fleet, `/propagate-vendored usage_track_ratchet,usage_track_scan`; manifest keys `usage_track_ratchet` and `usage_track_scan`), together with the current `usage-log` client, whose sheet watch the `untracked-sheet` rule relies on. Declare all three in `[vendored]`. The ratchet loads the sibling by path and exits 3 when it is missing. It needs Python 3.11+ (`tomllib`) and `git`.
 2. Add to the repo's own `.fleet.toml`:
 
    ```toml
@@ -173,7 +173,7 @@ Re-vendoring the script never breaks a repo that has not opted in: an absent `[u
    A fleet web app lists all four rules.
 3. Run `python scripts/usage_track_ratchet.py --init`, review the baseline and commit it. **Adoption never requires the fixes first.**
 4. Add a gate stage that runs `python scripts/usage_track_ratchet.py` and fails on any non-zero exit. The scaffold's `scripts/verify-before-ship.ps1` places it after the runtime write ratchet and before `mypy`. **Do not path-route it**: it is cheap, and the wiring rule must see the whole tree.
-5. If the repo uses diff-proportionate e2e routing, add a `tier = "none"` rule for the baseline file to `.fleet.toml` `[e2e]` and a matching assertion in its `test_classify_e2e.py`.
+5. Only if the repo uses this scaffold's diff-proportionate e2e routing ([e2e-routing.md](e2e-routing.md)), add a `tier = "none"` rule for the baseline file to `.fleet.toml` `[e2e]` and a matching assertion in its `test_classify_e2e.py`.
 6. Burn the baseline down: give each control its id and each `<dialog>` its `data-track-view`, then lower it with `--update-baseline`. Remove any hand-written `trackView` call for a sheet at the same time; the client now records it.
 
 The script spawns `git` with `CREATE_NO_WINDOW`, derived locally (it is vendor-verbatim, so it cannot import `src/no_window.py`), and with `GIT_OPTIONAL_LOCKS=0`. It shares its config, glob and baseline helpers with the sibling ratchets by copy, because each vendored ratchet must be self-contained. Its HTML and JS readers (an `html.parser` subclass and a small JS tokenizer) live in `usage_track_scan.py`, which keeps both files under the structure limits, the same split as `structure_layout.py` beside the structure ratchet.

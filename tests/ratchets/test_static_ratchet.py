@@ -417,6 +417,72 @@ def test_no_npx_is_not_confirmed(repo: Path, monkeypatch: pytest.MonkeyPatch) ->
         sr.run_jscpd(repo, sr.Config(sr.DEFAULT_BASELINE, 10, 100, ()))
 
 
+# ------------------------------------------- per-check opt-out (duplicates / ruff)
+
+def test_switches_default_on_and_parse_off() -> None:
+    on = sr.parse_config("[static_ratchet]\nenabled = true\n")
+    assert on is not None and on.duplicates and on.ruff and on.off_checks() == []
+    off = sr.parse_config("[static_ratchet]\nenabled = true\nduplicates = false\n")
+    assert off is not None and not off.duplicates and off.ruff and off.off_checks() == ["duplicates"]
+
+
+@pytest.mark.parametrize("body", ['duplicates = "no"\n', "ruff = 0\n", "duplicates = false\nruff = false\n"])
+def test_bad_or_empty_switches_fail_loud(body: str) -> None:
+    with pytest.raises(sr.ConfigError):
+        sr.parse_config("[static_ratchet]\nenabled = true\n" + body)
+
+
+def no_npx(monkeypatch: pytest.MonkeyPatch) -> None:
+    real_which = shutil.which
+    monkeypatch.setattr(shutil, "which", lambda name, *a, **k: None if name == "npx" else real_which(name, *a, **k))
+
+
+def test_no_npx_without_the_opt_out_is_still_not_confirmed(
+    repo: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str],
+) -> None:
+    write_baseline(repo)
+    no_npx(monkeypatch)
+    monkeypatch.setattr(sr, "run_ruff", lambda root, cfg: [])
+    assert run_mode(repo) == sr.EXIT_NOT_CONFIRMED
+    assert "npx not found" in capsys.readouterr().out
+
+
+def test_no_npx_with_duplicates_off_reports_off_and_runs_ruff(
+    repo: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str],
+) -> None:
+    (repo / ".fleet.toml").write_text("[static_ratchet]\nenabled = true\nduplicates = false\n", encoding="utf-8")
+    write_baseline(repo)
+    no_npx(monkeypatch)
+    ran: list[str] = []
+    monkeypatch.setattr(sr, "run_ruff", lambda root, cfg: ran.append("ruff") or [])
+    assert run_mode(repo) == sr.EXIT_PASS
+    out = capsys.readouterr().out
+    assert ran == ["ruff"]
+    assert "duplicates: OFF" in out and "not clean" in out
+    assert "duplicates OFF)" in out  # the pass line names what it did not check
+
+
+def test_an_off_check_keeps_its_baselined_entries(
+    repo: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str],
+) -> None:
+    (repo / ".fleet.toml").write_text("[static_ratchet]\nenabled = true\nduplicates = false\n", encoding="utf-8")
+    path = write_baseline(repo, "dup:abc:a.py|b.py", "unused:F401:a.py:os", "unused:F401:a.py:sys")
+    stub_findings(monkeypatch, "unused:F401:a.py:os")
+    assert run_mode(repo) == sr.EXIT_PASS
+    assert "1 baselined finding(s) are gone" in capsys.readouterr().out  # sys, never the dup
+    assert run_mode(repo, update=True) == sr.EXIT_PASS
+    assert set(sr.read_baseline(path)) == {"dup:abc:a.py|b.py", "unused:F401:a.py:os"}
+
+
+def test_ruff_off_skips_ruff_and_keeps_its_entries(repo: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    (repo / ".fleet.toml").write_text("[static_ratchet]\nenabled = true\nruff = false\n", encoding="utf-8")
+    path = write_baseline(repo, "lint:S113:a.py:requests.get(u)")
+    monkeypatch.setattr(sr, "run_jscpd", lambda root, cfg: [])
+    monkeypatch.setattr(sr, "run_ruff", lambda root, cfg: pytest.fail("ruff ran while off"))
+    assert run_mode(repo, update=True) == sr.EXIT_PASS
+    assert set(sr.read_baseline(path)) == {"lint:S113:a.py:requests.get(u)"}
+
+
 # ------------------------------------------- acceptance criteria, real tools
 
 def py_block(tag: str, size: int = 14) -> str:

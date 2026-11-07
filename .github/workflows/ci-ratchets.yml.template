@@ -1,0 +1,48 @@
+# Ratchet gate for a repo OUTSIDE the owner's fleet: runs scripts/run_ratchets.py.
+#
+# COPY-TO-ADAPT TEMPLATE. Copy this file to `ci-ratchets.yml` in the adopting
+# repo's `.github/workflows/` and change only the lines marked `# ADAPT:`. The
+# `.template` suffix keeps it inert here. Procedure: docs/adopting-ratchets.md.
+#
+# ubuntu-latest on purpose: this template is for repos outside the fleet, which
+# do not share the fleet's Windows runner pin (docs/ci-conventions.md). A fleet
+# repo uses ci.yml.template and its own local gate instead.
+#
+# The ratchets need Python 3.11+ and git only. The static ratchet also needs
+# ruff and, for its duplicate check, Node (preinstalled on ubuntu-latest); a
+# repo that set `duplicates = false` gets that check reported as OFF.
+name: ratchets
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ratchets-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  PYTHONUTF8: "1"
+  PYTHONUNBUFFERED: "1"
+
+jobs:
+  ratchets:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install the test and static-ratchet tools
+        run: python -m pip install ruff pytest   # ADAPT: or `pip install -r requirements.txt`
+
+      - name: Ratchets, with the runtime write probe around the tests
+        run: python scripts/run_ratchets.py --tests python -m pytest -q   # ADAPT: the repo's test command
