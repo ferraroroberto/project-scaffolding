@@ -1,6 +1,10 @@
 # `site-header` — header, text nav and phone menu
 
-The brand on the left, the text nav on the right; under 1024 px a 44 px menu button opens a full-width panel under the header. The current page's nav item carries the pen marker. `site-header.js` adds the hairline once the page scrolls and the menu's open, close, Escape and link-tap behaviour; the page works without it.
+The brand on the left, the text nav on the right; under the nav breakpoint (1024 px unless the site sets one) a 44 px menu button opens a full-width panel under the header. The current page's nav item carries the pen marker. `site-header.js` adds the hairline once the page scrolls and the menu's open, close, Escape and link-tap behaviour; the page works without it.
+
+- **The brand never shrinks.** `.logo` is `flex: none` and the image keeps `width: auto` at its set height, so a long nav cannot squeeze the wordmark sideways.
+- **The nav breakpoint is a token.** A site with a long nav sets `--nav-breakpoint` on `:root` in its own stylesheet (for example `1200px`, a px length). `site-header.js` reads it, marks the header `data-nav="menu"` below it and `data-nav="inline"` from it, and closes an open menu when the nav goes inline. A media query cannot read a custom property, which is why the script applies it. The stylesheet's own 1024 px query is the floor, so a value below 1024 px or one that is not in px is ignored, and without the script the breakpoint is 1024 px. The script runs deferred, so a site above 1024 px can show the text nav for a moment between 1024 px and its breakpoint on first paint.
+- **The logo height is the site's.** The component sets 32 px (40 px from 1024 px); a site whose nav and wordmark need a different size beside each other sets it in its own stylesheet.
 
 - **Never put `backdrop-filter`, `filter` or `transform` on `.site-header`.** Any of them makes the header the containing block of the `position: fixed` menu panel, which then sizes itself to the 64 px header and is invisible. Test a menu by hit-testing each link's centre with `elementFromPoint`, not by its bounding box.
 
