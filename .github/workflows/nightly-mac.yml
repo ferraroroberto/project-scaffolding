@@ -90,6 +90,12 @@ jobs:
           path: adopter
           persist-credentials: false
 
+      - name: Point the Python installer at the runner's own tool cache
+        # actions/setup-python's macOS installer falls back to the hosted
+        # image's /Users/runner/hostedtoolcache when AGENT_TOOLSDIRECTORY is
+        # unset, a folder a self-hosted runner user cannot create.
+        run: echo "AGENT_TOOLSDIRECTORY=$RUNNER_TOOL_CACHE" >> "$GITHUB_ENV"
+
       - uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python }}

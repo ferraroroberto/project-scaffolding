@@ -80,6 +80,15 @@ mkdir -p ~/actions-runner && cd ~/actions-runner
 
 The runner adds `self-hosted`, `macOS` and `ARM64` itself, and labels match case-insensitively, so the workflow's `runs-on: [self-hosted, macos, arm64, iphone-sim]` needs only the one custom label.
 
+A runner registered without `--labels iphone-sim` (for example by following the "New self-hosted runner" page, which does not ask for labels) shows only `self-hosted`, `macOS` and `ARM64`, and every `nightly-mac` run queues forever. Add the label afterwards, from any machine with a `gh` login that has admin on the repo, with no re-registration:
+
+```sh
+gh api repos/ferraroroberto/project-scaffolding/actions/runners --jq '.runners[] | "\(.id) \(.name)"'
+gh api -X POST repos/ferraroroberto/project-scaffolding/actions/runners/<id>/labels -f "labels[]=iphone-sim"
+```
+
+`gh api -X DELETE repos/ferraroroberto/project-scaffolding/actions/runners/<id>/labels/iphone-sim` removes it again.
+
 ## Check it is online
 
 - `bash scripts/mac_runner_setup.sh status` prints the launchd state and, with a `gh` login, GitHub's view (`online`, `busy`, labels).
