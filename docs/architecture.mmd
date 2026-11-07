@@ -192,10 +192,12 @@ docs/adopting-ratchets.md"]
   GATEWATCH[".github/workflows/main-gate-watch.yml.template (#222)\ncopy-to-adapt red-main issue filer\nworkflow_run on the gate: main only, failure only\nidempotent — comments on the open ci-red-main issue\ninert here: this repo's gate is local-only, so nothing fires it"]
   CITEMPLATE[".github/workflows/ci.yml.template (#351)\ncopy-to-adapt web-app CI gate\nfresh .venv · unit · Playwright desktop + phone\ntraces uploaded only on failure; advisory, not required"]
   NIGHTLYMAC[".github/workflows/nightly-mac.yml
-nightly platform pass on the self-hosted Mac runner
+the fleet's nightly CI on the self-hosted Mac runner
 schedule + dispatch only, fork-guarded, no secrets
-per adopter: WebKit e2e + scripts/ios_sim_smoke.py
-results stay on the runner host"]
+select job: scripts/nightly_matrix.py reads .github/nightly-adopters.txt
++ each adopter's [ci.nightly] table, changed repos only (all on Sunday)
+per adopter: unit + WebKit e2e (one retry) + scripts/ios_sim_smoke.py
+results + READY stay on the runner host"]
   MACDOC["docs/mac-runner.md + scripts/mac_runner_setup.sh
 runner install, labels, safety settings
 scripts/audio_latency_probe.py: speech-to-text p95 during a run

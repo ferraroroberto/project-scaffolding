@@ -1,0 +1,4 @@
+# Repos the nightly Mac run checks, one per line (docs/mac-runner.md).
+# Each declares its own settings in a [ci.nightly] table in its .fleet.toml
+# on main, and must be public: the run reads it anonymously.
+home-automation

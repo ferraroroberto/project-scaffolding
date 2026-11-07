@@ -1,29 +1,37 @@
-# Nightly platform pass on the Mac Mini self-hosted runner: each public web-app
-# adopter's WebKit e2e suite (iPhone projection) and an iOS Simulator Mobile
-# Safari smoke of its key views.
+# The fleet's CI, nightly on the Mac Mini self-hosted runner: for each adopter
+# whose `main` moved since its last green night (every adopter on Sunday), its
+# unit suite with Windows-only tests excluded, its WebKit e2e suite (iPhone
+# projection) and an iOS Simulator Mobile Safari smoke of its key views.
 #
 # One hub runner serves the fleet: it is registered on this repo only, and this
-# workflow checks out each adopter in turn. Setup, labels and the safety
-# settings: docs/mac-runner.md. The per-change contract stays each repo's local
-# gate; this is the slower platform stage that runs after merges, not before.
+# workflow checks out each adopter in turn. The adopter list is
+# .github/nightly-adopters.txt; each adopter's settings are the `[ci.nightly]`
+# table in its own .fleet.toml, read by scripts/nightly_matrix.py. Setup,
+# labels, the table contract and the safety settings: docs/mac-runner.md. The
+# per-change contract stays each repo's local gate; this checks what landed on
+# `main`.
 #
 # PUBLIC REPO, SELF-HOSTED RUNNER. A self-hosted runner executes whatever a
 # triggering workflow says, so nothing an outsider controls may start it:
 #   * triggers are `schedule` and `workflow_dispatch` only (dispatch needs write
 #     access); never `pull_request`, `pull_request_target` or `push`;
-#   * the job's `if:` refuses any other event, any fork event and any copy of
+#   * every job's `if:` refuses any other event, any fork event and any copy of
 #     this file running in a fork;
-#   * `permissions` is read-only and both checkouts drop the token afterwards;
-#   * no secret is used: the runner holds only its own registration.
+#   * `permissions` is read-only and every checkout drops the token afterwards;
+#   * no secret is used: the runner holds only its own registration;
+#   * adopter settings reach scripts through `env:`, never as `${{ }}` text
+#     inside a `run:` script, and nightly_matrix.py rejects any value outside a
+#     conservative character set.
 # tests/ci/test_nightly_mac_workflow.py asserts each of these.
 #
 # RESULTS STAY PRIVATE. Logs of a public repo are public, so the run log and
-# the step summary carry pass/fail lines only. Screenshots, traces and failure
-# images go to a folder in the runner user's home on the Mac, outside the
-# checkout, and are never uploaded as an artifact. Delivery to the owner is
-# pull-only: a trusted host reads a finished run folder (marked READY) over SSH.
-# The runner holds no delivery credential, gets no write-back and this workflow
-# makes no outbound call (docs/mac-runner.md, "Delivering results").
+# the step summary carry pass/fail lines only. Screenshots, traces, junit files
+# and flaky test ids go to a folder in the runner user's home on the Mac,
+# outside the checkout, and are never uploaded as an artifact. Delivery to the
+# owner is pull-only: a trusted host reads a finished run folder (marked READY)
+# over SSH. The runner holds no delivery credential, gets no write-back, and the
+# only outbound calls are anonymous read-only fetches of public adopters
+# (docs/mac-runner.md, "Delivering results").
 name: nightly-mac
 
 on:
@@ -35,6 +43,11 @@ on:
   # A manual run outside the quiet hours slows the Mac's speech-to-text for the
   # seconds its WebKit suite runs (docs/mac-runner.md, "Speech-to-text latency").
   workflow_dispatch:
+    inputs:
+      full:
+        description: "Run every adopter, changed or not (the Sunday behaviour)"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -54,11 +67,51 @@ env:
   PYTHONUNBUFFERED: "1"
 
 jobs:
-  platform:
+  select:
     if: >-
       github.repository == 'ferraroroberto/project-scaffolding' &&
       (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') &&
       github.event.pull_request.head.repo.fork != true
+    runs-on: [self-hosted, macos, arm64, iphone-sim]
+    timeout-minutes: 15
+    outputs:
+      matrix: ${{ steps.build.outputs.matrix }}
+      count: ${{ steps.build.outputs.count }}
+    steps:
+      - name: Check out the scaffold (matrix script)
+        uses: actions/checkout@v6
+        with:
+          path: scaffold
+          persist-credentials: false
+
+      # The scaffold scripts need Python 3.11+ (tomllib); the Mac's own python3 may be older.
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+
+      # Reads each adopter's main anonymously (a public repo needs no credential)
+      # and the last green SHA from the runner's state; writes no file but the
+      # matrix output and the step summary.
+      - name: Build tonight's matrix (changed repos; every repo on Sunday)
+        id: build
+        env:
+          FULL: ${{ inputs.full }}
+        run: >
+          python scaffold/scripts/nightly_matrix.py build
+          --adopters scaffold/.github/nightly-adopters.txt
+          --url-base https://github.com/ferraroroberto/
+          --state-root "$HOME/mac-nightly-results"
+          --full "${FULL:-false}"
+          --github-output "$GITHUB_OUTPUT"
+          --summary-file "$GITHUB_STEP_SUMMARY"
+
+  platform:
+    needs: select
+    if: >-
+      github.repository == 'ferraroroberto/project-scaffolding' &&
+      (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') &&
+      github.event.pull_request.head.repo.fork != true &&
+      needs.select.outputs.count != '0'
     runs-on: [self-hosted, macos, arm64, iphone-sim]
     # Cap a wedge: GitHub's default is 6 h, and a wedged run would hold the Mac
     # into the morning. About 4x a typical adopter's full WebKit suite.
@@ -66,32 +119,61 @@ jobs:
     strategy:
       fail-fast: false
       max-parallel: 1
-      matrix:
-        # One entry per public web-app adopter. To add one: its repo name, its
-        # Python, its requirements files, the folder of committed `*.sample.*`
-        # config twins, its e2e target plus flags, and the key views the smoke
-        # opens. The adopter must declare `[design.review.synthetic] command`
-        # in its .fleet.toml (the throwaway instance the smoke boots).
-        include:
-          - repo: home-automation
-            python: "3.14"
-            requirements: requirements.txt requirements-dev.txt
-            samples: config
-            e2e: tests/e2e --e2e-autoboot
-            views: /
+      matrix: ${{ fromJSON(needs.select.outputs.matrix) }}
     name: ${{ matrix.repo }}
+    env:
+      REPO: ${{ matrix.repo }}
+      SHA: ${{ matrix.sha }}
+      STATUS: ${{ matrix.status }}
+      REASON: ${{ matrix.reason }}
+      REQUIREMENTS: ${{ matrix.requirements }}
+      SAMPLES: ${{ matrix.samples }}
+      UNIT: ${{ matrix.unit }}
+      E2E_ARGS: ${{ matrix.e2e }}
+      VIEWS: ${{ matrix.views }}
+      EXCLUDE: ${{ matrix.exclude_marker }}
     steps:
-      - name: Check out the scaffold (smoke script)
+      - name: Check out the scaffold (scripts)
         uses: actions/checkout@v6
         with:
           path: scaffold
           persist-credentials: false
 
-      - name: Check out the adopter's main
+      # The scaffold scripts' own Python (3.11+ for tomllib), kept as TOOL_PY
+      # because the adopter's setup-python below takes over PATH.
+      - uses: actions/setup-python@v6
+        id: tools
+        with:
+          python-version: "3.13"
+
+      - name: Results folder (runner host only, never uploaded)
+        # Runs older than 14 days are pruned so failure traces cannot fill the disk.
+        env:
+          TOOLS_PYTHON: ${{ steps.tools.outputs.python-path }}
+        run: |
+          root="$HOME/mac-nightly-results/$REPO"
+          mkdir -p "$root"
+          find "$root" -mindepth 1 -maxdepth 1 -type d -mtime +14 -exec rm -rf {} +
+          {
+            echo "RESULTS=$root/$GITHUB_RUN_ID"
+            echo "STATE=$root/state.json"
+            echo "TOOL_PY=$TOOLS_PYTHON"
+            echo "FLEET_DATA_ROOT=$RUNNER_TEMP/fleet-data"
+          } >> "$GITHUB_ENV"
+
+      # An adopter whose main or table could not be read still gets a run, so
+      # its READY says unknown instead of the repo silently dropping out.
+      - name: Refuse an unreadable adopter
+        if: ${{ matrix.status != 'run' }}
+        run: |
+          echo "::error::$REPO: $REASON"
+          exit 1
+
+      - name: Check out the adopter at the selected commit
         uses: actions/checkout@v6
         with:
           repository: ferraroroberto/${{ matrix.repo }}
-          ref: main
+          ref: ${{ matrix.sha }}
           path: adopter
           # Full history: the routing audit walks the commits merged since the last green night.
           fetch-depth: 0
@@ -104,59 +186,79 @@ jobs:
         with:
           python-version: ${{ matrix.python }}
 
-      - name: Results folder (runner host only, never uploaded)
-        # Runs older than 14 days are pruned so failure traces cannot fill the disk.
-        run: |
-          root="$HOME/mac-nightly-results/${{ matrix.repo }}"
-          mkdir -p "$root"
-          find "$root" -mindepth 1 -maxdepth 1 -type d -mtime +14 -exec rm -rf {} +
-          echo "RESULTS=$root/${{ github.run_id }}" >> "$GITHUB_ENV"
-          echo "FLEET_DATA_ROOT=$RUNNER_TEMP/fleet-data" >> "$GITHUB_ENV"
-
       - name: Create .venv and install deps
         working-directory: adopter
         run: |
           python -m venv .venv
           ./.venv/bin/python -m pip install --upgrade pip
           reqs=()
-          for r in ${{ matrix.requirements }}; do reqs+=(-r "$r"); done
+          for r in $REQUIREMENTS; do reqs+=(-r "$r"); done
           ./.venv/bin/python -m pip install "${reqs[@]}"
-          ./.venv/bin/python -m playwright install webkit
+          if [ -n "$E2E_ARGS" ]; then ./.venv/bin/python -m playwright install webkit; fi
 
       - name: Seed gitignored config from committed samples
+        id: seed
         working-directory: adopter
         run: |
+          [ -n "$SAMPLES" ] || exit 0
           shopt -s nullglob
-          for src in ${{ matrix.samples }}/*.sample.*; do
+          for src in "$SAMPLES"/*.sample.*; do
             dest="${src/.sample./.}"
             [ -e "$dest" ] || cp "$src" "$dest"
           done
 
-      - name: WebKit e2e (iPhone projection)
+      # Failures re-run once (--last-failed): a pass on the retry is flaky, its
+      # test ids kept in the run folder; a second failure is red.
+      - name: Unit (Windows-only tests excluded, one retry)
+        id: unit
+        if: ${{ !cancelled() && steps.seed.outcome == 'success' && matrix.unit != '' }}
+        run: |
+          set +e
+          "$TOOL_PY" scaffold/scripts/nightly_matrix.py leg --name unit \
+            --python "$PWD/adopter/.venv/bin/python" --cwd adopter \
+            --args "$UNIT" --marker "$EXCLUDE" \
+            --junit "$RESULTS/unit.xml" --retry-junit "$RESULTS/unit-retry.xml" \
+            --flaky-out "$RESULTS/unit-flaky.txt" | tee "$RUNNER_TEMP/unit.log"
+          code=${PIPESTATUS[0]}
+          set -e
+          echo "result=$(tail -n 1 "$RUNNER_TEMP/unit.log" | sed -n 's/^LEG=unit result=\([a-z-]*\).*/\1/p')" >> "$GITHUB_OUTPUT"
+          exit "$code"
+
+      - name: WebKit e2e (iPhone projection, one retry)
         id: e2e
-        working-directory: adopter
-        run: >
-          ./.venv/bin/python -m pytest ${{ matrix.e2e }}
-          --browser webkit
-          --tracing retain-on-failure
-          --screenshot only-on-failure
-          --junitxml "$RESULTS/junit.xml"
-          --output "$RESULTS/e2e"
+        # After a red unit leg, still run e2e: each leg reports on its own.
+        if: ${{ !cancelled() && steps.seed.outcome == 'success' && matrix.e2e != '' }}
+        run: |
+          set +e
+          "$TOOL_PY" scaffold/scripts/nightly_matrix.py leg --name e2e \
+            --python "$PWD/adopter/.venv/bin/python" --cwd adopter \
+            --args "$E2E_ARGS --browser webkit --tracing retain-on-failure --screenshot only-on-failure --output $RESULTS/e2e" \
+            --retry-args "--output $RESULTS/e2e/retry" \
+            --junit "$RESULTS/junit.xml" --retry-junit "$RESULTS/junit-retry.xml" \
+            --flaky-out "$RESULTS/e2e-flaky.txt" | tee "$RUNNER_TEMP/e2e.log"
+          code=${PIPESTATUS[0]}
+          set -e
+          echo "result=$(tail -n 1 "$RUNNER_TEMP/e2e.log" | sed -n 's/^LEG=e2e result=\([a-z-]*\).*/\1/p')" >> "$GITHUB_OUTPUT"
+          exit "$code"
 
       - name: iOS Simulator Mobile Safari smoke
         id: smoke
         # After a failed e2e, still smoke; after a failed install, there is nothing to boot.
-        if: ${{ !cancelled() && steps.e2e.outcome != 'skipped' }}
+        if: ${{ !cancelled() && steps.seed.outcome == 'success' && matrix.views != '' }}
         run: |
-          views=()
-          for v in ${{ matrix.views }}; do views+=(--view "$v"); done
+          view_args=()
+          for v in $VIEWS; do view_args+=(--view "$v"); done
           set +e
           adopter/.venv/bin/python scaffold/scripts/ios_sim_smoke.py \
             --repo adopter --python "$PWD/adopter/.venv/bin/python" \
-            --out "$RESULTS/ios" "${views[@]}" | tee "$RUNNER_TEMP/smoke.log"
+            --out "$RESULTS/ios" "${view_args[@]}" | tee "$RUNNER_TEMP/smoke.log"
           code=${PIPESTATUS[0]}
           set -e
-          echo "line=$(tail -n 1 "$RUNNER_TEMP/smoke.log")" >> "$GITHUB_OUTPUT"
+          line=$(tail -n 1 "$RUNNER_TEMP/smoke.log")
+          {
+            echo "line=$line"
+            echo "result=$(echo "$line" | sed -n 's/^SMOKE=\([a-z]*\).*/\1/p')"
+          } >> "$GITHUB_OUTPUT"
           # Exit 3 is "could not establish a result", its own failing state.
           exit "$code"
 
@@ -165,15 +267,15 @@ jobs:
       # audit.json in the run folder for the trusted host to file from. No network.
       - name: Routing audit (counts only; node ids stay in the run folder)
         id: audit
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.status == 'run' && matrix.e2e != '' }}
         env:
           E2E: ${{ steps.e2e.outcome }}
         run: |
           set +e
           python scaffold/scripts/routing_audit.py audit \
-            --repo-dir adopter --repo "${{ matrix.repo }}" --e2e-outcome "${E2E:-}" \
+            --repo-dir adopter --repo "$REPO" --e2e-outcome "${E2E:-}" \
             --junit "$RESULTS/junit.xml" \
-            --state "$HOME/mac-nightly-results/${{ matrix.repo }}/audit-state.json" \
+            --state "$HOME/mac-nightly-results/$REPO/audit-state.json" \
             --out "$RESULTS/audit.json" --summary-file "$GITHUB_STEP_SUMMARY" \
             | tee "$RUNNER_TEMP/audit.log"
           code=${PIPESTATUS[0]}
@@ -187,35 +289,46 @@ jobs:
       - name: Summary (pass/fail only; images stay on the runner host)
         if: ${{ !cancelled() }}
         env:
-          E2E: ${{ steps.e2e.outcome }}
-          SMOKE: ${{ steps.smoke.outcome }}
+          UNIT_R: ${{ steps.unit.outputs.result || steps.unit.outcome }}
+          E2E_R: ${{ steps.e2e.outputs.result || steps.e2e.outcome }}
+          SMOKE_R: ${{ steps.smoke.outputs.result || steps.smoke.outcome }}
           SMOKE_LINE: ${{ steps.smoke.outputs.line }}
         run: |
           {
-            echo "### ${{ matrix.repo }}"
+            echo "### $REPO"
             echo "| Leg | Result |"
             echo "|---|---|"
-            echo "| WebKit e2e (iPhone projection) | ${E2E:-not run} |"
-            echo "| iOS Simulator smoke | ${SMOKE:-not run}: \`${SMOKE_LINE:-no result line}\` |"
+            echo "| Unit (Windows-only excluded) | ${UNIT_R:-not run} |"
+            echo "| WebKit e2e (iPhone projection) | ${E2E_R:-not run} |"
+            echo "| iOS Simulator smoke | ${SMOKE_R:-not run}: \`${SMOKE_LINE:-no result line}\` |"
             echo
-            echo "Screenshots and failure traces are kept on the runner host, not uploaded."
+            echo "Screenshots, failure traces and flaky test ids are kept on the runner host, not uploaded."
           } >> "$GITHUB_STEP_SUMMARY"
 
       # Written last: the pulling host takes a run folder only once READY exists,
-      # so it never reads a half-written run. Outcomes only, no host or path.
+      # so it never reads a half-written run. Outcomes and the tested SHA only,
+      # no host, path or log. A green night also records the SHA as last green.
       - name: Mark the run folder ready for the trusted puller
         if: ${{ !cancelled() }}
         env:
-          E2E: ${{ steps.e2e.outcome }}
-          SMOKE: ${{ steps.smoke.outcome }}
+          UNIT_R: ${{ steps.unit.outputs.result }}
+          UNIT_S: ${{ steps.unit.outcome }}
+          E2E_R: ${{ steps.e2e.outputs.result }}
+          E2E_S: ${{ steps.e2e.outcome }}
+          SMOKE_R: ${{ steps.smoke.outputs.result }}
+          SMOKE_S: ${{ steps.smoke.outcome }}
           AUDIT: ${{ steps.audit.outputs.result }}
         run: |
-          mkdir -p "$RESULTS"
-          {
-            echo "run=${{ github.run_id }}"
-            echo "repo=${{ matrix.repo }}"
-            echo "e2e=${E2E:-not run}"
-            echo "smoke=${SMOKE:-not run}"
-            echo "audit=${AUDIT:-not run}"
-          } > "$RESULTS/READY.tmp"
-          mv "$RESULTS/READY.tmp" "$RESULTS/READY"
+          # A plain string, not an array: macOS /bin/bash 3.2 under `set -u` rejects an empty one.
+          declared=""
+          if [ -n "$UNIT" ]; then declared="$declared,unit"; fi
+          if [ -n "$E2E_ARGS" ]; then declared="$declared,e2e"; fi
+          if [ -n "$VIEWS" ]; then declared="$declared,smoke"; fi
+          "$TOOL_PY" scaffold/scripts/nightly_matrix.py ready \
+            --results "$RESULTS" --state "$STATE" --run "$GITHUB_RUN_ID" \
+            --repo "$REPO" --sha "$SHA" --status "$STATUS" \
+            --declared "$declared" \
+            --unit "$UNIT_R" --unit-step "$UNIT_S" \
+            --e2e "$E2E_R" --e2e-step "$E2E_S" \
+            --smoke "$SMOKE_R" --smoke-step "$SMOKE_S" \
+            --audit "$AUDIT"

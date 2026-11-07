@@ -21,6 +21,7 @@ import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 WORKFLOW = REPO_ROOT / ".github" / "workflows" / "nightly-mac.yml"
+ADOPTERS = REPO_ROOT / ".github" / "nightly-adopters.txt"
 
 
 def _body() -> str:
@@ -38,21 +39,54 @@ def _on_block() -> str:
     return match.group(1)
 
 
-def _job_guard() -> str:
-    match = re.search(r"^    if: >-\n((?:      .*\n)+)", _body() + "\n", re.M)
-    assert match, "the platform job has no folded `if: >-` guard"
+def _jobs() -> dict[str, str]:
+    """Each job's body, keyed by job id."""
+    jobs_block = _body().split("\njobs:\n", 1)[1] + "\n"
+    parts = re.split(r"^  ([\w-]+):\n", jobs_block, flags=re.M)
+    return dict(zip(parts[1::2], parts[2::2], strict=True))
+
+
+def _job_guard(job: str) -> str:
+    match = re.search(r"^    if: >-\n((?:      .*\n)+)", _jobs()[job], re.M)
+    assert match, f"the {job} job has no folded `if: >-` guard"
     return " ".join(line.strip() for line in match.group(1).splitlines())
+
+
+def _run_scripts() -> list[str]:
+    """The text of every `run:` script, inline or block."""
+    scripts: list[str] = []
+    current: list[str] | None = None
+    indent = 0
+    for line in _body().splitlines():
+        if current is not None:
+            if line.strip() and len(line) - len(line.lstrip()) <= indent:
+                scripts.append("\n".join(current))
+                current = None
+            else:
+                current.append(line)
+                continue
+        found = re.match(r"^(\s*)(?:- )?run:\s*(.*)$", line)
+        if found:
+            indent = len(found.group(1))
+            if found.group(2) in ("|", ">"):
+                current = []
+            else:
+                scripts.append(found.group(2))
+    if current is not None:
+        scripts.append("\n".join(current))
+    return scripts
 
 
 _ATOM = re.compile(r"^\s*([\w.]+)\s*(==|!=)\s*('[^']*'|true|false)\s*$")
 
 
-def _evaluate(guard: str, repository: str, event_name: str, fork: bool | None) -> bool:
-    """A dry run of the job's `if:` for one event: `&&` of `||`-groups of `==`/`!=` atoms."""
+def _evaluate(guard: str, repository: str, event_name: str, fork: bool | None, count: str = "1") -> bool:
+    """A dry run of a job's `if:` for one event: `&&` of `||`-groups of `==`/`!=` atoms."""
     context: dict[str, object] = {
         "github.repository": repository,
         "github.event_name": event_name,
         "github.event.pull_request.head.repo.fork": fork,
+        "needs.select.outputs.count": count,
     }
 
     def atom(text: str) -> bool:
@@ -97,11 +131,28 @@ def test_schedule_is_in_the_quiet_hours() -> None:
     ],
 )
 def test_job_guard_dry_run(repository: str, event: str, fork: bool | None, runs: bool) -> None:
-    assert _evaluate(_job_guard(), repository, event, fork) is runs
+    assert set(_jobs()) == {"select", "platform"}
+    for job in _jobs():
+        assert _evaluate(_job_guard(job), repository, event, fork) is runs, job
+
+
+def test_an_empty_matrix_skips_the_platform_job() -> None:
+    guard = _job_guard("platform")
+    assert not _evaluate(guard, "ferraroroberto/project-scaffolding", "schedule", None, count="0")
+    assert re.search(r"^    needs: select$", _jobs()["platform"], re.M)
 
 
 def test_runs_only_on_the_labelled_mac() -> None:
-    assert re.search(r"^    runs-on: \[self-hosted, macos, arm64, iphone-sim\]$", _body(), re.M)
+    for job, body in _jobs().items():
+        assert re.search(r"^    runs-on: \[self-hosted, macos, arm64, iphone-sim\]$", body, re.M), job
+
+
+def test_no_expression_text_inside_run_scripts() -> None:
+    """Adopter settings come from their .fleet.toml: they reach scripts as env vars, never as script text."""
+    scripts = _run_scripts()
+    assert len(scripts) >= 10, "the run-script parser lost track of the steps"
+    for script in scripts:
+        assert "${{" not in script, script[:120]
 
 
 def test_least_privilege_and_no_secrets() -> None:
@@ -127,12 +178,22 @@ def test_action_majors_are_node_24() -> None:
 
 
 def test_home_automation_is_the_first_adopter() -> None:
-    assert re.search(r"^          - repo: home-automation$", _body(), re.M)
+    names = [ln.split("#", 1)[0].strip() for ln in ADOPTERS.read_text(encoding="utf-8").splitlines()]
+    assert "home-automation" in names
+    assert "include:" not in _body(), "the matrix is built from the adopters' [ci.nightly] tables, never hand-written"
+
+
+def test_adopters_are_read_anonymously_in_the_select_job_only() -> None:
+    jobs = _jobs()
+    assert "--url-base https://github.com/ferraroroberto/" in jobs["select"]
+    assert "https://" not in jobs["platform"]
+    assert "matrix: ${{ fromJSON(needs.select.outputs.matrix) }}" in jobs["platform"]
+    assert "ref: ${{ matrix.sha }}" in jobs["platform"], "test the exact commit the select job read"
 
 
 def test_delivery_is_pull_only_no_outbound_calls() -> None:
     body = _body()
-    for forbidden in ("curl ", "wget ", "scp ", "rsync ", "ssh ", "nc ", "gh "):
+    for forbidden in ("curl ", "wget ", "scp ", "rsync ", "ssh ", "nc ", "gh ", "git push"):
         assert forbidden not in body, f"delivery is pull-only; the workflow must not call {forbidden.strip()}"
 
 
@@ -142,6 +203,7 @@ def test_routing_audit_step_stays_on_the_runner() -> None:
     assert "scripts/routing_audit.py audit" in step, "the runner half is the `audit` subcommand only"
     assert " file " not in step, "filing needs `gh`; it runs on the trusted host, never here"
     assert "!cancelled()" in step, "an audit must run after a red e2e leg, which is when it matters"
-    assert 'junit.xml' in body and "--junitxml" in body
+    assert '--junit "$RESULTS/junit.xml"' in step and '--junit "$RESULTS/junit.xml"' in _jobs()["platform"].split(
+        "name: Routing audit", 1)[0], "the audit reads the e2e leg's first-attempt junit file"
     assert re.search(r"^          fetch-depth: 0$", body, re.M), "the audit walks the adopter's history"
-    assert 'echo "audit=' in body, "READY carries the audit outcome for the puller"
+    assert '--audit "$AUDIT"' in body, "READY carries the audit outcome for the puller"
