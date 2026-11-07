@@ -699,6 +699,8 @@ usage_track_scan = { src = "scripts/usage_track_scan.py" }
 runtime_write_ratchet = { src = "scripts/runtime_write_ratchet.py" }
 # runtime_write_ratchet loads this sibling (the static path resolver): vendor both.
 runtime_write_resolve = { src = "scripts/runtime_write_resolve.py" }
+# The cross-platform ratchet runner adopt_ratchets.py copies into an outside repo (docs/adopting-ratchets.md).
+run_ratchets = { src = "scripts/run_ratchets.py" }
 shot_baseline   = { src = "scripts/shot_baseline.py" }
 # Dot-sourced at the top of a gate script; holds the shared box load lock for the run.
 box_lock_gate   = { src = "scripts/box_lock_gate.ps1" }

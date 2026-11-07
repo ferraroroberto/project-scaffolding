@@ -30,11 +30,14 @@ from dataclasses import dataclass
 from pathlib import Path
 
 SCAFFOLD_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(SCAFFOLD_ROOT))  # a script's own dir is sys.path[0], not the repo root
+
+from src.no_window import NO_WINDOW  # noqa: E402 -- needs the sys.path line above
+
 SCRIPTS = SCAFFOLD_ROOT / "scripts"
 RUNNER = "run_ratchets.py"
 INIT_TIMEOUT_S = 900
 EXIT_OK, EXIT_FAILED, EXIT_USAGE = 0, 1, 2
-_NO_WINDOW = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
 
 
 @dataclass(frozen=True)
@@ -76,7 +79,7 @@ RECOMMENDED = ("comment", "docs", "structure", "instruction", "doc_refs", "dead_
 def _run(cmd: list[str], cwd: Path, timeout: float = 60) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         cmd, cwd=cwd, capture_output=True, text=True, encoding="utf-8", errors="replace",
-        stdin=subprocess.DEVNULL, creationflags=_NO_WINDOW, timeout=timeout, check=False,
+        stdin=subprocess.DEVNULL, creationflags=NO_WINDOW, timeout=timeout, check=False,
     )
 
 
