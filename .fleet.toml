@@ -690,8 +690,8 @@ instruction_frontmatter = { src = "scripts/instruction_frontmatter.py" }
 instruction_repeats = { src = "scripts/instruction_repeats.py" }
 doc_refs_ratchet = { src = "scripts/doc_refs_ratchet.py" }
 dead_code_ratchet = { src = "scripts/dead_code_ratchet.py" }
-conventions_ratchet = { src = "scripts/conventions_ratchet.py" }
-# conventions_ratchet loads this sibling (the syntax-tree predicates and the web and text line rules): vendor both.
+conventions_ratchet = { src = "scripts/conventions_ratchet.py", requires = ["conventions_readers"] }
+# conventions_ratchet loads this sibling (the syntax-tree predicates and the web and text line rules); `requires` makes /propagate-vendored carry both.
 conventions_readers = { src = "scripts/conventions_readers.py" }
 usage_track_ratchet = { src = "scripts/usage_track_ratchet.py" }
 # usage_track_ratchet loads this sibling (the HTML and JS readers): vendor both.
