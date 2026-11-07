@@ -26,7 +26,7 @@ Delivery is covered under "Delivering results" below.
 
 The images reach the owner's chat without any delivery credential on the runner. Delivery is **pull-only**, run by a scheduled `local-llm-hub` job on the trusted hub host:
 
-1. The workflow's last step writes `READY` in the run folder (`run`, `repo`, `e2e`, `smoke` outcomes, nothing else), by write-then-rename so it is never half-written.
+1. The workflow's last step writes `READY` in the run folder (`run`, `repo`, `e2e`, `smoke`, `audit` outcomes, nothing else), by write-then-rename so it is never half-written.
 2. The hub job lists run folders that have `READY`, skips the run ids it has already delivered, copies the `*.png` files over SSH, and sends them to the owner's chat with `send_file.py`.
 3. The hub records the delivered run id in its own store. Nothing is written back to the Mac, which keeps its plain 14-day prune.
 
@@ -168,6 +168,24 @@ RUNNER_TOKEN=<new token> bash scripts/mac_runner_setup.sh install
 ```
 
 `remove` mints a removal token with `gh api` (or reads `RUNNER_REMOVE_TOKEN`; the web UI's runner page shows one too). It leaves `~/actions-runner` on disk for you to delete. A runner that has been offline for 14 days is removed by GitHub automatically and needs a fresh `install`.
+
+## Routing audit
+
+The per-change gate routes e2e with `classify_e2e` (skip, static, surface or full), so the nightly full WebKit run is the check on that routing: a failure on a night whose merged commits were routed `skip`, or `static` for a node outside the declared `static_pytest_target`, means the adopter's `[e2e]` rules are too narrow. `scripts/routing_audit.py` has two halves split by trust.
+
+**`audit` (runner, no network).** It runs after the e2e and smoke legs, even when they failed, and reads the adopter checkout (full history), the pytest junit file and a state file in the runner user's home, `mac-nightly-results/<repo>/audit-state.json`, which holds the last green commit. It writes `audit.json` into the run folder and appends one line to the step summary, counts only: `Routing audit: nights audited N, misses found M`.
+
+| Line | Exit | Meaning |
+|---|---|---|
+| `AUDIT=clean nights=1 misses=0` | 0 | a green night, or a red one whose window routing covered |
+| `AUDIT=miss nights=1 misses=N` | 1 | N failing nodes on commits routing would not have run them for |
+| `AUDIT=unknown nights=0 reason=...` | 3 | the night could not be measured |
+
+A green night advances the state to the adopter's `HEAD`. A red or unknown night leaves it, so the next night audits the longer window since the last green one. Each first-parent commit in that window is classified with the adopter's current `[e2e]` table (a shared stylesheet counts as full, which can only hide a miss, never invent one). Any commit routed `skip` makes every failing node a miss; otherwise a `static` commit makes the failing nodes outside `static_pytest_target` a miss. A failure when every commit routed `surface` or `full` is not a miss: routing ran the suite.
+
+`unknown` is its own state, never folded into clean: the e2e leg was skipped or cancelled, the junit file is missing or has no failing test under a failed leg, the adopter's `[e2e]` table is missing or unusable, there is no earlier green night yet (the first run only records a baseline when it is green), the last green commit is gone from the history, git cannot list the window, or a failing node sits in a module that cannot be located on disk under a `static` change.
+
+**`file` (trusted host, needs `gh`).** `python scripts/routing_audit.py file --audit <audit.json>` reads a pulled `audit.json` and files nothing unless it records a miss. For a miss it keeps exactly one open issue in the adopter titled `e2e routing: nightly audit found a miss`, labelled `bug`: it creates it, or comments on the open one only when the failing-node set changed (a hidden marker holds the set's digest). The body carries the failing node ids, the tier counts and an acceptance checklist, nothing else. `audit.json` is untrusted data (adopter code named the nodes), so the tool checks its shape and size, strips backticks and control characters, and prints node ids inside a code fence. It ends on `FILE=none|created|commented|unchanged`, or `FILE=unknown` (exit 3) when `gh` could not confirm. `--dry-run` prints the body. The runner holds no `gh` or token; the pull job in `local-llm-hub` runs `file` after it copies a run that has `READY`.
 
 ## Adding an adopter
 

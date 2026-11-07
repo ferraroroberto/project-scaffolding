@@ -191,7 +191,8 @@ per adopter: WebKit e2e + scripts/ios_sim_smoke.py
 results stay on the runner host"]
   MACDOC["docs/mac-runner.md + scripts/mac_runner_setup.sh
 runner install, labels, safety settings
-scripts/audio_latency_probe.py: speech-to-text p95 during a run"]
+scripts/audio_latency_probe.py: speech-to-text p95 during a run
+scripts/routing_audit.py: nightly audit of what per-change e2e routing skipped"]
   MACDOC -.->|sets up the runner for| NIGHTLYMAC
   CLAUDEMD -.->|documents the Actions precondition for| GATEWATCH
   CONVDOCS -.->|documents the adoption steps for| CITEMPLATE

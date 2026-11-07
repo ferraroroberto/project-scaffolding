@@ -93,6 +93,8 @@ jobs:
           repository: ferraroroberto/${{ matrix.repo }}
           ref: main
           path: adopter
+          # Full history: the routing audit walks the commits merged since the last green night.
+          fetch-depth: 0
           persist-credentials: false
 
       # setup-python on macOS ignores AGENT_TOOLSDIRECTORY and always installs
@@ -138,6 +140,7 @@ jobs:
           --browser webkit
           --tracing retain-on-failure
           --screenshot only-on-failure
+          --junitxml "$RESULTS/junit.xml"
           --output "$RESULTS/e2e"
 
       - name: iOS Simulator Mobile Safari smoke
@@ -155,6 +158,30 @@ jobs:
           set -e
           echo "line=$(tail -n 1 "$RUNNER_TEMP/smoke.log")" >> "$GITHUB_OUTPUT"
           # Exit 3 is "could not establish a result", its own failing state.
+          exit "$code"
+
+      # Audits what per-change routing skipped (docs/mac-runner.md, "Routing audit").
+      # Reads the checkout, the junit file and a state file on the runner; writes
+      # audit.json in the run folder for the trusted host to file from. No network.
+      - name: Routing audit (counts only; node ids stay in the run folder)
+        id: audit
+        if: ${{ !cancelled() }}
+        env:
+          E2E: ${{ steps.e2e.outcome }}
+        run: |
+          set +e
+          python scaffold/scripts/routing_audit.py audit \
+            --repo-dir adopter --repo "${{ matrix.repo }}" --e2e-outcome "${E2E:-}" \
+            --junit "$RESULTS/junit.xml" \
+            --state "$HOME/mac-nightly-results/${{ matrix.repo }}/audit-state.json" \
+            --out "$RESULTS/audit.json" --summary-file "$GITHUB_STEP_SUMMARY" \
+            | tee "$RUNNER_TEMP/audit.log"
+          code=${PIPESTATUS[0]}
+          set -e
+          word=$(tail -n 1 "$RUNNER_TEMP/audit.log" | sed -n 's/^AUDIT=\([a-z]*\).*/\1/p')
+          echo "result=${word:-unknown}" >> "$GITHUB_OUTPUT"
+          # A miss is a finding, not a failed night; unknown (exit 3) stays a failing state.
+          [ "$code" -eq 1 ] && exit 0
           exit "$code"
 
       - name: Summary (pass/fail only; images stay on the runner host)
@@ -181,6 +208,7 @@ jobs:
         env:
           E2E: ${{ steps.e2e.outcome }}
           SMOKE: ${{ steps.smoke.outcome }}
+          AUDIT: ${{ steps.audit.outputs.result }}
         run: |
           mkdir -p "$RESULTS"
           {
@@ -188,5 +216,6 @@ jobs:
             echo "repo=${{ matrix.repo }}"
             echo "e2e=${E2E:-not run}"
             echo "smoke=${SMOKE:-not run}"
+            echo "audit=${AUDIT:-not run}"
           } > "$RESULTS/READY.tmp"
           mv "$RESULTS/READY.tmp" "$RESULTS/READY"

@@ -209,6 +209,10 @@ A routing table is only safe if it stays honest as the layout evolves — a new 
 
 Keep both. When you add a new e2e-relevant directory, add its `full` rule to `.fleet.toml` **and** a representative assertion to that test, in the same PR — the same anti-staleness contract as the `.fleet.toml` `description` field and `docs/architecture.mmd`.
 
+## Auditing the routing
+
+The nightly full run audits these rules after the fact: `scripts/routing_audit.py` flags a failure that routing would have skipped (`docs/mac-runner.md`, "Routing audit").
+
 ## Diff-proportionate e2e routing (`.fleet.toml` `[e2e]` + `classify_e2e.py`)
 
 Moved verbatim from `CLAUDE.md` so the always-on file stays under its size cap. `CLAUDE.md` keeps each section's heading, its *apply only if* gate and one-line rules, and points here for the full procedure, reasoning, snippets and decision records. Headings match `CLAUDE.md`'s, so a reference to a section by name resolves in either file.
