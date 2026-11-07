@@ -1,0 +1,167 @@
+# Nightly platform pass on the Mac Mini self-hosted runner: each public web-app
+# adopter's WebKit e2e suite (iPhone projection) and an iOS Simulator Mobile
+# Safari smoke of its key views.
+#
+# One hub runner serves the fleet: it is registered on this repo only, and this
+# workflow checks out each adopter in turn. Setup, labels and the safety
+# settings: docs/mac-runner.md. The per-change contract stays each repo's local
+# gate; this is the slower platform stage that runs after merges, not before.
+#
+# PUBLIC REPO, SELF-HOSTED RUNNER. A self-hosted runner executes whatever a
+# triggering workflow says, so nothing an outsider controls may start it:
+#   * triggers are `schedule` and `workflow_dispatch` only (dispatch needs write
+#     access); never `pull_request`, `pull_request_target` or `push`;
+#   * the job's `if:` refuses any other event, any fork event and any copy of
+#     this file running in a fork;
+#   * `permissions` is read-only and both checkouts drop the token afterwards;
+#   * no secret is used: the runner holds only its own registration.
+# tests/ci/test_nightly_mac_workflow.py asserts each of these.
+#
+# RESULTS STAY PRIVATE. Logs of a public repo are public, so the run log and
+# the step summary carry pass/fail lines only. Screenshots, traces and failure
+# images go to a folder in the runner user's home on the Mac, outside the
+# checkout, and are never uploaded as an artifact.
+name: nightly-mac
+
+on:
+  schedule:
+    # Cron is UTC. 02:00 UTC is 03:00 in Madrid in winter (CET, UTC+1) and
+    # 04:00 in summer (CEST, UTC+2): inside the 02:00-05:00 local quiet hours
+    # either way, when the hub is not placing whisper jobs on the Mac.
+    - cron: "0 2 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# One platform run at a time: the Mac is shared with whisper, and two runs
+# would fight over the one simulator.
+concurrency:
+  group: nightly-mac
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash --noprofile --norc -euo pipefail {0}
+
+env:
+  PYTHONUTF8: "1"
+  PYTHONUNBUFFERED: "1"
+
+jobs:
+  platform:
+    if: >-
+      github.repository == 'ferraroroberto/project-scaffolding' &&
+      (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') &&
+      github.event.pull_request.head.repo.fork != true
+    runs-on: [self-hosted, macos, arm64, iphone-sim]
+    # Cap a wedge: GitHub's default is 6 h, and a wedged run would hold the Mac
+    # into the morning. About 4x a typical adopter's full WebKit suite.
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        # One entry per public web-app adopter. To add one: its repo name, its
+        # Python, its requirements files, the folder of committed `*.sample.*`
+        # config twins, its e2e target plus flags, and the key views the smoke
+        # opens. The adopter must declare `[design.review.synthetic] command`
+        # in its .fleet.toml (the throwaway instance the smoke boots).
+        include:
+          - repo: home-automation
+            python: "3.14"
+            requirements: requirements.txt requirements-dev.txt
+            samples: config
+            e2e: tests/e2e --e2e-autoboot
+            views: /
+    name: ${{ matrix.repo }}
+    steps:
+      - name: Check out the scaffold (smoke script)
+        uses: actions/checkout@v6
+        with:
+          path: scaffold
+          persist-credentials: false
+
+      - name: Check out the adopter's main
+        uses: actions/checkout@v6
+        with:
+          repository: ferraroroberto/${{ matrix.repo }}
+          ref: main
+          path: adopter
+          persist-credentials: false
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python }}
+
+      - name: Results folder (runner host only, never uploaded)
+        # Runs older than 14 days are pruned so failure traces cannot fill the disk.
+        run: |
+          root="$HOME/mac-nightly-results/${{ matrix.repo }}"
+          mkdir -p "$root"
+          find "$root" -mindepth 1 -maxdepth 1 -type d -mtime +14 -exec rm -rf {} +
+          echo "RESULTS=$root/${{ github.run_id }}" >> "$GITHUB_ENV"
+          echo "FLEET_DATA_ROOT=$RUNNER_TEMP/fleet-data" >> "$GITHUB_ENV"
+
+      - name: Create .venv and install deps
+        working-directory: adopter
+        run: |
+          python -m venv .venv
+          ./.venv/bin/python -m pip install --upgrade pip
+          reqs=()
+          for r in ${{ matrix.requirements }}; do reqs+=(-r "$r"); done
+          ./.venv/bin/python -m pip install "${reqs[@]}"
+          ./.venv/bin/python -m playwright install webkit
+
+      - name: Seed gitignored config from committed samples
+        working-directory: adopter
+        run: |
+          shopt -s nullglob
+          for src in ${{ matrix.samples }}/*.sample.*; do
+            dest="${src/.sample./.}"
+            [ -e "$dest" ] || cp "$src" "$dest"
+          done
+
+      - name: WebKit e2e (iPhone projection)
+        id: e2e
+        working-directory: adopter
+        run: >
+          ./.venv/bin/python -m pytest ${{ matrix.e2e }}
+          --browser webkit
+          --tracing retain-on-failure
+          --screenshot only-on-failure
+          --output "$RESULTS/e2e"
+
+      - name: iOS Simulator Mobile Safari smoke
+        id: smoke
+        # After a failed e2e, still smoke; after a failed install, there is nothing to boot.
+        if: ${{ !cancelled() && steps.e2e.outcome != 'skipped' }}
+        run: |
+          views=()
+          for v in ${{ matrix.views }}; do views+=(--view "$v"); done
+          set +e
+          adopter/.venv/bin/python scaffold/scripts/ios_sim_smoke.py \
+            --repo adopter --python "$PWD/adopter/.venv/bin/python" \
+            --out "$RESULTS/ios" "${views[@]}" | tee "$RUNNER_TEMP/smoke.log"
+          code=${PIPESTATUS[0]}
+          set -e
+          echo "line=$(tail -n 1 "$RUNNER_TEMP/smoke.log")" >> "$GITHUB_OUTPUT"
+          # Exit 3 is "could not establish a result", its own failing state.
+          exit "$code"
+
+      - name: Summary (pass/fail only; images stay on the runner host)
+        if: ${{ !cancelled() }}
+        env:
+          E2E: ${{ steps.e2e.outcome }}
+          SMOKE: ${{ steps.smoke.outcome }}
+          SMOKE_LINE: ${{ steps.smoke.outputs.line }}
+        run: |
+          {
+            echo "### ${{ matrix.repo }}"
+            echo "| Leg | Result |"
+            echo "|---|---|"
+            echo "| WebKit e2e (iPhone projection) | ${E2E:-not run} |"
+            echo "| iOS Simulator smoke | ${SMOKE:-not run}: \`${SMOKE_LINE:-no result line}\` |"
+            echo
+            echo "Screenshots and failure traces are kept on the runner host, not uploaded."
+          } >> "$GITHUB_STEP_SUMMARY"

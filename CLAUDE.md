@@ -189,7 +189,7 @@ Examples — adapt to the project's actual tooling. Windows / PowerShell: syntax
 Starter scaffold for a Streamlit app + Python pipelines project — clone, rename, and build. See `README.md` for setup, layout, and usage.
 
 ### CI expectations
-- No workflow runs here: `.github/workflows/` holds only the `*.yml.template` files adopters copy, so `/issue-finish` has no CI run to wait on. **Advisory, not required** — the local gate (`scripts/verify-before-ship.ps1`) is the contract.
+- No per-change workflow runs here: `.github/workflows/` holds the `*.yml.template` files adopters copy plus `nightly-mac.yml`, which fires only on `schedule`/`workflow_dispatch` on the self-hosted Mac runner (`docs/mac-runner.md`), never on a PR or push. So `/issue-finish` has no CI run to wait on. **Advisory, not required** — the local gate (`scripts/verify-before-ship.ps1`) is the contract.
 
 ### Internal architecture
 [`docs/architecture.mmd`](docs/architecture.mmd) is a hand-authored Mermaid diagram of this repo's internal structure (`app/`, `src/`, `scripts/`, `tests/`, `docs/`, external deps). Update it in the same PR as any material structural change (new view, new vendored component, script relocated) — same anti-staleness contract as `.fleet.toml`'s `description` field. Not auto-generated; not covered by `scripts/verify-before-ship.ps1`.

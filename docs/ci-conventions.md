@@ -34,6 +34,8 @@ jobs:
           path: <path>
 ```
 
+**The one exception is the self-hosted Mac runner.** `nightly-mac.yml` runs on `[self-hosted, macos, arm64, iphone-sim]` instead of a dated hosted image, and on `schedule` + `workflow_dispatch` instead of `push`/`pull_request`: a self-hosted runner on a public repo must never be reachable from a pull request. Its rules and setup: [`mac-runner.md`](mac-runner.md).
+
 **Sister-repo tracking:** a repo still on the old runner/actions or duplicate `push`-on-branches trigger gets a pointer issue back to `project-scaffolding`'s canonical record. Fix before the deprecation deadline.
 
 **A red default branch files its own tracking issue — `main-gate-watch`.** Copy `.github/workflows/main-gate-watch.yml.template` → `.github/workflows/main-gate-watch.yml`, replace `__GATE_WORKFLOW_NAME__` with the gate workflow's `name:`. On `workflow_run` completion for that workflow (filtered `branches:[main]`, PR runs excluded, gated on `conclusion=='failure'`): creates label `ci-red-main` (`--force`, idempotent), comments `Still red on main at <sha>: <run-url>` on the open `ci-red-main` issue, or files `main's <gate> gate is red` (`bug`+`ci-red-main`, assigned to `github.repository_owner`) if none open. Issue stays open until `main` is green; discounting a red gate for an unrelated PR does not close it. Without this, a red `main` is nobody's finding.

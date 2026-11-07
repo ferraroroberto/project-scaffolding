@@ -14,6 +14,7 @@ Clone this directory, rename it, and start building.
 - `launch_server.{bat,sh}` — local launch + Cloudflare Tunnel for public sharing.
 - `tray.bat.template` — copy-to-adapt Windows tray launcher for a long-lived-service app. See [`docs/windows-tray.md`](docs/windows-tray.md).
 - `.github/workflows/ci.yml.template` — copy-to-adapt web-app CI gate (unit + Playwright desktop/phone). See [`docs/ci-conventions.md`](docs/ci-conventions.md) ("Web-app CI template").
+- `.github/workflows/nightly-mac.yml` + `scripts/ios_sim_smoke.py` + `scripts/mac_runner_setup.sh` — the nightly platform pass on the Mac Mini self-hosted runner: each web-app adopter's WebKit e2e and an iOS Simulator Mobile Safari smoke. See [`docs/mac-runner.md`](docs/mac-runner.md).
 - `.github/workflows/main-gate-watch.yml.template` — copy-to-adapt watcher that files a tracking issue when your Actions gate goes red on `main`. See `CLAUDE.md` ("GitHub Actions CI conventions").
 - `scripts/gen_tailscale_cert.py` — copy-to-adapt HTTPS cert generator via `tailscale cert`. See [`docs/app-onboarding.md`](docs/app-onboarding.md) §2.
 - `%USERPROFILE%/.claude/tray/tray_lifecycle.ps1` — the one shared, machine-local tray lifecycle helper `tray.bat.template` shells to. See [`docs/windows-tray.md`](docs/windows-tray.md).
