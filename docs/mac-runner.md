@@ -20,7 +20,25 @@ A personal GitHub account has no organization-level runners, and one runner per 
 - **Results stay private.** A public repo's logs and artifacts are public, so the log and the step summary carry pass/fail lines only. Screenshots and failure traces go to `~/mac-nightly-results/<repo>/<run id>/` in the runner user's home, outside every checkout, and nothing is uploaded. Runs older than 14 days are pruned.
 - **Fork approval stays on.** Repo Settings → Actions → General → "Approval for running fork pull request workflows from contributors" is set to require approval for all outside contributors. The workflow has no pull-request trigger, so this is depth, not the main line.
 
-Delivering the screenshots to the owner's private channel is not wired: it needs a bot credential, which the runner must not hold. Until that has a home that is not the runner, the images are read on the Mac (or over Screen Sharing).
+Delivery is covered under "Delivering results" below.
+
+## Delivering results
+
+The images reach the owner's chat without any delivery credential on the runner. Delivery is **pull-only**, run by a scheduled `local-llm-hub` job on the trusted hub host:
+
+1. The workflow's last step writes `READY` in the run folder (`run`, `repo`, `e2e`, `smoke` outcomes, nothing else), by write-then-rename so it is never half-written.
+2. The hub job lists run folders that have `READY`, skips the run ids it has already delivered, copies the `*.png` files over SSH, and sends them to the owner's chat with `send_file.py`.
+3. The hub records the delivered run id in its own store. Nothing is written back to the Mac, which keeps its plain 14-day prune.
+
+Contract the puller keeps:
+
+- **Its key is forced-command and read-only.** The runner user's `authorized_keys` entry for the hub restricts the command to listing run folders and reading `*.png` from a run, with no shell, no write, no port or agent forwarding and no pty. The hub holds the private key; nothing on the runner can use it.
+- **The pull window is shorter than the prune.** The job only considers runs newer than a few days (well under the 14-day prune), so a run is never pulled while it is being deleted.
+- **A run folder is untrusted data.** Adopter code produced it, so the puller takes only regular `*.png` files under a size cap and a count cap, ignores symlinks and any other name, and never executes or interprets a file's content.
+- **Nothing leaves the Mac by the workflow.** It makes no outbound call, uploads nothing and reads no `secrets.*`; a fork pull request cannot start it, and it has no path to the puller. Host addresses, logins and keys live in the hub's own configuration, never in this repo, a log or an artifact.
+- **Unknown stays unknown.** An unreachable Mac, a run without `READY` or a send that is not confirmed is reported as such and retried on the next pass; a run id is recorded as delivered only after a confirmed send.
+
+The puller itself is tracked in `local-llm-hub`; this repo owns the folder layout and the `READY` marker above.
 
 ## Schedule and whisper
 

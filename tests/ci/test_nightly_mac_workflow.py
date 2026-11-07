@@ -128,3 +128,9 @@ def test_action_majors_are_node_24() -> None:
 
 def test_home_automation_is_the_first_adopter() -> None:
     assert re.search(r"^          - repo: home-automation$", _body(), re.M)
+
+
+def test_delivery_is_pull_only_no_outbound_calls() -> None:
+    body = _body()
+    for forbidden in ("curl ", "wget ", "scp ", "rsync ", "ssh ", "nc ", "gh "):
+        assert forbidden not in body, f"delivery is pull-only; the workflow must not call {forbidden.strip()}"
