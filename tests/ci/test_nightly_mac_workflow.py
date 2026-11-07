@@ -134,3 +134,14 @@ def test_delivery_is_pull_only_no_outbound_calls() -> None:
     body = _body()
     for forbidden in ("curl ", "wget ", "scp ", "rsync ", "ssh ", "nc ", "gh "):
         assert forbidden not in body, f"delivery is pull-only; the workflow must not call {forbidden.strip()}"
+
+
+def test_routing_audit_step_stays_on_the_runner() -> None:
+    body = _body()
+    step = body.split("name: Routing audit", 1)[1].split("      - name:", 1)[0]
+    assert "scripts/routing_audit.py audit" in step, "the runner half is the `audit` subcommand only"
+    assert " file " not in step, "filing needs `gh`; it runs on the trusted host, never here"
+    assert "!cancelled()" in step, "an audit must run after a red e2e leg, which is when it matters"
+    assert 'junit.xml' in body and "--junitxml" in body
+    assert re.search(r"^          fetch-depth: 0$", body, re.M), "the audit walks the adopter's history"
+    assert 'echo "audit=' in body, "READY carries the audit outcome for the puller"
