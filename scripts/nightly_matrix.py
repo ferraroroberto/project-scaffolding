@@ -80,6 +80,7 @@ def fetch_main(url: str, work: Path) -> tuple[str | None, str | None, str]:
     Reading both from the same fetch means the settings always belong to the
     commit that gets tested. A missing ``.fleet.toml`` gives text None, no error.
     """
+    # runtime-write-exempt: a temporary directory the caller created, removed after the build
     work.mkdir(parents=True, exist_ok=True)
     for args in (("init", "-q"), ("fetch", "-q", "--depth", "1", "--no-tags", url, "refs/heads/main")):
         out = _git(work, *args)
@@ -265,10 +266,12 @@ def cmd_build(args: argparse.Namespace) -> int:
         rows, decisions = build(adopters, args.url_base, Path(args.state_root).expanduser(), Path(tmp), full)
     matrix = json.dumps({"include": rows}, separators=(",", ":"))
     if args.github_output:
+        # runtime-write-exempt: --github-output is the Actions output file, outside every checkout
         with open(args.github_output, "a", encoding="utf-8") as fh:
             fh.write(f"matrix={matrix}\ncount={len(rows)}\n")
     counts = {k: sum(1 for d in decisions if d[1] == k) for k in ("run", "skip", "unknown")}
     if args.summary_file:
+        # runtime-write-exempt: --summary-file is the Actions step summary, outside every checkout
         with open(args.summary_file, "a", encoding="utf-8") as fh:
             fh.write(f"### Nightly selection ({'full' if full else 'changed repos only'})\n")
             fh.write("| Repo | Decision | Reason |\n|---|---|---|\n")
@@ -330,7 +333,9 @@ def run_leg(
         return "fail", 0, "timed out on retry" if second is None else "failed twice"
     first_ids = failed_ids(junit) or set()
     flaky = sorted(first_ids - (failed_ids(retry_junit) or set()))
+    # runtime-write-exempt: --flaky-out is in the caller's run folder on the runner host, outside every checkout
     flaky_out.parent.mkdir(parents=True, exist_ok=True)
+    # runtime-write-exempt: same caller-chosen run folder
     flaky_out.write_text("".join(f"{i}\n" for i in flaky), encoding="utf-8")
     return "flaky", len(flaky), "passed on retry"
 
@@ -387,8 +392,10 @@ def _count_lines(path: Path) -> int:
 
 
 def _atomic_write(path: Path, text: str) -> None:
+    # runtime-write-exempt: --results/--state are the caller's run folder and state file in the runner user's home, outside every checkout
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_name(path.name + ".tmp")
+    # runtime-write-exempt: same caller-chosen file, written beside itself and renamed over it
     tmp.write_text(text, encoding="utf-8")
     os.replace(tmp, path)
 
