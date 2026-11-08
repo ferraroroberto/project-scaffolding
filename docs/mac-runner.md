@@ -45,7 +45,7 @@ The puller itself is tracked in `local-llm-hub`; this repo owns the folder layou
 
 ## Schedule and whisper
 
-The Mac is also a whisper host. The hub places whisper on the gaming PC first, then the Mac, so the nightly pass runs in the quiet hours: cron `0 2 * * *` is **UTC**, which is 03:00 in Madrid in winter (CET) and 04:00 in summer (CEST), inside 02:00–05:00 local either way. Concurrency is 1 at every level: the runner takes one job, the workflow's `concurrency` group queues a second run, and the matrix runs adopters one after another (`max-parallel: 1`). A wedged run is capped at 90 minutes.
+The Mac is also a whisper host. The hub places whisper on the gaming PC first, then the Mac, so the nightly pass runs in the quiet hours: cron `17 1 * * *` is **UTC**, which is 02:17 in Madrid in winter (CET) and 03:17 in summer (CEST), inside 02:00–05:00 local either way and, with the 90-minute cap, finished by 04:47. The minute is off `:00` because GitHub delays or drops scheduled runs at the start of the hour. Concurrency is 1 at every level: the runner takes one job, the workflow's `concurrency` group queues a second run, and the matrix runs adopters one after another (`max-parallel: 1`). A wedged run is capped at 90 minutes.
 
 ### Speech-to-text latency during a run
 
