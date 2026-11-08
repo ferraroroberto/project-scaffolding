@@ -676,3 +676,119 @@ def test_pill_inactive_label_clears_aa_on_the_composited_bar_in_both_themes(
         bar = _style(nav_mobile, ".tabs", "backgroundColor")
         ratio = _contrast(label, bar, canvas)
         assert ratio >= 4.5, f"{theme}: inactive pill label {ratio:.2f}:1 on the glass"
+
+
+# ------------------------------------------- capsule follows late cell geometry
+# The capsule is measured at init. On an installed iOS app the cells settle
+# later without any window resize: an app reveals or hides a tab once its data
+# arrives (the equal-column grid re-divides), or the bar's width settles after
+# the standalone viewport expands. The capsule must follow, and only then.
+
+
+def _pill_vs_active(page: Page) -> dict[str, str]:
+    return page.evaluate(
+        "() => { const p = document.querySelector('.tab-pill');"
+        " const on = document.querySelector('.tab.active');"
+        " return { x: p.style.getPropertyValue('--pill-x'),"
+        " w: p.style.getPropertyValue('--pill-w'),"
+        " want_x: on.offsetLeft + 'px', want_w: on.offsetWidth + 'px' }; }"
+    )
+
+
+def _wait_pill_on_active(page: Page) -> None:
+    page.wait_for_function(
+        "() => { const p = document.querySelector('.tab-pill');"
+        " const on = document.querySelector('.tab.active');"
+        " return p.style.getPropertyValue('--pill-x') === on.offsetLeft + 'px'"
+        " && p.style.getPropertyValue('--pill-w') === on.offsetWidth + 'px'; }",
+        timeout=2000,
+    )
+
+
+def test_capsule_follows_a_tab_hidden_after_init(nav_mobile: Page) -> None:
+    """A tab the app hides after init re-divides the columns; the capsule follows."""
+    _init_nav(nav_mobile)
+    nav_mobile.evaluate("() => window.__nav.setTab('history')")
+    before = _pill_vs_active(nav_mobile)
+    assert (before["x"], before["w"]) == (before["want_x"], before["want_w"])
+    nav_mobile.evaluate(
+        "() => { document.querySelector('.tab[data-tab=home]').style.display = 'none'; }"
+    )
+    after = _pill_vs_active(nav_mobile)
+    assert after["want_w"] != before["want_w"], "the hide did not change the cells"
+    _wait_pill_on_active(nav_mobile)
+
+
+def test_capsule_follows_a_tab_revealed_after_init(nav_mobile: Page) -> None:
+    """A tab the app adds after init narrows every column; the capsule follows."""
+    _init_nav(nav_mobile)
+    nav_mobile.evaluate(
+        "() => { const nav = document.querySelector('.tabs');"
+        " const extra = nav.querySelector('.tab[data-tab=stats]').cloneNode(true);"
+        " extra.removeAttribute('id'); extra.dataset.tab = 'extra';"
+        " extra.classList.remove('active'); nav.appendChild(extra); }"
+    )
+    _wait_pill_on_active(nav_mobile)
+
+
+def test_capsule_follows_the_bar_width_settling(nav_mobile: Page) -> None:
+    """The bar narrowing with no window resize (viewport settle) re-places the capsule."""
+    _init_nav(nav_mobile)
+    nav_mobile.evaluate("() => window.__nav.setTab('stats')")
+    before = _pill_vs_active(nav_mobile)
+    nav_mobile.evaluate("() => { document.querySelector('.tabs').style.maxWidth = '240px'; }")
+    assert _pill_vs_active(nav_mobile)["want_w"] != before["want_w"]
+    _wait_pill_on_active(nav_mobile)
+
+
+def test_resize_without_cell_change_leaves_the_capsule_untouched(nav_mobile: Page) -> None:
+    """An iOS keyboard resize moves no cell, so the glass bar is not restyled.
+
+    The guard that keeps the keyboard from repainting the bar must survive the
+    observer that re-places the capsule on real geometry changes.
+    """
+    _init_nav(nav_mobile)
+    writes = nav_mobile.evaluate(
+        "() => new Promise((done) => {"
+        " const nav = document.querySelector('.tabs');"
+        " const pill = nav.querySelector('.tab-pill');"
+        " let n = 0;"
+        " new MutationObserver((m) => { n += m.length; })"
+        "   .observe(pill, { attributes: true });"
+        " new MutationObserver((m) => { n += m.length; })"
+        "   .observe(nav, { attributes: true, attributeFilter: ['class', 'style'] });"
+        " window.dispatchEvent(new Event('resize'));"
+        " requestAnimationFrame(() => requestAnimationFrame(() =>"
+        "   setTimeout(() => done(n), 100)));"
+        " })"
+    )
+    assert writes == 0, f"{writes} attribute writes on a no-op resize"
+
+
+def test_standalone_start_rebuilds_the_glass_once_and_restores_it(nav_mobile: Page) -> None:
+    """Installed-app start: the bar's filter drops for one frame after the viewport settles.
+
+    Chromium has no `display-mode: standalone` emulation, so matchMedia is
+    stubbed for that one query. Only a device shows whether the rebuild clears
+    the iOS smear; this pins that it happens, once, and that the glass returns.
+    """
+    nav_mobile.evaluate(
+        "() => { const real = window.matchMedia.bind(window);"
+        " window.matchMedia = (q) => q === '(display-mode: standalone)'"
+        "   ? { matches: true, media: q, addEventListener() {}, removeEventListener() {} }"
+        "   : real(q);"
+        " window.__rebuilds = 0;"
+        " new MutationObserver(() => {"
+        "   if (document.querySelector('.tabs').classList.contains('glass-rebuild'))"
+        "     window.__rebuilds += 1; })"
+        "   .observe(document.querySelector('.tabs'), { attributes: true, attributeFilter: ['class'] }); }"
+    )
+    _init_nav(nav_mobile)
+    nav_mobile.wait_for_function(
+        "() => window.__rebuilds === 1"
+        " && !document.querySelector('.tabs').classList.contains('glass-rebuild')",
+        timeout=2000,
+    )
+    assert "blur" in _style(nav_mobile, ".tabs", "backdropFilter")
+    assert nav_mobile.evaluate("window.scrollY") == 0
+    _wait_pill_on_active(nav_mobile)
