@@ -51,6 +51,10 @@ A deliberate write keeps a reasoned marker on one of its own lines, or in the co
 
 A bare `# runtime-write-exempt` with no reason exempts nothing.
 
+Keep a marker only where the path is fixed from outside: another tool's contract, a file the user edits by hand, a deliberately committed artefact. Runtime output moves to the runtime root instead and the marker goes.
+
+A path a caller names (a parameter, a CLI argument, a runner's step-summary file) can be routed through one repo-local writer helper that resolves the path at run time and raises when it lands under a code folder. The guarantee is then enforced rather than asserted, and the helper carries the only markers, with one stated reason. Name the helper's functions so they do not collide with the write methods the check looks for (`write_text`, `write_bytes`, `mkdir`, `touch`): a call spelled `helper.write_text(...)` still counts as a write target. This scaffold's instance is `src/runtime_files.py`; it is repo-local, not a `[components]` entry, so a vendored script cannot use it and keeps its own marker.
+
 ### Scope
 
 Every `.py` file git lists (tracked, or untracked and not ignored), except:

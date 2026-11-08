@@ -4,8 +4,8 @@ Deliberately NOT a stealth profile: doc capture drives the project's own
 localhost app, so there is nothing to hide from — what matters is determinism
 (identical pixels for identical inputs) and isolation (never touch a logged-in
 scraping profile). The global "never re-inline launch args" rule protects the
-*stealth* profile, which this deliberately is not (reasoning recorded in
-content-management#110), so these values live here and the vendored component
+*stealth* profile, which this deliberately is not (the reasoning is recorded
+with the pilot app), so these values live here and the vendored component
 stays self-contained. A project that already centralizes launch kwargs in a
 ``chrome_launch.py`` may re-export these instead of importing them directly.
 """

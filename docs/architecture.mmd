@@ -42,6 +42,11 @@ flowchart TB
     DOCCAP["doc_capture/\nengine.py + adapters.py (streamlit | url)\n+ launch.py + __main__.py (CLI)\nvendor-verbatim doc-capture screenshot engine\n(manifest-driven, fail-safe-masked,\ninput-hash-idempotent + README tour regen)"]
     POOLEDHTTP["pooled_http.py (#192)\nbuild_session() / pooled_request()\nvendor-verbatim pooled requests.Session\n+ single-retry-on-ConnectionError"]
     RUNTIMEDATA["runtime_data.py (#243)\nruntime_db_path(app, file, env_var=)\nvendor-verbatim SQLite-location resolver\nFLEET_DATA_ROOT -> C:/sqlite/&lt;app&gt;/\n(off the spinning disk, one dir per app)"]
+    RUNTIMEFILES["runtime_files.py (repo-local, not vendored)
+save_text / append_text / make_dirs / copy_file
+refuses a path under a code folder at run time
+(caller-named paths of adopt_ratchets, nightly_matrix,
+routing_audit, gen_verify_skill, ios_sim_smoke)"]
     FLEETROOT["fleet_root.py\nfleet_root(): the dir holding the fleet repos\nvendor-verbatim; FLEET_ROOT -> ~/.config/fleet/fleet.toml\n-> checkout parent, else FleetRootError\n(replaces drive-letter literals)"]
     USAGELOG["usage_log.py (#349)\nusage_router(db_path, dependencies=)\nvendor-verbatim local-only usage log\nPOST /api/usage/events + GET /api/usage/summary\nGET /api/usage/time (foreground minutes, #403)\nallowlisted kinds, bounded ids, 365d / row cap\n+ usage_log_worker.js: same contract on Cloudflare D1\nfor public sites (country, daily visitor hash, #540)"]
     USAGELOGSTAR["usage_log_starlette.py\nusage_route(db_path) -> Starlette Route\nvendor-verbatim; hands /api/usage/{rest:path} to a small FastAPI app\nGET summary/time owner-only: loopback or tailnet,\nread from Tailscale-Funnel-Request + X-Forwarded-For"]
@@ -118,6 +123,7 @@ docs/adopting-ratchets.md"]
   VERIFY -->|runs, opt-in, after the runtime write ratchet| UTRATCHET
   UTRATCHET -.->|reads [usage_track_ratchet] + [vendored] from| FLEETTOML
   ADOPTKIT -->|copies into an outside repo + runs there| UTRATCHET
+  ADOPTKIT -->|writes the adopter's files through| RUNTIMEFILES
   VERIFY -->|runs after the e2e stage| SHOTBASE
   SHOTBASE -.->|reads [shot_baseline] from| FLEETTOML
   SHOTBASE -.->|compares the PNGs written by| SHOT

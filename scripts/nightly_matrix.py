@@ -37,6 +37,7 @@ from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from src import runtime_files  # noqa: E402 -- needs the sys.path line above
 from src.no_window import NO_WINDOW  # noqa: E402 -- needs the sys.path line above
 
 # A shallow fetch of one public repo; well past a slow network, short of a wedge.
@@ -80,8 +81,7 @@ def fetch_main(url: str, work: Path) -> tuple[str | None, str | None, str]:
     Reading both from the same fetch means the settings always belong to the
     commit that gets tested. A missing ``.fleet.toml`` gives text None, no error.
     """
-    # runtime-write-exempt: a temporary directory the caller created, removed after the build
-    work.mkdir(parents=True, exist_ok=True)
+    runtime_files.make_dirs(work)
     for args in (("init", "-q"), ("fetch", "-q", "--depth", "1", "--no-tags", url, "refs/heads/main")):
         out = _git(work, *args)
         if out is None or out.returncode != 0:
@@ -266,20 +266,16 @@ def cmd_build(args: argparse.Namespace) -> int:
         rows, decisions = build(adopters, args.url_base, Path(args.state_root).expanduser(), Path(tmp), full)
     matrix = json.dumps({"include": rows}, separators=(",", ":"))
     if args.github_output:
-        # runtime-write-exempt: --github-output is the Actions output file, outside every checkout
-        with open(args.github_output, "a", encoding="utf-8") as fh:
-            fh.write(f"matrix={matrix}\ncount={len(rows)}\n")
+        runtime_files.append_text(args.github_output, f"matrix={matrix}\ncount={len(rows)}\n")
     counts = {k: sum(1 for d in decisions if d[1] == k) for k in ("run", "skip", "unknown")}
     if args.summary_file:
-        # runtime-write-exempt: --summary-file is the Actions step summary, outside every checkout
-        with open(args.summary_file, "a", encoding="utf-8") as fh:
-            fh.write(f"### Nightly selection ({'full' if full else 'changed repos only'})\n")
-            fh.write("| Repo | Decision | Reason |\n|---|---|---|\n")
-            for repo, decision, reason in decisions:
-                fh.write(f"| {repo} | {decision} | {reason} |\n")
-            if not rows:
-                fh.write("\nNothing changed since the last green night: no repo runs tonight.\n")
-            fh.write("\n")
+        lines = [f"### Nightly selection ({'full' if full else 'changed repos only'})\n",
+                 "| Repo | Decision | Reason |\n|---|---|---|\n"]
+        lines += [f"| {repo} | {decision} | {reason} |\n" for repo, decision, reason in decisions]
+        if not rows:
+            lines.append("\nNothing changed since the last green night: no repo runs tonight.\n")
+        lines.append("\n")
+        runtime_files.append_text(args.summary_file, "".join(lines))
     full_word = "true" if full else "false"
     print(f"SELECT=ok run={counts['run']} skip={counts['skip']} unknown={counts['unknown']} full={full_word}")
     return 0
@@ -333,10 +329,8 @@ def run_leg(
         return "fail", 0, "timed out on retry" if second is None else "failed twice"
     first_ids = failed_ids(junit) or set()
     flaky = sorted(first_ids - (failed_ids(retry_junit) or set()))
-    # runtime-write-exempt: --flaky-out is in the caller's run folder on the runner host, outside every checkout
-    flaky_out.parent.mkdir(parents=True, exist_ok=True)
-    # runtime-write-exempt: same caller-chosen run folder
-    flaky_out.write_text("".join(f"{i}\n" for i in flaky), encoding="utf-8")
+    runtime_files.make_dirs(flaky_out.parent)
+    runtime_files.save_text(flaky_out, "".join(f"{i}\n" for i in flaky))
     return "flaky", len(flaky), "passed on retry"
 
 
@@ -392,11 +386,9 @@ def _count_lines(path: Path) -> int:
 
 
 def _atomic_write(path: Path, text: str) -> None:
-    # runtime-write-exempt: --results/--state are the caller's run folder and state file in the runner user's home, outside every checkout
-    path.parent.mkdir(parents=True, exist_ok=True)
+    runtime_files.make_dirs(path.parent)
     tmp = path.with_name(path.name + ".tmp")
-    # runtime-write-exempt: same caller-chosen file, written beside itself and renamed over it
-    tmp.write_text(text, encoding="utf-8")
+    runtime_files.save_text(tmp, text)
     os.replace(tmp, path)
 
 

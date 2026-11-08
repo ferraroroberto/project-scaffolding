@@ -1,7 +1,6 @@
 """Capture engine + README generator for deterministic app screenshots.
 
-Canonical vendored component (project-scaffolding#171; pilot proven in
-content-management#110). Design:
+Canonical vendored component (proven in the pilot app). Design:
 
 * **Manifest is the contract** — ``docs/screenshots/manifest.json`` declares
   every capturable feature. The engine never invents targets.

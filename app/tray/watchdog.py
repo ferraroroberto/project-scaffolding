@@ -6,7 +6,7 @@ scaffold re-propagates everywhere. Everything app-specific (the probe, the
 respawn action, the log path, the toast) is passed in by the caller, never
 hardcoded here, which is what keeps the file identical. Full reasoning + the
 worked wiring pattern: scaffold ``docs/windows-tray.md`` (gotcha 5) +
-project-scaffolding#201 / app-launcher#386 / photo-ocr#110.
+the sister apps' tray watchdog wiring.
 
 The tray is the only long-lived process watching the webapp, and it starts that
 webapp exactly once. Two failure modes follow from that, both observed in the
@@ -16,7 +16,7 @@ field, and this module supplies one primitive for each:
   not free yet, a cert renewal is in flight, a dependency hub is not up — one
   failed ``manager.start()`` at tray boot leaves the webapp dead for the tray's
   entire lifetime. :func:`retry_with_backoff` turns that single attempt into a
-  bounded, escalating retry (photo-ocr#110: six days of silent downtime).
+  bounded, escalating retry (a spawn that failed once used to mean days of silent downtime).
 
 * **The webapp dies or wedges later and nothing notices.** :class:`HealthWatchdog`
   is a consecutive-failure monitor with edge-triggered callbacks — it fires once

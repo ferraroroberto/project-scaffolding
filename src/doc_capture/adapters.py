@@ -5,7 +5,7 @@ agnostic; everything that knows *how to drive a page to a feature* lives here,
 behind one small interface. Two shapes ship:
 
 * ``streamlit`` (default) — the pilot's proven adapter
-  (content-management#110): Streamlit-aware settle, sidebar collapse verified
+  (proven in the pilot app): Streamlit-aware settle, sidebar collapse verified
   by visibility at shot time (falls back to masking the whole sidebar),
   segmented-control section clicks via ``reach.label``, ``reach.expand`` for
   collapsed expanders (hidden expander content keeps DOM boxes, so its masks
@@ -114,7 +114,7 @@ _SECTION_BUTTON = 'button[data-testid^="stBaseButton-segmented_control"]'
 
 
 class StreamlitAdapter(ReachAdapter):
-    """The pilot's proven Streamlit adapter (content-management#110)."""
+    """The pilot's proven Streamlit adapter."""
 
     def open(self, page: Any, base_url: str, name: str, entry: dict[str, Any]) -> list[str]:
         page.goto(base_url, wait_until="load", timeout=NAV_TIMEOUT_MS)

@@ -42,6 +42,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from classify_e2e import E2EConfig, classify, load_config  # noqa: E402 -- needs the sys.path lines above
 
+from src import runtime_files  # noqa: E402 -- needs the sys.path lines above
 from src.no_window import NO_WINDOW  # noqa: E402 -- needs the sys.path lines above
 
 GIT_TIMEOUT_S = 120
@@ -152,11 +153,9 @@ def _read_state(path: Path) -> str | None:
 
 
 def _write_state(path: Path, sha: str) -> None:
-    # runtime-write-exempt: --state is the caller's file in the runner user's home, outside every checkout
-    path.parent.mkdir(parents=True, exist_ok=True)
+    runtime_files.make_dirs(path.parent)
     tmp = path.with_suffix(".tmp")
-    # runtime-write-exempt: same caller-chosen state file, written beside itself and renamed over it
-    tmp.write_text(json.dumps({"last_green_sha": sha}), encoding="utf-8")
+    runtime_files.save_text(tmp, json.dumps({"last_green_sha": sha}))
     tmp.replace(path)
 
 
@@ -208,16 +207,12 @@ def run_audit(repo: Path, e2e_outcome: str, junit: Path, state: Path) -> dict[st
 def _audit_main(args: argparse.Namespace) -> int:
     result = run_audit(Path(args.repo_dir), args.e2e_outcome, Path(args.junit), Path(args.state))
     result["repo"] = args.repo
-    # runtime-write-exempt: --out and --summary-file are the caller's run folder and step summary, outside every checkout
-    Path(args.out).parent.mkdir(parents=True, exist_ok=True)
-    # runtime-write-exempt: the caller's run folder on the runner host
-    Path(args.out).write_text(json.dumps(result, indent=2), encoding="utf-8")
+    runtime_files.make_dirs(Path(args.out).parent)
+    runtime_files.save_text(args.out, json.dumps(result, indent=2))
     out, nights, misses = result["outcome"], result["nights"], result["misses"]
     note = f", unknown: {result['reason']}" if out == "unknown" else ""
     if args.summary_file:
-        # runtime-write-exempt: the workflow's step-summary file
-        with open(args.summary_file, "a", encoding="utf-8") as fh:
-            fh.write(f"Routing audit: nights audited {nights}, misses found {misses}{note}.\n\n")
+        runtime_files.append_text(args.summary_file, f"Routing audit: nights audited {nights}, misses found {misses}{note}.\n\n")
     if out == "unknown":
         print(f"AUDIT=unknown nights=0 reason={result['reason']}")
         return 3

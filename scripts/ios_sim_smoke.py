@@ -45,7 +45,11 @@ from collections.abc import Sequence
 from pathlib import Path
 from typing import IO, Any
 
-logger = logging.getLogger("ios_sim_smoke")
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))  # a script's own dir is sys.path[0], not the repo root
+
+from src import runtime_files  # noqa: E402 -- needs the sys.path line above
+
+logger =logging.getLogger("ios_sim_smoke")
 
 #: A first boot of a fresh simulator runtime can take minutes (data migration).
 BOOT_TIMEOUT_S = 600.0
@@ -185,8 +189,7 @@ def run(repo: Path, python: str, views: Sequence[str], out: Path, settle_s: floa
 
     udid, name = device
     logger.info("ℹ️ device: %s", name)
-    # runtime-write-exempt: --out is the caller's results folder on the runner host, outside every checkout
-    out.mkdir(parents=True, exist_ok=True)
+    runtime_files.make_dirs(out)
     # no-window-exempt: macOS-only script; CREATE_NO_WINDOW exists only on Windows
     instance = subprocess.Popen(
         [python, *command], cwd=str(repo), stdin=subprocess.PIPE, stdout=subprocess.PIPE,

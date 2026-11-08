@@ -1,4 +1,4 @@
-"""Generate a web app's project-local `verify-<app>` skill (project-scaffolding#412).
+"""Generate a web app's project-local `verify-<app>` skill.
 
 A skill written for an agent that has never seen the app: Launch (reach a usable
 state from an empty data dir), Doctor (read-only health check), Drive (real
@@ -12,7 +12,7 @@ feature map: `features/README.md` and one `features/<view>.md` per view.
 **Seeded from committed inventories, read statically** (`ast` + `tomllib`; no
 browser, nothing of the adopter imported or executed), in this order:
 
-  1. `surface(page, "<view>.<surface>")` calls in `tests/e2e/**/*.py` (the #408
+  1. `surface(page, "<view>.<surface>")` calls in `tests/e2e/**/*.py` (the surface
      hook): grouped by the view prefix, each name a sub-feature, each enclosing
      test function its driving pytest node.
   2. `[[design.review.extra_steps]]` in `.fleet.toml` (tab, id, click): how a user
@@ -72,6 +72,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))  # a script's own dir is sys.path[0], not the repo root
 
 from scripts.verify_skill_templates import TEMPLATES  # noqa: E402
+from src import runtime_files  # noqa: E402
 from src.runtime_data import app_dir_env_var  # noqa: E402
 
 logger = logging.getLogger("gen_verify_skill")
@@ -531,10 +532,8 @@ def generate(out: Path, outputs: dict[str, str]) -> list[str]:
         text = merge_blocks(_read(path), rendered) if path.is_file() else rendered
         if path.is_file() and _read(path) == text:
             continue
-        # runtime-write-exempt: output folder under the target repo's .claude/skills, chosen by --repo
-        path.parent.mkdir(parents=True, exist_ok=True)
-        # runtime-write-exempt: output folder under the target repo's .claude/skills, chosen by --repo
-        path.write_bytes(text.encode("utf-8"))
+        runtime_files.make_dirs(path.parent)
+        runtime_files.save_bytes(path, text.encode("utf-8"))
         changed.append(rel)
     return changed
 
