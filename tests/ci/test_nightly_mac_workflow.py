@@ -114,7 +114,8 @@ def test_triggers_are_schedule_and_dispatch_only() -> None:
 
 def test_schedule_is_in_the_quiet_hours() -> None:
     crons = re.findall(r'cron:\s*"([^"]+)"', _on_block())
-    assert crons == ["0 2 * * *"], "02:00 UTC is 03:00 CET / 04:00 CEST, inside 02:00-05:00 local"
+    assert crons == ["17 1 * * *"], "01:17 UTC is 02:17 CET / 03:17 CEST, inside 02:00-05:00 local"
+    assert not crons[0].startswith("0 "), "the top of the hour is GitHub's high-load slot"
 
 
 @pytest.mark.parametrize(
