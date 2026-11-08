@@ -1,6 +1,6 @@
 # Files an issue the moment the default branch's gate goes red.
 #
-# COPY-TO-ADAPT TEMPLATE (project-scaffolding#222). Copy this file to
+# COPY-TO-ADAPT TEMPLATE. Copy this file to
 # `.github/workflows/main-gate-watch.yml` in the adopting repo and replace the
 # one `__GATE_WORKFLOW_NAME__` token (two sites: the `workflows:` trigger and
 # the `GATE_WORKFLOW` env var) with the *name:* of the workflow that gates
@@ -14,8 +14,7 @@
 # developer's machine) gets ZERO coverage from this file: it will never fire,
 # and installing it produces a false sense of coverage — which is the failure
 # this workflow exists to prevent, not a cheap version of the fix. Such a repo
-# has no automated red-main detection; say so rather than assuming green (see
-# the decision recorded on project-scaffolding#222).
+# has no automated red-main detection; say so rather than assuming green.
 #
 # WHY THIS EXISTS. CI is advisory in this fleet — the local gate (pytest/ruff/
 # mypy, CLAUDE.md) is the real contract — but a red main should never rely on

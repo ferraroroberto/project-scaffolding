@@ -1,7 +1,4 @@
 {
   "version": 1,
-  "entries": [
-    {"key": ".github/workflows/ci.yml.template", "count": 1},
-    {"key": ".github/workflows/main-gate-watch.yml.template", "count": 2}
-  ]
+  "entries": []
 }
