@@ -32,6 +32,8 @@ Listed in gate stage order, the order `scripts/run_ratchets.py` runs them. **Sib
 | runtime write | `runtime_write_ratchet.py`, `runtime_write_resolve.py` | a test command, for the probe | fast | yes | [runtime-write-ratchet.md](runtime-write-ratchet.md) |
 | usage track | `usage_track_ratchet.py`, `usage_track_scan.py` | a web UI; choose `rules` | fast | | [usage-track-ratchet.md](usage-track-ratchet.md) |
 
+[ratchet-catalog.md](ratchet-catalog.md) lists every rule of every ratchet by category, with a bad and a fixed snippet for each; read it to learn what a ratchet will flag before you adopt it.
+
 Two of the reference docs' terms belong to the owner's fleet and can be ignored here: `/propagate-vendored` (a private re-vendoring skill) and the e2e routing step (only for repos that use this scaffold's e2e router). `[vendored]` is **not** fleet-only: the ratchets read its `dest` entries to skip their own copies, so keep it.
 
 ## Steps
