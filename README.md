@@ -123,6 +123,7 @@ src/
   logger.py                 the elegant logger
   no_window.py              the one CREATE_NO_WINDOW flag every spawn imports
   pooled_http.py            vendor-verbatim pooled outbound HTTP client (keep-alive session + single-retry dispatch)
+  runtime_files.py          repo-local guarded writer for caller-named paths (refuses a code folder at run time)
   runtime_data.py           vendor-verbatim SQLite-location resolver (C:\sqlite\<app>\, off the spinning disk)
   fleet_root.py             vendor-verbatim fleet-root resolver (FLEET_ROOT -> machine config -> checkout parent)
   usage_log.py              vendor-verbatim local-only usage-log router (views, taps, device class -> usage.sqlite3)

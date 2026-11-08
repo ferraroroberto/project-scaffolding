@@ -89,13 +89,13 @@ def render_set(
     case ``tray_out_dir`` is ignored and may be ``None``.
     """
     glyph_paths = _glyph_paths(master.read_text(encoding="utf-8"))
-    # runtime-write-exempt: output folder is a caller argument
+    # runtime-write-exempt: the icons are committed assets in the adopter's static folder, and adopters import this file with only scripts/ on sys.path, so it cannot use src/runtime_files.py
     out_dir.mkdir(parents=True, exist_ok=True)
-    # runtime-write-exempt: output folder is a caller argument
+    # runtime-write-exempt: the icons are committed assets in the adopter's static folder, and adopters import this file with only scripts/ on sys.path, so it cannot use src/runtime_files.py
     stream_deck_out_dir.mkdir(parents=True, exist_ok=True)
     if emit_tray:
         assert tray_out_dir is not None, "tray_out_dir is required when emit_tray=True"
-        # runtime-write-exempt: output folder is a caller argument
+        # runtime-write-exempt: the icons are committed assets in the adopter's static folder, and adopters import this file with only scripts/ on sys.path, so it cannot use src/runtime_files.py
         tray_out_dir.mkdir(parents=True, exist_ok=True)
 
     icon_512 = _render_tile(glyph_paths, 512, FULL_BLEED_PAD)

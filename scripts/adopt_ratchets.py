@@ -32,6 +32,7 @@ from pathlib import Path
 SCAFFOLD_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(SCAFFOLD_ROOT))  # a script's own dir is sys.path[0], not the repo root
 
+from src import runtime_files  # noqa: E402 -- needs the sys.path line above
 from src.no_window import NO_WINDOW  # noqa: E402 -- needs the sys.path line above
 
 SCRIPTS = SCAFFOLD_ROOT / "scripts"
@@ -111,8 +112,8 @@ def copy_file(name: str, target: Path) -> str:
     src, dest = SCRIPTS / name, target / "scripts" / name
     if dest.exists():
         return "same" if dest.read_bytes() == src.read_bytes() else "refused"
-    dest.parent.mkdir(parents=True, exist_ok=True)  # runtime-write-exempt: the adopter repo named on the command line
-    shutil.copyfile(src, dest)  # runtime-write-exempt: the adopter repo named on the command line
+    runtime_files.make_dirs(dest.parent)
+    runtime_files.copy_file(src, dest)
     return "copied"
 
 
@@ -265,7 +266,7 @@ def adopt(target: Path, chosen: list[Ratchet]) -> int:
     except ValueError as exc:
         print(f"adopt ratchets: .fleet.toml: {exc}")
         return EXIT_FAILED
-    (target / ".fleet.toml").write_text(text, encoding="utf-8", newline="\n")  # runtime-write-exempt: the adopter repo named on the command line
+    runtime_files.save_text(target / ".fleet.toml", text, newline="\n")
     for note in notes:
         print(f"  {note}")
     if any(r.name == "static" for r in usable) and not npx:

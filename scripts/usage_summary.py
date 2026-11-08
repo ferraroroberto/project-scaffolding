@@ -1,4 +1,4 @@
-"""Summarize one fleet app's local usage log for a design review (#349).
+"""Summarize one fleet app's local usage log for a design review.
 
 Reads ``<runtime-data root>/<app>/usage.sqlite3`` (the file the vendored
 ``src/usage_log.py`` router writes) read-only and prints per-view visit

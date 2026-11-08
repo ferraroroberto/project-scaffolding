@@ -7,7 +7,7 @@ with no console of its own -- a ``pythonw`` tray, a scheduled task, a daemon,
 an agent's captured shell -- otherwise makes Windows allocate a fresh console
 per child, flashing a window on screen; on a poll loop that reads as malware
 or a stuck app. See ``CLAUDE.md`` -> "Windows console-subprocess suppression
-(``CREATE_NO_WINDOW``)" (project-scaffolding#13, fleet-config#399).
+(``CREATE_NO_WINDOW``)".
 
 Import the flag from here instead of re-deriving the
 ``sys.platform == "win32"`` ternary at each call site::

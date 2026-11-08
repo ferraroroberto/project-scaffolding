@@ -49,7 +49,11 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urlsplit
 
-logger = logging.getLogger("audio_latency_probe")
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))  # a script's own dir is sys.path[0], not the repo root
+
+from src import runtime_files  # noqa: E402 -- needs the sys.path line above
+
+logger =logging.getLogger("audio_latency_probe")
 
 DEFAULT_HUB = "http://127.0.0.1:8000"
 #: The hub's transcribe role: parakeet on the Mac with whisper as the fallback.
@@ -221,8 +225,7 @@ def run_probe(hub: str, model: str, count: int, interval_s: float) -> list[dict[
 def _cmd_probe(args: argparse.Namespace) -> int:
     samples = run_probe(args.hub, args.model, args.count, args.interval_s)
     payload = {"label": args.label, "model": args.model, "samples": samples}
-    # runtime-write-exempt: --out is the caller's chosen results file, outside the checkout
-    args.out.write_text(json.dumps(payload), encoding="utf-8")
+    runtime_files.save_text(args.out, json.dumps(payload))
     summary = summarize(samples)
     logger.info("ℹ️ %s: %s", args.label, json.dumps(summary))
     print(f"PROBE={args.label} sent={summary['sent']} ok={summary['ok']} errors={summary['errors']}")
