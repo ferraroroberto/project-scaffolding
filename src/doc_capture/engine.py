@@ -77,6 +77,7 @@ def load_manifest(path: Path = MANIFEST_PATH) -> dict[str, Any]:
 
 
 def save_manifest(manifest: dict[str, Any], path: Path = MANIFEST_PATH) -> None:
+    # runtime-write-exempt: manifest path is an argument, docs/screenshots/manifest.json by default
     path.write_text(
         json.dumps(manifest, indent=2, ensure_ascii=False) + "\n",
         encoding="utf-8",
@@ -213,6 +214,7 @@ def capture_features(
                     masks = list(entry["mask"])
                     masks.extend(adapter.open(page, url, item.name, entry))
                     out = screenshot_path(item.name, repo_root)
+                    # runtime-write-exempt: screenshot folder of the target repo's docs/screenshots
                     out.parent.mkdir(parents=True, exist_ok=True)
                     page.screenshot(
                         path=str(out),
@@ -278,6 +280,7 @@ def regenerate_readme(
     if new == text:
         logger.info("✅ README unchanged")
         return False
+    # runtime-write-exempt: README path is an argument
     readme_path.write_text(new, encoding="utf-8", newline="\n")
     logger.info("✅ README screenshots section regenerated")
     return True

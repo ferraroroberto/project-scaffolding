@@ -531,7 +531,9 @@ def generate(out: Path, outputs: dict[str, str]) -> list[str]:
         text = merge_blocks(_read(path), rendered) if path.is_file() else rendered
         if path.is_file() and _read(path) == text:
             continue
+        # runtime-write-exempt: output folder under the target repo's .claude/skills, chosen by --repo
         path.parent.mkdir(parents=True, exist_ok=True)
+        # runtime-write-exempt: output folder under the target repo's .claude/skills, chosen by --repo
         path.write_bytes(text.encode("utf-8"))
         changed.append(rel)
     return changed
