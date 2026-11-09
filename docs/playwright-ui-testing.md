@@ -924,7 +924,7 @@ snippet; the war story above stays as the *why*.
 of the fleet design contracts that are **rendered-DOM facts no static
 scan can prove** — the rendered leg of the `design.md` canon that
 fleet-config codified statically in `design_lint.py`. A clean
-static lint proves authored tokens and markup; these five checks prove
+static lint proves authored tokens and markup; these checks prove
 what the browser actually laid out:
 
 - `effective_rect(locator)` / `effective_rects(locator)` — visual
@@ -942,6 +942,15 @@ what the browser actually laid out:
   rectangles; adjacent compact controls may each reach 44px by
   invisible expansion, but the expanded rectangles must never
   intersect.
+- `assert_unpainted(page, locator)` — every match is a plain glyph at
+  rest: transparent fill, no background image, zero border width on all
+  four sides, no box-shadow, read from `getComputedStyle` with
+  `document.documentElement.dataset.theme` stamped to `light` and then
+  `dark` (the original theme is restored in a `finally`). Zero matches
+  raise. Move the pointer off the control first when its hover state
+  paints. This is the rule a row verb, a copy control or any
+  icon-button must keep; the vendored-component harnesses call it
+  instead of carrying their own copy.
 - `assert_no_horizontal_overflow(page)` — the measured
   `scrollWidth <= clientWidth` guard (generalizes the snippet above).
 - `chart_tick_budget` / `assert_chart_ticks` / `chart_dataset_cues` —

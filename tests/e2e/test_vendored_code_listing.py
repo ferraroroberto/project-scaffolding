@@ -14,27 +14,14 @@ import re
 
 from playwright.sync_api import Page, expect
 
-from tests.e2e._color_assertions import set_theme as _set_theme
 from tests.e2e._color_assertions import style as _style
+from tests.e2e._geometry import assert_unpainted
 
 _LISTING = "#demoCodeListing .code-listing"
 _COPY = "#demoCodeListing .code-listing-copy"
 _STATUS = "#demoCodeListing .code-listing-status"
 _HEAD = "#demoCodeListing .code-listing-head"
 _SAMPLE = "setx ARCHIVE_ROOT D:\\archive"
-
-
-def _assert_unpainted(gallery: Page) -> None:
-    """The Copy control draws no fill, border or shadow at rest, in either theme."""
-    for theme in ("light", "dark"):
-        _set_theme(gallery, theme)
-        bg = _style(gallery, _COPY, "backgroundColor")
-        assert bg in ("rgba(0, 0, 0, 0)", "transparent"), f"{theme}: painted fill {bg}"
-        assert _style(gallery, _COPY, "backgroundImage") == "none"
-        for side in ("Top", "Right", "Bottom", "Left"):
-            assert _style(gallery, _COPY, f"border{side}Width") == "0px", f"{theme}: {side} border"
-        assert _style(gallery, _COPY, "boxShadow") == "none"
-    _set_theme(gallery, "light")
 
 
 def test_code_listing_copy_is_an_unpainted_icon_button_in_a_list_item(gallery: Page) -> None:
@@ -48,7 +35,7 @@ def test_code_listing_copy_is_an_unpainted_icon_button_in_a_list_item(gallery: P
     expect(copy).to_have_attribute("aria-label", "Copy")
     expect(copy).to_have_attribute("title", "Copy")
     assert gallery.locator(_COPY).inner_text().strip() == ""
-    _assert_unpainted(gallery)
+    assert_unpainted(gallery, gallery.locator(_COPY))
     # The target floor is 44px and the header grows to hold it.
     box = copy.bounding_box()
     assert box is not None and box["width"] >= 44 and box["height"] >= 44, box
@@ -74,7 +61,7 @@ def test_code_listing_copy_puts_the_listing_on_the_clipboard_and_confirms(galler
     # The confirmation clears itself and the control returns to its resting glyph.
     expect(status).to_have_text("", timeout=5000)
     expect(gallery.locator(_COPY)).not_to_have_attribute("data-copied", "true")
-    _assert_unpainted(gallery)
+    assert_unpainted(gallery, gallery.locator(_COPY))
 
 
 def test_code_listing_copy_failure_is_said_not_swallowed(gallery: Page) -> None:

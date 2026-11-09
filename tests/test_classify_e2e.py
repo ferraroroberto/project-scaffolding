@@ -468,7 +468,8 @@ def test_real_surfaces_route_representative_paths() -> None:
     assert route("tests/e2e/_geometry.py") == (
         "surface",
         "tests/e2e/test_geometry_helper.py tests/e2e/test_layout_lint.py "
-        "tests/e2e/test_vendored_action_row_avatar.py tests/e2e/test_vendored_components.py "
+        "tests/e2e/test_vendored_action_row_avatar.py tests/e2e/test_vendored_code_listing.py "
+            "tests/e2e/test_vendored_components.py "
         "tests/e2e/test_vendored_day.py tests/e2e/test_vendored_home_head.py "
         "tests/e2e/test_vendored_nav.py tests/e2e/test_vendored_row_menu.py")
     # The layout lint: the helper, its proof and its fixture page run only that proof.

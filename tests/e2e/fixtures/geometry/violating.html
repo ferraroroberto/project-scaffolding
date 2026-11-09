@@ -13,6 +13,8 @@
     2. .crowded .icon-btn — 44px effective each, but the expanded rings overlap
     3. #badChart          — no maxTicksLimit, autoSkip off, rotated labels
     4. #wideBar           — fixed 900px element (overflows every 320-772 leg)
+    5. #paintedGlyph      — bordered, filled glyph at rest in both themes
+    6. #darkPaintedGlyph  — unpainted in light, takes a fill only in dark
 -->
 <script src="chart.umd.min.js"></script>
 <style>
@@ -70,6 +72,11 @@
   /* Violation 4: fixed element wider than every matrix viewport. */
   #wideBar { width: 900px; height: 8px; background: var(--deficit); }
 
+  /* Violation 5: a glyph that draws a border and a fill (the .icon-btn paint). */
+  /* Violation 6: clean in light, painted only under the dark token block. */
+  .glyph-btn { border: 0; background: transparent; color: var(--ink); padding: 0; }
+  [data-theme="dark"] #darkPaintedGlyph { background: var(--card-off); }
+
   .chart-box { position: relative; height: 160px; }
 </style>
 </head>
@@ -78,6 +85,12 @@
   <section>
     <h2>Sub-44 effective target</h2>
     <button id="tinyClose" class="icon-btn" aria-label="Close">×</button>
+  </section>
+
+  <section>
+    <h2>Painted glyphs at rest</h2>
+    <button id="paintedGlyph" class="icon-btn" aria-label="Copy">&#10697;</button>
+    <button id="darkPaintedGlyph" class="glyph-btn" aria-label="Copy">&#10697;</button>
   </section>
 
   <section>
