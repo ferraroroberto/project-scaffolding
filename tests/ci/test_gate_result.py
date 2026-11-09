@@ -122,3 +122,31 @@ def test_verdict_block_is_ascii_for_windows_powershell_5_1() -> None:
     """Windows PowerShell 5.1 reads a BOM-less file as ANSI, so the block stays ASCII."""
     block = _verdict_block()
     block.encode("ascii")
+
+
+@windows_only
+def test_lock_timeout_ends_with_fail_and_still_exits_three(tmp_path: Path) -> None:
+    """The inner gate never ran, so only the wrapper can print the verdict for exit 3."""
+    scripts = tmp_path / "scripts"
+    scripts.mkdir()
+    shutil.copy2(BOX_LOCK, scripts / BOX_LOCK.name)
+    gate = scripts / "gate.ps1"
+    gate.write_text(
+        'Set-Location (Join-Path $PSScriptRoot "..")\n'
+        '. (Join-Path $PSScriptRoot "box_lock_gate.ps1"); Enter-BoxLockGate\n'
+        'Write-Host "the gate ran"\n'
+        'exit 0\n',
+        encoding="ascii",
+    )
+    helper = tmp_path / ".claude" / "skills" / "_lib" / "box_lock.py"
+    helper.parent.mkdir(parents=True)
+    helper.write_text("import sys\nsys.exit(3)\n", encoding="ascii")
+    python_dir = str(Path(sys.executable).parent)
+    # The gate runs this suite under its own lock, which exports VERIFY_BOX_LOCK_HELD; the wrapper under test must not see it.
+    env = {**_isolated_env(tmp_path), "PATH": python_dir + os.pathsep + os.environ.get("PATH", "")}
+    env.pop("VERIFY_BOX_LOCK_HELD", None)
+    run = _run(["-File", str(gate)], env=env)
+    assert run.returncode == 3, run.stdout
+    assert "the gate ran" not in run.stdout
+    assert "box load lock not taken in time" in run.stdout
+    assert _last_line(run) == "GATE-RESULT: FAIL"

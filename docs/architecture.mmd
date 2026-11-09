@@ -93,7 +93,7 @@ docs/adopting-ratchets.md"]
     USAGESUM["usage_summary.py (#349)\n--app slug --days N --json\nreads an app's usage.sqlite3 read-only\n--time = per-day foreground minutes\nexit 2 = no data yet"]
     BRANDGEN["brand_gen.py\nrender_set(): Lucide master SVG -> dark-tile\nPWA/tray/Stream Deck icon set (resvg-py)"]
     SITESCRIPTS["site_images.py · site_routes.py · site_serve.py · site_check.py\n(vendor-verbatim, a built static site's scripts/)\nWebP variants per role + social JPEG (Pillow) ·\nCloudflare Pages URL rules · preview server ·\noffline check: sitemap routes, forbidden hosts, local refs"]
-    BOXLOCK["box_lock_gate.ps1 (vendor-verbatim)\ndot-sources verify-before-ship.ps1 under\nfleet-config's box_lock.py run --mode shared\nexit 3 = lock held past timeout;\nno helper -> runs unlocked with [WARN]"]
+    BOXLOCK["box_lock_gate.ps1 (vendor-verbatim)\ndot-sources verify-before-ship.ps1 under\nfleet-config's box_lock.py run --mode shared\nexit 3 = lock held past timeout, prints GATE-RESULT: FAIL;\nno helper -> runs unlocked with [WARN]"]
   end
   BOXLOCK -->|dot-sources, holds the shared box lock for the run| VERIFY
   SITESCRIPTS -->|sizes and classes the images of| SITEVEND
