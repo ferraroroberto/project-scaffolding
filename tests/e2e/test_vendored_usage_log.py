@@ -16,8 +16,8 @@ import socket
 import sqlite3
 import threading
 import time
-from collections.abc import Iterator
-from contextlib import contextmanager
+from collections.abc import Callable, Iterator
+from contextlib import AbstractContextManager, contextmanager, nullcontext
 from pathlib import Path
 
 import pytest
@@ -27,6 +27,7 @@ from fastapi.staticfiles import StaticFiles
 from playwright.sync_api import Browser, Page, Response
 
 from src.usage_log import usage_router
+from tests.e2e._cases import cases
 from tests.e2e.conftest import STATIC_DIR
 
 _BOOT_TIMEOUT_S = 10.0
@@ -69,8 +70,8 @@ def usage_app(tmp_path_factory: pytest.TempPathFactory) -> Iterator[tuple[str, P
         yield base, db
 
 
-@pytest.fixture
-def token_app(tmp_path: Path) -> Iterator[tuple[str, list[str]]]:
+@contextmanager
+def _token_app(tmp_path: Path) -> Iterator[tuple[str, list[str]]]:
     """The router behind a token check (the shape of an app whose API is
     bearer-gated for off-loopback callers); yields the base URL and every token
     the server accepted, in order. A request without a `tok-…` header is a 401."""
@@ -114,7 +115,7 @@ def _open_with_headers(page: Page, base: str) -> None:
     }""")
 
 
-def test_headers_option_reaches_the_normal_send(
+def _check_headers_option_reaches_the_normal_send(
     token_app: tuple[str, list[str]], page: Page
 ) -> None:
     base, accepted = token_app
@@ -125,7 +126,7 @@ def test_headers_option_reaches_the_normal_send(
     assert accepted == ["tok-1"]
 
 
-def test_headers_option_reaches_the_page_hide_send_as_a_keepalive_fetch(
+def _check_headers_option_reaches_the_page_hide_send_as_a_keepalive_fetch(
     token_app: tuple[str, list[str]], page: Page
 ) -> None:
     base, accepted = token_app
@@ -139,7 +140,7 @@ def test_headers_option_reaches_the_page_hide_send_as_a_keepalive_fetch(
     assert page.evaluate("window.__beacons") == 0
 
 
-def test_without_headers_the_page_hide_send_is_still_a_beacon(
+def _check_without_headers_the_page_hide_send_is_still_a_beacon(
     token_app: tuple[str, list[str]], page: Page
 ) -> None:
     base, accepted = token_app
@@ -154,7 +155,7 @@ def test_without_headers_the_page_hide_send_is_still_a_beacon(
     assert page.evaluate("window.__beacons") == 1
 
 
-def test_a_sheet_records_its_view_and_hands_it_back_on_close(tmp_path: Path, page: Page) -> None:
+def _check_a_sheet_records_its_view_and_hands_it_back_on_close(tmp_path: Path, page: Page) -> None:
     """Real `showModal()` / `close()` / `remove()` reach the client's observer: nested sheets
     stack, and a sheet removed while open hands the view back too (time spent stays exact)."""
     db = tmp_path / "usage.sqlite3"
@@ -211,7 +212,7 @@ def _drive(page: Page, base: str) -> list[str]:
     return requested
 
 
-def test_view_switch_and_tracked_tap_reach_the_summary(
+def _check_view_switch_and_tracked_tap_reach_the_summary(
     usage_app: tuple[str, Path], page: Page, browser: Browser
 ) -> None:
     base, db = usage_app
@@ -245,3 +246,18 @@ def test_view_switch_and_tracked_tap_reach_the_summary(
     assert summary["sessions"] == 2
     assert summary["devices"] == {"desktop": 1, "phone": 1}
     assert summary["views"] == {"history": 2, "overview": 2}
+
+
+def test_usage_log_contract(new_page: Callable[..., AbstractContextManager[Page]], tmp_path_factory: pytest.TempPathFactory, usage_app: tuple[str, Path], browser: Browser) -> None:
+    """The usage log client and router: header options, page-hide transport, sheet views and the summary."""
+    with cases() as c:
+        with c.case("headers_option_reaches_the_normal_send"), _token_app(tmp_path_factory.mktemp("usage")) as token_app, new_page() as page:
+            _check_headers_option_reaches_the_normal_send(token_app=token_app, page=page)
+        with c.case("headers_option_reaches_the_page_hide_send_as_a_keepalive_fetch"), _token_app(tmp_path_factory.mktemp("usage")) as token_app, new_page() as page:
+            _check_headers_option_reaches_the_page_hide_send_as_a_keepalive_fetch(token_app=token_app, page=page)
+        with c.case("without_headers_the_page_hide_send_is_still_a_beacon"), _token_app(tmp_path_factory.mktemp("usage")) as token_app, new_page() as page:
+            _check_without_headers_the_page_hide_send_is_still_a_beacon(token_app=token_app, page=page)
+        with c.case("a_sheet_records_its_view_and_hands_it_back_on_close"), nullcontext(tmp_path_factory.mktemp("case")) as tmp_path, new_page() as page:
+            _check_a_sheet_records_its_view_and_hands_it_back_on_close(tmp_path=tmp_path, page=page)
+        with c.case("view_switch_and_tracked_tap_reach_the_summary"), new_page() as page:
+            _check_view_switch_and_tracked_tap_reach_the_summary(usage_app=usage_app, page=page, browser=browser)

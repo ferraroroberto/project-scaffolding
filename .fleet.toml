@@ -66,7 +66,7 @@ full_pytest_target    = "tests/e2e"
 # Suite-size ratchet in collected pytest nodes, read by fleet-config's /e2e
 # budget step (not classify_e2e.py); adopters set their own count, or omit it
 # for the scaffold's default of 15 (#260).
-test_budget           = 48
+test_budget           = 24
 
 # Inert image/font assets under the vendored static tree -> smoke is enough.
 [[e2e.rule]]

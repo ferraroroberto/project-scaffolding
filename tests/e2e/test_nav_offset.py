@@ -14,11 +14,13 @@ from __future__ import annotations
 import io
 import re
 from collections.abc import Iterator
+from contextlib import contextmanager
 
 import pytest
 from PIL import Image
 from playwright.sync_api import Browser, Page
 
+from tests.e2e._cases import cases
 from tests.e2e._nav_graft import mount_nav, phone_nav
 
 _TABS = ("home", "stats", "history")
@@ -52,8 +54,8 @@ _FADE_JS = """pseudo => {
 }"""
 
 
-@pytest.fixture()
-def nav_phone(static_server: str, browser: Browser) -> Iterator[Page]:
+@contextmanager
+def _nav_phone(static_server: str, browser: Browser) -> Iterator[Page]:
     """The real `initNavTabs` on the phone pill, over short (empty) tabs."""
     with phone_nav(browser, static_server) as page:
         page.evaluate(_SHORT_TABS_JS)
@@ -64,7 +66,7 @@ def nav_phone(static_server: str, browser: Browser) -> Iterator[Page]:
         yield page
 
 
-def test_bar_sits_at_the_same_offset_on_every_tab(nav_phone: Page) -> None:
+def _check_bar_sits_at_the_same_offset_on_every_tab(nav_phone: Page) -> None:
     page = nav_phone
     offsets: dict[str, float] = {}
     for tab in _TABS:
@@ -111,7 +113,7 @@ def _stops(image: str) -> list[tuple[float, str, float]]:
     return stops
 
 
-def test_scroll_edge_fades_top_and_bottom(nav_phone: Page) -> None:
+def _check_scroll_edge_fades_top_and_bottom(nav_phone: Page) -> None:
     page = nav_phone
 
     bottom = page.evaluate(_FADE_JS, "::before")
@@ -134,8 +136,7 @@ def test_scroll_edge_fades_top_and_bottom(nav_phone: Page) -> None:
         assert fade["z"] < fade["barZ"], fade
 
 
-@pytest.mark.parametrize("theme", ["light", "dark"])
-def test_fades_follow_one_eased_curve_to_the_edge(nav_phone: Page, theme: str) -> None:
+def _check_fades_follow_one_eased_curve_to_the_edge(nav_phone: Page, theme: str) -> None:
     """Both edges: content stays at least half visible over the inner three
     quarters of the band and vanishes only at the screen edge, with no solid
     zone (on the owner's iPhone a solid band behind the bar read as a wall and
@@ -159,7 +160,7 @@ def test_fades_follow_one_eased_curve_to_the_edge(nav_phone: Page, theme: str) -
     assert all(rgb == bg for a, rgb, _ in top + bottom if a > 0), (bg, top, bottom)
 
 
-def test_top_fade_is_off_at_rest_and_on_after_one_band_of_scroll(
+def _check_top_fade_is_off_at_rest_and_on_after_one_band_of_scroll(
     static_server: str, browser: Browser
 ) -> None:
     """At scroll-top the first row sits right under the status bar, undimmed;
@@ -186,7 +187,7 @@ def test_top_fade_is_off_at_rest_and_on_after_one_band_of_scroll(
         context.close()
 
 
-def test_installed_app_anchors_the_bar_from_the_large_viewport_top(
+def _check_installed_app_anchors_the_bar_from_the_large_viewport_top(
     nav_phone: Page, browser_name: str
 ) -> None:
     """In the installed app iOS grows the viewport after launch, so the bar is
@@ -231,7 +232,7 @@ def test_installed_app_anchors_the_bar_from_the_large_viewport_top(
     assert m["topBefore"] == m["lvh"] - 82, m
 
 
-def test_document_stays_scrollable_with_the_body_pinned(nav_phone: Page) -> None:
+def _check_document_stays_scrollable_with_the_body_pinned(nav_phone: Page) -> None:
     """An app-side scroll lock pins the body while a dialog is open; if that left
     the document unscrollable, an installed iOS app would shrink its viewport and
     re-grow it over ~3s on close, revealing the bar bit by bit."""
@@ -246,7 +247,7 @@ def test_document_stays_scrollable_with_the_body_pinned(nav_phone: Page) -> None
     assert overflow >= 1, overflow
 
 
-def test_resize_without_moved_cells_leaves_the_pill_alone(nav_phone: Page) -> None:
+def _check_resize_without_moved_cells_leaves_the_pill_alone(nav_phone: Page) -> None:
     """iOS fires resize on every keyboard open and close; when the tab cells did
     not move, the capsule (and so the glass bar) must not be restyled."""
     page = nav_phone
@@ -271,7 +272,7 @@ def test_resize_without_moved_cells_leaves_the_pill_alone(nav_phone: Page) -> No
     )
 
 
-def test_gallery_nav_mode_plays_the_installed_app(static_server: str, browser: Browser) -> None:
+def _check_gallery_nav_mode_plays_the_installed_app(static_server: str, browser: Browser) -> None:
     """demo.html?nav is the on-device check page: the gallery becomes the Home
     tab of the real nav, and the status bar colour follows the theme toggle."""
     context = browser.new_context(
@@ -318,9 +319,7 @@ _FLAT_PAGE_JS = r"""([contrast]) => {
 
 
 # WebKit only: the engine of the installed iOS app the curve is tuned on.
-@pytest.mark.only_browser("webkit")
-@pytest.mark.parametrize("theme", ["light", "dark"])
-def test_bottom_fade_eases_to_solid_at_the_screen_edge_without_a_step(
+def _check_bottom_fade_eases_to_solid_at_the_screen_edge_without_a_step(
     static_server: str, browser: Browser, theme: str
 ) -> None:
     """Going down from the content the page colour covers smoothly, with no
@@ -390,8 +389,7 @@ _LONG_PAGE_WITH_FOOT_JS = """() => {
 }"""
 
 
-@pytest.mark.parametrize("tail", [None, 60])
-def test_build_footer_ends_a_gap_above_the_bottom_fade(nav_phone: Page, tail: int | None) -> None:
+def _check_build_footer_ends_a_gap_above_the_bottom_fade(nav_phone: Page, tail: int | None) -> None:
     """Scrolled to the end, the last content (the build footer) sits a full
     --gap above the bottom fade's top edge, so it is never dimmed, including
     when an app lengthens the fade's tail."""
@@ -433,9 +431,7 @@ _HEADER_CARD_JS = """([sticky]) => {
 }"""
 
 
-@pytest.mark.parametrize("standalone", [False, True], ids=["tab", "standalone"])
-@pytest.mark.parametrize("sticky", [False, True], ids=["static", "sticky"])
-def test_first_card_top_edge_is_undimmed_at_rest(
+def _check_first_card_top_edge_is_undimmed_at_rest(
     static_server: str, browser: Browser, sticky: bool, standalone: bool
 ) -> None:
     """At scroll 0 nothing is dimmed: the first rounded header card's top edge,
@@ -463,3 +459,37 @@ def test_first_card_top_edge_is_undimmed_at_rest(
         top = page.evaluate("() => document.getElementById('testHead').getBoundingClientRect().top")
         assert top == 0, top
         assert _undimmed(page, "#testHead")
+
+
+def test_nav_offset_and_fades(static_server: str, browser: Browser, browser_name: str) -> None:
+    """The phone pill's offset, scroll-edge fades and installed-app anchoring, one case per pinned behaviour."""
+    with cases() as c:
+        with c.case("bar_sits_at_the_same_offset_on_every_tab"), _nav_phone(static_server, browser) as nav_phone:
+            _check_bar_sits_at_the_same_offset_on_every_tab(nav_phone=nav_phone)
+        with c.case("scroll_edge_fades_top_and_bottom"), _nav_phone(static_server, browser) as nav_phone:
+            _check_scroll_edge_fades_top_and_bottom(nav_phone=nav_phone)
+        for theme in ["light", "dark"]:
+            with c.case(f"fades_follow_one_eased_curve_to_the_edge[{theme}]"), _nav_phone(static_server, browser) as nav_phone:
+                _check_fades_follow_one_eased_curve_to_the_edge(nav_phone=nav_phone, theme=theme)
+        with c.case("top_fade_is_off_at_rest_and_on_after_one_band_of_scroll"):
+            _check_top_fade_is_off_at_rest_and_on_after_one_band_of_scroll(static_server=static_server, browser=browser)
+        with c.case("installed_app_anchors_the_bar_from_the_large_viewport_top"), _nav_phone(static_server, browser) as nav_phone:
+            _check_installed_app_anchors_the_bar_from_the_large_viewport_top(nav_phone=nav_phone, browser_name=browser_name)
+        with c.case("document_stays_scrollable_with_the_body_pinned"), _nav_phone(static_server, browser) as nav_phone:
+            _check_document_stays_scrollable_with_the_body_pinned(nav_phone=nav_phone)
+        with c.case("resize_without_moved_cells_leaves_the_pill_alone"), _nav_phone(static_server, browser) as nav_phone:
+            _check_resize_without_moved_cells_leaves_the_pill_alone(nav_phone=nav_phone)
+        with c.case("gallery_nav_mode_plays_the_installed_app"):
+            _check_gallery_nav_mode_plays_the_installed_app(static_server=static_server, browser=browser)
+        for theme in ["light", "dark"]:
+            with c.case(f"bottom_fade_eases_to_solid_at_the_screen_edge_without_a_step[{theme}]"):
+                if browser_name != 'webkit':
+                    pytest.skip('webkit only')
+                _check_bottom_fade_eases_to_solid_at_the_screen_edge_without_a_step(static_server=static_server, browser=browser, theme=theme)
+        for tail in [None, 60]:
+            with c.case(f"build_footer_ends_a_gap_above_the_bottom_fade[{tail}]"), _nav_phone(static_server, browser) as nav_phone:
+                _check_build_footer_ends_a_gap_above_the_bottom_fade(nav_phone=nav_phone, tail=tail)
+        for standalone in [False, True]:
+            for sticky in [False, True]:
+                with c.case(f"first_card_top_edge_is_undimmed_at_rest[{standalone}-{sticky}]"):
+                    _check_first_card_top_edge_is_undimmed_at_rest(static_server=static_server, browser=browser, sticky=sticky, standalone=standalone)

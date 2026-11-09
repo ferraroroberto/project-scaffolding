@@ -35,14 +35,14 @@ from __future__ import annotations
 import os
 import tempfile
 import threading
-from collections.abc import Iterator
-from contextlib import contextmanager
+from collections.abc import Callable, Iterator
+from contextlib import AbstractContextManager, contextmanager
 from functools import partial
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 import pytest
-from playwright.sync_api import Page, Playwright, sync_playwright
+from playwright.sync_api import Browser, Page, Playwright, sync_playwright
 
 from tests._streamlit_lifecycle import (
     STREAMLIT_E2E_PORT,
@@ -172,12 +172,55 @@ def static_server() -> Iterator[str]:
         yield base_url
 
 
+def load_gallery(page: Page, base_url: str) -> Page:
+    """Load the demo gallery into *page* and wait until its module script is ready."""
+    page.goto(f"{base_url}/_vendored/demo.html")
+    page.wait_for_selector("body[data-demo-ready='1']")
+    return page
+
+
 @pytest.fixture()
 def gallery(static_server: str, page: Page) -> Page:
     """The demo gallery, loaded and module-script-ready, in the light theme."""
-    page.goto(f"{static_server}/_vendored/demo.html")
-    page.wait_for_selector("body[data-demo-ready='1']")
-    return page
+    return load_gallery(page, static_server)
+
+
+@pytest.fixture()
+def new_page(browser: Browser, browser_context_args: dict) -> Callable[..., AbstractContextManager[Page]]:
+    """Open a page in its own fresh browser context, as the `page` fixture would.
+
+    One e2e test runs several isolated cases (`_cases.py`); each case opens its
+    own page here so nothing a case does (theme, storage, routes, init scripts,
+    a fake clock) leaks into the next. Keyword arguments override the context
+    arguments, e.g. `new_page(viewport={...})`.
+    """
+
+    @contextmanager
+    def _open(**overrides: object) -> Iterator[Page]:
+        context = browser.new_context(**{**browser_context_args, **overrides})
+        try:
+            fresh = context.new_page()
+            fresh.set_default_timeout(_DEFAULT_TIMEOUT_MS)
+            fresh.set_default_navigation_timeout(_DEFAULT_TIMEOUT_MS)
+            yield fresh
+        finally:
+            context.close()
+
+    return _open
+
+
+@pytest.fixture()
+def new_gallery(
+    new_page: Callable[..., AbstractContextManager[Page]], static_server: str
+) -> Callable[[], AbstractContextManager[Page]]:
+    """Open the demo gallery in a fresh browser context, once per case."""
+
+    @contextmanager
+    def _open() -> Iterator[Page]:
+        with new_page() as fresh:
+            yield load_gallery(fresh, static_server)
+
+    return _open
 
 
 def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:

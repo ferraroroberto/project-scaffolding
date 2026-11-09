@@ -7,9 +7,12 @@ split from `test_vendored_components.py` to keep each harness module small.
 from __future__ import annotations
 
 import re
+from collections.abc import Callable
+from contextlib import AbstractContextManager
 
 from playwright.sync_api import Page, expect
 
+from tests.e2e._cases import cases
 from tests.e2e._color_assertions import contrast as _contrast
 from tests.e2e._color_assertions import set_theme as _set_theme
 from tests.e2e._color_assertions import style as _style
@@ -18,7 +21,7 @@ from tests.e2e._geometry import assert_min_target, assert_no_overlap
 _TRANSPARENT = "rgba(0, 0, 0, 0)"
 
 
-def test_page_foot_contract(gallery: Page) -> None:
+def _check_page_foot_contract(gallery: Page) -> None:
     """page-foot: centered footer, muted/caption readout text, shared build-text format."""
     assert _style(gallery, "#demoPageFoot", "textAlign") == "center"
     assert _style(gallery, "#demoBuildReadout", "color") == "rgb(101, 109, 118)"
@@ -27,7 +30,7 @@ def test_page_foot_contract(gallery: Page) -> None:
     assert re.match(r"^Build: abc1234 · \d{4}-\d{2}-\d{2} \d{2}:\d{2}$", text), text
 
 
-def test_home_head_contract(gallery: Page) -> None:
+def _check_home_head_contract(gallery: Page) -> None:
     """home-head: 52px row at 0-14px inset, title glyph 18px, status ellipsizes, right-pinned 34px toggle + Settings gear (44px targets)."""
     # One row at the disclosure closed-summary geometry (rows.md 52px, 0 14px).
     assert _style(gallery, "#demoHomeHead", "minHeight") == "52px"
@@ -97,7 +100,7 @@ def _render_status(page: Page, exceptions: object, fallback: object) -> dict[str
     return page.evaluate(_RENDER_STATUS_JS, [exceptions, fallback])  # type: ignore[no-any-return]
 
 
-def test_home_head_status_colours_exceptions_by_tone(gallery: Page) -> None:
+def _check_home_head_status_colours_exceptions_by_tone(gallery: Page) -> None:
     """home-head: each exception part sits in its tone's *-text with AA contrast, both themes (#343)."""
     shown = _render_status(
         gallery,
@@ -122,7 +125,7 @@ def test_home_head_status_colours_exceptions_by_tone(gallery: Page) -> None:
         assert _contrast(_style(gallery, sel, "color"), card, card) >= 4.5, sel
 
 
-def test_home_head_status_without_exceptions_renders_as_today(gallery: Page) -> None:
+def _check_home_head_status_without_exceptions_renders_as_today(gallery: Page) -> None:
     """home-head: no exceptions = the plain muted fallback text, no spans, no tone; no .status = no-op (#343)."""
     # Dirty the slot first so the reset is what is measured.
     _render_status(gallery, [{"text": "1 stalled", "tone": "danger"}], "7 sessions")
@@ -140,7 +143,7 @@ def test_home_head_status_without_exceptions_renders_as_today(gallery: Page) -> 
     )
 
 
-def test_home_head_status_keeps_at_most_two_parts(gallery: Page) -> None:
+def _check_home_head_status_keeps_at_most_two_parts(gallery: Page) -> None:
     """home-head: two parts max, joined by ' · '; a neutral part keeps the slot's muted colour (#343)."""
     shown = _render_status(
         gallery,
@@ -155,3 +158,18 @@ def test_home_head_status_keeps_at_most_two_parts(gallery: Page) -> None:
     assert _style(gallery, f"{_TONE_STATUS} .head-exception", "color") == _style(
         gallery, "#demoHomeStatus", "color"
     )
+
+
+def test_home_head_contract(new_gallery: Callable[[], AbstractContextManager[Page]]) -> None:
+    """The home head and its status line, and the gallery's page foot, one case per contract."""
+    with cases() as c:
+        with c.case("page_foot_contract"), new_gallery() as gallery:
+            _check_page_foot_contract(gallery=gallery)
+        with c.case("home_head_contract"), new_gallery() as gallery:
+            _check_home_head_contract(gallery=gallery)
+        with c.case("home_head_status_colours_exceptions_by_tone"), new_gallery() as gallery:
+            _check_home_head_status_colours_exceptions_by_tone(gallery=gallery)
+        with c.case("home_head_status_without_exceptions_renders_as_today"), new_gallery() as gallery:
+            _check_home_head_status_without_exceptions_renders_as_today(gallery=gallery)
+        with c.case("home_head_status_keeps_at_most_two_parts"), new_gallery() as gallery:
+            _check_home_head_status_keeps_at_most_two_parts(gallery=gallery)

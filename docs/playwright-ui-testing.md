@@ -718,6 +718,16 @@ POSIX:
   or static-config — collect the outcomes in a list and assert once, so
   every contract is still reported by name (`tests/e2e/test_geometry_helper.py`
   is the worked example).
+- **One collected test per contract, many cases inside it.** A component
+  contract or user flow with several independent checks is one test whose
+  checks run as cases (`tests/e2e/_cases.py`): each case opens its own
+  fresh setup (the `new_page` / `new_gallery` fixtures give a new browser
+  context per case, so no theme, storage, route, init script or fake
+  clock leaks between cases), a failing case is recorded and the rest
+  still run, and the test fails once naming every failed case with its
+  traceback. This keeps the node count at one per contract without
+  giving up isolation or the per-check report; every module in this
+  scaffold's `tests/e2e/` follows it.
 - **No Page Object Model.** Too much ceremony at this scale.
 - **One shared fixture.** Don't build a framework until I have three
   tests that need the same helper.

@@ -12,11 +12,12 @@ bottom fade (the footer adds no bottom padding; the nav's reserve does).
 
 from __future__ import annotations
 
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
+from contextlib import AbstractContextManager, contextmanager
 
-import pytest
 from playwright.sync_api import Browser, Page
 
+from tests.e2e._cases import cases
 from tests.e2e._nav_graft import phone_nav
 from tests.e2e.conftest import STATIC_DIR
 
@@ -72,7 +73,7 @@ def _computed(page: Page) -> dict[str, str]:
     )
 
 
-def test_readout_type_is_pinned_to_the_caption_style(page: Page) -> None:
+def _check_readout_type_is_pinned_to_the_caption_style(page: Page) -> None:
     _mount(page, _BODIES["serif"])
     cs = _computed(page)
     assert cs["fontSize"] == "12px"
@@ -87,7 +88,7 @@ def test_readout_type_is_pinned_to_the_caption_style(page: Page) -> None:
     assert cs["color"] == "rgb(101, 109, 118)"
 
 
-def test_readout_ignores_the_body_typeface(page: Page) -> None:
+def _check_readout_ignores_the_body_typeface(page: Page) -> None:
     computed: dict[str, dict[str, str]] = {}
     shots: dict[str, bytes] = {}
     for name, body in _BODIES.items():
@@ -99,8 +100,7 @@ def test_readout_ignores_the_body_typeface(page: Page) -> None:
     assert shots["serif"] == shots["mono"], "footer pixels differ between body fonts"
 
 
-@pytest.mark.parametrize("body", sorted(_BODIES))
-def test_readout_does_not_widen_with_the_body(page: Page, body: str) -> None:
+def _check_readout_does_not_widen_with_the_body(page: Page, body: str) -> None:
     """The footer box itself is one line of caption height, whatever the body's line-height."""
     _mount(page, _BODIES[body])
     height = page.locator("#readout").evaluate("el => el.getBoundingClientRect().height")
@@ -140,15 +140,15 @@ _STATE_JS = """() => {
 }"""
 
 
-@pytest.fixture()
-def phone(static_server: str, browser: Browser) -> Iterator[Page]:
+@contextmanager
+def _phone(static_server: str, browser: Browser) -> Iterator[Page]:
     with phone_nav(browser, static_server) as page:
         page.add_style_tag(url=f"{static_server}/_vendored/page-foot/page-foot.css")
         page.evaluate(_MOUNT_JS)
         yield page
 
 
-def test_footer_ends_above_the_nav_fade_undimmed(phone: Page) -> None:
+def _check_footer_ends_above_the_nav_fade_undimmed(phone: Page) -> None:
     page = phone
     page.evaluate("() => window.scrollTo({ top: 1e6, behavior: 'instant' })")
     state = page.evaluate(_STATE_JS)
@@ -158,3 +158,19 @@ def test_footer_ends_above_the_nav_fade_undimmed(phone: Page) -> None:
     assert state["footTop"] >= 0, state  # footer is on screen, not past the top
     assert state["fadeTop"] - state["footBottom"] >= _GAP - 0.5, state
     assert state["opacity"] == 1, state
+
+
+def test_page_foot_contract(
+    new_page: Callable[..., AbstractContextManager[Page]], static_server: str, browser: Browser
+) -> None:
+    """The build footer's type is pinned whatever the body font, and it ends clear of the nav fade."""
+    with cases() as c:
+        with c.case("readout_type_is_pinned_to_the_caption_style"), new_page() as page:
+            _check_readout_type_is_pinned_to_the_caption_style(page=page)
+        with c.case("readout_ignores_the_body_typeface"), new_page() as page:
+            _check_readout_ignores_the_body_typeface(page=page)
+        for body in sorted(_BODIES):
+            with c.case(f"readout_does_not_widen_with_the_body[{body}]"), new_page() as page:
+                _check_readout_does_not_widen_with_the_body(page=page, body=body)
+        with c.case("footer_ends_above_the_nav_fade_undimmed"), _phone(static_server, browser) as phone:
+            _check_footer_ends_above_the_nav_fade_undimmed(phone=phone)
