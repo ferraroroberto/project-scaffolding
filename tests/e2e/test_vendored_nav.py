@@ -765,14 +765,13 @@ def test_resize_without_cell_change_leaves_the_capsule_untouched(nav_mobile: Pag
     assert writes == 0, f"{writes} attribute writes on a no-op resize"
 
 
-def test_standalone_start_rebuilds_the_glass_once_and_restores_it(nav_mobile: Page) -> None:
-    """Installed-app start: the bar's filter drops for one frame after the viewport settles.
+def _stub_standalone_and_count_rebuilds(page: Page) -> None:
+    """Pretend to be the installed app and count the bar's `.glass-rebuild` drops.
 
     Chromium has no `display-mode: standalone` emulation, so matchMedia is
-    stubbed for that one query. Only a device shows whether the rebuild clears
-    the iOS smear; this pins that it happens, once, and that the glass returns.
+    stubbed for that one query.
     """
-    nav_mobile.evaluate(
+    page.evaluate(
         "() => { const real = window.matchMedia.bind(window);"
         " window.matchMedia = (q) => q === '(display-mode: standalone)'"
         "   ? { matches: true, media: q, addEventListener() {}, removeEventListener() {} }"
@@ -783,12 +782,57 @@ def test_standalone_start_rebuilds_the_glass_once_and_restores_it(nav_mobile: Pa
         "     window.__rebuilds += 1; })"
         "   .observe(document.querySelector('.tabs'), { attributes: true, attributeFilter: ['class'] }); }"
     )
-    _init_nav(nav_mobile)
-    nav_mobile.wait_for_function(
-        "() => window.__rebuilds === 1"
+
+
+def _wait_rebuilds(page: Page, count: int) -> None:
+    page.wait_for_function(
+        "(n) => window.__rebuilds === n"
         " && !document.querySelector('.tabs').classList.contains('glass-rebuild')",
+        arg=count,
         timeout=2000,
     )
+
+
+def test_standalone_start_rebuilds_the_glass_once_and_restores_it(nav_mobile: Page) -> None:
+    """Installed-app start: the bar's filter drops for one frame after the viewport settles.
+
+    Only a device shows whether the rebuild clears the iOS smear; this pins
+    that it happens, once, and that the glass returns.
+    """
+    _stub_standalone_and_count_rebuilds(nav_mobile)
+    _init_nav(nav_mobile)
+    _wait_rebuilds(nav_mobile, 1)
     assert "blur" in _style(nav_mobile, ".tabs", "backdropFilter")
     assert nav_mobile.evaluate("window.scrollY") == 0
     _wait_pill_on_active(nav_mobile)
+
+
+def test_glass_rebuild_waits_for_the_viewport_to_stop_resizing(nav_mobile: Page) -> None:
+    """While the installed app's viewport keeps resizing, the glass is not rebuilt yet.
+
+    A rebuild at a fixed frame can land while iOS is still growing the
+    viewport and leave the texture stale again; it must follow the last resize.
+    """
+    _stub_standalone_and_count_rebuilds(nav_mobile)
+    during = nav_mobile.evaluate(
+        "async () => { const m = await import('/_vendored/nav/nav-tabs.js');"
+        " window.__nav = m.initNavTabs();"
+        " for (let i = 0; i < 12; i++) {"
+        "   window.dispatchEvent(new Event('resize'));"
+        "   await new Promise((r) => setTimeout(r, 60)); }"
+        " return window.__rebuilds; }"
+    )
+    assert during == 0, f"glass rebuilt {during}x while the viewport was still resizing"
+    _wait_rebuilds(nav_mobile, 1)
+    assert "blur" in _style(nav_mobile, ".tabs", "backdropFilter")
+
+
+def test_glass_is_rebuilt_on_every_return_to_the_foreground(nav_mobile: Page) -> None:
+    """iOS resumes a kept-alive home-screen app without a reload: rebuild on each return."""
+    _stub_standalone_and_count_rebuilds(nav_mobile)
+    _init_nav(nav_mobile)
+    _wait_rebuilds(nav_mobile, 1)
+    for expected in (2, 3):
+        nav_mobile.evaluate("() => document.dispatchEvent(new Event('visibilitychange'))")
+        _wait_rebuilds(nav_mobile, expected)
+    assert "blur" in _style(nav_mobile, ".tabs", "backdropFilter")
