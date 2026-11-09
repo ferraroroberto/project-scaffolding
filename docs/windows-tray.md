@@ -156,6 +156,8 @@ The port-reclaim and single-instance guarantees make a *restart* deterministic; 
 
 **`rearm()` is what stops a failed respawn going silent forever.** The watchdog is edge-triggered: `on_wedge` fires once and does not fire again until a *recovery* re-arms it. A handler that respawned and failed would therefore wait for a recovery that a genuinely-dead process can never produce on its own. Calling `rearm()` from inside the handler says "I acted; re-evaluate me next tick".
 
+**`on_failing(count)` is the level-triggered counterpart, for a recovery policy that outlives the first alert.** Pass it as the optional `on_failing=` constructor argument and it fires on every failed probe while the watchdog is alerted — on the alert tick itself (right after `on_wedge`) and on each failing tick after it — with the running consecutive-failure count. It stops at the first success and starts over at the next alert. Use it for "restart once the service has been failing past a grace period" or a back-off retry: the callback owns the grace period and the retry, the watchdog stays ignorant of both. Unlike `rearm()` it needs no state in the handler and does not re-fire `on_wedge`. A handler that calls `rearm()` has declared itself un-alerted, so no `on_failing` call follows until the next alert. Omitted (the default `None`), the watchdog behaves exactly as without it.
+
 The canonical wiring, at the end of `run_tray()`:
 
 ```python
