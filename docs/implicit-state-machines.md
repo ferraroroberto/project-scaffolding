@@ -23,12 +23,13 @@ An area is a suspect when it shows one or more of these:
 - **Flags that outlive their trigger.** A `busy` or `retrying` flag set on entry and cleared only on the happy path, so an exception leaves it stuck.
 - **Outcomes passed as prose.** A result carried as a free-text message or an exception string that a caller later matches with `in` or a regex to decide what to do.
 - **Unknown folded into a negative.** A timeout, a stale cache or an unresolved probe stored as `False`, `None` or an empty list, indistinguishable from a real "no".
+- **In-memory restart latches.** A "fired", "sent" or "armed" fact kept only in a long-lived process's memory, so a restart forgets it and the action repeats (or never happens). No scan sees this; it is a review question for every long-lived process: what does this latch read after a restart?
 
 One sign is a hint; two or more on the same concept is a suspect worth a deep-dive.
 
 ## Finding them: two passes
 
-1. **Deterministic scan.** A cheap, repeatable pass over the code flags suspects from the signs above: lifecycle-named booleans assigned in more than one module, a concept name appearing in several guards with different conditions, status strings compared by equality in many places. It runs often and never decides anything; its output is a ranked list of suspects, not a verdict. No scan script exists in the scaffold yet; until one does, the agent pass below does the searching by hand.
+1. **Deterministic scan.** A cheap, repeatable pass over the code flags suspects from the signs above. It is three opt-in rules of the [conventions ratchet](conventions-ratchet.md): `state-literal` (a lifecycle string compared or stored as a status), `state-set-repeat` (one set of states spelled in two modules) and `state-write` (one lifecycle flag written from two modules). It runs in the gate on every change and never decides anything; its output is a list of suspects, not a verdict. It cannot see a state held in names that say nothing, a mode inferred from an empty field or a timer, or an in-memory restart latch: those stay signs for the agent pass.
 2. **Agent deep-dive.** An agent takes each suspect and confirms it against the code and the live behaviour before anything is declared. For each machine it records:
    - the variables that together hold the state, and where each is written and read;
    - the **reachable states** (combinations that actually occur) against the **declared states** (what the code or UI names today);
@@ -69,3 +70,4 @@ Without a guardrail, each quick change adds one more flag or one more local guar
 4. Write the derive function and its table test.
 5. Migrate the readers one at a time, deleting each re-derivation as it moves.
 6. Document the machine in the repo's own `docs/<concept>-state.md`: why it is declared, the state table, who reads it.
+7. Declare it in the repo's `.fleet.toml` as a `[[state_machines]]` table (`name`, `module`, `type`, optional `derive`; see [conventions-ratchet.md](conventions-ratchet.md)), so the state rules stop reporting its module and keep reporting any other module that re-derives it. Shrink the conventions baseline with `--update-baseline`.

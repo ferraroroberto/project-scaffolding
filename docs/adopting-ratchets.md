@@ -28,7 +28,7 @@ Listed in gate stage order, the order `scripts/run_ratchets.py` runs them. **Sib
 | instruction | `instruction_ratchet.py`, `instruction_frontmatter.py`, `instruction_repeats.py` | - | fast | yes | [instruction-ratchet.md](instruction-ratchet.md) |
 | doc refs | `doc_refs_ratchet.py` | - | fast | yes | [doc-refs-ratchet.md](doc-refs-ratchet.md) |
 | dead code | `dead_code_ratchet.py` | - | fast | yes | [dead-code-ratchet.md](dead-code-ratchet.md) |
-| conventions | `conventions_ratchet.py`, `conventions_readers.py` | choose `rules` | fast | | [conventions-ratchet.md](conventions-ratchet.md) |
+| conventions | `conventions_ratchet.py`, `conventions_readers.py`, `conventions_state.py` | choose `rules` | fast | | [conventions-ratchet.md](conventions-ratchet.md) |
 | runtime write | `runtime_write_ratchet.py`, `runtime_write_resolve.py` | a test command, for the probe | fast | yes | [runtime-write-ratchet.md](runtime-write-ratchet.md) |
 | usage track | `usage_track_ratchet.py`, `usage_track_scan.py` | a web UI; choose `rules` | fast | | [usage-track-ratchet.md](usage-track-ratchet.md) |
 
