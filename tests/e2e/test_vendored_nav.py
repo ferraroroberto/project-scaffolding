@@ -827,6 +827,37 @@ def test_glass_rebuild_waits_for_the_viewport_to_stop_resizing(nav_mobile: Page)
     assert "blur" in _style(nav_mobile, ".tabs", "backdropFilter")
 
 
+def test_glass_rebuild_drops_and_restores_the_layer_promotion(nav_mobile: Page) -> None:
+    """The rebuild frame also drops the bar's and labels' own layers, then restores them.
+
+    A promoted layer keeps its bitmap across a filter toggle, so a raster made
+    while the viewport was still growing would survive the rebuild. Dropping
+    the promotion for that frame makes WebKit paint the contents again; the
+    promotion returns so the bar still repaints after a modal closes.
+    """
+    _stub_standalone_and_count_rebuilds(nav_mobile)
+    nav_mobile.evaluate(
+        "() => { const nav = document.querySelector('.tabs');"
+        " const read = () => { const label = nav.querySelector('.tab-label');"
+        "   const s = getComputedStyle(nav);"
+        "   return { bar: s.transform, hint: s.willChange,"
+        "     label: label ? getComputedStyle(label).transform : null }; };"
+        " window.__during = null;"
+        " new MutationObserver(() => {"
+        "   if (nav.classList.contains('glass-rebuild') && !window.__during)"
+        "     window.__during = read(); })"
+        "   .observe(nav, { attributes: true, attributeFilter: ['class'] });"
+        " window.__readLayers = read; }"
+    )
+    _init_nav(nav_mobile)
+    _wait_rebuilds(nav_mobile, 1)
+    during = nav_mobile.evaluate("window.__during")
+    assert during == {"bar": "none", "hint": "auto", "label": "none"}, during
+    after = nav_mobile.evaluate("window.__readLayers()")
+    assert after["bar"] != "none" and after["hint"] == "transform", after
+    assert after["label"] != "none", after
+
+
 def test_glass_is_rebuilt_on_every_return_to_the_foreground(nav_mobile: Page) -> None:
     """iOS resumes a kept-alive home-screen app without a reload: rebuild on each return."""
     _stub_standalone_and_count_rebuilds(nav_mobile)
