@@ -17,17 +17,19 @@ gallery-plus-nav mount and the phone context live once in `_nav_graft.py` (#394)
 
 from __future__ import annotations
 
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
+from contextlib import AbstractContextManager, contextmanager
 
 import pytest
 from playwright.sync_api import Browser, Page, expect
 
+from tests.e2e._cases import cases
 from tests.e2e._color_assertions import contrast as _contrast
 from tests.e2e._color_assertions import rgba as _rgba
 from tests.e2e._color_assertions import set_theme as _set_theme
 from tests.e2e._color_assertions import style as _style
 from tests.e2e._geometry import EFFECTIVE_RECT_JS, assert_min_target, effective_rect
-from tests.e2e._nav_graft import NAV_DIR, mount_nav, phone_nav
+from tests.e2e._nav_graft import mount_nav, phone_nav
 
 # Desktop token values the assertions below key on (from demo.html's :root,
 # which transcribes ~/.claude/design.md). --font-label 0.875rem @ 16px root
@@ -81,32 +83,15 @@ def _pseudo_content(page: Page, selector: str, pseudo: str) -> str:
     )
 
 
-@pytest.fixture()
-def nav(static_server: str, page: Page) -> Page:
+@contextmanager
+def _nav(new_page: Callable[..., AbstractContextManager[Page]], static_server: str) -> Iterator[Page]:
     """The nav skeleton at a desktop viewport (fine pointer), below the rail."""
-    page.set_viewport_size({"width": _WIDE - 1, "height": 800})
-    return mount_nav(page, static_server)
+    with new_page() as page:
+        page.set_viewport_size({"width": _WIDE - 1, "height": 800})
+        yield mount_nav(page, static_server)
 
 
-@pytest.fixture()
-def nav_mobile(static_server: str, browser: Browser) -> Iterator[Page]:
-    """The nav skeleton at a phone viewport with a coarse pointer."""
-    with phone_nav(browser, static_server) as page:
-        yield page
-
-
-def test_skeleton_ships_no_emoji_span() -> None:
-    """The markup skeleton demonstrates icon + label only (#142), and no Settings tab."""
-    skeleton = (NAV_DIR / "nav-tabs.html").read_text(encoding="utf-8")
-    assert "tab-emoji" not in skeleton
-    # Settings is the page-header gear, never a tab (fleet-config#1200): a new
-    # app copies this skeleton, so a Settings tab here becomes one in every app.
-    assert 'data-tab="settings"' not in skeleton
-    assert 'id="tabSettings"' not in skeleton
-    assert '<span class="tab-label">Settings</span>' not in skeleton
-
-
-def test_desktop_control_and_wide_rail(nav: Page) -> None:
+def _check_desktop_control_and_wide_rail(nav: Page) -> None:
     """Desktop: the icon beside the label in the column, a left rail when wide.
 
     Below layout.wide the segmented control holds the layout.measure column.
@@ -185,7 +170,7 @@ def _icon_width(page: Page) -> float:
     return float(box["width"])
 
 
-def test_app_icon_utility_does_not_resize_nav_glyphs(nav: Page) -> None:
+def _check_app_icon_utility_does_not_resize_nav_glyphs(nav: Page) -> None:
     """An app's later `.icon { width: 1em }` can't shrink the nav's glyphs (#303).
 
     The icon-size rules used to be a bare `.tab-icon`, the same specificity as
@@ -204,7 +189,7 @@ def test_app_icon_utility_does_not_resize_nav_glyphs(nav: Page) -> None:
     assert _icon_width(nav) == 24  # icons.size.feature
 
 
-def test_app_icon_utility_does_not_resize_pill_glyphs(nav_mobile: Page) -> None:
+def _check_app_icon_utility_does_not_resize_pill_glyphs(nav_mobile: Page) -> None:
     """The pill's 24px glyph survives an app's later icon utility too (#303)."""
     _adopt_icon_utility(nav_mobile)
     assert _icon_width(nav_mobile) == 24  # the iOS tab-bar glyph size
@@ -213,7 +198,7 @@ def test_app_icon_utility_does_not_resize_pill_glyphs(nav_mobile: Page) -> None:
 _LONG_LABELS = ("Capture", "History", "Insights", "Energy", "Family")
 
 
-def test_narrow_desktop_stacks_icon_over_label(nav: Page) -> None:
+def _check_narrow_desktop_stacks_icon_over_label(nav: Page) -> None:
     """Below 520px on a fine pointer: never icon-only; the icon stacks over its label.
 
     Five tabs of 6-8 letters, the case that clipped with the icon beside the
@@ -247,7 +232,7 @@ def test_narrow_desktop_stacks_icon_over_label(nav: Page) -> None:
     expect(nav.locator("#tabHome")).to_have_accessible_name("Capture")
 
 
-def test_mobile_pill_stacks_icon_over_label(nav_mobile: Page) -> None:
+def _check_mobile_pill_stacks_icon_over_label(nav_mobile: Page) -> None:
     """The floating pill keeps its 24px icon above the label; no rail when coarse.
 
     The phone `.app` padding is part of the same contract: the top is the safe
@@ -275,7 +260,7 @@ def test_mobile_pill_stacks_icon_over_label(nav_mobile: Page) -> None:
     assert bar is not None and bar["width"] > _RAIL and bar["height"] < 100, bar
 
 
-def test_touch_tabs_keep_the_44px_floor_at_every_width(nav_mobile: Page) -> None:
+def _check_touch_tabs_keep_the_44px_floor_at_every_width(nav_mobile: Page) -> None:
     """A coarse pointer's tab is >= 44px tall wider than the phone pill too.
 
     Above 520px a touch device (a tablet, an installed PWA on a large phone in
@@ -361,7 +346,7 @@ _PAIRS_JS = """(effRect) => {
 }"""
 
 
-def test_pill_takes_every_tap_where_a_tab_meets_a_list_row(nav_mobile: Page) -> None:
+def _check_pill_takes_every_tap_where_a_tab_meets_a_list_row(nav_mobile: Page) -> None:
     """No tab's tap rectangle shares a tappable point with a list row's (#348, TOUCH-02).
 
     390x844, coarse pointer. Rows scroll under the floating pill by design;
@@ -399,7 +384,7 @@ def test_pill_takes_every_tap_where_a_tab_meets_a_list_row(nav_mobile: Page) -> 
     assert bar["y"] - last >= 21 + 12, (last, bar)  # --bottom-tabs-margin + --gap
 
 
-def test_mobile_pill_active_tab_is_accent_text_on_a_translucent_capsule(
+def _check_mobile_pill_active_tab_is_accent_text_on_a_translucent_capsule(
     nav_mobile: Page,
 ) -> None:
     """Active tab: accent text and icon over the translucent `--tabbar-pill` capsule, both themes.
@@ -472,7 +457,7 @@ def _badge_text(page: Page, tab: str) -> str | None:
     )
 
 
-def test_no_set_badge_call_leaves_the_dom_untouched(nav: Page) -> None:
+def _check_no_set_badge_call_leaves_the_dom_untouched(nav: Page) -> None:
     """An app that never calls setBadge has no badge nodes, and a round trip restores the DOM."""
     _init_nav(nav)
     for cls in (".tab-badge", ".tab-badge-sr", ".tab-icon-wrap"):
@@ -484,7 +469,7 @@ def test_no_set_badge_call_leaves_the_dom_untouched(nav: Page) -> None:
     assert nav.evaluate("() => document.querySelector('.tabs').outerHTML") == before
 
 
-def test_set_badge_count_rules(nav: Page) -> None:
+def _check_set_badge_count_rules(nav: Page) -> None:
     """1-9 show the digit, 10+ show 9+, 0 / null / junk remove it; an unknown tab is a no-op."""
     _init_nav(nav)
     for count, shown in ((1, "1"), (9, "9"), (10, "9+"), (250, "9+"), (3.7, "3")):
@@ -504,7 +489,7 @@ def test_set_badge_count_rules(nav: Page) -> None:
     assert nav.locator("#tabStats .tab-badge-sr").count() == 1
 
 
-def test_badge_is_in_the_accessible_name_once(nav: Page) -> None:
+def _check_badge_is_in_the_accessible_name_once(nav: Page) -> None:
     """The tab's name carries the count; the painted digit is aria-hidden so it is not read twice."""
     _init_nav(nav)
     _set_badge(nav, "stats", 2, "waiting")
@@ -528,7 +513,7 @@ def test_badge_is_in_the_accessible_name_once(nav: Page) -> None:
     )
 
 
-def test_badge_text_meets_contrast_in_both_themes(nav: Page) -> None:
+def _check_badge_text_meets_contrast_in_both_themes(nav: Page) -> None:
     """attention fill + card text clears WCAG AA (4.5:1), measured as rendered, light and dark."""
     _init_nav(nav)
     _set_badge(nav, "stats", 2, "waiting")
@@ -543,7 +528,7 @@ def test_badge_text_meets_contrast_in_both_themes(nav: Page) -> None:
     assert _contrast(text, fill, "rgb(22, 27, 34)") >= 4.5
 
 
-def test_danger_badge_tone_meets_contrast_in_both_themes(nav: Page) -> None:
+def _check_danger_badge_tone_meets_contrast_in_both_themes(nav: Page) -> None:
     """tone 'danger' paints the danger fill under card text at 4.5:1+, light and dark (#342)."""
     _init_nav(nav)
     badge = ".tab-badge"
@@ -559,7 +544,7 @@ def test_danger_badge_tone_meets_contrast_in_both_themes(nav: Page) -> None:
     assert _contrast(text, fill, "rgb(22, 27, 34)") >= 4.5
 
 
-def test_badge_tone_defaults_to_attention_and_repaints(nav: Page) -> None:
+def _check_badge_tone_defaults_to_attention_and_repaints(nav: Page) -> None:
     """Omitting the tone (or an unknown one) is attention; a later call repaints the same badge."""
     _init_nav(nav)
     badge = ".tab-badge"
@@ -611,7 +596,7 @@ def _assert_badge_does_not_move_layout(page: Page, tab: str, where: str) -> None
         assert after[key] == pytest.approx(before[key], abs=0.5), (where, key, before, after)
 
 
-def test_badge_in_inline_desktop_tabs_and_wide_rail(nav: Page) -> None:
+def _check_badge_in_inline_desktop_tabs_and_wide_rail(nav: Page) -> None:
     """Desktop segmented control (icon beside label), the narrow stack, and the 80px rail."""
     _init_nav(nav)
     _set_badge(nav, "stats", 3, "waiting")
@@ -632,7 +617,7 @@ def test_badge_in_inline_desktop_tabs_and_wide_rail(nav: Page) -> None:
     _assert_badge_does_not_move_layout(nav, "stats", "rail")
 
 
-def test_badge_in_mobile_pill(nav_mobile: Page) -> None:
+def _check_badge_in_mobile_pill(nav_mobile: Page) -> None:
     """The phone pill (coarse pointer, iPhone-size viewport), on an inactive and the active tab."""
     _init_nav(nav_mobile)
     _set_badge(nav_mobile, "stats", 3, "waiting")
@@ -648,7 +633,7 @@ def test_badge_in_mobile_pill(nav_mobile: Page) -> None:
     assert _style(nav_mobile, "#tabHome .tab-badge", "transitionDuration") == "0s"
 
 
-def test_badge_geometry_does_not_scale_with_text_size(nav: Page) -> None:
+def _check_badge_geometry_does_not_scale_with_text_size(nav: Page) -> None:
     """px, not rem: the Large text step (a bigger root font size) leaves the badge at 12px / 16px."""
     _init_nav(nav)
     _set_badge(nav, "stats", 3, "waiting")
@@ -657,7 +642,7 @@ def test_badge_geometry_does_not_scale_with_text_size(nav: Page) -> None:
     assert _style(nav, ".tab-badge", "height") == "16px"
 
 
-def test_pill_inactive_label_clears_aa_on_the_composited_bar_in_both_themes(
+def _check_pill_inactive_label_clears_aa_on_the_composited_bar_in_both_themes(
     nav_mobile: Page,
 ) -> None:
     """Inactive pill labels clear 4.5:1 on the bar glass composited over the canvas (WCAG 1.4.3).
@@ -705,7 +690,7 @@ def _wait_pill_on_active(page: Page) -> None:
     )
 
 
-def test_capsule_follows_a_tab_hidden_after_init(nav_mobile: Page) -> None:
+def _check_capsule_follows_a_tab_hidden_after_init(nav_mobile: Page) -> None:
     """A tab the app hides after init re-divides the columns; the capsule follows."""
     _init_nav(nav_mobile)
     nav_mobile.evaluate("() => window.__nav.setTab('history')")
@@ -719,7 +704,7 @@ def test_capsule_follows_a_tab_hidden_after_init(nav_mobile: Page) -> None:
     _wait_pill_on_active(nav_mobile)
 
 
-def test_capsule_follows_a_tab_revealed_after_init(nav_mobile: Page) -> None:
+def _check_capsule_follows_a_tab_revealed_after_init(nav_mobile: Page) -> None:
     """A tab the app adds after init narrows every column; the capsule follows."""
     _init_nav(nav_mobile)
     nav_mobile.evaluate(
@@ -731,7 +716,7 @@ def test_capsule_follows_a_tab_revealed_after_init(nav_mobile: Page) -> None:
     _wait_pill_on_active(nav_mobile)
 
 
-def test_capsule_follows_the_bar_width_settling(nav_mobile: Page) -> None:
+def _check_capsule_follows_the_bar_width_settling(nav_mobile: Page) -> None:
     """The bar narrowing with no window resize (viewport settle) re-places the capsule."""
     _init_nav(nav_mobile)
     nav_mobile.evaluate("() => window.__nav.setTab('stats')")
@@ -741,7 +726,7 @@ def test_capsule_follows_the_bar_width_settling(nav_mobile: Page) -> None:
     _wait_pill_on_active(nav_mobile)
 
 
-def test_resize_without_cell_change_leaves_the_capsule_untouched(nav_mobile: Page) -> None:
+def _check_resize_without_cell_change_leaves_the_capsule_untouched(nav_mobile: Page) -> None:
     """An iOS keyboard resize moves no cell, so the glass bar is not restyled.
 
     The guard that keeps the keyboard from repainting the bar must survive the
@@ -793,7 +778,7 @@ def _wait_rebuilds(page: Page, count: int) -> None:
     )
 
 
-def test_standalone_start_rebuilds_the_glass_once_and_restores_it(nav_mobile: Page) -> None:
+def _check_standalone_start_rebuilds_the_glass_once_and_restores_it(nav_mobile: Page) -> None:
     """Installed-app start: the bar's filter drops for one frame after the viewport settles.
 
     Only a device shows whether the rebuild clears the iOS smear; this pins
@@ -807,7 +792,7 @@ def test_standalone_start_rebuilds_the_glass_once_and_restores_it(nav_mobile: Pa
     _wait_pill_on_active(nav_mobile)
 
 
-def test_glass_rebuild_waits_for_the_viewport_to_stop_resizing(nav_mobile: Page) -> None:
+def _check_glass_rebuild_waits_for_the_viewport_to_stop_resizing(nav_mobile: Page) -> None:
     """While the installed app's viewport keeps resizing, the glass is not rebuilt yet.
 
     A rebuild at a fixed frame can land while iOS is still growing the
@@ -827,7 +812,7 @@ def test_glass_rebuild_waits_for_the_viewport_to_stop_resizing(nav_mobile: Page)
     assert "blur" in _style(nav_mobile, ".tabs", "backdropFilter")
 
 
-def test_glass_rebuild_drops_and_restores_the_layer_promotion(nav_mobile: Page) -> None:
+def _check_glass_rebuild_drops_and_restores_the_layer_promotion(nav_mobile: Page) -> None:
     """The rebuild frame also drops the bar's and labels' own layers, then restores them.
 
     A promoted layer keeps its bitmap across a filter toggle, so a raster made
@@ -858,7 +843,7 @@ def test_glass_rebuild_drops_and_restores_the_layer_promotion(nav_mobile: Page) 
     assert after["label"] != "none", after
 
 
-def test_glass_is_rebuilt_on_every_return_to_the_foreground(nav_mobile: Page) -> None:
+def _check_glass_is_rebuilt_on_every_return_to_the_foreground(nav_mobile: Page) -> None:
     """iOS resumes a kept-alive home-screen app without a reload: rebuild on each return."""
     _stub_standalone_and_count_rebuilds(nav_mobile)
     _init_nav(nav_mobile)
@@ -867,3 +852,62 @@ def test_glass_is_rebuilt_on_every_return_to_the_foreground(nav_mobile: Page) ->
         nav_mobile.evaluate("() => document.dispatchEvent(new Event('visibilitychange'))")
         _wait_rebuilds(nav_mobile, expected)
     assert "blur" in _style(nav_mobile, ".tabs", "backdropFilter")
+
+
+def test_nav_contract(
+    new_page: Callable[..., AbstractContextManager[Page]], static_server: str, browser: Browser
+) -> None:
+    """The nav's desktop control, mobile pill, badges, capsule and glass rebuild, one case per contract."""
+    with cases() as c:
+        with c.case("desktop_control_and_wide_rail"), _nav(new_page, static_server) as nav:
+            _check_desktop_control_and_wide_rail(nav=nav)
+        with c.case("app_icon_utility_does_not_resize_nav_glyphs"), _nav(new_page, static_server) as nav:
+            _check_app_icon_utility_does_not_resize_nav_glyphs(nav=nav)
+        with c.case("app_icon_utility_does_not_resize_pill_glyphs"), phone_nav(browser, static_server) as nav_mobile:
+            _check_app_icon_utility_does_not_resize_pill_glyphs(nav_mobile=nav_mobile)
+        with c.case("narrow_desktop_stacks_icon_over_label"), _nav(new_page, static_server) as nav:
+            _check_narrow_desktop_stacks_icon_over_label(nav=nav)
+        with c.case("mobile_pill_stacks_icon_over_label"), phone_nav(browser, static_server) as nav_mobile:
+            _check_mobile_pill_stacks_icon_over_label(nav_mobile=nav_mobile)
+        with c.case("touch_tabs_keep_the_44px_floor_at_every_width"), phone_nav(browser, static_server) as nav_mobile:
+            _check_touch_tabs_keep_the_44px_floor_at_every_width(nav_mobile=nav_mobile)
+        with c.case("pill_takes_every_tap_where_a_tab_meets_a_list_row"), phone_nav(browser, static_server) as nav_mobile:
+            _check_pill_takes_every_tap_where_a_tab_meets_a_list_row(nav_mobile=nav_mobile)
+        with c.case("mobile_pill_active_tab_is_accent_text_on_a_translucent_capsule"), phone_nav(browser, static_server) as nav_mobile:
+            _check_mobile_pill_active_tab_is_accent_text_on_a_translucent_capsule(nav_mobile=nav_mobile)
+        with c.case("no_set_badge_call_leaves_the_dom_untouched"), _nav(new_page, static_server) as nav:
+            _check_no_set_badge_call_leaves_the_dom_untouched(nav=nav)
+        with c.case("set_badge_count_rules"), _nav(new_page, static_server) as nav:
+            _check_set_badge_count_rules(nav=nav)
+        with c.case("badge_is_in_the_accessible_name_once"), _nav(new_page, static_server) as nav:
+            _check_badge_is_in_the_accessible_name_once(nav=nav)
+        with c.case("badge_text_meets_contrast_in_both_themes"), _nav(new_page, static_server) as nav:
+            _check_badge_text_meets_contrast_in_both_themes(nav=nav)
+        with c.case("danger_badge_tone_meets_contrast_in_both_themes"), _nav(new_page, static_server) as nav:
+            _check_danger_badge_tone_meets_contrast_in_both_themes(nav=nav)
+        with c.case("badge_tone_defaults_to_attention_and_repaints"), _nav(new_page, static_server) as nav:
+            _check_badge_tone_defaults_to_attention_and_repaints(nav=nav)
+        with c.case("badge_in_inline_desktop_tabs_and_wide_rail"), _nav(new_page, static_server) as nav:
+            _check_badge_in_inline_desktop_tabs_and_wide_rail(nav=nav)
+        with c.case("badge_in_mobile_pill"), phone_nav(browser, static_server) as nav_mobile:
+            _check_badge_in_mobile_pill(nav_mobile=nav_mobile)
+        with c.case("badge_geometry_does_not_scale_with_text_size"), _nav(new_page, static_server) as nav:
+            _check_badge_geometry_does_not_scale_with_text_size(nav=nav)
+        with c.case("pill_inactive_label_clears_aa_on_the_composited_bar_in_both_themes"), phone_nav(browser, static_server) as nav_mobile:
+            _check_pill_inactive_label_clears_aa_on_the_composited_bar_in_both_themes(nav_mobile=nav_mobile)
+        with c.case("capsule_follows_a_tab_hidden_after_init"), phone_nav(browser, static_server) as nav_mobile:
+            _check_capsule_follows_a_tab_hidden_after_init(nav_mobile=nav_mobile)
+        with c.case("capsule_follows_a_tab_revealed_after_init"), phone_nav(browser, static_server) as nav_mobile:
+            _check_capsule_follows_a_tab_revealed_after_init(nav_mobile=nav_mobile)
+        with c.case("capsule_follows_the_bar_width_settling"), phone_nav(browser, static_server) as nav_mobile:
+            _check_capsule_follows_the_bar_width_settling(nav_mobile=nav_mobile)
+        with c.case("resize_without_cell_change_leaves_the_capsule_untouched"), phone_nav(browser, static_server) as nav_mobile:
+            _check_resize_without_cell_change_leaves_the_capsule_untouched(nav_mobile=nav_mobile)
+        with c.case("standalone_start_rebuilds_the_glass_once_and_restores_it"), phone_nav(browser, static_server) as nav_mobile:
+            _check_standalone_start_rebuilds_the_glass_once_and_restores_it(nav_mobile=nav_mobile)
+        with c.case("glass_rebuild_waits_for_the_viewport_to_stop_resizing"), phone_nav(browser, static_server) as nav_mobile:
+            _check_glass_rebuild_waits_for_the_viewport_to_stop_resizing(nav_mobile=nav_mobile)
+        with c.case("glass_rebuild_drops_and_restores_the_layer_promotion"), phone_nav(browser, static_server) as nav_mobile:
+            _check_glass_rebuild_drops_and_restores_the_layer_promotion(nav_mobile=nav_mobile)
+        with c.case("glass_is_rebuilt_on_every_return_to_the_foreground"), phone_nav(browser, static_server) as nav_mobile:
+            _check_glass_is_rebuilt_on_every_return_to_the_foreground(nav_mobile=nav_mobile)

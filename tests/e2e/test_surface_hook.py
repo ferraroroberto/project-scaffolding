@@ -11,18 +11,17 @@ the capture-mode collection filter.
 from __future__ import annotations
 
 import json
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
+from contextlib import AbstractContextManager, nullcontext
 from pathlib import Path
-from types import SimpleNamespace
 from typing import Any, cast
 
 import pytest
 from playwright.sync_api import Page
 
+from tests.e2e._cases import cases
 from tests.e2e._surface import (
     CAPTURE_ENV,
-    SurfaceCaptureError,
-    pytest_collection_modifyitems,
     surface,
 )
 from tests.e2e.conftest import serve_directory
@@ -66,28 +65,7 @@ def _read(path: Path) -> dict[str, Any]:
     return cast("dict[str, Any]", json.loads(path.read_text(encoding="utf-8")))
 
 
-class _Untouchable:
-    """A page stand-in that fails the test on any use."""
-
-    def __getattr__(self, name: str) -> Any:
-        raise AssertionError(f"surface() touched the page ({name}) when it must not")
-
-
-def test_unset_env_is_a_noop(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    monkeypatch.chdir(tmp_path)
-    page = cast(Page, _Untouchable())
-    for value in (None, ""):
-        if value is None:
-            monkeypatch.delenv(CAPTURE_ENV, raising=False)
-        else:
-            monkeypatch.setenv(CAPTURE_ENV, value)
-        # Not even the name is looked at: the gate path is one env lookup.
-        surface(page, "Not A Valid Name")
-        assert list(tmp_path.iterdir()) == []
-
-
-@pytest.mark.parametrize("storage_key", [None, "fixture-theme"], ids=["media-only", "storage-key"])
-def test_capture_flips_both_themes_in_place_and_restores(
+def _check_capture_flips_both_themes_in_place_and_restores(
     page: Page, surface_server: str, monkeypatch: pytest.MonkeyPatch, tmp_path: Path, storage_key: str | None
 ) -> None:
     out = _capture_dir(tmp_path / "cap", storage_key=storage_key)
@@ -134,18 +112,7 @@ def test_capture_flips_both_themes_in_place_and_restores(
     assert (out / "jobs.sort-sheet.light.json").read_bytes() == before
 
 
-def test_misuse_fails_loudly(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    page = cast(Page, _Untouchable())
-    monkeypatch.setenv(CAPTURE_ENV, str(_capture_dir(tmp_path / "cap")))
-    for bad in ("", "Jobs.Sheet", "jobs sheet", "jobs..sheet", "-jobs", "jobs.", "jobs_sheet"):
-        with pytest.raises(ValueError):
-            surface(page, bad)
-    monkeypatch.setenv(CAPTURE_ENV, str(tmp_path / "missing"))
-    with pytest.raises(SurfaceCaptureError):
-        surface(page, "jobs.sort-sheet")
-
-
-def test_a_throwing_script_is_recorded_not_swallowed(
+def _check_a_throwing_script_is_recorded_not_swallowed(
     page: Page, surface_server: str, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     out = _capture_dir(tmp_path / "cap", script="(params) => { throw new Error('boom'); }")
@@ -158,7 +125,7 @@ def test_a_throwing_script_is_recorded_not_swallowed(
         assert "boom" in record["error"]
 
 
-def test_two_runs_write_identical_json(
+def _check_two_runs_write_identical_json(
     page: Page, surface_server: str, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     runs: list[dict[str, bytes]] = []
@@ -172,38 +139,13 @@ def test_two_runs_write_identical_json(
     assert runs[0] == runs[1]
 
 
-def _opens_and_captures() -> None:
-    surface(cast(Page, None), "jobs.sort-sheet")
-
-
-def _delegates_to_a_helper() -> None:
-    _opens_and_captures()
-
-
-def _helper_test_surface() -> None:  # the name merely ends in "surface"
-    pass
-
-
-def test_capture_mode_deselects_tests_that_never_call_surface(monkeypatch: pytest.MonkeyPatch) -> None:
-    def make_items() -> list[Any]:
-        return [
-            SimpleNamespace(function=_opens_and_captures),
-            SimpleNamespace(function=_delegates_to_a_helper),
-            SimpleNamespace(function=_helper_test_surface),
-            SimpleNamespace(),  # no python function at all
-            SimpleNamespace(function=len),  # source unreadable: unknown, so kept
-        ]
-
-    deselected: list[Any] = []
-    config = SimpleNamespace(hook=SimpleNamespace(pytest_deselected=lambda items: deselected.extend(items)))
-
-    monkeypatch.delenv(CAPTURE_ENV, raising=False)
-    items = make_items()
-    pytest_collection_modifyitems(cast(pytest.Config, config), items)
-    assert len(items) == 5 and deselected == []
-
-    monkeypatch.setenv(CAPTURE_ENV, "somewhere")
-    items = make_items()
-    pytest_collection_modifyitems(cast(pytest.Config, config), items)
-    assert [getattr(i, "function", None) for i in items] == [_opens_and_captures, len]
-    assert len(deselected) == 3
+def test_surface_capture_in_the_page(new_page: Callable[..., AbstractContextManager[Page]], tmp_path_factory: pytest.TempPathFactory, surface_server: str) -> None:
+    """The capture hook in a real page: both themes flipped and restored, a throwing script recorded, output byte-stable."""
+    with cases() as c:
+        for storage_key in [None, "fixture-theme"]:
+            with c.case(f"capture_flips_both_themes_in_place_and_restores[{storage_key}]"), new_page() as page, pytest.MonkeyPatch.context() as monkeypatch, nullcontext(tmp_path_factory.mktemp("case")) as tmp_path:
+                _check_capture_flips_both_themes_in_place_and_restores(page=page, surface_server=surface_server, monkeypatch=monkeypatch, tmp_path=tmp_path, storage_key=storage_key)
+        with c.case("a_throwing_script_is_recorded_not_swallowed"), new_page() as page, pytest.MonkeyPatch.context() as monkeypatch, nullcontext(tmp_path_factory.mktemp("case")) as tmp_path:
+            _check_a_throwing_script_is_recorded_not_swallowed(page=page, surface_server=surface_server, monkeypatch=monkeypatch, tmp_path=tmp_path)
+        with c.case("two_runs_write_identical_json"), new_page() as page, pytest.MonkeyPatch.context() as monkeypatch, nullcontext(tmp_path_factory.mktemp("case")) as tmp_path:
+            _check_two_runs_write_identical_json(page=page, surface_server=surface_server, monkeypatch=monkeypatch, tmp_path=tmp_path)

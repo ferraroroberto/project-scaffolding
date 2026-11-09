@@ -23,11 +23,15 @@ from __future__ import annotations
 
 import sys
 import time
+from collections.abc import Iterator
+from contextlib import contextmanager
+from pathlib import Path
 
 import pytest
 
 from tests._port_probe import listening_pids
 from tests.e2e import _tray_harness as harness
+from tests.e2e._cases import cases
 
 pytestmark = [
     pytest.mark.skipif(sys.platform != "win32", reason="tray lifecycle is Windows-only"),
@@ -47,25 +51,17 @@ def _bound_default_timeouts() -> None:
     return None
 
 
-@pytest.fixture
-def env(tmp_path):
-    e = harness.build_env(tmp_path)
+@contextmanager
+def _env(root: Path, *, https: bool = False) -> Iterator[harness.TrayEnv]:
+    """A fresh tray environment under *root*, torn down (processes included) on exit."""
+    e = harness.build_env(root, https=https)
     try:
         yield e
     finally:
         harness.cleanup_env(e)
 
 
-@pytest.fixture
-def env_https(tmp_path):
-    e = harness.build_env(tmp_path, https=True)
-    try:
-        yield e
-    finally:
-        harness.cleanup_env(e)
-
-
-def test_cold_start_serves_declared_sha(env: harness.TrayEnv) -> None:
+def _check_cold_start_serves_declared_sha(env: harness.TrayEnv) -> None:
     """A plain `tray.bat` launch boots the dummy app and serves repo HEAD."""
     result = harness.run_tray_bat(env.tray_bat, [])
     assert result.returncode == 0, result.stdout + result.stderr
@@ -77,7 +73,7 @@ def test_cold_start_serves_declared_sha(env: harness.TrayEnv) -> None:
     assert version["git_sha"] == harness.head_sha(env.script_dir)
 
 
-def test_idempotent_second_launch_does_not_duplicate_process(env: harness.TrayEnv) -> None:
+def _check_idempotent_second_launch_does_not_duplicate_process(env: harness.TrayEnv) -> None:
     """Re-running `tray.bat` (no `--restart`) while one is up must no-op, not
     spawn a second process -- the "idempotent start" claim in
     docs/windows-tray.md and tray.bat.template's own header comment."""
@@ -96,7 +92,7 @@ def test_idempotent_second_launch_does_not_duplicate_process(env: harness.TrayEn
     )
 
 
-def test_restart_serves_new_sha_after_bump(env: harness.TrayEnv) -> None:
+def _check_restart_serves_new_sha_after_bump(env: harness.TrayEnv) -> None:
     """`--restart` after a new commit must serve the NEW git_sha -- not exit 0
     while still serving the process it never actually replaced (#144)."""
     first = harness.run_tray_bat(env.tray_bat, [])
@@ -118,7 +114,7 @@ def test_restart_serves_new_sha_after_bump(env: harness.TrayEnv) -> None:
     )
 
 
-def test_restart_via_noninteractive_nested_shell_serves_new_build(env: harness.TrayEnv) -> None:
+def _check_restart_via_noninteractive_nested_shell_serves_new_build(env: harness.TrayEnv) -> None:
     """The full cold-start -> bump -> `--restart` cycle, launched the way that
     historically failed silently: a non-interactive nested shell with no
     console/tty attached (project-scaffolding#54, #144)."""
@@ -140,7 +136,7 @@ def test_restart_via_noninteractive_nested_shell_serves_new_build(env: harness.T
     )
 
 
-def test_https_loopback_self_signed_cert_restart_verifies(env_https: harness.TrayEnv) -> None:
+def _check_https_loopback_self_signed_cert_restart_verifies(env_https: harness.TrayEnv) -> None:
     """The verify leg must reach an HTTPS PWA over loopback despite a
     self-signed cert that names 127.0.0.1, not a public host (#147/#148)."""
     first = harness.run_tray_bat(env_https.tray_bat, [])
@@ -162,7 +158,7 @@ def test_https_loopback_self_signed_cert_restart_verifies(env_https: harness.Tra
     assert served == new_sha
 
 
-def test_plain_start_without_shared_helper_serves_and_does_not_duplicate(
+def _check_plain_start_without_shared_helper_serves_and_does_not_duplicate(
     env: harness.TrayEnv,
 ) -> None:
     """With no fleet-config helper on the box, a plain `tray.bat` still starts
@@ -191,7 +187,7 @@ def test_plain_start_without_shared_helper_serves_and_does_not_duplicate(
     )
 
 
-def test_restart_without_shared_helper_is_still_a_hard_error(env: harness.TrayEnv) -> None:
+def _check_restart_without_shared_helper_is_still_a_hard_error(env: harness.TrayEnv) -> None:
     """`--restart` must not degrade to a plain start when the helper is missing:
     it exits non-zero, names fleet-config, and starts nothing (#54, #345)."""
     harness.remove_shared_helper(env.script_dir)
@@ -200,3 +196,22 @@ def test_restart_without_shared_helper_is_still_a_hard_error(env: harness.TrayEn
     assert result.returncode != 0, result.stdout + result.stderr
     assert "fleet-config" in result.stdout, result.stdout
     assert not listening_pids(env.port), "--restart must not start a tray"
+
+
+def test_tray_lifecycle(tmp_path_factory: pytest.TempPathFactory) -> None:
+    """The tray launcher's start, restart and duplicate-launch contract, each case in a fresh tray environment."""
+    with cases() as c:
+        with c.case("cold_start_serves_declared_sha"), _env(tmp_path_factory.mktemp("tray")) as env:
+            _check_cold_start_serves_declared_sha(env=env)
+        with c.case("idempotent_second_launch_does_not_duplicate_process"), _env(tmp_path_factory.mktemp("tray")) as env:
+            _check_idempotent_second_launch_does_not_duplicate_process(env=env)
+        with c.case("restart_serves_new_sha_after_bump"), _env(tmp_path_factory.mktemp("tray")) as env:
+            _check_restart_serves_new_sha_after_bump(env=env)
+        with c.case("restart_via_noninteractive_nested_shell_serves_new_build"), _env(tmp_path_factory.mktemp("tray")) as env:
+            _check_restart_via_noninteractive_nested_shell_serves_new_build(env=env)
+        with c.case("https_loopback_self_signed_cert_restart_verifies"), _env(tmp_path_factory.mktemp("tray"), https=True) as env_https:
+            _check_https_loopback_self_signed_cert_restart_verifies(env_https=env_https)
+        with c.case("plain_start_without_shared_helper_serves_and_does_not_duplicate"), _env(tmp_path_factory.mktemp("tray")) as env:
+            _check_plain_start_without_shared_helper_serves_and_does_not_duplicate(env=env)
+        with c.case("restart_without_shared_helper_is_still_a_hard_error"), _env(tmp_path_factory.mktemp("tray")) as env:
+            _check_restart_without_shared_helper_is_still_a_hard_error(env=env)

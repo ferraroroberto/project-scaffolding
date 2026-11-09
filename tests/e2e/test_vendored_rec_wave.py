@@ -16,8 +16,12 @@ clock, so each test waits tens of milliseconds, not the real 1.5 s.
 
 from __future__ import annotations
 
+from collections.abc import Callable
+from contextlib import AbstractContextManager
+
 from playwright.sync_api import Page, expect
 
+from tests.e2e._cases import cases
 from tests.e2e._color_assertions import set_theme as _set_theme
 from tests.e2e._color_assertions import style as _style
 
@@ -74,7 +78,7 @@ def _glyph_display(page: Page) -> str:
 # ------------------------------------------------------------------ gallery
 
 
-def test_gallery_legs_render_their_states(gallery: Page) -> None:
+def _check_gallery_legs_render_their_states(gallery: Page) -> None:
     """Idle shows the glyph only; live, silent, reduced and unmeasured set their state."""
     expect(gallery.locator("#demoRecIdle .rec-wave")).to_have_count(0)
     states = {
@@ -103,7 +107,7 @@ def test_gallery_legs_render_their_states(gallery: Page) -> None:
     assert gallery.locator("#demoRecNoneHost .rec-wave-time").inner_text() == "0:00"
 
 
-def test_gallery_live_bars_move_and_silent_bars_are_flat_and_dimmed(gallery: Page) -> None:
+def _check_gallery_live_bars_move_and_silent_bars_are_flat_and_dimmed(gallery: Page) -> None:
     gallery.wait_for_function(
         "() => document.querySelector('#demoRecSilentHost').dataset.recWaveState === 'silent'"
     )
@@ -122,7 +126,7 @@ def test_gallery_live_bars_move_and_silent_bars_are_flat_and_dimmed(gallery: Pag
     assert _style(gallery, "#demoRecLiveHost .rec-wave-bars", "opacity") == "1"
 
 
-def test_gallery_strip_takes_the_host_text_color_in_both_themes(gallery: Page) -> None:
+def _check_gallery_strip_takes_the_host_text_color_in_both_themes(gallery: Page) -> None:
     for theme in ("light", "dark"):
         _set_theme(gallery, theme)
         button_color = _style(gallery, "#demoRecLive", "color")
@@ -130,7 +134,7 @@ def test_gallery_strip_takes_the_host_text_color_in_both_themes(gallery: Page) -
         assert _style(gallery, "#demoRecLiveHost .rec-wave-time", "color") == button_color
 
 
-def test_reduced_motion_meter_has_no_transition(gallery: Page) -> None:
+def _check_reduced_motion_meter_has_no_transition(gallery: Page) -> None:
     assert _style(gallery, "#demoRecReducedHost .rec-wave-meter", "overflow") == "hidden"
     gallery.emulate_media(reduced_motion="reduce")
     assert _style(gallery, "#demoRecReducedHost .rec-wave-meter", "transitionDuration") == "0s"
@@ -140,7 +144,7 @@ def test_reduced_motion_meter_has_no_transition(gallery: Page) -> None:
 # ---------------------------------------------------------------- lifecycle
 
 
-def test_format_elapsed_is_exported_and_prints_m_ss_from_milliseconds(gallery: Page) -> None:
+def _check_format_elapsed_is_exported_and_prints_m_ss_from_milliseconds(gallery: Page) -> None:
     got = gallery.evaluate(
         """
         async () => {
@@ -152,7 +156,7 @@ def test_format_elapsed_is_exported_and_prints_m_ss_from_milliseconds(gallery: P
     assert got == ["0:00", "0:00", "1:05", "60:00", "61:05"]
 
 
-def test_starts_on_a_stream_and_stop_releases_the_context(gallery: Page) -> None:
+def _check_starts_on_a_stream_and_stop_releases_the_context(gallery: Page) -> None:
     # The gallery's own legs (rec-wave and mic-notice) are mounted by demo-capture.js.
     gallery.wait_for_selector("#demoMicNoLabel .rec-wave")
     own_legs = gallery.locator(".rec-wave").count()
@@ -171,7 +175,7 @@ def test_starts_on_a_stream_and_stop_releases_the_context(gallery: Page) -> None
     assert gallery.locator(".rec-wave").count() == own_legs  # only the gallery's own legs remain
 
 
-def test_quiet_input_goes_silent_then_signal_clears_it(gallery: Page) -> None:
+def _check_quiet_input_goes_silent_then_signal_clears_it(gallery: Page) -> None:
     _fake(gallery)
     gallery.evaluate("() => { window.__fake.level = 0; }")
     gallery.evaluate(_ATTACH, {"reducedMotion": False, "silenceMs": 150})
@@ -184,14 +188,14 @@ def test_quiet_input_goes_silent_then_signal_clears_it(gallery: Page) -> None:
     gallery.evaluate("() => window.__stop()")
 
 
-def test_a_signal_is_announced_once_not_every_tick(gallery: Page) -> None:
+def _check_a_signal_is_announced_once_not_every_tick(gallery: Page) -> None:
     _fake(gallery).evaluate(_ATTACH, {"reducedMotion": False})
     gallery.wait_for_timeout(300)
     assert gallery.evaluate("() => window.__events") == ["signal"]
     gallery.evaluate("() => window.__stop()")
 
 
-def test_a_shared_source_stays_open_after_stop(gallery: Page) -> None:
+def _check_a_shared_source_stays_open_after_stop(gallery: Page) -> None:
     _fake(gallery).evaluate(
         """async () => {
           const { attachRecWave, createLevelSource } = await import('./rec-wave/rec-wave.js');
@@ -207,7 +211,7 @@ def test_a_shared_source_stays_open_after_stop(gallery: Page) -> None:
     assert gallery.evaluate("() => window.__fake.closed") == 1
 
 
-def test_no_audio_context_falls_back_to_the_timer(gallery: Page) -> None:
+def _check_no_audio_context_falls_back_to_the_timer(gallery: Page) -> None:
     gallery.evaluate(
         "() => { window.AudioContext = undefined; window.webkitAudioContext = undefined;"
         " window.__host = document.createElement('button'); document.body.appendChild(window.__host); }"
@@ -220,7 +224,7 @@ def test_no_audio_context_falls_back_to_the_timer(gallery: Page) -> None:
     gallery.evaluate("() => window.__stop()")
 
 
-def test_a_suspended_context_is_unmeasured_not_silent(gallery: Page) -> None:
+def _check_a_suspended_context_is_unmeasured_not_silent(gallery: Page) -> None:
     _fake(gallery).evaluate("() => { window.__fake.state = 'suspended'; }")
     gallery.evaluate(_ATTACH, {"reducedMotion": False, "silenceMs": 50})
     gallery.wait_for_timeout(300)
@@ -229,14 +233,14 @@ def test_a_suspended_context_is_unmeasured_not_silent(gallery: Page) -> None:
     gallery.evaluate("() => window.__stop()")
 
 
-def test_the_media_query_picks_the_meter_when_no_option_is_given(gallery: Page) -> None:
+def _check_the_media_query_picks_the_meter_when_no_option_is_given(gallery: Page) -> None:
     gallery.emulate_media(reduced_motion="reduce")
     _fake(gallery).evaluate(_ATTACH, {})
     assert gallery.locator("#glyph + .rec-wave[data-motion='reduced'] .rec-wave-meter").count() == 1
     gallery.evaluate("() => window.__stop()")
 
 
-def test_reduced_motion_option_draws_one_meter(gallery: Page) -> None:
+def _check_reduced_motion_option_draws_one_meter(gallery: Page) -> None:
     _fake(gallery).evaluate(_ATTACH, {"reducedMotion": True})
     assert gallery.eval_on_selector_all("#glyph + .rec-wave .rec-wave-bars", "els => els.length") == 0
     meter = gallery.locator("#glyph + .rec-wave .rec-wave-meter > i")
@@ -246,3 +250,34 @@ def test_reduced_motion_option_draws_one_meter(gallery: Page) -> None:
         " return t.startsWith('scaleX(') && t !== 'scaleX(0)'; }"
     )
     gallery.evaluate("() => window.__stop()")
+
+
+def test_rec_wave_contract(new_gallery: Callable[[], AbstractContextManager[Page]]) -> None:
+    """The record wave: gallery legs, meter motion, audio-context lifecycle and reduced motion."""
+    with cases() as c:
+        with c.case("gallery_legs_render_their_states"), new_gallery() as gallery:
+            _check_gallery_legs_render_their_states(gallery=gallery)
+        with c.case("gallery_live_bars_move_and_silent_bars_are_flat_and_dimmed"), new_gallery() as gallery:
+            _check_gallery_live_bars_move_and_silent_bars_are_flat_and_dimmed(gallery=gallery)
+        with c.case("gallery_strip_takes_the_host_text_color_in_both_themes"), new_gallery() as gallery:
+            _check_gallery_strip_takes_the_host_text_color_in_both_themes(gallery=gallery)
+        with c.case("reduced_motion_meter_has_no_transition"), new_gallery() as gallery:
+            _check_reduced_motion_meter_has_no_transition(gallery=gallery)
+        with c.case("format_elapsed_is_exported_and_prints_m_ss_from_milliseconds"), new_gallery() as gallery:
+            _check_format_elapsed_is_exported_and_prints_m_ss_from_milliseconds(gallery=gallery)
+        with c.case("starts_on_a_stream_and_stop_releases_the_context"), new_gallery() as gallery:
+            _check_starts_on_a_stream_and_stop_releases_the_context(gallery=gallery)
+        with c.case("quiet_input_goes_silent_then_signal_clears_it"), new_gallery() as gallery:
+            _check_quiet_input_goes_silent_then_signal_clears_it(gallery=gallery)
+        with c.case("a_signal_is_announced_once_not_every_tick"), new_gallery() as gallery:
+            _check_a_signal_is_announced_once_not_every_tick(gallery=gallery)
+        with c.case("a_shared_source_stays_open_after_stop"), new_gallery() as gallery:
+            _check_a_shared_source_stays_open_after_stop(gallery=gallery)
+        with c.case("no_audio_context_falls_back_to_the_timer"), new_gallery() as gallery:
+            _check_no_audio_context_falls_back_to_the_timer(gallery=gallery)
+        with c.case("a_suspended_context_is_unmeasured_not_silent"), new_gallery() as gallery:
+            _check_a_suspended_context_is_unmeasured_not_silent(gallery=gallery)
+        with c.case("the_media_query_picks_the_meter_when_no_option_is_given"), new_gallery() as gallery:
+            _check_the_media_query_picks_the_meter_when_no_option_is_given(gallery=gallery)
+        with c.case("reduced_motion_option_draws_one_meter"), new_gallery() as gallery:
+            _check_reduced_motion_option_draws_one_meter(gallery=gallery)

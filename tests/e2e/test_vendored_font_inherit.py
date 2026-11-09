@@ -16,8 +16,12 @@ supposed to fall back to the UA font here.
 
 from __future__ import annotations
 
+from collections.abc import Callable
+from contextlib import AbstractContextManager
+
 from playwright.sync_api import Page, Route
 
+from tests.e2e._cases import cases
 from tests.e2e._color_assertions import style as _style
 from tests.e2e._nav_graft import mount_nav
 
@@ -66,7 +70,7 @@ def _assert_inherit(page: Page, scope: str) -> int:
     return len(rows)
 
 
-def test_gallery_controls_inherit_without_base(static_server: str, page: Page) -> None:
+def _check_gallery_controls_inherit_without_base(static_server: str, page: Page) -> None:
     """Every gallery control takes the body's font with no `base.css` loaded."""
     _drop_base_css(page)
     page.goto(f"{static_server}/_vendored/demo.html")
@@ -80,8 +84,17 @@ def test_gallery_controls_inherit_without_base(static_server: str, page: Page) -
     assert count >= _MIN_CONTROLS, count
 
 
-def test_nav_tabs_inherit_without_base(static_server: str, page: Page) -> None:
+def _check_nav_tabs_inherit_without_base(static_server: str, page: Page) -> None:
     """The nav's `<button class="tab">` takes the body's font with no `base.css`."""
     _drop_base_css(page)
     mount_nav(page, static_server)
     assert _assert_inherit(page, ".tabs") >= 2
+
+
+def test_controls_inherit_the_body_font_without_base(new_page: Callable[..., AbstractContextManager[Page]], static_server: str) -> None:
+    """Gallery controls and nav tabs take the body font with no `base.css` loaded."""
+    with cases() as c:
+        with c.case("gallery_controls_inherit_without_base"), new_page() as page:
+            _check_gallery_controls_inherit_without_base(static_server=static_server, page=page)
+        with c.case("nav_tabs_inherit_without_base"), new_page() as page:
+            _check_nav_tabs_inherit_without_base(static_server=static_server, page=page)

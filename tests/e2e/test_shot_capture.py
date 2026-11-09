@@ -21,6 +21,7 @@ from playwright.sync_api import Browser, Page
 
 from scripts import shot_baseline as sb
 from tests._git_repo import git
+from tests.e2e._cases import cases
 from tests.e2e._shot import DESKTOP, PHONE, Variant, capture_screen
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -70,7 +71,7 @@ def baseline_repo(browser: Browser, static_server: str, tmp_path_factory: pytest
     return root
 
 
-def test_two_captures_of_the_same_commit_match(
+def _check_two_captures_of_the_same_commit_match(
     browser: Browser, static_server: str, baseline_repo: Path, capsys: pytest.CaptureFixture[str],
 ) -> None:
     since = time.time()
@@ -80,7 +81,7 @@ def test_two_captures_of_the_same_commit_match(
     assert "2 of 2 committed shot(s) recaptured, 0 drifted" in capsys.readouterr().out
 
 
-def test_a_deliberate_visible_change_is_caught(
+def _check_a_deliberate_visible_change_is_caught(
     browser: Browser, static_server: str, baseline_repo: Path, capsys: pytest.CaptureFixture[str],
 ) -> None:
     since = time.time()
@@ -91,3 +92,18 @@ def test_a_deliberate_visible_change_is_caught(
     assert "DRIFTED: gallery-phone-light.png" in out and "DRIFTED: gallery-desktop-dark.png" in out
     # The run restored the baseline over the drifted capture (`git diff --quiet` raises otherwise).
     git(baseline_repo, "diff", "--quiet", "--", "shots")
+
+
+def test_shot_baseline_passes_a_rerun_and_catches_a_change(browser: Browser, static_server: str, baseline_repo: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """The screenshot baseline passes a recapture of the same commit and catches a deliberate visible change.
+
+    The cases share the module's baseline repo and run in this order: the second
+    one drifts the captures and relies on the check restoring the baseline.
+    """
+    with cases() as c:
+        with c.case("two_captures_of_the_same_commit_match"):
+            capsys.readouterr()  # each case reads only its own run's report
+            _check_two_captures_of_the_same_commit_match(browser=browser, static_server=static_server, baseline_repo=baseline_repo, capsys=capsys)
+        with c.case("a_deliberate_visible_change_is_caught"):
+            capsys.readouterr()  # each case reads only its own run's report
+            _check_a_deliberate_visible_change_is_caught(browser=browser, static_server=static_server, baseline_repo=baseline_repo, capsys=capsys)

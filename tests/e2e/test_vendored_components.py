@@ -22,10 +22,19 @@ live once in `_color_assertions.py` (#208).
 from __future__ import annotations
 
 import re
+from collections.abc import Callable
+from contextlib import AbstractContextManager
 
-import pytest
 from playwright.sync_api import Browser, Page, expect
 
+from tests.e2e._action_row_assertions import (
+    assert_action_row,
+    assert_action_row_colors,
+    assert_action_row_ext,
+    assert_action_row_ext_colors,
+    assert_action_row_meta_figures,
+)
+from tests.e2e._cases import cases
 from tests.e2e._color_assertions import contrast as _contrast
 from tests.e2e._color_assertions import rgba as _rgba
 from tests.e2e._color_assertions import set_theme as _set_theme
@@ -80,240 +89,7 @@ def _assert_base_inherits(page: Page) -> None:
             assert _style(page, sel, prop) == want, (sel, prop)
 
 
-_ACTION_LIST = "#demoActionList"
-
-
-def _assert_action_row_colors(page: Page, *, muted: str, ink: str, control_border: str,
-                              attention: str) -> None:
-    """action-row: the theme-dependent colors (meta, verbs, filter, favorite)."""
-    assert _style(page, "#demoActionTwoLine .action-row-meta", "color") == muted
-    # A row verb is a plain icon-button (#386, fleet-config#1420): no fill, no
-    # border, the muted glyph at rest, at the 44px square. The Stop alias
-    # renders exactly like Run, not outlined (#361 retired).
-    page.mouse.move(0, 0)
-    for verb in ("#demoActionVerb", "#demoActionStop"):
-        assert _style(page, verb, "backgroundColor") == _TRANSPARENT, verb
-        assert _style(page, verb, "borderTopWidth") == "0px", verb
-        assert _style(page, verb, "color") == muted, verb
-        assert _style(page, verb, "width") == "44px", verb
-        assert _style(page, verb, "height") == "44px", verb
-    assert _style(page, "#demoActionFilter", "borderTopColor") == control_border
-    assert _style(page, "#demoActionFavOn", "color") == attention
-
-
-def _assert_action_row(page: Page) -> None:
-    """action-row (#268, fleet-config#965): tap-the-row geometry and contract.
-
-    Rows sit full-bleed in a zero-padded card on rows-scale heights; the
-    title and context line truncate to one line; the favorite shows its
-    pressed state by glyph fill, not only by color; every target is a real
-    44px box, and no two touch.
-    """
-    assert _style(page, _ACTION_LIST, "paddingTop") == "0px"
-    assert _style(page, "#demoActionOneLine", "minHeight") == "52px"
-    assert _style(page, "#demoActionTwoLine", "minHeight") == "60px"
-    # No vertical rules: rows divide on a top hairline, accessories on none.
-    assert _style(page, "#demoActionTwoLine", "borderTopWidth") == "1px"
-    assert _style(page, "#demoActionKebab", "borderLeftWidth") == "0px"
-    # The main button is the row: it fills the row's full height.
-    heights = page.evaluate(
-        "() => { const row = document.getElementById('demoActionVerbRow');"
-        " const main = row.querySelector('.action-row-main');"
-        " return [row.clientHeight, main.getBoundingClientRect().height]; }"
-    )
-    assert heights[0] == heights[1], heights
-    # Title: body at 600, one line, ellipsized; context: body-sm.
-    title = "#demoActionLongTitle"
-    assert _style(page, title, "fontWeight") == "600"
-    assert _style(page, title, "fontSize") == "16px"
-    assert _style(page, title, "whiteSpace") == "nowrap"
-    assert _style(page, title, "textOverflow") == "ellipsis"
-    assert page.eval_on_selector(title, "el => el.scrollWidth > el.clientWidth")
-    assert _style(page, "#demoActionLong .action-row-meta", "fontSize") == "14px"
-    assert _style(page, "#demoActionLong .action-row-meta", "textOverflow") == "ellipsis"
-    # Favorite: outline at rest, filled glyph when pressed; the caller flips
-    # aria-pressed only.
-    assert _style(page, "#demoActionFavOn .action-row-fav-on", "display") != "none"
-    assert _style(page, "#demoActionFavOn .action-row-fav-off", "display") == "none"
-    assert _style(page, "#demoActionFavOff .action-row-fav-on", "display") == "none"
-    page.click("#demoActionFavOff")
-    expect(page.locator("#demoActionFavOff")).to_have_attribute("aria-pressed", "true")
-    assert _style(page, "#demoActionFavOff .action-row-fav-off", "display") == "none"
-    page.click("#demoActionFavOff")
-    # Every accessory and main button is a >=44px target; none overlap.
-    buttons = page.locator(f"{_ACTION_LIST} .action-row button")
-    assert_min_target(buttons)
-    assert_no_overlap(buttons)
-    assert _style(page, "#demoActionKebab", "width") == "44px"
-    assert _style(page, "#demoActionFilter", "height") == "44px"
-    # A verb under hover changes its glyph colour only (to ink): still no fill,
-    # still no border.
-    for verb in ("#demoActionVerb", "#demoActionStop"):
-        page.hover(verb)
-        assert _style(page, verb, "color") == _style(page, "#demoActionTwoLine .action-row-title", "color"), verb
-        assert _style(page, verb, "backgroundColor") == _TRANSPARENT, verb
-        assert _style(page, verb, "borderTopWidth") == "0px", verb
-    page.mouse.move(0, 0)
-    # The open kebab takes the accent; the filter hides rows (a flex row
-    # must still honour [hidden]).
-    page.click("#demoActionKebab")
-    expect(page.locator("#demoActionKebab")).to_have_attribute("aria-expanded", "true")
-    assert _style(page, "#demoActionKebab", "color") == "rgb(9, 105, 218)"
-    page.fill("#demoActionFilterInput", "backup")
-    expect(page.locator(f"{_ACTION_LIST} .action-row:visible")).to_have_count(1)
-    page.fill("#demoActionFilterInput", "")
-    expect(page.locator(f"{_ACTION_LIST} .action-row:visible")).to_have_count(5)
-
-
-# The rect of the last character of an element's text, and whether it lies inside
-# the element's own box: a figure an ellipsis cut is laid out past the right edge
-# (or collapsed to nothing), a figure on a wrapped second line stays inside.
-_LAST_CHAR_VISIBLE_JS = """el => {
-  const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
-  let last = null;
-  while (walker.nextNode()) last = walker.currentNode;
-  const range = document.createRange();
-  range.setStart(last, last.data.length - 1);
-  range.setEnd(last, last.data.length);
-  const c = range.getBoundingClientRect(), box = el.getBoundingClientRect();
-  return { shown: c.width > 0 && c.right <= box.right + 0.5 && c.bottom <= box.bottom + 0.5,
-           lines: Math.round(box.height / parseFloat(getComputedStyle(el).lineHeight)),
-           overflowX: el.scrollWidth > el.clientWidth + 1,
-           overflowY: el.scrollHeight > el.clientHeight + 1 };
-}"""
-
-
-def _assert_action_row_meta_figures(page: Page) -> None:
-    """action-row meta (#396, LAYOUT-09): wraps to two lines, so its trailing figures stay.
-
-    At the 390px phone width a `<words> · <time> · <count>` status line used to
-    keep one line and lose `12 conversations` behind an ellipsis. It now wraps
-    to at most two lines (a third is clamped), the title keeps one line, and a
-    one-line meta keeps the rows-scale height. Runs in the theme the caller set;
-    the original viewport comes back afterwards.
-    """
-    original = page.viewport_size
-    page.set_viewport_size({"width": 390, "height": 844})
-    try:
-        meta = page.eval_on_selector("#demoActionMetaFiguresText", _LAST_CHAR_VISIBLE_JS)
-        assert meta == {"shown": True, "lines": 2, "overflowX": False, "overflowY": False}, meta
-        clamped = page.eval_on_selector("#demoActionMetaClampedText", _LAST_CHAR_VISIBLE_JS)
-        assert clamped["lines"] == 2 and clamped["overflowY"], clamped
-        for row in ("#demoActionMetaFigures", "#demoActionMetaClamped"):
-            title = f"{row} .action-row-title"
-            assert _style(page, title, "whiteSpace") == "nowrap", row
-            assert page.eval_on_selector(title, "el => el.scrollWidth <= el.clientWidth + 1"), row
-        # A one-line meta keeps the rows-scale height (the wrap only adds height).
-        assert _style(page, "#demoActionTwoLine", "minHeight") == "60px"
-        assert page.eval_on_selector(
-            "#demoActionTwoLine", "el => el.getBoundingClientRect().height"
-        ) == 60
-    finally:
-        if original:
-            page.set_viewport_size(original)
-
-
-_ACTION_EXT = "#demoActionListExt"
-_AFTER_JS ="(el, prop) => getComputedStyle(el, '::after')[prop]"
-
-
-def _after(page: Page, selector: str, prop: str) -> str:
-    """A computed property of the `::after` pseudo-element (the avatar badge)."""
-    return page.eval_on_selector(selector, _AFTER_JS, prop)
-
-
-def _assert_action_row_ext_colors(page: Page, *, muted: tuple[int, int, int], ink: str,
-                                  card: str, success: str, danger: str) -> None:
-    """action-row extensions (#341): avatar fill and badge, trailing value, per theme.
-
-    The badge means alive and nothing else: `up` is success, `down` is
-    danger, no attribute paints no dot, and the dot is ringed in the card
-    colour so it reads cut out of the squircle.
-    """
-    r, g, b, a = _rgba(_style(page, "#demoAvatarUp", "backgroundColor"))
-    assert (r, g, b) == muted  # neutral-soft: the muted mix
-    assert 0 < a < 1
-    assert _style(page, "#demoAvatarUp", "color") == ink
-    assert _after(page, "#demoAvatarUp", "backgroundColor") == success
-    assert _after(page, "#demoAvatarDown", "backgroundColor") == danger
-    assert _after(page, "#demoAvatarPlain", "content") == "none"
-    for badge in ("#demoAvatarUp", "#demoAvatarDown"):
-        assert _after(page, badge, "boxShadow") == f"{card} 0px 0px 0px 2px", badge
-        assert _after(page, badge, "width") == "12px", badge
-    assert _style(page, "#demoActionValue", "color") == ink
-
-
-def _assert_action_row_ext(page: Page) -> None:
-    """action-row extensions (#341): one leading slot, one trailing item.
-
-    The avatar is a 36px squircle inside the main button, so a tap on it is a
-    tap on the row; the trailing item (switch, value, segmented verbs) is the
-    main button's sibling, inset to the text column's edge; the check swaps
-    its glyph when pressed; every target is 44px and none overlap.
-    """
-    assert _style(page, "#demoAvatarUp", "width") == "36px"
-    assert _style(page, "#demoAvatarUp", "height") == "36px"
-    assert _style(page, "#demoAvatarUp", "borderRadius") == "12px"
-    assert _style(page, "#demoAvatarUp .icon", "width") == "20px"
-    # The avatar is part of the tap target: a hit test at its centre lands in
-    # the row's main button.
-    assert page.evaluate(
-        "() => { const r = document.getElementById('demoAvatarUp').getBoundingClientRect();"
-        " const hit = document.elementFromPoint((r.left + r.right) / 2, (r.top + r.bottom) / 2);"
-        " return !!hit && !!hit.closest('.action-row-main'); }"
-    )
-    # Rows-scale heights hold with an avatar: a meta row is 60px, title-only 52px.
-    assert _style(page, "#demoActionAvatarRow", "minHeight") == "60px"
-    assert _style(page, "#demoActionSegRow", "minHeight") == "52px"
-    # Each trailing item sits outside the main button, its right edge at the
-    # text column's inset (row 4px + 10px).
-    for trail in ("#demoActionTrailSwitch", "#demoActionValue", "#demoActionSegVerbs",
-                  "#demoActionVerbCluster"):
-        geo = page.eval_on_selector(
-            trail,
-            "el => { const row = el.closest('.action-row').getBoundingClientRect();"
-            " return { inMain: !!el.closest('.action-row-main'),"
-            " inset: row.right - el.getBoundingClientRect().right }; }",
-        )
-        assert not geo["inMain"], (trail, geo)
-        assert abs(geo["inset"] - 14) <= 0.5, (trail, geo)
-    assert _style(page, "#demoActionValue", "fontVariantNumeric") == "tabular-nums"
-    assert _style(page, "#demoActionValue", "fontWeight") == "600"
-    # A segmented verb cluster in a row: 44px segments on the 44px verbs track.
-    segments = page.locator("#demoActionSegVerbs .segmented-item")
-    assert [_style(page, f"#demoActionSegVerbs .segmented-item:nth-child({i})", "width")
-            for i in (1, 2, 3)] == ["44px"] * 3
-    assert _style(page, "#demoActionSegVerbs", "height") == "44px"
-    assert_min_target(segments)
-    assert_no_overlap(segments)
-    # Check: an empty circle at rest, a checked one when pressed (the shape is
-    # what reads without hue), in icon-button's pressed accent-text.
-    check = "#demoActionCheck"
-    assert _style(page, f"{check} .action-row-check-on", "display") == "none"
-    page.click(check)
-    expect(page.locator(check)).to_have_attribute("aria-pressed", "true")
-    assert _style(page, f"{check} .action-row-check-off", "display") == "none"
-    assert _style(page, f"{check} .action-row-check-on", "display") != "none"
-    assert _style(page, check, "color") == "rgb(5, 80, 174)"
-    page.click(check)
-    # Every control in the list is a >=44px target; none overlap.
-    controls = page.locator(f"{_ACTION_EXT} .action-row > button")
-    assert controls.count() == 7
-    assert_min_target(controls)
-    assert_no_overlap(controls)
-    # A verb cluster is an icon-button group with no track: unpainted, 44px
-    # boxes that touch (gap 0) and never overlap (#386, fleet-config#1420).
-    cluster = "#demoActionVerbCluster"
-    assert _style(page, cluster, "backgroundColor") == _TRANSPARENT
-    assert _style(page, cluster, "columnGap") in ("0px", "normal")
-    verbs = page.locator(f"{cluster} .icon-button")
-    assert verbs.count() == 2
-    assert_min_target(verbs)
-    assert_no_overlap(verbs)
-    assert [_style(page, f"{cluster} .icon-button:nth-child({i})", "width") for i in (1, 2)] == ["44px"] * 2
-
-
-def test_card_contract(gallery: Page) -> None:
+def _check_card_contract(gallery: Page) -> None:
     """card: rounded.lg corners, spacing.md padding, hairline border, title glyph 18px.
 
     Also carries the base rule's and the action-row's (a card modifier)
@@ -325,20 +101,20 @@ def test_card_contract(gallery: Page) -> None:
     assert _style(gallery, "#demoCard", "borderTopWidth") == "1px"
     assert _style(gallery, "#demoCard .card-title .icon", "width") == "18px"
     _assert_base_inherits(gallery)
-    _assert_action_row(gallery)
-    _assert_action_row_colors(
+    assert_action_row(gallery)
+    assert_action_row_colors(
         gallery, muted="rgb(101, 109, 118)", ink="rgb(31, 35, 40)",
         control_border="rgb(129, 139, 152)", attention="rgb(154, 103, 0)",
     )
-    _assert_action_row_ext(gallery)
-    _assert_action_row_ext_colors(
+    assert_action_row_ext(gallery)
+    assert_action_row_ext_colors(
         gallery, muted=(101, 109, 118), ink="rgb(31, 35, 40)", card="rgb(255, 255, 255)",
         success="rgb(26, 127, 55)", danger="rgb(207, 34, 46)",
     )
-    _assert_action_row_meta_figures(gallery)
+    assert_action_row_meta_figures(gallery)
 
 
-def test_disclosure_contract(gallery: Page) -> None:
+def _check_disclosure_contract(gallery: Page) -> None:
     """disclosure: 52px closed summary, zeroed card padding, open-state divider."""
     assert _style(gallery, "#demoDisclosureClosed .collapse-summary", "height") == "52px"
     assert _style(gallery, "#demoDisclosureClosed", "paddingTop") == "0px"
@@ -348,7 +124,7 @@ def test_disclosure_contract(gallery: Page) -> None:
     assert _style(gallery, "#demoDisclosureClosed .collapse-summary", "borderBottomWidth") == "0px"
 
 
-def test_switch_contract(gallery: Page) -> None:
+def _check_switch_contract(gallery: Page) -> None:
     """switch: 44x26 track, accent-fill on-track (never green), off-track = border."""
     assert _style(gallery, "#demoSwitchOn", "width") == "44px"
     assert _style(gallery, "#demoSwitchOn", "height") == "26px"
@@ -358,7 +134,7 @@ def test_switch_contract(gallery: Page) -> None:
     assert _style(gallery, "#demoSwitchOff", "backgroundColor") == "rgb(129, 139, 152)"
 
 
-def test_switch_builder(gallery: Page) -> None:
+def _check_switch_builder(gallery: Page) -> None:
     """switch.js: builder emits the contract markup and flips on click."""
     built = gallery.locator("#demoSwitchBuilt")
     expect(built).to_have_attribute("role", "switch")
@@ -368,7 +144,7 @@ def test_switch_builder(gallery: Page) -> None:
     _wait_bg(gallery, "#demoSwitchBuilt", "rgb(9, 105, 218)")
 
 
-def test_empty_state_contract(gallery: Page) -> None:
+def _check_empty_state_contract(gallery: Page) -> None:
     """empty-state: builder emits glyph (24px feature size) + message + action."""
     host = gallery.locator("#demoEmptyHost .empty-state")
     expect(host).to_be_visible()
@@ -382,7 +158,7 @@ def test_empty_state_contract(gallery: Page) -> None:
     assert_min_target(gallery.locator("#demoEmptyHost .empty-state-action"))
 
 
-def test_modal_contract(gallery: Page) -> None:
+def _check_modal_contract(gallery: Page) -> None:
     """modal: opens via the native API, 34px close, 48px primary, AA disabled Save."""
     gallery.click("#openModalBtn")
     expect(gallery.locator("#demoDialog")).to_be_visible()
@@ -399,7 +175,7 @@ def test_modal_contract(gallery: Page) -> None:
     expect(gallery.locator("#demoDialog")).to_be_hidden()
 
 
-def test_modal_row_label_only(gallery: Page) -> None:
+def _check_modal_row_label_only(gallery: Page) -> None:
     """modal: the row label is ink 600; an app's muted span in the row keeps its own style (#363)."""
     gallery.click("#openModalBtn")
     for theme, ink, muted in (("light", "rgb(31, 35, 40)", "rgb(101, 109, 118)"),
@@ -411,7 +187,7 @@ def test_modal_row_label_only(gallery: Page) -> None:
         assert _style(gallery, "#demoRowNote", "fontWeight") == "400", theme
 
 
-def test_modal_autofocus_title_has_no_ring(gallery: Page) -> None:
+def _check_modal_autofocus_title_has_no_ring(gallery: Page) -> None:
     """modal: an autofocused `h2[tabindex=-1]` title draws no ring; a tabbed control keeps it (#359)."""
     # The gallery paints no app-wide ring, so give it the one the fleet apps
     # ship (`:focus-visible { outline: 2px solid var(--accent) }`).
@@ -431,14 +207,14 @@ def test_modal_autofocus_title_has_no_ring(gallery: Page) -> None:
     assert _style(gallery, "#demoDialogClose", "outlineWidth") == "2px"
 
 
-def test_icon_tile_contract(gallery: Page) -> None:
+def _check_icon_tile_contract(gallery: Page) -> None:
     """icon-tile: rounded.md squircle, tile-blue fill, feature-size glyph."""
     assert _style(gallery, "#demoTileBlue", "borderRadius") == "12px"
     assert _style(gallery, "#demoTileBlue", "backgroundColor") == "rgb(9, 105, 218)"
     assert _style(gallery, "#demoTileBlue .icon", "width") == "24px"
 
 
-def test_button_contract(gallery: Page) -> None:
+def _check_button_contract(gallery: Page) -> None:
     """button: four tiers + shared disabled recipe + outlined danger (fleet-config#296, #1403)."""
     # primary: solid accent fill, accent-fg text, spec's 48px min-height.
     assert _style(gallery, "#demoButtonPrimary", "backgroundColor") == "rgb(9, 105, 218)"
@@ -533,15 +309,14 @@ def _assert_icon_button_targets(page: Page) -> None:
             assert abs(right.left - left.right) <= 0.5, (group, left, right)
 
 
-@pytest.mark.parametrize("theme", ["light", "dark"])
-def test_icon_only_controls_unpainted(gallery: Page, theme: str) -> None:
+def _check_icon_only_controls_unpainted(gallery: Page, theme: str) -> None:
     """Icon buttons, home-head toggles, modal close: unpainted, 44px targets, both themes."""
     _set_theme(gallery, theme)
     _assert_unpainted_at_rest(gallery)
     _assert_icon_button_targets(gallery)
 
 
-def test_sprite_open_about_view_control_glyphs(gallery: Page) -> None:
+def _check_sprite_open_about_view_control_glyphs(gallery: Page) -> None:
     """The sprite carries Open, About, View and Control, and each draws (#388)."""
     ids = ("i-external-link", "i-info", "i-eye", "i-mouse-pointer-2")
     drawn = gallery.eval_on_selector_all(
@@ -559,7 +334,7 @@ def test_sprite_open_about_view_control_glyphs(gallery: Page) -> None:
         assert row["symbol"] and row["drawn"], row
 
 
-def test_sprite_app_launcher_glyphs(gallery: Page) -> None:
+def _check_sprite_app_launcher_glyphs(gallery: Page) -> None:
     """The sprite carries the 16 glyphs upstreamed from app-launcher, and each draws (#391)."""
     ids = (
         "i-arrow-big-up", "i-arrow-down", "i-arrow-left", "i-arrow-right",
@@ -585,7 +360,7 @@ def test_sprite_app_launcher_glyphs(gallery: Page) -> None:
         assert row["symbol"] and row["drawn"], row
 
 
-def test_icon_button_contract(gallery: Page) -> None:
+def _check_icon_button_contract(gallery: Page) -> None:
     """icon-button: hover and press change the glyph colour only (fleet-config#1259)."""
     gallery.mouse.move(0, 0)
     # Rest: the muted glyph; pressed takes accent-text; disabled is faint.
@@ -677,7 +452,7 @@ def _assert_text_size(page: Page, static_server: str) -> None:
     assert _style(page, root, "fontSize") == "15px"  # 93.75% of 16px
 
 
-def test_range_tab_contract(gallery: Page, static_server: str, browser: Browser) -> None:
+def _check_range_tab_contract(gallery: Page, static_server: str, browser: Browser) -> None:
     """range-tab: control-h height, card-off resting, accent-soft active pill.
 
     Plus #267: a selected state that survives greyscale, one-line labels, and
@@ -769,7 +544,7 @@ def _assert_segmented_theme(page: Page, *, card: str, ink: str,
     assert _style(page, "#demoSegFull", "cursor") == "not-allowed"
 
 
-def test_segmented_contract(gallery: Page, static_server: str, browser: Browser) -> None:
+def _check_segmented_contract(gallery: Page, static_server: str, browser: Browser) -> None:
     """segmented (#341, fleet-config#1334): the selected segment is the state.
 
     Both themes: card-raised selection, fg labels at AA on the track and on
@@ -817,7 +592,7 @@ def test_segmented_contract(gallery: Page, static_server: str, browser: Browser)
         context.close()
 
 
-def test_select_native_contract(gallery: Page) -> None:
+def _check_select_native_contract(gallery: Page) -> None:
     """select-native: control-height (36px via explicit height, not min-height), control-border border, input-bg fill."""
     # THE iOS decision: height is an explicit `height` (respected), never
     # `min-height` (ignored on a bare <select>, rendering it stubby).
@@ -830,7 +605,7 @@ def test_select_native_contract(gallery: Page) -> None:
     assert _style(gallery, "#demoSelectNative", "color") == "rgb(31, 35, 40)"
 
 
-def test_toast_contract(gallery: Page) -> None:
+def _check_toast_contract(gallery: Page) -> None:
     """toast: nav-bar glass, centred above the nav, one line; only an error tints, never green."""
     gallery.click("#demoToastShow")
     toast = gallery.locator("#toast")
@@ -871,7 +646,7 @@ def test_toast_contract(gallery: Page) -> None:
 # ---------------------------------------------------------------------- dark
 
 
-def test_dark_control_fill_is_not_true_black(gallery: Page) -> None:
+def _check_dark_control_fill_is_not_true_black(gallery: Page) -> None:
     """Disabled button, select and empty-state action fill with #21262d in dark (#356, #352).
 
     Regression for the dark "black well": these fills used `--card-off` /
@@ -894,7 +669,7 @@ def test_dark_control_fill_is_not_true_black(gallery: Page) -> None:
     assert _style(gallery, "#demoEmptyHost", "backgroundColor") == "rgb(22, 27, 34)"
 
 
-def test_dark_labelled_surfaces_follow_the_control_fill(gallery: Page) -> None:
+def _check_dark_labelled_surfaces_follow_the_control_fill(gallery: Page) -> None:
     """button-surface and the resting range-tab take the control fill and `fg` in dark (#358).
 
     Regression for the labelled black well: both filled with `--card-off`, true
@@ -919,7 +694,7 @@ def test_dark_labelled_surfaces_follow_the_control_fill(gallery: Page) -> None:
     assert _style(gallery, "#demoRangeDay", "backgroundColor") != _DARK_CONTROL_FILL
 
 
-def test_dark_theme_values(gallery: Page) -> None:
+def _check_dark_theme_values(gallery: Page) -> None:
     """Every component re-skins from the dark token block — same structure."""
     _set_theme(gallery, "dark")
     # card surface goes to the dark elevated value.
@@ -978,13 +753,61 @@ def test_dark_theme_values(gallery: Page) -> None:
     assert _style(gallery, "#demoSelectNative", "borderTopColor") == "rgb(110, 118, 129)"
     # action-row re-skins from the dark tokens; its rows-scale heights hold.
     assert _style(gallery, "#demoActionTwoLine", "minHeight") == "60px"
-    _assert_action_row_colors(
+    assert_action_row_colors(
         gallery, muted="rgb(125, 133, 144)", ink="rgb(230, 237, 243)",
         control_border="rgb(110, 118, 129)", attention="rgb(210, 153, 34)",
     )
     # action-row extensions (#341): the avatar and its badge ring re-skin too.
-    _assert_action_row_ext_colors(
+    assert_action_row_ext_colors(
         gallery, muted=(125, 133, 144), ink="rgb(230, 237, 243)", card="rgb(22, 27, 34)",
         success="rgb(63, 185, 80)", danger="rgb(248, 81, 73)",
     )
-    _assert_action_row_meta_figures(gallery)
+    assert_action_row_meta_figures(gallery)
+
+
+def test_gallery_component_contracts(new_gallery: Callable[[], AbstractContextManager[Page]], static_server: str, browser: Browser) -> None:
+    """Every gallery component's contract, one case per component, each on a freshly loaded gallery."""
+    with cases() as c:
+        with c.case("card_contract"), new_gallery() as gallery:
+            _check_card_contract(gallery=gallery)
+        with c.case("disclosure_contract"), new_gallery() as gallery:
+            _check_disclosure_contract(gallery=gallery)
+        with c.case("switch_contract"), new_gallery() as gallery:
+            _check_switch_contract(gallery=gallery)
+        with c.case("switch_builder"), new_gallery() as gallery:
+            _check_switch_builder(gallery=gallery)
+        with c.case("empty_state_contract"), new_gallery() as gallery:
+            _check_empty_state_contract(gallery=gallery)
+        with c.case("modal_contract"), new_gallery() as gallery:
+            _check_modal_contract(gallery=gallery)
+        with c.case("modal_row_label_only"), new_gallery() as gallery:
+            _check_modal_row_label_only(gallery=gallery)
+        with c.case("modal_autofocus_title_has_no_ring"), new_gallery() as gallery:
+            _check_modal_autofocus_title_has_no_ring(gallery=gallery)
+        with c.case("icon_tile_contract"), new_gallery() as gallery:
+            _check_icon_tile_contract(gallery=gallery)
+        with c.case("button_contract"), new_gallery() as gallery:
+            _check_button_contract(gallery=gallery)
+        for theme in ["light", "dark"]:
+            with c.case(f"icon_only_controls_unpainted[{theme}]"), new_gallery() as gallery:
+                _check_icon_only_controls_unpainted(gallery=gallery, theme=theme)
+        with c.case("sprite_open_about_view_control_glyphs"), new_gallery() as gallery:
+            _check_sprite_open_about_view_control_glyphs(gallery=gallery)
+        with c.case("sprite_app_launcher_glyphs"), new_gallery() as gallery:
+            _check_sprite_app_launcher_glyphs(gallery=gallery)
+        with c.case("icon_button_contract"), new_gallery() as gallery:
+            _check_icon_button_contract(gallery=gallery)
+        with c.case("range_tab_contract"), new_gallery() as gallery:
+            _check_range_tab_contract(gallery=gallery, static_server=static_server, browser=browser)
+        with c.case("segmented_contract"), new_gallery() as gallery:
+            _check_segmented_contract(gallery=gallery, static_server=static_server, browser=browser)
+        with c.case("select_native_contract"), new_gallery() as gallery:
+            _check_select_native_contract(gallery=gallery)
+        with c.case("toast_contract"), new_gallery() as gallery:
+            _check_toast_contract(gallery=gallery)
+        with c.case("dark_control_fill_is_not_true_black"), new_gallery() as gallery:
+            _check_dark_control_fill_is_not_true_black(gallery=gallery)
+        with c.case("dark_labelled_surfaces_follow_the_control_fill"), new_gallery() as gallery:
+            _check_dark_labelled_surfaces_follow_the_control_fill(gallery=gallery)
+        with c.case("dark_theme_values"), new_gallery() as gallery:
+            _check_dark_theme_values(gallery=gallery)

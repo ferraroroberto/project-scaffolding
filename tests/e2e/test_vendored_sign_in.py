@@ -10,10 +10,11 @@ connection, a slow answer) is driven exactly.
 from __future__ import annotations
 
 from collections.abc import Callable
+from contextlib import AbstractContextManager
 
-import pytest
 from playwright.sync_api import Page, Route, expect
 
+from tests.e2e._cases import cases
 from tests.e2e._color_assertions import set_theme, style
 
 _ENDPOINT = "/api/login"
@@ -69,7 +70,7 @@ def _submit(page: Page, password: str = "hunter2") -> None:
     page.click(_SUBMIT)
 
 
-def test_the_sheet_renders_one_field_one_primary_and_no_close(gallery: Page) -> None:
+def _check_the_sheet_renders_one_field_one_primary_and_no_close(gallery: Page) -> None:
     _open(gallery)
     dialog = gallery.locator(_DIALOG)
     assert dialog.get_attribute("data-track-view") == "sign-in"
@@ -95,15 +96,14 @@ def test_the_sheet_renders_one_field_one_primary_and_no_close(gallery: Page) -> 
     assert primary["height"] == 48, "the footer primary is the modal's 48px button-primary"
 
 
-def test_escape_does_not_dismiss_the_sheet(gallery: Page) -> None:
+def _check_escape_does_not_dismiss_the_sheet(gallery: Page) -> None:
     _open(gallery)
     gallery.keyboard.press("Escape")
     gallery.keyboard.press("Escape")
     expect(gallery.locator(_DIALOG)).to_be_visible()
 
 
-@pytest.mark.parametrize("theme", ["light", "dark"])
-def test_a_wrong_password_says_so_and_selects_the_field(gallery: Page, theme: str) -> None:
+def _check_a_wrong_password_says_so_and_selects_the_field(gallery: Page, theme: str) -> None:
     set_theme(gallery, theme)
     bodies = _answer(gallery, lambda r: r.fulfill(status=401, json={"detail": "bad password"}))
     _open(gallery)
@@ -119,16 +119,16 @@ def test_a_wrong_password_says_so_and_selects_the_field(gallery: Page, theme: st
     expect(gallery.locator(_SUBMIT)).to_be_enabled()
 
 
-@pytest.mark.parametrize(
-    ("status", "headers", "message"),
-    [
-        pytest.param(429, {"Retry-After": "30"}, "Too many attempts — try again in 30 s", id="lockout"),
-        pytest.param(429, {}, "Too many attempts — try again later", id="lockout-no-retry-after"),
-        pytest.param(503, {}, "Password sign-in isn't set up on this server", id="not-set-up"),
-        pytest.param(500, {}, "Sign-in failed (HTTP 500)", id="other"),
-    ],
-)
-def test_each_server_refusal_has_its_one_message(
+# Each refusal the server can answer with, by name: status, headers, the one message shown.
+_REFUSALS = [
+    ("lockout", 429, {"Retry-After": "30"}, "Too many attempts — try again in 30 s"),
+    ("lockout-no-retry-after", 429, {}, "Too many attempts — try again later"),
+    ("not-set-up", 503, {}, "Password sign-in isn't set up on this server"),
+    ("other", 500, {}, "Sign-in failed (HTTP 500)"),
+]
+
+
+def _check_each_server_refusal_has_its_one_message(
     gallery: Page, status: int, headers: dict[str, str], message: str
 ) -> None:
     _answer(gallery, lambda r: r.fulfill(status=status, headers=headers, json={"detail": "server words"}))
@@ -138,14 +138,14 @@ def test_each_server_refusal_has_its_one_message(
     expect(gallery.locator(_DIALOG)).to_be_visible()
 
 
-def test_an_unreachable_server_says_so(gallery: Page) -> None:
+def _check_an_unreachable_server_says_so(gallery: Page) -> None:
     _answer(gallery, lambda r: r.abort("connectionrefused"))
     _open(gallery)
     _submit(gallery)
     expect(gallery.locator(_ERROR)).to_have_text("Can't reach the app")
 
 
-def test_the_primary_is_busy_while_the_request_is_pending(gallery: Page) -> None:
+def _check_the_primary_is_busy_while_the_request_is_pending(gallery: Page) -> None:
     held: list[Route] = []
     _answer(gallery, held.append)
     _open(gallery)
@@ -159,7 +159,7 @@ def test_the_primary_is_busy_while_the_request_is_pending(gallery: Page) -> None
     assert gallery.get_attribute(_SUBMIT, "aria-busy") == "false"
 
 
-def test_success_hands_the_token_over_closes_and_stores_nothing(gallery: Page) -> None:
+def _check_success_hands_the_token_over_closes_and_stores_nothing(gallery: Page) -> None:
     _answer(gallery, lambda r: r.fulfill(status=200, json={"token": "tok-123"}))
     _open(gallery)
     _submit(gallery)
@@ -168,3 +168,24 @@ def test_success_hands_the_token_over_closes_and_stores_nothing(gallery: Page) -
     assert gallery.evaluate("window.__tokens") == ["tok-123"]
     assert gallery.evaluate("localStorage.length === window.__storageBefore"), "the component never stores the token"
     assert gallery.evaluate("document.querySelector('.sign-in-input').value") == ""
+
+
+def test_sign_in_sheet_contract(new_gallery: Callable[[], AbstractContextManager[Page]]) -> None:
+    """The sign-in sheet: its shape, each server answer's one message, the busy state and the token hand-over."""
+    with cases() as c:
+        with c.case("the_sheet_renders_one_field_one_primary_and_no_close"), new_gallery() as gallery:
+            _check_the_sheet_renders_one_field_one_primary_and_no_close(gallery=gallery)
+        with c.case("escape_does_not_dismiss_the_sheet"), new_gallery() as gallery:
+            _check_escape_does_not_dismiss_the_sheet(gallery=gallery)
+        for theme in ["light", "dark"]:
+            with c.case(f"a_wrong_password_says_so_and_selects_the_field[{theme}]"), new_gallery() as gallery:
+                _check_a_wrong_password_says_so_and_selects_the_field(gallery=gallery, theme=theme)
+        for refusal, status, headers, message in _REFUSALS:
+            with c.case(f"each_server_refusal_has_its_one_message[{refusal}]"), new_gallery() as gallery:
+                _check_each_server_refusal_has_its_one_message(gallery=gallery, status=status, headers=headers, message=message)
+        with c.case("an_unreachable_server_says_so"), new_gallery() as gallery:
+            _check_an_unreachable_server_says_so(gallery=gallery)
+        with c.case("the_primary_is_busy_while_the_request_is_pending"), new_gallery() as gallery:
+            _check_the_primary_is_busy_while_the_request_is_pending(gallery=gallery)
+        with c.case("success_hands_the_token_over_closes_and_stores_nothing"), new_gallery() as gallery:
+            _check_success_hands_the_token_over_closes_and_stores_nothing(gallery=gallery)

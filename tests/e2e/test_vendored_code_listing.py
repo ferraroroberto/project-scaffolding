@@ -11,9 +11,12 @@ reads as a painted row verb. The component's Copy must draw nothing at rest.
 from __future__ import annotations
 
 import re
+from collections.abc import Callable
+from contextlib import AbstractContextManager
 
 from playwright.sync_api import Page, expect
 
+from tests.e2e._cases import cases
 from tests.e2e._color_assertions import style as _style
 from tests.e2e._geometry import assert_unpainted
 
@@ -24,7 +27,7 @@ _HEAD = "#demoCodeListing .code-listing-head"
 _SAMPLE = "setx ARCHIVE_ROOT D:\\archive"
 
 
-def test_code_listing_copy_is_an_unpainted_icon_button_in_a_list_item(gallery: Page) -> None:
+def _check_code_listing_copy_is_an_unpainted_icon_button_in_a_list_item(gallery: Page) -> None:
     """code-listing: inside a list item the Copy is a plain glyph named by aria-label and a tooltip."""
     copy = gallery.locator(_COPY)
     expect(copy).to_be_visible()
@@ -47,7 +50,7 @@ def test_code_listing_copy_is_an_unpainted_icon_button_in_a_list_item(gallery: P
     assert _style(gallery, "#demoCodeListing pre", "fontSize") == "13px"
 
 
-def test_code_listing_copy_puts_the_listing_on_the_clipboard_and_confirms(gallery: Page) -> None:
+def _check_code_listing_copy_puts_the_listing_on_the_clipboard_and_confirms(gallery: Page) -> None:
     """code-listing: a tap copies the listing's text, swaps the glyph and announces it politely."""
     gallery.context.grant_permissions(["clipboard-read", "clipboard-write"])
     status = gallery.locator(_STATUS)
@@ -64,7 +67,7 @@ def test_code_listing_copy_puts_the_listing_on_the_clipboard_and_confirms(galler
     assert_unpainted(gallery, gallery.locator(_COPY))
 
 
-def test_code_listing_copy_failure_is_said_not_swallowed(gallery: Page) -> None:
+def _check_code_listing_copy_failure_is_said_not_swallowed(gallery: Page) -> None:
     """code-listing: when the clipboard refuses, the header says so instead of confirming."""
     gallery.evaluate(
         "() => { Object.defineProperty(navigator, 'clipboard', {"
@@ -75,3 +78,14 @@ def test_code_listing_copy_failure_is_said_not_swallowed(gallery: Page) -> None:
     expect(status).to_have_text("Copy failed")
     expect(status).to_have_attribute("data-state", "error")
     expect(gallery.locator(_COPY)).not_to_have_attribute("data-copied", "true")
+
+
+def test_code_listing_contract(new_gallery: Callable[[], AbstractContextManager[Page]]) -> None:
+    """The code listing's copy control: an unpainted icon button that copies, confirms, and reports a failure."""
+    with cases() as c:
+        with c.case("code_listing_copy_is_an_unpainted_icon_button_in_a_list_item"), new_gallery() as gallery:
+            _check_code_listing_copy_is_an_unpainted_icon_button_in_a_list_item(gallery=gallery)
+        with c.case("code_listing_copy_puts_the_listing_on_the_clipboard_and_confirms"), new_gallery() as gallery:
+            _check_code_listing_copy_puts_the_listing_on_the_clipboard_and_confirms(gallery=gallery)
+        with c.case("code_listing_copy_failure_is_said_not_swallowed"), new_gallery() as gallery:
+            _check_code_listing_copy_failure_is_said_not_swallowed(gallery=gallery)

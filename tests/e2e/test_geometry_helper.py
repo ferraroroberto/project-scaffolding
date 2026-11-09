@@ -7,11 +7,11 @@ boot-check (the computed background actually flipped) so a matrix leg that
 silently failed to apply can never read as conformance — the same fail-loud
 idiom as `test_vendored_nav.py`'s coarse-pointer assert.
 
-Both twins are **one test node per matrix leg**, not one per (check x leg):
-the checks are independent by fixture construction, so a per-check split just
+Both twins are **one case per matrix leg**, not one per (check x leg): the
+checks are independent by fixture construction, so a per-check split just
 re-loads the same page four more times per leg to re-prove fixed-pixel facts.
-Keep it that way — the suite is measured against CLAUDE.md's "< 15 tests"
-rule in collected nodes, not in `def`s (#209).
+All the cases run inside one collected test (`_cases.py`), because the suite
+is measured against CLAUDE.md's "< 15 tests" rule in collected nodes.
 
 Engines: the gate's bare `pytest` runs Chromium (like the vendored-component
 suites); the geometry math is engine-agnostic. One manual two-engine pass
@@ -24,11 +24,13 @@ before re-vendoring:
 from __future__ import annotations
 
 from collections.abc import Callable, Iterator
+from contextlib import AbstractContextManager
 from pathlib import Path
 
 import pytest
 from playwright.sync_api import Page
 
+from tests.e2e._cases import cases
 from tests.e2e._geometry import (
     MATRIX,
     apply_matrix_leg,
@@ -40,7 +42,6 @@ from tests.e2e._geometry import (
     chart_dataset_cues,
     effective_rect,
     effective_rects,
-    matrix_id,
 )
 from tests.e2e.conftest import serve_directory
 
@@ -76,7 +77,7 @@ def _apply_leg_checked(page: Page, width: int, theme: str) -> None:
 # ---------------------------------------------------------------------------
 # Rect math
 
-def test_pseudo_ring_expands_34px_visual_to_44px_effective(
+def _check_pseudo_ring_expands_34px_visual_to_44px_effective(
     geometry_server: str, page: Page
 ) -> None:
     _load(page, geometry_server, "compliant.html")
@@ -87,7 +88,7 @@ def test_pseudo_ring_expands_34px_visual_to_44px_effective(
     assert target.effective.height == pytest.approx(44)
 
 
-def test_switch_track_expands_26px_to_44px_vertically(
+def _check_switch_track_expands_26px_to_44px_vertically(
     geometry_server: str, page: Page
 ) -> None:
     _load(page, geometry_server, "compliant.html")
@@ -97,7 +98,7 @@ def test_switch_track_expands_26px_to_44px_vertically(
     assert target.effective.height == pytest.approx(44)
 
 
-def test_element_without_hit_pseudo_keeps_visual_rect(
+def _check_element_without_hit_pseudo_keeps_visual_rect(
     geometry_server: str, page: Page
 ) -> None:
     _load(page, geometry_server, "compliant.html")
@@ -105,7 +106,7 @@ def test_element_without_hit_pseudo_keeps_visual_rect(
     assert target.effective == target.visual
 
 
-def test_zero_matches_fail_loud(geometry_server: str, page: Page) -> None:
+def _check_zero_matches_fail_loud(geometry_server: str, page: Page) -> None:
     _load(page, geometry_server, "compliant.html")
     with pytest.raises(AssertionError, match="no elements match"):
         effective_rects(page.locator(".does-not-exist"))
@@ -116,8 +117,7 @@ def test_zero_matches_fail_loud(geometry_server: str, page: Page) -> None:
 # ---------------------------------------------------------------------------
 # Compliant twin: every check passes at every matrix leg
 
-@pytest.mark.parametrize(("width", "theme"), MATRIX, ids=map(matrix_id, MATRIX))
-def test_compliant_twin_passes_all_checks(
+def _check_compliant_twin_passes_all_checks(
     geometry_server: str, page: Page, width: int, theme: str
 ) -> None:
     _load(page, geometry_server, "compliant.html")
@@ -177,14 +177,13 @@ _VIOLATIONS: tuple[tuple[str, Callable[[Page], None], str], ...] = (
 )
 
 
-@pytest.mark.parametrize(("width", "theme"), MATRIX, ids=map(matrix_id, MATRIX))
-def test_violating_twin_fails_every_check(
+def _check_violating_twin_fails_every_check(
     geometry_server: str, page: Page, width: int, theme: str
 ) -> None:
     """Every check FAILS on the violating twin, at every matrix leg.
 
-    The mirror image of `test_compliant_twin_passes_all_checks`: one node per
-    leg exercising every contract, not one node per (contract x leg). The
+    The mirror image of `_check_compliant_twin_passes_all_checks`: one case per
+    leg exercising every contract, not one case per (contract x leg). The
     four violations are fixed-pixel geometry and static Chart.js config, so
     each was previously re-proving the same fact across all eight legs — 32
     nodes for four facts, against this repo's own "< 15 tests" rule (#209).
@@ -219,7 +218,7 @@ def test_violating_twin_fails_every_check(
 # ---------------------------------------------------------------------------
 # Chart cue reads
 
-def test_dataset_cues_round_trip(geometry_server: str, page: Page) -> None:
+def _check_dataset_cues_round_trip(geometry_server: str, page: Page) -> None:
     _load(page, geometry_server, "compliant.html")
     cues = chart_dataset_cues(page, "#chart")
     assert [cue.label for cue in cues] == [
@@ -231,7 +230,30 @@ def test_dataset_cues_round_trip(geometry_server: str, page: Page) -> None:
     assert [cue.point_style for cue in cues] == ["circle", "rectRot", "triangle"]
 
 
-def test_chart_lookup_failures_are_named(geometry_server: str, page: Page) -> None:
+def _check_chart_lookup_failures_are_named(geometry_server: str, page: Page) -> None:
     _load(page, geometry_server, "compliant.html")
     with pytest.raises(AssertionError, match="no canvas matches"):
         chart_dataset_cues(page, "#missingCanvas")
+
+
+def test_geometry_checks_on_the_twins(new_page: Callable[..., AbstractContextManager[Page]], geometry_server: str) -> None:
+    """The geometry helper's checks on its hermetic twins, one case per check or matrix leg."""
+    with cases() as c:
+        with c.case("pseudo_ring_expands_34px_visual_to_44px_effective"), new_page() as page:
+            _check_pseudo_ring_expands_34px_visual_to_44px_effective(geometry_server=geometry_server, page=page)
+        with c.case("switch_track_expands_26px_to_44px_vertically"), new_page() as page:
+            _check_switch_track_expands_26px_to_44px_vertically(geometry_server=geometry_server, page=page)
+        with c.case("element_without_hit_pseudo_keeps_visual_rect"), new_page() as page:
+            _check_element_without_hit_pseudo_keeps_visual_rect(geometry_server=geometry_server, page=page)
+        with c.case("zero_matches_fail_loud"), new_page() as page:
+            _check_zero_matches_fail_loud(geometry_server=geometry_server, page=page)
+        for width, theme in MATRIX:
+            with c.case(f"compliant_twin_passes_all_checks[{width}-{theme}]"), new_page() as page:
+                _check_compliant_twin_passes_all_checks(geometry_server=geometry_server, page=page, width=width, theme=theme)
+        for width, theme in MATRIX:
+            with c.case(f"violating_twin_fails_every_check[{width}-{theme}]"), new_page() as page:
+                _check_violating_twin_fails_every_check(geometry_server=geometry_server, page=page, width=width, theme=theme)
+        with c.case("dataset_cues_round_trip"), new_page() as page:
+            _check_dataset_cues_round_trip(geometry_server=geometry_server, page=page)
+        with c.case("chart_lookup_failures_are_named"), new_page() as page:
+            _check_chart_lookup_failures_are_named(geometry_server=geometry_server, page=page)

@@ -9,7 +9,9 @@ bar rides that growth.
 
 No desktop engine reproduces that, so the guard is textual: the markup skeleton
 an adopter pastes, the CSS it copies and the README contract all name the pair,
-and the gallery page that plays the app's head carries it.
+and the gallery page that plays the app's head carries it. The same skeleton is
+also held to the tab shape every new app copies: icon and label only, and no
+Settings tab.
 """
 
 from __future__ import annotations
@@ -63,3 +65,14 @@ def test_css_and_readme_state_the_dependency() -> None:
     ):
         assert needle in readme, f"README.md does not mention {needle}"
     assert _WRONG_STATUS_BAR_META not in readme
+
+
+def test_skeleton_ships_no_emoji_span() -> None:
+    """The markup skeleton demonstrates icon + label only, and no Settings tab."""
+    skeleton = _read(NAV / "nav-tabs.html")
+    assert "tab-emoji" not in skeleton
+    # Settings is the page-header gear, never a tab: a new
+    # app copies this skeleton, so a Settings tab here becomes one in every app.
+    assert 'data-tab="settings"' not in skeleton
+    assert 'id="tabSettings"' not in skeleton
+    assert '<span class="tab-label">Settings</span>' not in skeleton
