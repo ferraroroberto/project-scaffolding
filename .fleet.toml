@@ -453,6 +453,8 @@ agents_pointer = true
 # Repeated text (S-04): a run of 12 shared words with docs/ is a hit. No `repeated_text_global`: the
 # global file exists only on the owner's machine, and this gate also runs in a fresh clone.
 repeated_text_words = 12
+# The master template is CLAUDE.md's body by design (tests/test_claude_master_sync.py), so it is never a source.
+repeated_text_exclude = ["docs/agents/CLAUDE.master.md"]
 
 # ---------------------------------------------------------------------------
 # Doc references ratchet. scripts/verify-before-ship.ps1 runs

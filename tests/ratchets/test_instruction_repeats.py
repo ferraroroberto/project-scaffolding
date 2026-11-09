@@ -108,6 +108,26 @@ def test_a_malformed_key_fails_loud(body: str) -> None:
         ir.parse_config("[instruction_ratchet]\nenabled = true\n" + body)
 
 
+def test_an_excluded_source_is_listed_and_defaults_to_none() -> None:
+    off = ir.parse_config("[instruction_ratchet]\nenabled = true\nrepeated_text_words = 12\n")
+    on = ir.parse_config('[instruction_ratchet]\nenabled = true\nrepeated_text_words = 12\nrepeated_text_exclude = ["docs/m.md"]\n')
+    assert off is not None and on is not None
+    assert (off.repeated_text_exclude, on.repeated_text_exclude) == ((), ("docs/m.md",))
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        pytest.param('repeated_text_exclude = ["docs/m.md"]\n', id="exclude-without-words"),
+        pytest.param('repeated_text_words = 12\nrepeated_text_exclude = "docs/m.md"\n', id="exclude-not-a-list"),
+        pytest.param("repeated_text_words = 12\nrepeated_text_exclude = [1]\n", id="exclude-not-paths"),
+    ],
+)
+def test_a_malformed_exclude_fails_loud(body: str) -> None:
+    with pytest.raises(ir.ConfigError):
+        ir.parse_config("[instruction_ratchet]\nenabled = true\n" + body)
+
+
 def test_s04_is_a_registered_shape_rule() -> None:
     assert "S-04" in ir.SHAPE_RULES and "S-04" not in ir.RULES
 
@@ -154,6 +174,18 @@ def test_only_markdown_under_docs_is_a_source(tmp_path: Path) -> None:
 
 def test_docs_in_a_subfolder_are_sources(tmp_path: Path) -> None:
     make_repo(tmp_path, **{"CLAUDE.md": PASSAGE + "\n", "docs__agents__p.md": PASSAGE})
+    assert '"S-04": 1' in init_text(tmp_path)
+
+
+def test_an_excluded_doc_is_never_a_source(tmp_path: Path) -> None:
+    make_repo(tmp_path, N + 'repeated_text_exclude = ["docs/agents/master.md"]\n',
+              **{"CLAUDE.md": PASSAGE + "\n", "docs__agents__master.md": PASSAGE})
+    assert '"entries": []' in init_text(tmp_path)
+
+
+def test_an_excluded_doc_leaves_every_other_doc_a_source(tmp_path: Path) -> None:
+    make_repo(tmp_path, N + 'repeated_text_exclude = ["docs/agents/master.md"]\n',
+              **{"CLAUDE.md": PASSAGE + "\n", "docs__agents__master.md": PASSAGE, "docs__a.md": PASSAGE})
     assert '"S-04": 1' in init_text(tmp_path)
 
 

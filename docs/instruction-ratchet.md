@@ -61,7 +61,7 @@ Four rules check the shape of the instruction files rather than their lines (S-0
 
 `CLAUDE.md` should point to a doc rather than restate it; restated text costs every session its tokens and drifts from the original. S-04 counts the runs of `repeated_text_words = N` or more consecutive words that a `CLAUDE.md` shares with a source. It is **off until the table sets that key** (a whole number, 5 or more; the fleet default is 12), so re-vendoring never turns an adopter red; once on, hits are baselined per file like any other count and may only shrink.
 
-- **Sources.** Every tracked `docs/**/*.md`, plus the owner's global `~/.claude/CLAUDE.md` when `repeated_text_global = true`. An instruction file under `docs/` is compared, never a source, and a file is never compared with itself (a repo that carries the global file as `extra_files` is checked against `docs/` only).
+- **Sources.** Every tracked `docs/**/*.md`, plus the owner's global `~/.claude/CLAUDE.md` when `repeated_text_global = true`. An instruction file under `docs/` is compared, never a source, and a file is never compared with itself (a repo that carries the global file as `extra_files` is checked against `docs/` only). `repeated_text_exclude = ["docs/x.md"]` removes a file from the sources: for a doc that is a deliberate copy of `CLAUDE.md` (this scaffold's `docs/agents/CLAUDE.master.md`, kept in sync by a test), which would otherwise absorb the whole file into one run. It needs `repeated_text_words`.
 - **Compared text.** The prose of each file: frontmatter, fenced blocks and inline code are dropped, then words are lowercased alphanumerics, so wrapping, markdown marks and punctuation do not hide a copy.
 - **Counted.** One hit per maximal run, so a pasted paragraph is one hit however long it is, and two separate copies are two. The report line names the first line of the run, its length and the source; the fix is to replace the text with a pointer to the source.
 - **Not confirmed.** `repeated_text_global = true` with no readable global file is exit 3, never a pass: the global file exists only on the owner's machine, so a repo that runs this gate in CI leaves `repeated_text_global` off. The option needs the `instruction_repeats` sibling; a script without it exits 3 only when the option is on.
@@ -141,6 +141,7 @@ Re-vendoring the script never breaks a repo that has not opted in: an absent `[i
    claude_md_max_lines = 120                             # S-03, optional, default off; an app repo
    repeated_text_words = 12                              # S-04, optional, default off; a run of 12 shared words is a hit
    repeated_text_global = false                          # S-04, optional; true also compares ~/.claude/CLAUDE.md (owner's machine only)
+   repeated_text_exclude = []                            # S-04, optional; docs/ files that are never a source
    ```
 
    A repo that ships skills from another folder lists it in `skill_dirs` (for example `["skills", ".claude/skills"]`, with `extra_files = ["global-CLAUDE.md"]`).
