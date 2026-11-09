@@ -144,3 +144,58 @@ def test_send_text_non_object_json_raises_notifier_error(
     )
     with pytest.raises(NotifierError, match="non-object"):
         TelegramNotifier("TOKEN", "CHAT").send_text("hi")
+
+
+def _capture_texts(monkeypatch: pytest.MonkeyPatch) -> list[str]:
+    texts: list[str] = []
+
+    def fake_urlopen(request: Any, timeout: int = 0):  # noqa: ANN401
+        texts.append(json.loads(request.data.decode("utf-8"))["text"])
+        return _fake_response({"ok": True})
+
+    monkeypatch.setattr(telegram_mod.urllib.request, "urlopen", fake_urlopen)
+    return texts
+
+
+def test_send_text_at_limit_is_one_call(monkeypatch: pytest.MonkeyPatch) -> None:
+    texts = _capture_texts(monkeypatch)
+    TelegramNotifier("TOKEN", "CHAT").send_text("x" * 4096)
+    assert texts == ["x" * 4096]
+
+
+def test_send_text_over_limit_chunks_without_loss(monkeypatch: pytest.MonkeyPatch) -> None:
+    texts = _capture_texts(monkeypatch)
+    # 1200 lines of 9 chars + newline: about 12000 characters, so several chunks.
+    message = "".join(f"line {i:04d}\n" for i in range(1200))
+    TelegramNotifier("TOKEN", "CHAT").send_text(message)
+
+    assert len(texts) > 1
+    assert all(len(piece) <= 4096 for piece in texts)
+    assert "".join(texts) == message
+    # Every cut lands on a line boundary because every line fits.
+    assert all(piece.endswith("\n") for piece in texts)
+
+
+def test_send_text_hard_cuts_a_line_longer_than_the_limit(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    texts = _capture_texts(monkeypatch)
+    message = "y" * 10000
+    TelegramNotifier("TOKEN", "CHAT").send_text(message)
+
+    assert [len(piece) for piece in texts] == [4096, 4096, 1808]
+    assert "".join(texts) == message
+
+
+def test_send_text_stops_at_the_first_rejected_chunk(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls = 0
+
+    def fake_urlopen(request: Any, timeout: int = 0):  # noqa: ANN401
+        nonlocal calls
+        calls += 1
+        return _fake_response({"ok": False, "description": "chat not found"})
+
+    monkeypatch.setattr(telegram_mod.urllib.request, "urlopen", fake_urlopen)
+    with pytest.raises(NotifierError, match="chat not found"):
+        TelegramNotifier("TOKEN", "CHAT").send_text("z" * 9000)
+    assert calls == 1
