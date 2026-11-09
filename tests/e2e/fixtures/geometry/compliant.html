@@ -67,6 +67,9 @@
   }
   .icon-btn.hit-target::before { content: ""; position: absolute; inset: -5px; }
 
+  /* Plain glyph: draws nothing at rest in either theme. */
+  .glyph-btn { border: 0; background: transparent; color: var(--ink); padding: 0; }
+
   /* Switch-style control: 44x26 visual track, ::before expands vertical to 44. */
   .toggle {
     position: relative;
@@ -104,6 +107,11 @@
     <button id="lonePlus" class="icon-btn hit-target" aria-label="Add">+</button>
     <br><br>
     <button id="loneToggle" class="toggle" role="switch" aria-checked="false" aria-label="Power"></button>
+  </section>
+
+  <section>
+    <h2>Unpainted glyph at rest</h2>
+    <button id="plainGlyph" class="glyph-btn" aria-label="Copy">&#10697;</button>
   </section>
 
   <section>

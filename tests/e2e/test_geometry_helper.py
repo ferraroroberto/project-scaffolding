@@ -36,6 +36,7 @@ from tests.e2e._geometry import (
     assert_min_target,
     assert_no_horizontal_overflow,
     assert_no_overlap,
+    assert_unpainted,
     chart_dataset_cues,
     effective_rect,
     effective_rects,
@@ -108,6 +109,8 @@ def test_zero_matches_fail_loud(geometry_server: str, page: Page) -> None:
     _load(page, geometry_server, "compliant.html")
     with pytest.raises(AssertionError, match="no elements match"):
         effective_rects(page.locator(".does-not-exist"))
+    with pytest.raises(AssertionError, match="no elements match"):
+        assert_unpainted(page, page.locator(".does-not-exist"))
 
 
 # ---------------------------------------------------------------------------
@@ -124,6 +127,9 @@ def test_compliant_twin_passes_all_checks(
     assert_min_target(page.locator("#loneToggle"))
     assert_min_target(page.locator(".cluster .day"))
     assert_no_overlap(page.locator(".cluster .day"))
+    assert_unpainted(page, page.locator("#plainGlyph"))
+    # The unpainted read stamps both themes; the leg's theme must survive it.
+    assert page.evaluate("document.documentElement.dataset.theme") == theme
     assert_no_horizontal_overflow(page)
     assert_chart_ticks(page, "#chart", max_ticks=4)
     cues = chart_dataset_cues(page, "#chart")
@@ -136,7 +142,7 @@ def test_compliant_twin_passes_all_checks(
 # One entry per contract the violating twin breaks: a name for the failure
 # report, the call under test, and the substring its AssertionError must carry.
 # `violating.html` authors each violation on its own independently-targetable
-# element, so the four checks below cannot mask one another.
+# element, so the checks below cannot mask one another.
 _VIOLATIONS: tuple[tuple[str, Callable[[Page], None], str], ...] = (
     (
         "assert_min_target(#tinyClose)",
@@ -147,6 +153,16 @@ _VIOLATIONS: tuple[tuple[str, Callable[[Page], None], str], ...] = (
         "assert_no_overlap(.crowded .icon-btn)",
         lambda page: assert_no_overlap(page.locator(".crowded .icon-btn")),
         "overlap",
+    ),
+    (
+        "assert_unpainted(#paintedGlyph)",
+        lambda page: assert_unpainted(page, page.locator("#paintedGlyph")),
+        "painted at rest in the light theme: fill",
+    ),
+    (
+        "assert_unpainted(#darkPaintedGlyph)",
+        lambda page: assert_unpainted(page, page.locator("#darkPaintedGlyph")),
+        "painted at rest in the dark theme: fill",
     ),
     (
         "assert_chart_ticks(#badChart)",
@@ -168,7 +184,7 @@ def test_violating_twin_fails_every_check(
     """Every check FAILS on the violating twin, at every matrix leg.
 
     The mirror image of `test_compliant_twin_passes_all_checks`: one node per
-    leg exercising all four contracts, not one node per (contract x leg). The
+    leg exercising every contract, not one node per (contract x leg). The
     four violations are fixed-pixel geometry and static Chart.js config, so
     each was previously re-proving the same fact across all eight legs — 32
     nodes for four facts, against this repo's own "< 15 tests" rule (#209).

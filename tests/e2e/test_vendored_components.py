@@ -30,7 +30,12 @@ from tests.e2e._color_assertions import contrast as _contrast
 from tests.e2e._color_assertions import rgba as _rgba
 from tests.e2e._color_assertions import set_theme as _set_theme
 from tests.e2e._color_assertions import style as _style
-from tests.e2e._geometry import assert_min_target, assert_no_overlap, effective_rect
+from tests.e2e._geometry import (
+    assert_min_target,
+    assert_no_overlap,
+    assert_unpainted,
+    effective_rect,
+)
 from tests.e2e.conftest import STATIC_DIR
 
 _RANGE_ROWS = ("#demoRange2", "#demoRangeTabs", "#demoRange5")
@@ -486,12 +491,6 @@ _ICON_ONLY = (
     "#demoActionList .action-row-verb--stop",
     "#demoActionVerbCluster .icon-button",
 )
-_PAINT_JS = """els => els.map(el => {
-  const s = getComputedStyle(el);
-  return { id: el.id, bg: s.backgroundColor, shadow: s.boxShadow,
-           border: [s.borderTopWidth, s.borderRightWidth,
-                    s.borderBottomWidth, s.borderLeftWidth] };
-})"""
 
 
 def _assert_unpainted_at_rest(page: Page) -> None:
@@ -503,12 +502,7 @@ def _assert_unpainted_at_rest(page: Page) -> None:
     """
     page.mouse.move(0, 0)
     for selector in _ICON_ONLY:
-        rows = page.eval_on_selector_all(selector, _PAINT_JS)
-        assert rows, f"no elements match {selector}"
-        for row in rows:
-            assert row["bg"] == _TRANSPARENT, (selector, row)
-            assert row["border"] == ["0px"] * 4, (selector, row)
-            assert row["shadow"] == "none", (selector, row)
+        assert_unpainted(page, page.locator(selector))
     assert_min_target(page.locator(f"{_ICON_BUTTONS}, #demoHomeHead .home-toggle"))
     page.click("#openModalBtn")
     expect(page.locator("#demoDialog")).to_be_visible()
