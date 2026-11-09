@@ -30,7 +30,7 @@ no_window = { src = "src/no_window.py", reason = "adds a process-group flag", up
 
 - `src` is the forked path, as in `[vendored]`; `reason` says what differs and why; `upstream` is the issue offering the change here, so a fork without one is a smell.
 - A forked key is not also listed in `[vendored]`; it leaves the table when the adopter re-vendors the upstream version.
-- The reader belongs to `fleet-config`'s `vendored_drift.py`, which hashes the copies. Until it reads this table, a declared fork still shows as differing from the scaffold: the declaration is the record a human or `/propagate-vendored` reads to tell a deliberate fork from a stale copy.
+- `fleet-config`'s `skills/_lib/vendored_drift.py` reads the table (the parsing lives in `skills/_lib/vendored_wave/forks.py`). A declared fork reports as `fork`, is counted in `coverage.declared_forks` rather than folded into the clean adopters, and is neither an undeclared carrier nor a re-vendor target. A component listed in both `[vendored]` and `[vendored_forks]`, or a fork entry missing `src` or `reason`, is reported as an error.
 
 ## The web-page (static site) set
 
