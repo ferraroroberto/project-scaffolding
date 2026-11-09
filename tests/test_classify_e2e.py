@@ -816,3 +816,36 @@ def test_a_wedged_git_call_is_bounded_and_reads_as_no_answer(monkeypatch: pytest
     assert classify_e2e._run_git(["status"]) == []
     assert classify_e2e._git_text(["show", "HEAD:x"]) is None
     assert seen == [classify_e2e._GIT_TIMEOUT_S] * 2
+
+
+def test_every_git_spawn_runs_with_optional_locks_off(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A read-only git must not take the optional index.lock, or a gate beside another git strands it."""
+    envs: list[dict[str, str]] = []
+
+    def fake_run(*args: object, **kwargs: object) -> subprocess.CompletedProcess[str]:
+        env = kwargs.get("env")
+        assert isinstance(env, dict)
+        envs.append(env)
+        return subprocess.CompletedProcess(args=[], returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr(classify_e2e.subprocess, "run", fake_run)
+    classify_e2e._run_git(["diff", "--name-only", "HEAD"])
+    classify_e2e._git_text(["show", "HEAD:x"])
+    assert [e.get("GIT_OPTIONAL_LOCKS") for e in envs] == ["0", "0"]
+
+
+def test_classifier_spawns_git_only_through_the_two_env_pinning_helpers() -> None:
+    """A third raw subprocess call would bypass the env pin above, so the module may hold only two."""
+    tree = ast.parse((REPO_ROOT / "scripts" / "classify_e2e.py").read_text(encoding="utf-8"))
+    spawners = sorted(
+        func.name
+        for func in ast.walk(tree)
+        if isinstance(func, ast.FunctionDef)
+        for node in ast.walk(func)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and isinstance(node.func.value, ast.Name)
+        and node.func.value.id == "subprocess"
+        and node.func.attr in {"run", "Popen", "call", "check_call", "check_output"}
+    )
+    assert spawners == ["_git_text", "_run_git"]
