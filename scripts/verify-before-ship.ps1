@@ -111,18 +111,59 @@
     Strictness lives in pyproject.toml ([tool.ruff.lint], [tool.mypy]); this
     script only sequences the tools. Anchors to the repo root, so run it from
     anywhere:  & .\scripts\verify-before-ship.ps1
+
+    Verdict line: the last line on stdout is `GATE-RESULT: PASS` or
+    `GATE-RESULT: FAIL`, on every path that can still run code. Never pipe the
+    gate when its exit code matters (a pipeline reports its last command's
+    status, so `... | tail -40` turns a red run green); a caller that cannot
+    avoid a pipe asserts on that line. A run with no such line is not a pass.
 #>
 [CmdletBinding()]
 param()
 
 $ErrorActionPreference = "Stop"
+
+# gate-verdict:begin
+# The verdict is the last stdout line of every path that can still run code. A
+# terminating error under the "Stop" preference above would otherwise print to
+# stderr only and exit 1, leaving a piped caller an empty, apparently clean run,
+# so the trap reports it on stdout first. Exit codes stay 0 (pass) and 1 (fail).
+function Write-GateResult($verdict) {
+    Write-Host "GATE-RESULT: $verdict"
+}
+
+function Complete-Gate([int]$Code) {
+    Write-GateResult $(if ($Code -eq 0) { "PASS" } else { "FAIL" })
+    exit $Code
+}
+
+trap {
+    Write-Host ""
+    Write-Host "[FAIL] the gate aborted on an unhandled error:" -ForegroundColor Red
+    Write-Host ("       {0}" -f $_.Exception.Message) -ForegroundColor Red
+    Complete-Gate 1
+}
+
+function Invoke-Stage {
+    param([string]$Name, [scriptblock]$Body)
+    Write-Host ""
+    Write-Host ">> $Name" -ForegroundColor Cyan
+    & $Body
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "[FAIL] $Name (exit $LASTEXITCODE)" -ForegroundColor Red
+        Complete-Gate 1
+    }
+    Write-Host "[PASS] $Name" -ForegroundColor Green
+}
+# gate-verdict:end
+
 Set-Location (Join-Path $PSScriptRoot "..")
 
 $py = ".\.venv\Scripts\python.exe"
 if (-not (Test-Path $py)) {
     Write-Host "[FAIL] .venv not found at $py" -ForegroundColor Red
     Write-Host "       Create it and run: $py -m pip install -r requirements.txt" -ForegroundColor Red
-    exit 1
+    Complete-Gate 1
 }
 
 # Box load lock: re-runs this script under the shared lock and exits with its
@@ -144,23 +185,11 @@ if ($catalogExit -ne 0 -or $VendoredModules.Count -eq 0) {
     Write-Host "[FAIL] could not derive the vendored-module list from .fleet.toml [components]" -ForegroundColor Red
     Write-Host "       (an empty list would pass 'mypy --strict' while checking nothing)" -ForegroundColor Red
     Write-Host "       Run: $py scripts/vendored_catalog.py mypy-targets" -ForegroundColor Red
-    exit 1
+    Complete-Gate 1
 }
 Write-Host "vendored components (mypy --strict): $($VendoredModules.Count) targets from .fleet.toml [components]" -ForegroundColor DarkGray
 
-function Invoke-Stage {
-    param([string]$Name, [scriptblock]$Body)
-    Write-Host ""
-    Write-Host ">> $Name" -ForegroundColor Cyan
-    & $Body
-    if ($LASTEXITCODE -ne 0) {
-        Write-Host "[FAIL] $Name (exit $LASTEXITCODE)" -ForegroundColor Red
-        exit 1
-    }
-    Write-Host "[PASS] $Name" -ForegroundColor Green
-}
-
-Invoke-Stage "byte-compile"                       { & $py -m compileall -q app src tests }
+Invoke-Stage "byte-compile"                      { & $py -m compileall -q app src tests }
 Invoke-Stage "ruff"                               { & $py -m ruff check . }
 Invoke-Stage "static ratchet"                     { & $py "scripts/static_ratchet.py" }
 Invoke-Stage "comment ratchet"                    { & $py "scripts/comment_ratchet.py" }
@@ -247,3 +276,4 @@ Invoke-Stage "runtime write probe"                { & $py "scripts/runtime_write
 
 Write-Host ""
 Write-Host "[PASS] all checks green - safe to ship." -ForegroundColor Green
+Complete-Gate 0
