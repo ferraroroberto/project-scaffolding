@@ -732,6 +732,7 @@ agents_pointer       = false                # S-02
 claude_md_max_lines  = 120                  # S-03; unset means off
 repeated_text_words  = 12                   # S-04; unset means off
 repeated_text_global = false                # S-04
+repeated_text_exclude = []                   # S-04; docs/ files that are never a source
 ```
 
 **Default:** the `R-` rules below are on. The four `S-` rules are opt-in.
