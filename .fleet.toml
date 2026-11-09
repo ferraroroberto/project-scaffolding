@@ -502,14 +502,16 @@ allow   = [
 # flag, a print in app code, a hardcoded drive path, a raw secret compare outside
 # `secret_helpers`, a raw git spawn outside `git_wrappers`; in a web file, a
 # password input outside the vendored sign-in sheet; a `must_use` call outside
-# the one file the repo names for it), beyond the committed baseline. Opt-in per
+# the one file the repo names for it; an implicit-state-machine suspect outside a
+# module the top-level [[state_machines]] table declares), beyond the committed baseline. Opt-in per
 # repo and per rule through this table, like [dead_code_ratchet]. The scaffold has
 # no secret-compare helper or git wrapper, so it enforces the four rules that need
 # none, plus two must_use entries.
 # Mechanism + limits: docs/conventions-ratchet.md.
 [conventions_ratchet]
 enabled = true
-rules   = ["no-window", "logging-not-print", "no-drive-path", "password-input-vendored", "login-lockout", "subprocess-timeout"]
+rules   = ["no-window", "logging-not-print", "no-drive-path", "password-input-vendored", "login-lockout", "subprocess-timeout",
+           "state-literal", "state-set-repeat", "state-write"]
 
 # Outbound HTTP goes through the pooled session, not a bare requests call.
 [[conventions_ratchet.must_use]]
@@ -710,9 +712,11 @@ instruction_frontmatter = { src = "scripts/instruction_frontmatter.py" }
 instruction_repeats = { src = "scripts/instruction_repeats.py" }
 doc_refs_ratchet = { src = "scripts/doc_refs_ratchet.py" }
 dead_code_ratchet = { src = "scripts/dead_code_ratchet.py" }
-conventions_ratchet = { src = "scripts/conventions_ratchet.py", requires = ["conventions_readers"] }
-# conventions_ratchet loads this sibling (the syntax-tree predicates and the web and text line rules); `requires` makes /propagate-vendored carry both.
+conventions_ratchet = { src = "scripts/conventions_ratchet.py", requires = ["conventions_readers", "conventions_state"] }
+# conventions_ratchet loads these siblings (the syntax-tree predicates and the web and text line rules; the
+# implicit-state-machine readers); `requires` makes /propagate-vendored carry all three.
 conventions_readers = { src = "scripts/conventions_readers.py" }
+conventions_state = { src = "scripts/conventions_state.py" }
 usage_track_ratchet = { src = "scripts/usage_track_ratchet.py", requires = ["usage_track_scan"] }
 # usage_track_ratchet loads this sibling (the HTML and JS readers); `requires` makes /propagate-vendored carry both.
 usage_track_scan = { src = "scripts/usage_track_scan.py" }

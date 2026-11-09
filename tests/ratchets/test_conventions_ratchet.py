@@ -726,7 +726,8 @@ def test_a_ratchet_vendored_without_its_readers_is_not_confirmed(tmp_path: Path)
                           env={**os.environ, "PYTHONUTF8": "1"}, creationflags=NO_WINDOW, timeout=60, check=False)
     assert done.returncode == cr.EXIT_NOT_CONFIRMED
     assert "conventions_readers.py is missing beside this script" in done.stdout
-    shutil.copyfile(REPO_ROOT / "scripts" / "conventions_readers.py", alone.with_name("conventions_readers.py"))
+    for sibling in ("conventions_readers.py", "conventions_state.py"):
+        shutil.copyfile(REPO_ROOT / "scripts" / sibling, alone.with_name(sibling))
     again = subprocess.run([sys.executable, "-P", str(alone), "--root", str(tmp_path)], capture_output=True, text=True,
                            encoding="utf-8", env={**os.environ, "PYTHONUTF8": "1"}, creationflags=NO_WINDOW,
                            timeout=60, check=False)
@@ -772,6 +773,7 @@ def test_the_script_is_catalogued_so_it_is_mypy_gated_and_drift_checked() -> Non
     catalog = load_catalog(REPO_ROOT)
     assert catalog["conventions_ratchet"] == {"src": "scripts/conventions_ratchet.py"}
     assert catalog["conventions_readers"] == {"src": "scripts/conventions_readers.py"}
+    assert catalog["conventions_state"] == {"src": "scripts/conventions_state.py"}
 
 
 def test_every_rule_is_documented_with_the_line_it_enforces() -> None:

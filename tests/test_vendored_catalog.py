@@ -150,8 +150,8 @@ def test_every_requires_names_a_declared_component(real_catalog: dict[str, dict[
     is not in the catalog would send a wave looking for a file that does not exist."""
     table = tomllib.loads((REPO_ROOT / ".fleet.toml").read_text(encoding="utf-8"))["components"]
     requires = {k: v["requires"] for k, v in table.items() if "requires" in v}
-    assert requires.get("conventions_ratchet") == ["conventions_readers"], (
-        "conventions_ratchet imports scripts/conventions_readers.py; re-vendoring it alone exits 3"
+    assert requires.get("conventions_ratchet") == ["conventions_readers", "conventions_state"], (
+        "conventions_ratchet imports scripts/conventions_readers.py and conventions_state.py; re-vendoring it alone exits 3"
     )
     unknown = sorted(d for deps in requires.values() for d in deps if d not in real_catalog)
     assert not unknown, f"`requires` names components the catalog does not declare: {unknown}"

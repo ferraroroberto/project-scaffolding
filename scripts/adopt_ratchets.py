@@ -66,7 +66,7 @@ RATCHETS: tuple[Ratchet, ...] = (
     Ratchet("instruction", ("instruction_frontmatter", "instruction_repeats"), "-"),
     Ratchet("doc_refs", (), "-"),
     Ratchet("dead_code", (), "-"),
-    Ratchet("conventions", ("conventions_readers",), "-",
+    Ratchet("conventions", ("conventions_readers", "conventions_state"), "-",
             'rules = ["subprocess-timeout"]  # pick more: docs/conventions-ratchet.md\n'),
     Ratchet("runtime_write", ("runtime_write_resolve",), "-"),
     Ratchet("usage_track", ("usage_track_scan",), "a web UI (HTML/JS) to scan",

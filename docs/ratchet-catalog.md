@@ -664,6 +664,53 @@ conn = sqlite3.connect("orders.db")
 conn = get_db()          # defined in src/db.py, the only module that connects
 ```
 
+#### `state-literal`
+
+A lifecycle string (`running`, `failed`, `pending`, `ready`, …) compared or stored as a state: the name on the other side ends in `status`, `state`, `phase`, `stage` or `lifecycle`. Each one is a suspect implicit state machine ([implicit-state-machines.md](implicit-state-machines.md)); an agent confirms it before anything is declared. Code in a module the top-level `[[state_machines]]` table declares is never reported.
+
+```python
+# bad: src/jobs/queue.py
+if latest.get("status") in ("running", "pending"):
+    ...
+
+# fixed: src/jobs/queue.py
+if derive_job_state(latest).is_active:   # the one declared JobState, in src/jobs/state.py
+    ...
+```
+
+#### `state-set-repeat`
+
+One set of two or more lifecycle strings (a tuple, list or set literal, `frozenset({...})`, `Literal[...]`, or an `Enum`'s values) spelled out in more than one module. A declared module's spelling counts, so a second module that re-spells the declared states is a hit.
+
+```python
+# bad: the active set, in two modules
+ACTIVE = ("running", "pending")          # src/jobs/queue.py
+if status not in {"running", "pending"}:  # app/routers/jobs.py
+
+# fixed: both import it
+from src.jobs.state import ACTIVE_STATES
+```
+
+#### `state-write`
+
+A boolean or `None` written to a lifecycle-named flag (`ready`, `_loading`, `is_started`, `scan_pending`) on the same receiver name from more than one module: no single owner sets it. A bare local name is never a write.
+
+```python
+# bad: load.ready set in the declared module and again in the process module
+load.ready = True        # src/process/backend_process.py
+
+# fixed: the process module reports the fact; the declared module derives the state
+serving_state.record_ready(load)
+```
+
+```toml
+[[state_machines]]
+name   = "serving"
+module = "src/process/serving_state.py"
+type   = "ServingState"
+derive = "derive_serving_state"
+```
+
 ### Runtime write ratchet
 
 [runtime-write-ratchet.md](runtime-write-ratchet.md). Runtime output (logs, run records, caches, databases) belongs under `data/` or the machine's runtime root, never next to the code that writes it. The ratchet finds every write target in the repository's Python source and resolves its path statically. Write targets are `open()` with a writing mode, `<path>.write_text/write_bytes/touch/mkdir()`, `os.mkdir/makedirs`, `shutil.copy*/move` (the destination), `logging.*FileHandler`, `logging.basicConfig(filename=)` and `sqlite3.connect()`. A relative path is read from the repository root. Test modules are not scanned: they write under pytest's `tmp_path`, and the probe covers a run. **Except** one call with `# runtime-write-exempt: <reason>`, or by `exclude` and `safe_calls` (calls that return a path outside the tree).

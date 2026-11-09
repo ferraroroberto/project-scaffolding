@@ -4,7 +4,7 @@
 
 Before it, each convention was guarded by a one-off test in whichever repo last hit the bug: a no-window spawn test here, a constant-time compare test in one app, a raw-git check in another. This stage is the one vendored copy of those guards. A repo that adopts it can delete its local duplicate once the matching rule is enabled and its baseline is committed.
 
-It reuses the shape of the [dead code ratchet](dead-code-ratchet.md): an opt-in `.fleet.toml` table, a committed baseline, the same flags, and exit 3 for "not confirmed". It is stdlib-only and imports nothing it scans. It is two files: the ratchet (configuration, scanning, baseline) and `scripts/conventions_readers.py`, the pure readers (syntax-tree predicates and the web and text line rules), which keeps both under the structure limits.
+It reuses the shape of the [dead code ratchet](dead-code-ratchet.md): an opt-in `.fleet.toml` table, a committed baseline, the same flags, and exit 3 for "not confirmed". It is stdlib-only and imports nothing it scans. It is three files: the ratchet (configuration, scanning, baseline), `scripts/conventions_readers.py`, the pure readers (syntax-tree predicates and the web and text line rules), and `scripts/conventions_state.py`, the implicit-state-machine readers, which keeps each under the structure limits.
 
 ## The rules
 
@@ -242,6 +242,44 @@ An entry is data in the adopting repo's own `.fleet.toml`. Re-vendoring `scripts
 
 **Enabling an entry in a repo that has hits today.** Add the table, then record today's hits with `--update-baseline --allow-additions` (or `--init` when there is no baseline yet). Fix them in a follow-up: each fixed call shrinks the baseline with `--update-baseline`, and the goal is a baseline with no `must-use` entries left, not a standing ledger. A call that should stay takes the marker above.
 
+### `state-literal`
+
+> An *implicit state machine* is a concept that really has modes (stopped, loading, ready, failed) but never declares them as one official state. ([implicit-state-machines.md](implicit-state-machines.md))
+
+The three state rules are the deterministic scan that page describes: they flag **suspects**, and an agent deep-dive confirms each one before anything is declared or refactored. A lifecycle word is one of `idle`, `loading`, `loaded`, `ready`, `starting`, `started`, `running`, `stopping`, `stopped`, `pending`, `queued`, `waiting`, `failed`, `finished`, `completed`, `done`, `cancelled`, `canceled`, `crashed`, `retrying`, `paused`, `resuming`, `connecting`, `connected`, `disconnected`, `booting`, `warming`, `succeeded`, `errored`, `aborted`, `expired`, `draining`, `terminated`, `killed`, `dead`, `offline`, `online`, `in_progress` and `scheduled` (any case). Generic outcome words (`error`, `success`, `ok`, `active`, `unknown`) are left out: as values they are mostly log levels, HTTP outcomes and toggles.
+
+A `state-literal` hit is a lifecycle string that is compared or stored **as a state**: the name on the other side says it holds one, because its last word (after `_`) is `status`, `state`, `phase`, `stage` or `lifecycle`. The forms read:
+
+- `x.status == "running"`, `"failed" != row["state"]`, `job.get("phase") in ("idle", "loading")` (one hit per literal in the collection);
+- `self.status = "stopped"`, `entry["state"] = "idle"`, `status: str = "queued"`;
+- a dict literal's state key, `{"state": "started"}`, and a state keyword argument, `finish(status="failed")`.
+
+It is not a hit when the name says nothing about a state (`level == "running"`, `word = "failed"`), or the value is not a lifecycle word (`status = "green"`). It reads one module at a time.
+
+### `state-set-repeat`
+
+A hit is one set of states spelled out in more than one module: a tuple, list or set literal, a `frozenset({...})` / `set([...])` call, a `Literal[...]` subscript, or the string values of an `Enum` / `StrEnum` class, whose items are all strings and at least two of them lifecycle words. Two spellings are the same set when they hold the same strings, in any order and case. Every module that spells it gets a hit at each spelling; a set spelled twice in one module is not a hit. One concept's states written down twice is how two readers come to disagree about which states count as "active".
+
+### `state-write`
+
+A hit is a boolean, `None`, comparison or `not ...` written to a lifecycle-named flag from more than one module. A lifecycle-named flag is an attribute or a string key whose name, leading underscores dropped, is a flag word (`loading`, `loaded`, `ready`, `starting`, `started`, `running`, `stopping`, `stopped`, `pending`, `busy`, `connected`, `connecting`, `retrying`, `paused`, `initialized`, `booted`, `warming`, `warm`, `finished`, `failed`, `draining`, `in_flight`), optionally after `is_` / `has_` / `was_` and a prefix (`scan_pending`, `_is_ready`, `model_loaded`). `obj.flag = ...`, `obj["flag"] = ...` and `setattr(obj, "flag", ...)` are writes. The receiver's own name is part of the flag, so `load.ready` in one module and `load.ready` in another are one flag with two owners, while `self.ready` in one class and `state.ready` in another are two. A bare local name (`ready = True`) is never shared state and never a write. A flag with no single owner is the "set on entry, cleared only on the happy path" sign.
+
+#### Declaring a machine: `[[state_machines]]`
+
+Declaring a machine is what clears its suspects. Each declared machine is one top-level table in `.fleet.toml`:
+
+```toml
+[[state_machines]]
+name   = "job"                       # the concept, for the messages
+module = "src/jobs/state.py"         # the one module that owns it (repo-relative)
+type   = "JobState"                  # the declared state type: a class, Enum or type alias defined there
+derive = "derive_job_state"          # optional: the derive function defined there
+```
+
+Code in a declared module is never reported by the three state rules. Its spellings still count toward the cross-module rules, so a second module that re-spells the declared states (`state-set-repeat`) or writes its flag (`state-write`) is a hit: the fix is to import the declared type or call the derive function. The table is validated whenever the stage is enabled: a missing `name`, `module` or `type`, a non-string value or an unknown key is a configuration error (exit 2). With a state rule listed, a declared module that does not exist or parse, or that defines no top-level `type` or `derive` name, is **not confirmed** (exit 3), never a skip, because a stale declaration would exempt a module that no longer owns the state.
+
+**What the state rules cannot see.** A state held in names that say nothing (`if proc and not err`), a mode inferred from an empty field or a timer, an outcome passed as prose, unknown folded into a negative, and in-memory restart latches (a flag that survives in a long-lived process and is lost on restart). Those stay review-checklist items in [implicit-state-machines.md](implicit-state-machines.md). A status vocabulary that belongs to a remote API (a GitHub run's `in_progress`, a vehicle's `online`) is a hit at the boundary that translates it; that spot is usually the derive function, so declare it or mark it.
+
 ### Exempting one call
 
 A call that must break a rule keeps a reasoned marker on one of its own lines, or in the comment block directly above it:
@@ -268,8 +306,8 @@ Only Python source, web files and (for `no-pwsh-stub`) the text files above are 
 |---|---|---|
 | `0` | Pass (no rule count above the baseline), or the stage is **not enabled** | continues |
 | `1` | A file's count for a rule rose, or the baseline file is missing | fails |
-| `2` | Bad `[conventions_ratchet]` table (unknown key or rule, no rules, a helper rule with no helper, a `must_use` entry with an unknown key or no `call`, `helper` or `why`), unreadable baseline, bad arguments | fails |
-| `3` | **NOT CONFIRMED**: `git` unusable, a tracked `.py` file that does not parse, or a scanned file that cannot be read. The message names the file and line | fails |
+| `2` | Bad `[conventions_ratchet]` table (unknown key or rule, no rules, a helper rule with no helper, a `must_use` entry with an unknown key or no `call`, `helper` or `why`), a bad `[[state_machines]]` entry, unreadable baseline, bad arguments | fails |
+| `3` | **NOT CONFIRMED**: `git` unusable, a tracked `.py` file that does not parse, a scanned file that cannot be read, or (with a state rule listed) a declared state machine whose module is missing or defines no `type` / `derive`. The message names the file and line | fails |
 
 Exit 3 is its own state and never folded into a pass: a file the scanner cannot parse may hold a violation, so skipping it would report a clean tree it never saw.
 
@@ -303,7 +341,7 @@ A failing check prints every hit of the risen rule in the file, as `<path>:<line
 
 Re-vendoring the script never breaks a repo that has not opted in: an absent `[conventions_ratchet]` table, or `enabled = false`, prints `conventions ratchet: not enabled` and exits 0 (declared, not inferred).
 
-1. Vendor `scripts/conventions_ratchet.py` and its sibling `scripts/conventions_readers.py` byte-for-byte (`python scripts/adopt_ratchets.py <repo> --ratchets conventions` from a scaffold checkout copies and declares them, see [adopting-ratchets.md](adopting-ratchets.md); inside the fleet, `/propagate-vendored conventions_ratchet,conventions_readers`; manifest keys `conventions_ratchet` and `conventions_readers`) and declare both in the repo's `[vendored]` table. The ratchet loads the sibling by path and exits 3 when it is missing. It needs Python 3.11+ (`tomllib`) and `git`; it parses code with the running interpreter's grammar, so run it with the interpreter the project targets.
+1. Vendor `scripts/conventions_ratchet.py` and its siblings `scripts/conventions_readers.py` and `scripts/conventions_state.py` byte-for-byte (`python scripts/adopt_ratchets.py <repo> --ratchets conventions` from a scaffold checkout copies and declares them, see [adopting-ratchets.md](adopting-ratchets.md); inside the fleet, `/propagate-vendored conventions_ratchet`, whose `requires` carries both siblings; manifest keys `conventions_ratchet`, `conventions_readers` and `conventions_state`) and declare all three in the repo's `[vendored]` table. The ratchet loads the siblings by path and exits 3 when one is missing. It needs Python 3.11+ (`tomllib`) and `git`; it parses code with the running interpreter's grammar, so run it with the interpreter the project targets.
 2. Add to the repo's own `.fleet.toml`, enabling only the rules that apply:
 
    ```toml
@@ -374,6 +412,12 @@ A read-only dry run with **every rule on** over every fleet checkout (42 repos),
 
 | `subprocess-timeout` | 128 (24 are in scaffold scripts: 18 in adopters' copies of `gen_tailscale_cert.py`, 5 in `classify_e2e.py` (the scaffold's own 2 since fixed) and 1 in a `gen_ssl_cert.py`) | 21 (of 44) | 14 of the 104 hits outside the scaffold-script copies, every 7th, source read | 12 of 14: a `git`, `ffmpeg`, `ffprobe`, `clip`, `systemctl`, `launchctl` or Ghostscript call that waits on a child with no bound. 2 are a kind a marker covers: foreground runners that block for the child's life. The issue's own hand sample found 8 of 10 real, 2 deliberate. Vendored destinations and test modules are not read. |
 
+| `state-literal` | app-launcher 55, home-automation 9, local-llm-hub 15, whatsapp-radar 21 (100) | 4 of 4 | 42 sampled at random (10 to 12 per repo), source read | 38 of 42 are a lifecycle status compared or stored outside any declared machine (a job record's `"running"`, a run's `"failed"`, a container's `"running"`, a transcription's `"done"`). 4 are a remote API's vocabulary translated at the boundary (a GitHub run's `in_progress`, a vehicle's `online`), the spot a derive function belongs: declare it or mark it. A wider probe that did not require a state-named holder counted 74 / 44 / 30 in the first three repos |
+| `state-set-repeat` | app-launcher 4, others 0 | 1 of 4 | all | 4 of 4: one job record's active set (`running`, `pending`) spelled in three modules |
+| `state-write` | local-llm-hub 2, others 0 | 1 of 4 | all | 2 of 2: the serving state's `load.ready` written both in its declared module and in the backend process module. Keyed by attribute name alone (no receiver) it reported 4, 2 of them two unrelated classes sharing a `ready` field |
+
+The state rules were dry-run separately over four repos, read-only from each one's `origin/main` with tests skipped, before any of them declared its machines in `[[state_machines]]`.
+
 Before the platform-branch and system-folder rules, the dry run also reported `open`/`xdg-open`/`pbcopy`/`xclip` branches (`no-window`), `C:/ProgramData/pip/pip.ini` and a bare `"C:\\"` drive root (`no-drive-path`). Each became a rule above.
 
 The false-positive kinds that remain:
@@ -385,5 +429,7 @@ The false-positive kinds that remain:
 ## Tests
 
 `tests/ratchets/test_conventions_ratchet.py`: for each rule, a seeded violation that fails by name and the compliant form that passes. Also covered: import aliases, the `**kwargs` miss (for `no-window` and `subprocess-timeout`), `Popen` and the async spawns never a timeout hit, every platform-branch form and the early return, the CLI-module and file-write exceptions, the system-folder and drive-root exceptions, docstrings versus f-strings, helpers and wrappers, every spelling of a login `post` route and the routes that take no password, every text format and argv spelling of a `pwsh` command against the absolute path, prose, shell-name lists and lookups that are not hits, the test-module scope, and exempt markers (a reason is needed, and the marker must name this rule). On throwaway git repos it runs every mode and exit code: a new violation failing by rule, file and line; a second violation of a baselined rule; shrink-only updates; `--allow-additions`; vendored and excluded files, a new untracked file failing and an ignored one skipped; a tracked baseline and another ratchet's baseline never read as evidence; and exit 3 for an unparseable file and an unusable `git`, in every mode. A missing prerequisite is a hard failure there, never `pytest.skip`. The scaffold's own gate stage doubles as the guard that its committed baseline is current.
+
+`tests/ratchets/test_conventions_state.py` covers the three state rules on throwaway git repos: a hit, a miss, the exempt marker (a marked site is not reported but still counts as a second home) and the declared module's exemption for each, the `Enum`, `Literal` and `frozenset` spellings, and the `[[state_machines]]` table: every malformed entry exits 2, and a declared module, type or derive function that is not there exits 3.
 
 `tests/ratchets/test_conventions_must_use.py` covers `must-use`: the entry shape and every config error, import aliases and dotted modules, the helper, `paths` and test-module scope, several entries counted under one rule, the two built-in policies reporting beside a declared one, and the gate on a throwaway repo (a new hit failing by rule, file and line, a baseline burned down to zero, a bad entry exiting 2 in every mode).
