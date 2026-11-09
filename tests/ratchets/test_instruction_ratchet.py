@@ -209,6 +209,17 @@ def test_r15_skill_description_and_name(tmp_path: Path) -> None:
     assert rules(bad, "consider")["R-15"] == 2 + 2 + 1  # I + your, two tags, the name
 
 
+def test_r15_never_counts_in_a_neutral_skill(tmp_path: Path) -> None:
+    # Line-1 frontmatter hits cannot be scoped by a heading and a SKILL.md is agent-neutral,
+    # so R-15 stays at consider: documented as advisory in docs/instruction-ratchet.md.
+    hits = lint(tmp_path, ".claude/skills/a/SKILL.md",
+                skill("Body.\n", description="I help you review code. " + "x" * 1100, name="Review Helper"),
+                agents="CLAUDE.md")
+    assert rules(hits, "consider")["R-15"] > 0
+    assert rules(hits, "violation").get("R-15", 0) == 0
+    assert "R-15" in ir.RULES and "R-15" not in ir.NOT_ENFORCED
+
+
 @pytest.mark.parametrize(
     "text",
     [

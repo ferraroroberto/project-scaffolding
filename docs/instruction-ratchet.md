@@ -29,7 +29,7 @@ The reader comes from the file, never from the host running the check:
 - Everything else is agent-neutral.
 - A heading carrying `Claude Code only` or `Codex only` scopes its section to that reader.
 
-So in a typical repo, whose `AGENTS.md` points at `CLAUDE.md`, the counted rules are the shared ones: R-03, R-04, R-14, R-16 and R-17, plus R-36's relative backslash paths, which the audit always caps at violation.
+So in a typical repo, whose `AGENTS.md` points at `CLAUDE.md`, the counted rules are the shared ones: R-03, R-04, R-14, R-16 and R-17, plus R-36's relative backslash paths, which the audit always caps at violation. R-15 is reported but never counted: its hits sit on line 1 of a `SKILL.md` (the frontmatter), which no heading can scope, and a `SKILL.md` is agent-neutral, so they stay at **consider**.
 
 ### Enforced rules
 
@@ -37,7 +37,7 @@ So in a typical repo, whose `AGENTS.md` points at `CLAUDE.md`, the counted rules
 |---|---|
 | R-01 to R-12, R-30, R-45 | Phrase patterns in prose: ALL-CAPS pressure words, blanket tool defaults, forced re-check lines, periodic progress scaffolding, narration suppression, anti-formatting lines, hand-written reasoning plans, "do not think" rules, recall-suppressing review lines, prefill or thinking-budget references, dated phrasing, upfront-plan demands, reasoning-in-the-answer lines, blanket tool-use discouragement |
 | R-14 | Size caps: `CLAUDE.md` and rules files over 200 lines, a `SKILL.md` body over 500 lines, `AGENTS.md` over 32,768 bytes |
-| R-15 | A skill description over 1,024 characters, first- or second-person words in its prose (double-quoted trigger phrases excluded), an XML tag in it, or a `name` that is not 1 to 64 characters of `[a-z0-9-]` |
+| R-15 (advisory, never counted) | A skill description over 1,024 characters, first- or second-person words in its prose (double-quoted trigger phrases excluded), an XML tag in it, or a `name` that is not 1 to 64 characters of `[a-z0-9-]` |
 | R-16 | The same action phrase under both an always/must and a never/do-not modal in one file |
 | R-17 | An agent-neutral paragraph that names one vendor's products (`Claude`, `Anthropic`; `Codex`, `OpenAI`, `GPT`) and not the other's, without a scope marker |
 | R-34 | A skill's reference doc that links a further local `.md` the `SKILL.md` does not reference itself |
