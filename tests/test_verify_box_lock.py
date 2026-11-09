@@ -57,7 +57,7 @@ def test_gate_dot_sources_the_component_before_any_stage_runs() -> None:
     """A stage that ran before the lock would sit outside it."""
     text = _gate()
     assert DOT_SOURCE in text, "the gate must dot-source scripts/box_lock_gate.ps1"
-    assert text.index(DOT_SOURCE) < text.index("function Invoke-Stage"), "the lock must precede every stage"
+    assert text.index(DOT_SOURCE) < text.index('Invoke-Stage "'), "the lock must precede every stage"
 
 
 def test_gate_no_longer_carries_its_own_lock_block() -> None:
