@@ -17,6 +17,21 @@ Add a component to the table in the same PR that adds it to the tree. `tests/tes
 
 A component that loads a sibling at run time declares it with `requires = ["<key>", ...]` on its entry (`conventions_ratchet` requires `conventions_readers`; `tests/test_vendored_catalog.py` fails a script that loads a sibling through `_load_sibling` without listing it). `/propagate-vendored` expands a named component with its `requires`, so a wave never re-vendors one without the other. Every `requires` name must be a declared key.
 
+## Declaring a deliberate fork
+
+A component is vendored byte-for-byte; a copy that differs is stale until proven otherwise. When an adopter needs something the component lacks, the fix is to offer it here (an issue, then a change to the component, then a re-vendor), not to keep a private edit. A fork is the exception, for the window before the upstream change lands or for a need that is genuinely one repo's.
+
+An adopter records one in a `[vendored_forks]` table in its own `.fleet.toml`, beside `[vendored]`:
+
+```toml
+[vendored_forks]
+no_window = { src = "src/no_window.py", reason = "adds a process-group flag", upstream = "<owner>/project-scaffolding#<issue>" }
+```
+
+- `src` is the forked path, as in `[vendored]`; `reason` says what differs and why; `upstream` is the issue offering the change here, so a fork without one is a smell.
+- A forked key is not also listed in `[vendored]`; it leaves the table when the adopter re-vendors the upstream version.
+- The reader belongs to `fleet-config`'s `vendored_drift.py`, which hashes the copies. Until it reads this table, a declared fork still shows as differing from the scaffold: the declaration is the record a human or `/propagate-vendored` reads to tell a deliberate fork from a stale copy.
+
 ## The web-page (static site) set
 
 A fleet **web page** is a public, static, content-first site served as a folder from a CDN. Its components are a separate set from the web-app ones, because the app set is app-shaped (a floating tab pill, light and dark, data and controls) and a site is not (a top header with a phone menu, the owner's brand, text and images, light only). They were extracted from the fleet's first web page without changing its look: every CSS and JS rule is a verbatim copy, and the Python keeps its behaviour with the site-specific constants turned into arguments.

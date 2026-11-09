@@ -28,9 +28,12 @@ Two escape hatches, both deliberate and both self-documenting:
 from __future__ import annotations
 
 import ast
+import subprocess
+import sys
 from pathlib import Path
 
 from scripts.vendored_catalog import load_catalog
+from src import no_window
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
@@ -264,3 +267,18 @@ def test_bare_marker_is_not_excused_by_a_reasoned_marker_elsewhere_in_the_file(
     bare = _bare_exemptions(exemptions, root=tmp_path)
 
     assert bare == ["sample.py:4"]
+
+
+def test_new_group_no_window_adds_a_process_group_to_no_window() -> None:
+    """The `CTRL_BREAK_EVENT` flag is `NO_WINDOW` plus a process group, nothing else."""
+    group = subprocess.CREATE_NEW_PROCESS_GROUP if sys.platform == "win32" else 0
+    assert no_window.NEW_GROUP_NO_WINDOW == group | no_window.NO_WINDOW
+    if sys.platform == "win32":
+        assert no_window.NEW_GROUP_NO_WINDOW != no_window.NO_WINDOW
+        # DETACHED_PROCESS neither hides the window nor escapes a subtree kill.
+        detached = getattr(subprocess, "DETACHED_PROCESS")  # noqa: B009
+        assert not no_window.NEW_GROUP_NO_WINDOW & detached
+
+
+def test_both_flag_constants_are_exported() -> None:
+    assert set(no_window.__all__) == {"NO_WINDOW", "NEW_GROUP_NO_WINDOW"}
