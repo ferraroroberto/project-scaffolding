@@ -169,6 +169,62 @@ def test_rearm_lets_a_failed_respawn_try_again_next_tick() -> None:
     assert rec.wedges == [2, 3, 4]  # re-armed each tick, counter keeps climbing
 
 
+def test_on_failing_fires_every_failed_probe_from_the_alert_onward() -> None:
+    rec = _Recorder()
+    failing: list[int] = []
+    state = {"ok": False}
+    wd = HealthWatchdog(
+        lambda: state["ok"],
+        rec.on_wedge,
+        rec.on_recover,
+        failures_to_alert=3,
+        on_failing=failing.append,
+    )
+
+    for _ in range(5):
+        wd.tick()
+    assert rec.wedges == [3]
+    assert failing == [3, 4, 5]  # silent below the threshold, then every failed tick
+
+    state["ok"] = True
+    wd.tick()
+    wd.tick()
+    assert failing == [3, 4, 5]  # a recovery stops it
+    assert rec.recoveries == 1
+
+    state["ok"] = False
+    for _ in range(3):
+        wd.tick()
+    assert failing == [3, 4, 5, 3]  # the next alert starts a fresh count
+
+
+def test_on_failing_is_skipped_when_on_wedge_rearms() -> None:
+    failing: list[int] = []
+    wd: HealthWatchdog
+
+    def on_wedge(count: int) -> None:
+        wd.rearm()
+
+    wd = HealthWatchdog(
+        lambda: False, on_wedge, lambda: None, failures_to_alert=2, on_failing=failing.append
+    )
+
+    for _ in range(4):
+        wd.tick()
+
+    assert failing == []  # a re-armed watchdog is not alerted, so nothing to report
+
+
+def test_a_watchdog_without_on_failing_behaves_as_before() -> None:
+    rec = _Recorder()
+    wd = HealthWatchdog(lambda: False, rec.on_wedge, rec.on_recover, failures_to_alert=2)
+
+    for _ in range(4):
+        assert wd.tick() is False
+
+    assert rec.wedges == [2]
+
+
 def test_a_raising_probe_counts_as_a_failure() -> None:
     rec = _Recorder()
 

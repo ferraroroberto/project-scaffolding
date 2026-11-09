@@ -104,6 +104,12 @@ class HealthWatchdog:
     until a recovery (or an explicit :meth:`rearm`) re-arms it — and the first
     success after an alert fires ``on_recover()``.
 
+    The optional ``on_failing(count)`` is level-triggered: it fires on every
+    failed probe while the watchdog is alerted (on the alert tick itself, right
+    after ``on_wedge``). A recovery policy such as "restart once it has been
+    failing past a grace period" lives in that callback, so the watchdog needs
+    to know nothing about the grace period or the retry.
+
     A probe that raises counts as a failure: the tray must never die because a
     health check threw.
     """
@@ -114,10 +120,12 @@ class HealthWatchdog:
         on_wedge: Callable[[int], None],
         on_recover: Callable[[], None],
         failures_to_alert: int = DEFAULT_FAILURES_TO_ALERT,
+        on_failing: Callable[[int], None] | None = None,
     ) -> None:
         self._probe = probe
         self._on_wedge = on_wedge
         self._on_recover = on_recover
+        self._on_failing = on_failing
         self._failures_to_alert = failures_to_alert
         self._consecutive_failures = 0
         self._alerted = False
@@ -153,6 +161,10 @@ class HealthWatchdog:
         if not self._alerted and self._consecutive_failures >= self._failures_to_alert:
             self._alerted = True
             self._on_wedge(self._consecutive_failures)
+        # Read ``_alerted`` after ``on_wedge`` ran: a handler that called
+        # ``rearm()`` has declared itself un-alerted, so no failing tick fires.
+        if self._alerted and self._on_failing is not None:
+            self._on_failing(self._consecutive_failures)
         return False
 
     def run(
