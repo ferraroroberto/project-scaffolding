@@ -53,11 +53,8 @@ The rules (each one quotes its global-instruction line in docs/conventions-ratch
     way `secret-compare` and `git-wrapper` resolve theirs. Those two are the same
     check with the call set built in and the helper read from `secret_helpers` /
     `git_wrappers`. A method on an instance (`conn.replace`) is not seen;
-  * `state-literal`, `state-set-repeat`, `state-write` -- implicit-state-machine
-    suspects (a lifecycle string compared or stored as a status, one set of states
-    spelled in two modules, one lifecycle flag written from two modules), read by the
-    sibling `conventions_state.py`. A module the top-level `[[state_machines]]` table
-    declares (`name`, `module`, `type`, optional `derive`) is never reported.
+  * `state-literal`, `state-set-repeat`, `state-write` -- implicit-state-machine suspects,
+    read by `conventions_state.py`; a module `[[state_machines]]` declares is never reported.
 
 Test modules (and every file under a `tests/` or `test/` folder) are skipped by
 every rule except `no-window`. A single call keeps its exception with a
@@ -85,8 +82,7 @@ Opt-in, per adopter, in its own `.fleet.toml`:
 Exit codes: 0 pass or not enabled; 1 a count rose, or the baseline is missing /
 a mode was refused; 2 bad configuration, baseline or arguments; 3 NOT CONFIRMED
 (`git` unusable, a tracked `.py` file that does not parse, a scanned file
-that cannot be read, or a declared state machine whose module, type or derive
-function is not there) --
+that cannot be read, or a declared state machine that does not resolve) --
 the gate fails on it. Modes: `check`, `--init`, `--update-baseline` (shrink
 only), `--update-baseline --allow-additions` (shows in review).
 
@@ -111,9 +107,10 @@ import tomllib
 import warnings
 from collections import Counter
 from collections.abc import Callable
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from types import ModuleType
+from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
@@ -150,9 +147,11 @@ _writes_to_a_file: Callable[[ast.Call], bool] = _readers._writes_to_a_file
 _exempt: Callable[..., bool] = _readers._exempt
 _web_findings: _Findings = _readers.web_findings
 _text_findings: _Findings = _readers.text_findings
-# The implicit-state-machine readers (facts per module, hits across modules) live in their own sibling.
-_state = _load_sibling("conventions_state")
+matches_any: Callable[[str, tuple[str, ...]], bool] = _readers.matches_any
+_under: Callable[[str, str], bool] = _readers._under
+_state = _load_sibling("conventions_state")  # the implicit-state-machine readers
 STATE_RULES = frozenset(_state.STATE_RULES)
+StateMachine = _state.StateMachine
 
 BASELINE_VERSION = 1
 DEFAULT_BASELINE = ".conventions-ratchet-baseline.json"
@@ -207,7 +206,6 @@ _NO_WINDOW = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
 
 _CONFIG_KEYS = {"enabled", "baseline", "rules", "exclude", "print_paths", "secret_helpers", "git_wrappers", "must_use"}
 _MUST_USE_KEYS = {"call", "helper", "why", "paths"}
-_MACHINE_KEYS = {"name", "module", "type", "derive"}
 
 
 class ConfigError(RuntimeError):
@@ -229,16 +227,6 @@ class MustUse:
 
 
 @dataclass(frozen=True)
-class StateMachine:
-    """One `[[state_machines]]` entry: the module that owns a declared state, its type and derive function."""
-
-    name: str
-    module: str
-    type: str
-    derive: str = ""  # empty: a stored state with no derive function
-
-
-@dataclass(frozen=True)
 class Config:
     baseline: str
     rules: tuple[str, ...]
@@ -247,7 +235,7 @@ class Config:
     secret_helpers: tuple[str, ...] = ()
     git_wrappers: tuple[str, ...] = ()
     must_use: tuple[MustUse, ...] = ()
-    state_machines: tuple[StateMachine, ...] = ()
+    state_machines: tuple[Any, ...] = ()  # conventions_state.StateMachine
 
 
 @dataclass(frozen=True)
@@ -320,28 +308,6 @@ def _must_use_entries(table: dict[str, object]) -> tuple[MustUse, ...]:
     return tuple(_must_use_entry(item, number) for number, item in enumerate(raw, start=1))
 
 
-def _state_machines(data: dict[str, object]) -> tuple[StateMachine, ...]:
-    """The top-level `[[state_machines]]` array: each entry names its module, its type and (optionally) derive."""
-    raw = data.get("state_machines", [])
-    if not isinstance(raw, list):
-        raise ConfigError("state_machines must be an array of tables ([[state_machines]])")
-    machines = []
-    for number, item in enumerate(raw, start=1):
-        where = f"[[state_machines]] #{number}"
-        if not isinstance(item, dict):
-            raise ConfigError("state_machines must be an array of tables ([[state_machines]])")
-        unknown = sorted(set(item) - _MACHINE_KEYS)
-        if unknown:
-            raise ConfigError(f"{where}: unknown key(s) {', '.join(unknown)}; known: {', '.join(sorted(_MACHINE_KEYS))}")
-        values = {k: item.get(k, "" if k == "derive" else None) for k in _MACHINE_KEYS}
-        bad = sorted(k for k, v in values.items() if not isinstance(v, str) or (k != "derive" and not v.strip()))
-        if bad:
-            raise ConfigError(f"{where} needs {', '.join(bad)} as non-empty string(s)")
-        machines.append(StateMachine(str(values["name"]), str(values["module"]).replace("\\", "/").strip("/"),
-                                     str(values["type"]), str(values["derive"])))
-    return tuple(machines)
-
-
 def parse_config(toml_text: str) -> Config | None:
     """`[conventions_ratchet]` -> `Config`, or None when the stage is not enabled.
 
@@ -384,12 +350,19 @@ def parse_config(toml_text: str) -> Config | None:
         _str_list(table, "secret_helpers", ()),
         _str_list(table, "git_wrappers", ()),
         entries,
-        _state_machines(data),
+        _machines(data.get("state_machines", [])),
     )
     for rule, key in REQUIRED_KEYS.items():
         if rule in cfg.rules and not getattr(cfg, key):
             raise ConfigError(f"[conventions_ratchet] rule {rule} needs {key}: the file(s) that may do it")
     return cfg
+
+
+def _machines(raw: object) -> tuple[Any, ...]:
+    try:
+        return tuple(_state.parse_machines(raw))
+    except ValueError as exc:
+        raise ConfigError(str(exc)) from exc
 
 
 def vendored_dests(toml_text: str) -> tuple[str, ...]:
@@ -415,40 +388,6 @@ def load_config(root: Path) -> tuple[Config | None, tuple[str, ...]]:
         return parse_config(text), vendored_dests(text)
     except tomllib.TOMLDecodeError as exc:
         raise ConfigError(f"{path} is not valid TOML: {exc}") from exc
-
-
-# ------------------------------------------------------------------- globs
-
-def _glob_regex(glob: str) -> re.Pattern[str]:
-    """Repo-root-anchored glob -> regex; `**/` is zero or more directories."""
-    out: list[str] = []
-    i = 0
-    while i < len(glob):
-        if glob.startswith("**/", i):
-            out.append("(?:.*/)?")
-            i += 3
-        elif glob.startswith("**", i):
-            out.append(".*")
-            i += 2
-        elif glob[i] == "*":
-            out.append("[^/]*")
-            i += 1
-        elif glob[i] == "?":
-            out.append("[^/]")
-            i += 1
-        else:
-            out.append(re.escape(glob[i]))
-            i += 1
-    return re.compile("".join(out) + r"\Z")
-
-
-def matches_any(text: str, globs: tuple[str, ...]) -> bool:
-    return any(_glob_regex(g).match(text) for g in globs)
-
-
-def _under(path: str, prefix: str) -> bool:
-    prefix = prefix.replace("\\", "/").strip("/")
-    return path == prefix or path.startswith(prefix + "/")
 
 
 def in_scope(path: str, cfg: Config, vendored: tuple[str, ...]) -> bool:
@@ -681,39 +620,11 @@ def scan_text(source: bytes | str, path: str, rules: frozenset[str]) -> list[Hit
     return [Hit(path, n, "no-pwsh-stub", m) for n, m in _text_findings(source, rules)]
 
 
-@dataclass
-class _StateSink:
-    """What the state rules collect while the tree is scanned: per-module spellings and the marked sites."""
-
-    rules: frozenset[str]
-    facts: dict[str, object] = field(default_factory=dict)
-    exempt: dict[str, set[tuple[int, str]]] = field(default_factory=dict)
-
-    def collect(self, tree: ast.Module, path: str, lines: list[str]) -> None:
-        found = _state.facts(tree, self.rules)
-        self.facts[path] = found
-        self.exempt[path] = {(s.line, rule) for rule, sites in (("state-literal", found.literals),
-                                                                ("state-set-repeat", found.sets),
-                                                                ("state-write", found.writes))
-                             for s in sites if _exempt(rule, _window_at(s.line, s.end, lines))}
-
-    def hits(self, reported: set[str]) -> dict[str, list[Hit]]:
-        """The state rules' hits in the `reported` modules; a marked site still counts as a second home."""
-        out: dict[str, list[Hit]] = {}
-        for path, found in _state.cross_module(self.facts, reported).items():
-            kept = [Hit(path, s.line, rule, msg) for s, rule, msg in found
-                    if rule in self.rules and (s.line, rule) not in self.exempt[path]]
-            if kept:
-                out[path] = kept
-        return out
-
-
 def scan_source(source: bytes | str, path: str, rules: frozenset[str],
-                entries: tuple[MustUse, ...] = (), state: _StateSink | None = None) -> list[Hit]:
+                entries: tuple[MustUse, ...] = (), state: object = None) -> list[Hit]:
     """Hits of the given rules in one module; raises `NotConfirmed` when it does not parse.
 
     `entries` are the `must_use` entries that bind this file (`entries_for`); `must-use` reports nothing without them.
-    `state` collects the module's state spellings; their hits need every module, so `scan_tree` reports them.
     """
     try:
         with warnings.catch_warnings():
@@ -724,8 +635,8 @@ def scan_source(source: bytes | str, path: str, rules: frozenset[str],
         raise NotConfirmed(f"{path}: does not parse{where}: {exc.msg if isinstance(exc, SyntaxError) else exc}") from exc
     text = source.decode("utf-8", "replace") if isinstance(source, bytes) else source
     lines = text.splitlines()
-    if state is not None:
-        state.collect(tree, path, lines)
+    if isinstance(state, _state.Sink):  # state spellings; their hits need every module, so scan_tree reports them
+        state.collect(tree, path, lambda rule, start, end: _exempt(rule, _window_at(start, end, lines)))
     rules -= STATE_RULES
     if not rules:
         return []
@@ -773,7 +684,7 @@ def scan_tree(root: Path, cfg: Config, vendored: tuple[str, ...]) -> dict[str, l
     a hit or as evidence against one, even when `.json` files are read.
     """
     found: dict[str, list[Hit]] = {}
-    sink = _StateSink(STATE_RULES & set(cfg.rules))
+    sink = _state.Sink(frozenset(cfg.rules))
     if sink.rules:
         check_state_machines(root, cfg)
     reported: set[str] = set()
@@ -799,28 +710,20 @@ def scan_tree(root: Path, cfg: Config, vendored: tuple[str, ...]) -> dict[str, l
             hits = scan_text(source, path, rules)
         if hits:
             found[path] = hits
-    for path, hits in sink.hits(reported).items():
-        found[path] = sorted([*found.get(path, []), *hits], key=lambda h: (h.line, h.rule))
+    for path, extra in sink.hits(reported).items():
+        found[path] = sorted([*found.get(path, []), *(Hit(path, *h) for h in extra)], key=lambda h: (h.line, h.rule))
     return found
 
 
 def check_state_machines(root: Path, cfg: Config) -> None:
-    """Every declared machine's module exists and defines its type and derive function, else `NotConfirmed`.
-
-    A stale declaration would exempt a module that no longer owns the state, so it is never a skip.
-    """
-    for machine in cfg.state_machines:
-        where = f"[[state_machines]] {machine.name!r}"
+    """Every declared machine's module parses and defines its type and derive, else `NotConfirmed` (never a skip)."""
+    for m in cfg.state_machines:
         try:
-            tree = ast.parse((root / machine.module).read_bytes(), filename=machine.module)
-        except OSError as exc:
-            raise NotConfirmed(f"{where}: module {machine.module} cannot be read: {exc}") from exc
-        except (SyntaxError, ValueError) as exc:
-            raise NotConfirmed(f"{where}: module {machine.module} does not parse: {exc}") from exc
-        defined = _state.module_names(tree)
-        missing = [n for n in (machine.type, machine.derive) if n and n not in defined]
+            missing = _state.unresolved(m, ast.parse((root / m.module).read_bytes()))
+        except (OSError, SyntaxError, ValueError) as exc:
+            raise NotConfirmed(f"[[state_machines]] {m.name!r}: module {m.module} unreadable: {exc}") from exc
         if missing:
-            raise NotConfirmed(f"{where}: {machine.module} defines no {' or '.join(missing)} at module level")
+            raise NotConfirmed(f"[[state_machines]] {m.name!r}: {m.module} defines no {' or '.join(missing)}")
 
 
 # ---------------------------------------------------------------- baseline

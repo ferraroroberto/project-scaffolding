@@ -18,8 +18,9 @@ Code in a module that `[[state_machines]]` declares is never reported: declaring
 is what clears its suspects. Its spellings still count toward the cross-module rules, so a
 second module re-spelling the declared states or writing its flag is still a hit.
 
-Nothing here reads a config, a baseline or git. `facts()` reads one module; `cross_module()`
-turns the facts of every module into hits. Stdlib only.
+Nothing here reads a file, a baseline or git. `facts()` reads one parsed module; `cross_module()`
+turns the facts of every module into hits; `Sink` carries both through one scan of the tree;
+`parse_machines()` and `unresolved()` validate the declarations. Stdlib only.
 """
 
 from __future__ import annotations
@@ -27,6 +28,7 @@ from __future__ import annotations
 import ast
 import re
 from collections import defaultdict
+from collections.abc import Callable
 from dataclasses import dataclass, field
 
 STATE_RULES = ("state-literal", "state-set-repeat", "state-write")
@@ -233,6 +235,69 @@ class _Reader(ast.NodeVisitor):
 
 def _dotted_tail(node: ast.expr) -> str:
     return node.attr if isinstance(node, ast.Attribute) else node.id if isinstance(node, ast.Name) else ""
+
+
+@dataclass(frozen=True)
+class StateMachine:
+    """One `[[state_machines]]` entry: the module that owns a declared state, its type and derive function."""
+
+    name: str
+    module: str
+    type: str
+    derive: str = ""  # empty: a stored state with no derive function
+
+
+_MACHINE_KEYS = ("name", "module", "type", "derive")
+
+
+def parse_machines(raw: object) -> tuple[StateMachine, ...]:
+    """The parsed top-level `state_machines` value -> entries; raises `ValueError` on a malformed one."""
+    if not isinstance(raw, list) or not all(isinstance(item, dict) for item in raw):
+        raise ValueError("state_machines must be an array of tables ([[state_machines]])")
+    machines = []
+    for number, item in enumerate(raw, start=1):
+        where = f"[[state_machines]] #{number}"
+        unknown = sorted(set(item) - set(_MACHINE_KEYS))
+        if unknown:
+            raise ValueError(f"{where}: unknown key(s) {', '.join(unknown)}; known: {', '.join(_MACHINE_KEYS)}")
+        values = {k: item.get(k, "" if k == "derive" else None) for k in _MACHINE_KEYS}
+        bad = [k for k, v in values.items() if not isinstance(v, str) or (k != "derive" and not v.strip())]
+        if bad:
+            raise ValueError(f"{where} needs {', '.join(bad)} as non-empty string(s)")
+        name, module, kind, derive = (str(values[k]) for k in _MACHINE_KEYS)
+        machines.append(StateMachine(name, module.replace("\\", "/").strip("/"), kind, derive))
+    return tuple(machines)
+
+
+def unresolved(machine: StateMachine, tree: ast.Module) -> list[str]:
+    """The declared `type` / `derive` names the machine's parsed module does not define at its top level."""
+    defined = module_names(tree)
+    return [n for n in (machine.type, machine.derive) if n and n not in defined]
+
+
+class Sink:
+    """What the state rules collect while a tree is scanned: per-module spellings and the marked sites."""
+
+    def __init__(self, rules: frozenset[str]) -> None:
+        self.rules = rules & frozenset(STATE_RULES)
+        self.facts: dict[str, Facts] = {}
+        self.exempt: dict[str, set[tuple[int, str]]] = {}
+
+    def collect(self, tree: ast.Module, path: str, marked: Callable[[str, int, int], bool]) -> None:
+        """Read one module; `marked(rule, first_line, last_line)` says a site carries its exempt marker."""
+        found = self.facts[path] = facts(tree, self.rules)
+        sites = (("state-literal", found.literals), ("state-set-repeat", found.sets), ("state-write", found.writes))
+        self.exempt[path] = {(s.line, rule) for rule, group in sites for s in group if marked(rule, s.line, s.end)}
+
+    def hits(self, reported: set[str]) -> dict[str, list[tuple[int, str, str]]]:
+        """(line, rule, message) per `reported` module; a marked site is dropped but still counts as a home."""
+        out: dict[str, list[tuple[int, str, str]]] = {}
+        for path, found in cross_module(self.facts, reported).items():
+            kept = [(s.line, rule, msg) for s, rule, msg in found
+                    if rule in self.rules and (s.line, rule) not in self.exempt[path]]
+            if kept:
+                out[path] = kept
+        return out
 
 
 def module_names(tree: ast.Module) -> set[str]:
