@@ -199,7 +199,7 @@ def test_tray_lifecycle_helper_contains_restart_verification() -> None:
     helper = resolve_tray_lifecycle_path().read_text(encoding="utf-8")
 
     assert "[ValidateSet('detect', 'reclaim', 'launch')]" in helper
-    assert "Wait-VersionMatchesHead" in helper
+    assert "Wait-RestartedAndServingHead" in helper
     assert "git_sha" in helper
     assert "Invoke-RestMethod" in helper
 

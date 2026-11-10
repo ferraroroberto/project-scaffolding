@@ -149,7 +149,7 @@ def _check_https_loopback_self_signed_cert_restart_verifies(env_https: harness.T
     new_sha = harness.git_commit_allow_empty(env_https.script_dir, "bump https build")
 
     restarted = harness.run_tray_bat(env_https.tray_bat, ["--restart"])
-    # Load-bearing: Wait-VersionMatchesHead inside the real ps1 must itself
+    # Load-bearing: Wait-RestartedAndServingHead inside the real ps1 must itself
     # succeed against the self-signed loopback cert (via LoopbackCertBypass)
     # for --restart to exit 0 at all -- a broken bypass fails right here.
     assert restarted.returncode == 0, restarted.stdout + restarted.stderr
