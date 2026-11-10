@@ -258,8 +258,8 @@
       max(var(--nav-fade-tail, 24px), var(--bottom-tabs-margin, 21px)) +
       var(--bottom-tabs-height, 61px) + var(--bottom-tabs-margin, 21px) + var(--gap)
     );
-    /* Top = the safe area only: the top fade is off at scroll-top, so the
-       first card sits right under the status bar. */
+    /* Top = the safe area only in a browser tab: the top fade is off at
+       scroll-top, so the first card sits right under the status bar. */
     padding: env(safe-area-inset-top, 0px) var(--gap) var(--nav-bottom-reserve);
     scroll-padding-bottom: var(--nav-bottom-reserve);
   }
@@ -406,6 +406,15 @@
     html {
       min-height: calc(100vh + 1px);
       min-height: calc(100lvh + 1px);
+    }
+    /* Content starts --standalone-head-offset below the safe area. iOS rasters
+       the header card soft when the page content begins right at the
+       safe-area edge of the installed app, and 20px lower renders it sharp on
+       the device. Plain padding, so it creates no layer and the bar (a
+       body-level sibling of .app) does not move; a browser tab and the
+       desktop keep the safe area alone. */
+    .app {
+      padding-top: calc(env(safe-area-inset-top, 0px) + var(--standalone-head-offset, 20px));
     }
     .tabs {
       top: calc(100vh - var(--bottom-tabs-margin, 21px) - var(--bottom-tabs-height, 61px));
