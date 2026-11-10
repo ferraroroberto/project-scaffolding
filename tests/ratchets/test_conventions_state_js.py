@@ -95,13 +95,14 @@ def test_state_rules_skip_js_tests_and_minified_bundles(tmp_path: Path, path: st
 
 def test_state_set_repeat_reads_arrays_unions_enums_and_enum_objects(tmp_path: Path) -> None:
     found = scan(tmp_path, {
-        "web/a.js": "export const ACTIVE = ['running', 'pending'];\n",
+        "web/a.js": "export function active() {\n  return ['running', 'pending'];\n}\n",  # after a keyword
         "web/b.ts": "type Active = 'pending' | 'running';\n",
         "web/c.ts": "export enum Active { Running = 'running', Pending = 'pending' }\n",
         "web/d.js": "export const Active = Object.freeze({ RUNNING: 'running', PENDING: 'pending' });\n",
         "web/e.js": "export const LABEL = { running: 'Running', pending: 'Pending' };\n",  # keyed by its states
     }, ("state-set-repeat",))
-    assert found == {f"web/{n}": ["state-set-repeat:1"] for n in ("a.js", "b.ts", "c.ts", "d.js", "e.js")}
+    assert found == {"web/a.js": ["state-set-repeat:2"],
+                     **{f"web/{n}": ["state-set-repeat:1"] for n in ("b.ts", "c.ts", "d.js", "e.js")}}
 
 
 def test_state_set_repeat_misses_records_indexes_and_a_set_kept_in_one_module(tmp_path: Path) -> None:

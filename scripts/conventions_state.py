@@ -711,8 +711,8 @@ class _JsReader:
             self.add_set(tok.line, self.entries(k))
         elif text == "}" and braces:
             braces.pop()
-        elif text == "[" and not (self.at(k - 1).kind in ("name", "str", "tmpl") or self.punct(k - 1, ")", "]")):
-            self.add_set(tok.line, self.strings(k))  # an array literal, not an index
+        elif text == "[" and _regex_may_start(self.at(k - 1) if k else None):
+            self.add_set(tok.line, self.strings(k))  # an array literal, not an index: no value before it
         elif text in _JS_CMP:
             if _STATE_HOLDER.search(self.name_before(k)):
                 self.literal(tok.line, self.lone_str(k + 1))
