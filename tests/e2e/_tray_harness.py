@@ -370,7 +370,7 @@ def cleanup_env(env: TrayEnv) -> None:
 
 # ---------------------------------------------------------------------------
 # version-endpoint polling (the Python-side assertion, independent of the
-# ps1's own Wait-VersionMatchesHead -- proves the served value from outside)
+# ps1's own Wait-RestartedAndServingHead -- proves the served value from outside)
 # ---------------------------------------------------------------------------
 
 def poll_version(port: int, *, https: bool, timeout: float = 30.0) -> dict[str, object]:
