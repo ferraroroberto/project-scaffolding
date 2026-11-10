@@ -1,4 +1,6 @@
 {
   "version": 1,
-  "entries": []
+  "entries": [
+    {"key": "app/webapp/static/_vendored/rec-wave/rec-wave.js", "counts": {"state-literal": 1}}
+  ]
 }

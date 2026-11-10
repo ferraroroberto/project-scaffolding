@@ -4,7 +4,7 @@
 
 Before it, each convention was guarded by a one-off test in whichever repo last hit the bug: a no-window spawn test here, a constant-time compare test in one app, a raw-git check in another. This stage is the one vendored copy of those guards. A repo that adopts it can delete its local duplicate once the matching rule is enabled and its baseline is committed.
 
-It reuses the shape of the [dead code ratchet](dead-code-ratchet.md): an opt-in `.fleet.toml` table, a committed baseline, the same flags, and exit 3 for "not confirmed". It is stdlib-only and imports nothing it scans. It is three files: the ratchet (configuration, scanning, baseline), `scripts/conventions_readers.py`, the pure readers (syntax-tree predicates and the web and text line rules), and `scripts/conventions_state.py`, the implicit-state-machine readers, which keeps each under the structure limits.
+It reuses the shape of the [dead code ratchet](dead-code-ratchet.md): an opt-in `.fleet.toml` table, a committed baseline, the same flags, and exit 3 for "not confirmed". It is stdlib-only and imports nothing it scans. It is three files: the ratchet (configuration, scanning, baseline), `scripts/conventions_readers.py`, the pure readers (syntax-tree predicates and the web and text line rules), and `scripts/conventions_state.py`, the implicit-state-machine readers for Python and JavaScript/TypeScript, which keeps each under the structure limits.
 
 ## The rules
 
@@ -254,15 +254,26 @@ A `state-literal` hit is a lifecycle string that is compared or stored **as a st
 - `self.status = "stopped"`, `entry["state"] = "idle"`, `status: str = "queued"`;
 - a dict literal's state key, `{"state": "started"}`, and a state keyword argument, `finish(status="failed")`.
 
-It is not a hit when the name says nothing about a state (`level == "running"`, `word = "failed"`), or the value is not a lifecycle word (`status = "green"`). It reads one module at a time.
+In **JavaScript and TypeScript** the same rule reads:
+
+- `job.status === 'running'`, `'failed' !== row['state']`, `params.get('phase') == 'done'` (`==`, `===`, `!=`, `!==`, either way round);
+- `x.status = 'stopped'`, an object literal's state key `{ status: 'queued' }`;
+- a `case 'running':` inside a `switch` whose subject holds a state (`switch (job.status)`);
+- `['idle', 'paused'].includes(job.state)` and `new Set(['idle', 'paused']).has(job.state)`, one hit per literal, the JS form of `in (...)`.
+
+It is not a hit when the name says nothing about a state (`level == "running"`, `word = "failed"`), or the value is not a lifecycle word (`status = "green"`). A TypeScript union in a type (`status: 'running' | 'failed'`) is a set, not a stored value, so it is not a `state-literal` hit. It reads one module at a time.
 
 ### `state-set-repeat`
 
 A hit is one set of states spelled out in more than one module: a tuple, list or set literal, a `frozenset({...})` / `set([...])` call, a `Literal[...]` subscript, or the string values of an `Enum` / `StrEnum` class, whose items are all strings and at least two of them lifecycle words. Two spellings are the same set when they hold the same strings, in any order and case. Every module that spells it gets a hit at each spelling; a set spelled twice in one module is not a hit. One concept's states written down twice is how two readers come to disagree about which states count as "active".
 
+In JavaScript and TypeScript a set is an array literal (`new Set([...])` counts its array), a TypeScript union of string literals (`'idle' | 'running'`), the string values of a TypeScript `enum`, or an enum-shaped object: every value a string and every key in UPPER_CASE (`Object.freeze({ RUNNING: 'running', PENDING: 'pending' })`) or equal to its value in any case (`{ running: 'Running', pending: 'Pending' }`). A record such as `{ answer: 'done', label: 'Done' }` is data, not a set. A JS spelling counts a Python spelling of the same set as a second home, because a frontend re-spelling its backend's states is the same drift. A Python spelling counts only Python homes, so reading JS never changes a Python module's hits.
+
 ### `state-write`
 
 A hit is a boolean, `None`, comparison or `not ...` written to a lifecycle-named flag from more than one module. A lifecycle-named flag is an attribute or a string key whose name, leading underscores dropped, is a flag word (`loading`, `loaded`, `ready`, `starting`, `started`, `running`, `stopping`, `stopped`, `pending`, `busy`, `connected`, `connecting`, `retrying`, `paused`, `initialized`, `booted`, `warming`, `warm`, `finished`, `failed`, `draining`, `in_flight`), optionally after `is_` / `has_` / `was_` and a prefix (`scan_pending`, `_is_ready`, `model_loaded`). `obj.flag = ...`, `obj["flag"] = ...` and `setattr(obj, "flag", ...)` are writes. The receiver's own name is part of the flag, so `load.ready` in one module and `load.ready` in another are one flag with two owners, while `self.ready` in one class and `state.ready` in another are two. A bare local name (`ready = True`) is never shared state and never a write. A flag with no single owner is the "set on entry, cleared only on the happy path" sign.
+
+In JavaScript and TypeScript a write is `obj.flag = ...` or `obj['flag'] = ...` with `true`, `false`, `null`, `undefined`, a `!x` or a comparison (`===`, `!==`, `==`, `!=`, `<=`, `>=`; a bare `<` or `>` is left out because TypeScript generics use it). A default such as `x.ready = x.ready || false` is not a flag value. `this.loading` is keyed `this.loading`. JS flags and Python flags are counted apart in the same direction as sets: a JS write counts a Python write of the same key, a Python write never counts a JS one.
 
 #### Declaring a machine: `[[state_machines]]`
 
@@ -274,11 +285,31 @@ name   = "job"                       # the concept, for the messages
 module = "src/jobs/state.py"         # the one module that owns it (repo-relative)
 type   = "JobState"                  # the declared state type: a class, Enum or type alias defined there
 derive = "derive_job_state"          # optional: the derive function defined there
+
+[[state_machines]]
+name   = "upload"
+module = "app/webapp/static/upload-state.js"  # a JS or TS module works the same way
+type   = "UploadState"               # a top-level const, class, enum, type alias or interface there
+derive = "deriveUploadState"         # a top-level function or const there
 ```
 
-Code in a declared module is never reported by the three state rules. Its spellings still count toward the cross-module rules, so a second module that re-spells the declared states (`state-set-repeat`) or writes its flag (`state-write`) is a hit: the fix is to import the declared type or call the derive function. The table is validated whenever the stage is enabled: a missing `name`, `module` or `type`, a non-string value or an unknown key is a configuration error (exit 2). With a state rule listed, a declared module that does not exist or parse, or that defines no top-level `type` or `derive` name, is **not confirmed** (exit 3), never a skip, because a stale declaration would exempt a module that no longer owns the state.
+Code in a declared module is never reported by the three state rules. Its spellings still count toward the cross-module rules, so a second module that re-spells the declared states (`state-set-repeat`) or writes its flag (`state-write`) is a hit: the fix is to import the declared type or call the derive function. The table is validated whenever the stage is enabled: a missing `name`, `module` or `type`, a non-string value or an unknown key is a configuration error (exit 2). A declared JS/TS module resolves the same way: its top-level `const`, `let`, `var`, `function`, `class`, `enum`, `type` and `interface` names, exported or not, define it. With a state rule listed, a declared module that does not exist or parse, or that defines no top-level `type` or `derive` name, is **not confirmed** (exit 3), never a skip, because a stale declaration would exempt a module that no longer owns the state.
 
 **What the state rules cannot see.** A state held in names that say nothing (`if proc and not err`), a mode inferred from an empty field or a timer, an outcome passed as prose, unknown folded into a negative, and in-memory restart latches (a flag that survives in a long-lived process and is lost on restart). Those stay review-checklist items in [implicit-state-machines.md](implicit-state-machines.md). A status vocabulary that belongs to a remote API (a GitHub run's `in_progress`, a vehicle's `online`) is a hit at the boundary that translates it; that spot is usually the derive function, so declare it or mark it.
+
+#### State rules in JavaScript and TypeScript: how the files are read
+
+The rules read `.js`, `.mjs`, `.cjs`, `.ts`, `.jsx` and `.tsx` files with a stdlib tokenizer, not a JavaScript parser. The tokenizer handles comments, single- and double-quoted strings, template literals (the code inside `${...}` is read; the literal itself is never a fixed state string) and regex literals, then matches brackets. These patterns are all short and local (an operator with a name before it and a string after it, a bracketed list of strings, a `switch` body), so a token stream with bracket pairs is enough. Running a real parser through Node would mean a Node dependency in every adopter's gate and a second toolchain inside a vendored, stdlib-only script, and the fleet dry run showed no pattern the tokenizer misread that a parser would have read correctly (precision table below).
+
+What a token stream cannot tell apart, so the rules miss or over-report it:
+
+- `//` inside JSX text (`<p>see http://x</p>`) reads as a comment to the end of the line;
+- a `/` right after a closing `}` is read as division, so a regex literal that opens a statement after a block is misread;
+- two features that both name their state object `st` (`ctx.st.busy` in each) share a `state-write` key, like two Python classes sharing a receiver name;
+- React's `setLoading(true)` is a call, not a write, so `useState` flags are not `state-write` hits;
+- `.vue`, `.svelte` and HTML inline scripts are not read; neither are minified bundles (`*.min.js`).
+
+Test modules are skipped as in Python: a file under `tests/` or `test/` or `__tests__/`, or named `*.test.*` or `*.spec.*`. A file the tokenizer cannot read (an unterminated comment or template literal, or brackets that do not balance) is **not confirmed** (exit 3), never skipped.
 
 ### Exempting one call
 
@@ -293,7 +324,7 @@ return subprocess.run(cmd, cwd=str(PROJECT_ROOT)).returncode
 
 ## Scope
 
-Every `.py` file git lists (tracked, or untracked and not ignored), every web file for `password-input-vendored`, and every `.md`, `.ps1`, `.bat`, `.cmd`, `.toml`, `.json`, `.yml` and `.yaml` file for `no-pwsh-stub` (only while that rule is listed), except:
+Every `.py` file git lists (tracked, or untracked and not ignored), every web file for `password-input-vendored`, every `.js`, `.mjs`, `.cjs`, `.ts`, `.jsx` and `.tsx` file for the three state rules (not minified bundles or test modules), and every `.md`, `.ps1`, `.bat`, `.cmd`, `.toml`, `.json`, `.yml` and `.yaml` file for `no-pwsh-stub` (only while that rule is listed), except:
 
 - files under the repo's `[vendored]` destinations: a vendored copy's debt belongs to the repo it came from;
 - the `exclude` globs, plus `node_modules`, `.venv` and `venv` anywhere.
@@ -307,7 +338,7 @@ Only Python source, web files and (for `no-pwsh-stub`) the text files above are 
 | `0` | Pass (no rule count above the baseline), or the stage is **not enabled** | continues |
 | `1` | A file's count for a rule rose, or the baseline file is missing | fails |
 | `2` | Bad `[conventions_ratchet]` table (unknown key or rule, no rules, a helper rule with no helper, a `must_use` entry with an unknown key or no `call`, `helper` or `why`), a bad `[[state_machines]]` entry, unreadable baseline, bad arguments | fails |
-| `3` | **NOT CONFIRMED**: `git` unusable, a tracked `.py` file that does not parse, a scanned file that cannot be read, or (with a state rule listed) a declared state machine whose module is missing or defines no `type` / `derive`. The message names the file and line | fails |
+| `3` | **NOT CONFIRMED**: `git` unusable, a tracked `.py` file that does not parse, a scanned file that cannot be read, or (with a state rule listed) a JS/TS file the tokenizer cannot read (an unterminated comment or template literal, brackets that do not balance) or a declared state machine whose module is missing or defines no `type` / `derive`. The message names the file and line | fails |
 
 Exit 3 is its own state and never folded into a pass: a file the scanner cannot parse may hold a violation, so skipping it would report a clean tree it never saw.
 
@@ -416,7 +447,11 @@ A read-only dry run with **every rule on** over every fleet checkout (42 repos),
 | `state-set-repeat` | app-launcher 4, others 0 | 1 of 4 | all | 4 of 4: one job record's active set (`running`, `pending`) spelled in three modules |
 | `state-write` | local-llm-hub 2, others 0 | 1 of 4 | all | 2 of 2: the serving state's `load.ready` written both in its declared module and in the backend process module. Keyed by attribute name alone (no receiver) it reported 4, 2 of them two unrelated classes sharing a `ready` field |
 
-The state rules were dry-run separately over four repos, read-only from each one's `origin/main` with tests skipped, before any of them declared its machines in `[[state_machines]]`.
+| `state-literal`, JS/TS | 223 JS hits in 15 of 45 repos; read here: app-launcher 31, facilitation-suite 39, home-automation 33, task-os 17, minecraft-bedrock-bot 1, robertoferraro 1 (122) | 6 | all 122, source read | 118 of 122 are a lifecycle status compared or stored outside any declared machine (a job's `'running'`, a card's `'failed'`, a view's `'loading'`, a login's `'waiting'`, a `switch` over a session's submit state). 2 are a remote API's vocabulary (a vehicle's `'online'` and `'Starting'`) and 2 a browser API's (an `AudioContext`'s `'running'`, `document.fonts.status`'s `'loaded'`): declare or mark them. Every tracked JS/TS file in the 45 repos tokenized |
+| `state-set-repeat`, JS/TS | parking-manager 1, task-os 2 (3) | 2 | all | 3 of 3: a frontend re-spelling its backend's state set (a renewal's `starting`/`waiting`, a task's status list, a journal's `done`/`cancelled`). The same trees hold option records such as `{ answer: 'done', label: 'Done' }`, which the enum-shape test keeps out |
+| `state-write`, JS/TS | task-os 12 | 1 | all | 5 of 12: the archive feature's `st.busy` written from two modules. 7 are a timer feature's own `st.busy`: two features name their state object `st`, the receiver-name limit the Python rule shares |
+
+The state rules were dry-run separately over four repos, read-only from each one's `origin/main` with tests skipped, before any of them declared its machines in `[[state_machines]]`. The JS/TS rows are a later dry run over all 45 fleet repos' checked-out trees with the three rules forced on, tests skipped: every repo's Python counts were identical with and without JS reading.
 
 Before the platform-branch and system-folder rules, the dry run also reported `open`/`xdg-open`/`pbcopy`/`xclip` branches (`no-window`), `C:/ProgramData/pip/pip.ini` and a bare `"C:\\"` drive root (`no-drive-path`). Each became a rule above.
 
@@ -431,5 +466,7 @@ The false-positive kinds that remain:
 `tests/ratchets/test_conventions_ratchet.py`: for each rule, a seeded violation that fails by name and the compliant form that passes. Also covered: import aliases, the `**kwargs` miss (for `no-window` and `subprocess-timeout`), `Popen` and the async spawns never a timeout hit, every platform-branch form and the early return, the CLI-module and file-write exceptions, the system-folder and drive-root exceptions, docstrings versus f-strings, helpers and wrappers, every spelling of a login `post` route and the routes that take no password, every text format and argv spelling of a `pwsh` command against the absolute path, prose, shell-name lists and lookups that are not hits, the test-module scope, and exempt markers (a reason is needed, and the marker must name this rule). On throwaway git repos it runs every mode and exit code: a new violation failing by rule, file and line; a second violation of a baselined rule; shrink-only updates; `--allow-additions`; vendored and excluded files, a new untracked file failing and an ignored one skipped; a tracked baseline and another ratchet's baseline never read as evidence; and exit 3 for an unparseable file and an unusable `git`, in every mode. A missing prerequisite is a hard failure there, never `pytest.skip`. The scaffold's own gate stage doubles as the guard that its committed baseline is current.
 
 `tests/ratchets/test_conventions_state.py` covers the three state rules on throwaway git repos: a hit, a miss, the exempt marker (a marked site is not reported but still counts as a second home) and the declared module's exemption for each, the `Enum`, `Literal` and `frozenset` spellings, and the `[[state_machines]]` table: every malformed entry exits 2, and a declared module, type or derive function that is not there exits 3.
+
+`tests/ratchets/test_conventions_state_js.py` covers the same rules in JavaScript and TypeScript: each comparison, store, `switch`, `includes` and `Set.has` form; the misses (a union type, comments, plain template text, a regex holding a quote, a JSX apostrophe); code inside a `${...}` interpolation; the `//` and `/* */` markers; test modules and minified bundles skipped; arrays, unions, `enum`s and enum-shaped objects as sets, records not; a JS site counting a Python spelling while the Python site does not; JS flag writes and their misses; a declared JS module's exemption and name resolution; and exit 3 for a file the tokenizer cannot read.
 
 `tests/ratchets/test_conventions_must_use.py` covers `must-use`: the entry shape and every config error, import aliases and dotted modules, the helper, `paths` and test-module scope, several entries counted under one rule, the two built-in policies reporting beside a declared one, and the gate on a throwaway repo (a new hit failing by rule, file and line, a baseline burned down to zero, a bad entry exiting 2 in every mode).
