@@ -47,6 +47,37 @@ The puller itself is tracked in `local-llm-hub`; this repo owns the folder layou
 
 The Mac is also a whisper host. The hub places whisper on the gaming PC first, then the Mac, so the nightly pass runs in the quiet hours: cron `23 1 * * *` is **UTC**, which is 02:23 in Madrid in winter (CET) and 03:23 in summer (CEST), inside 02:00–05:00 local either way and, with the 90-minute cap, finished by 04:53. The minute is off `:00` because GitHub delays or drops scheduled runs at the start of the hour. Concurrency is 1 at every level: the runner takes one job, the workflow's `concurrency` group queues a second run, and the matrix runs adopters one after another (`max-parallel: 1`). A wedged run is capped at 90 minutes.
 
+### Fallback trigger
+
+GitHub's `schedule` trigger has not created a run for this workflow on any night, whatever the cron minute, so a PC-side job also starts it. `scripts/nightly_mac_fallback.py` runs `gh workflow run nightly-mac.yml --ref main` once a night, at 02:23 local, from a daily app-launcher Job. It needs `gh` logged in with write access to the repo, which the PC already has; the Mac never holds a GitHub token.
+
+It lists the workflow's recent runs first and does nothing when one of any event was already created for today's UTC date, so a schedule that starts working never doubles up. Each path ends in one log line:
+
+| Outcome | Log line starts | Exit |
+| --- | --- | --- |
+| Dispatched, and a run for today appeared within a minute | `✅ dispatched` | 0 |
+| A run for today already exists | `ℹ️ skipped` | 0 |
+| `gh` failed (not found, not logged in, offline, dispatch refused) | `❌ gh failed` | 1 |
+| Dispatch accepted but no run appeared in time | `⚠️ not confirmed` | 3 |
+
+The skip only protects the cron slot when the fallback runs second. From the last Sunday of October to the last Sunday of March (CET) 02:23 local is 01:23 UTC, the cron slot itself. In summer (CEST) it is 00:23 UTC, an hour before the slot, so a schedule that works would then add a second run behind the fallback's (the `concurrency` group queues it): move the Job to 03:23 for the summer, or drop it once the schedule is proven.
+
+The Job entry, as a committed example (`launcher.py` registers it through `POST /api/jobs` or the Jobs tab, never by a hand edit of `config/jobs.json`):
+
+```json
+{
+  "id": "nightly-mac-fallback",
+  "name": "nightly-mac fallback trigger (02:23)",
+  "script_path": "E:\\automation\\project-scaffolding\\scripts\\nightly_mac_fallback.py",
+  "args": "",
+  "schedule": { "type": "daily", "at": "02:23" },
+  "alert_on_failure": true,
+  "rerun_safe": true
+}
+```
+
+`rerun_safe` holds because a second run the same day skips.
+
 ### Speech-to-text latency during a run
 
 What the Mac serves is the hub's `audio_transcribe` role: parakeet on the Neural Engine, with whisper only as the fallback when parakeet is down. `scripts/audio_latency_probe.py` measures it through the hub's audio route only: `probe` sends short synthetic tone clips (no recording of anyone) at a fixed spacing and records each round trip with the host and model that served it, and `compare` judges a during-run window against a baseline. Negligible means up to +10 % at p95 plus 150 ms; anything unestablished (a failed request, fewer than 20 samples, a different serving host or model) is `unknown`, exit 3, never a pass.
