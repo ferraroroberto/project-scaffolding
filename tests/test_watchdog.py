@@ -16,6 +16,8 @@ from app.tray.watchdog import (
     DEFAULT_STARTUP_RETRY_DELAYS_S,
     BreadcrumbLog,
     HealthWatchdog,
+    WatchState,
+    next_watch_state,
     retry_with_backoff,
 )
 
@@ -265,6 +267,118 @@ def test_run_returns_immediately_if_already_stopped() -> None:
     wd.run(stop, interval_s=60.0)
 
     assert ticks == []
+
+
+def test_recovery_fires_after_a_failed_respawn_rearmed_the_watchdog() -> None:
+    """The first passing probe after ``rearm()`` is a recovery: the owner got the wedge alert."""
+    rec = _Recorder()
+    results = iter([False, False, False, True, True])
+    wd: HealthWatchdog
+
+    def on_wedge(count: int) -> None:
+        rec.on_wedge(count)
+        wd.rearm()  # the respawn failed
+
+    wd = HealthWatchdog(lambda: next(results), on_wedge, rec.on_recover, failures_to_alert=3)
+
+    for _ in range(5):
+        wd.tick()
+
+    assert rec.wedges == [3]
+    assert rec.recoveries == 1  # once: the second passing probe is already healthy
+
+
+def test_state_property_follows_the_four_states() -> None:
+    results = iter([True, False, False, False, True])
+    wd: HealthWatchdog
+
+    def on_wedge(_count: int) -> None:
+        wd.rearm()
+
+    wd = HealthWatchdog(lambda: next(results), on_wedge, lambda: None, failures_to_alert=3)
+    assert wd.state is WatchState.HEALTHY
+
+    seen = []
+    for _ in range(5):
+        wd.tick()
+        seen.append(wd.state)
+
+    assert seen == [
+        WatchState.HEALTHY,
+        WatchState.FAILING,
+        WatchState.FAILING,
+        WatchState.REARMED,  # the threshold tick fired on_wedge, which re-armed
+        WatchState.HEALTHY,
+    ]
+
+
+def test_rearm_is_a_no_op_outside_the_wedged_state() -> None:
+    wd = HealthWatchdog(lambda: False, lambda _c: None, lambda: None, failures_to_alert=3)
+
+    wd.rearm()
+    assert wd.state is WatchState.HEALTHY
+    wd.tick()
+    wd.rearm()
+    assert wd.state is WatchState.FAILING
+
+
+# One row per (state, probe result): the next state, and which callbacks fire.
+# ``failures`` is the consecutive-failure count before the probe; the threshold is 3.
+_H, _F, _W, _R = (
+    WatchState.HEALTHY,
+    WatchState.FAILING,
+    WatchState.WEDGED,
+    WatchState.REARMED,
+)
+_TRANSITION_TABLE = [
+    # state, failures, ok, next state, next failures, wedge, recover, failing
+    (_H, 0, True, _H, 0, False, False, False),
+    (_H, 0, False, _F, 1, False, False, False),
+    (_F, 1, True, _H, 0, False, False, False),
+    (_F, 1, False, _F, 2, False, False, False),
+    (_F, 2, False, _W, 3, True, False, True),
+    (_W, 3, True, _H, 0, False, True, False),
+    (_W, 3, False, _W, 4, False, False, True),
+    (_R, 3, True, _H, 0, False, True, False),
+    (_R, 3, False, _W, 4, True, False, True),
+]
+
+
+@pytest.mark.parametrize(
+    ("state", "failures", "ok", "want_state", "want_failures", "wedge", "recover", "failing"),
+    _TRANSITION_TABLE,
+)
+def test_transition_table(
+    state: WatchState,
+    failures: int,
+    ok: bool,
+    want_state: WatchState,
+    want_failures: int,
+    wedge: bool,
+    recover: bool,
+    failing: bool,
+) -> None:
+    step = next_watch_state(state, ok, failures, 3)
+
+    assert step.state is want_state
+    assert step.failures == want_failures
+    assert (step.wedge, step.recover, step.failing) == (wedge, recover, failing)
+
+
+@pytest.mark.parametrize(
+    ("state", "failures"),
+    [
+        (WatchState.HEALTHY, 1),  # healthy with a failure on the books
+        (WatchState.FAILING, 0),  # failing with none
+        (WatchState.FAILING, 3),  # failing at the threshold is already wedged
+        (WatchState.WEDGED, 2),  # wedged below the threshold
+        (WatchState.REARMED, 0),  # re-armed with nothing to re-arm from
+    ],
+)
+def test_an_impossible_state_and_count_pair_is_refused(state: WatchState, failures: int) -> None:
+    # state-machine-proof: tray-watchdog
+    with pytest.raises(ValueError, match="impossible"):
+        next_watch_state(state, False, failures, 3)
 
 
 # --------------------------------------------------------------- breadcrumbs
