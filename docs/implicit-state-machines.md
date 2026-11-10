@@ -71,3 +71,30 @@ Without a guardrail, each quick change adds one more flag or one more local guar
 5. Migrate the readers one at a time, deleting each re-derivation as it moves.
 6. Document the machine in the repo's own `docs/<concept>-state.md`: why it is declared, the state table, who reads it.
 7. Declare it in the repo's `.fleet.toml` as a `[[state_machines]]` table (`name`, `module`, `type`, optional `derive`; see [conventions-ratchet.md](conventions-ratchet.md)), so the state rules stop reporting its module and keep reporting any other module that re-derives it. Shrink the conventions baseline with `--update-baseline`.
+8. Prove the machine refuses an illegal transition: at least one test carries the `state-machine-proof: <name>` marker (see the scoreboard below).
+
+## Scoreboard: is the fleet ending in a better state?
+
+`scripts/state_scoreboard.py` answers that with numbers read from committed state only, so the same command at the same commit prints the same bytes and a "before" taken now is comparable with an "after" taken later. It lives in this scaffold and is not vendored: it reads the adopters from outside and writes to none of them.
+
+```
+scripts/state_scoreboard.py --at default          # each repo's shipped tip (origin/HEAD)
+scripts/state_scoreboard.py --at 2026-11-01       # the state at the start of that day (UTC), per repo
+scripts/state_scoreboard.py --at default --json   # the same, as data
+```
+
+Run it with the scaffold's `.venv` interpreter. `--at` takes a date (UTC; resolved on each repo's default branch), any revision, `default` (each repo's `origin/HEAD` tip: use it for "today", because a checkout that is behind or on a feature branch would otherwise be what gets measured) or nothing (each repo's checked-out `HEAD`). `--root` names the folder holding the repos (default: the fleet root), `--repo` limits the run. The fleet is every git checkout there with a committed `.fleet.toml`.
+
+| Metric | What it counts | Target |
+|---|---|---|
+| Findings | The `state-literal`, `state-set-repeat` and `state-write` counts in each repo's committed conventions baseline, split `py` / `js` (a baseline key that is not a `.py` file counts as `js`). The baseline is the ceiling on today's hits: the ratchet fails any rise and a fixed hit only shrinks it | 0 |
+| Declared machines | The `[[state_machines]]` entries and their owner modules | up, as suspects are confirmed |
+| Transition proof | Per machine, the test functions carrying a `state-machine-proof: <machine name>` marker. A machine with 0 is flagged `no proof` | at least 1 per machine |
+| Duplicate derivations | `state-write` plus `state-set-repeat`: places outside any declared owner that write a lifecycle flag the owner also writes or re-spell the owner's set of states | 0 |
+| Bug signal | With `--bug-split <date>`: closed `bug` issues that name a machine (its name, its type, or two of its states), before vs after the date. Reads GitHub through `gh` | none: lagging and noisy, read it as a trend |
+
+**The proof marker.** A test proves a machine refuses an illegal transition by carrying `state-machine-proof: <name>` in the comment block right above its `def`, in its docstring or in a comment in its body, where `<name>` is the machine's `name` in `[[state_machines]]`. Only functions named `test*` in a test file (under a `tests/` or `test/` folder, or named `test_*.py` / `*_test.py`) count; a marker in production code counts for nothing. The marker is a claim the reviewer checks: the scoreboard counts tests, it does not run them. Tests in other languages are not read yet.
+
+**What each cell can say.** A number is measured; `?` means the repo (or that section) could not be read (no committed baseline, a `.fleet.toml` or baseline that does not parse, a test module that does not parse, a failed git or `gh` call) and is never folded into zero; `-` means the repo has not opted into a state rule, so there is nothing to measure. A date before a repo's first commit reports the repo as `absent`. The fleet totals sum only the measured repos and print how many that was, so a total of 0 over three repos cannot be mistaken for a clean fleet. The exit code is 0 when everything readable was read and 3 (not confirmed) when any repo is unknown.
+
+Only counts and file paths are printed: no issue text and no code.

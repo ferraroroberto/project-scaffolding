@@ -158,6 +158,7 @@ scripts/
   instruction_repeats.py      the instruction ratchet's sibling: the repeated-text finder behind the opt-in S-04 rule (vendored with it)
   run_ratchets.py             cross-platform runner of every enabled ratchet, with the runtime write probe around a test command
   shot_baseline.py             gate stage: recaptured screenshots may not visibly drift from the committed baseline
+  state_scoreboard.py          fleet scoreboard of the implicit-state-machine work, from committed state only (docs/implicit-state-machines.md); siblings state_scoreboard_read.py and state_scoreboard_bugs.py
   static_ratchet.py            gate stage: new duplicate code, unused names or bug/security patterns may not rise above a committed baseline
   structure_ratchet.py        gate stage: oversized files/functions, flat directories, src->app imports, extra roots, loose root files, mistyped and misplaced files and redundant exceptions may not rise above a committed baseline
   structure_layout.py         the structure ratchet's sibling: the repo-shape contract (shape presets, root files, folder types, homes, exceptions; vendored with it)
