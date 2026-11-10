@@ -83,6 +83,70 @@ The runner adds two states of its own: no enabled ratchet at all is exit 2, and 
 - `--update-baseline` refuses to add entries. A genuinely new, accepted hit needs `--update-baseline --allow-additions`, which shows up in review as added baseline lines. Re-baselining just to get green is the one thing the ratchet exists to stop.
 - `--init` never overwrites an existing baseline.
 
+## Turning on the state rules
+
+Three rules of the conventions ratchet find **implicit state machines**: a concept that really has modes (stopped, loading, ready, failed) but never declares them as one official state. They flag suspects; a person or agent confirms each one before anything is declared. What a machine is and how to declare one well: [implicit-state-machines.md](implicit-state-machines.md); every rule with bad and fixed snippets: [conventions-ratchet.md](conventions-ratchet.md).
+
+| Rule | A hit is |
+|---|---|
+| `state-literal` | a lifecycle string compared or stored as a state (`job.status == "running"`, `case 'failed':`) |
+| `state-set-repeat` | one set of lifecycle strings spelled out in more than one module |
+| `state-write` | a lifecycle-named flag (`load.ready = True`) written from more than one module |
+
+**1. Turn them on.** The conventions ratchet is adopted first (the table above; `adopt_ratchets.py --ratchets conventions` copies all three files and writes a starter `rules` line). Add the three names to `rules` in `.fleet.toml`:
+
+```toml
+[conventions_ratchet]
+enabled = true
+rules   = ["subprocess-timeout", "state-literal", "state-set-repeat", "state-write"]
+```
+
+Python, JavaScript and TypeScript (`.js` `.mjs` `.cjs` `.ts` `.jsx` `.tsx`) are read with no further setting; test modules and minified bundles are skipped. Then record today's hits once. In a repo that already has a baseline, the new rules' hits read as additions, so the one time you run `python scripts/conventions_ratchet.py --update-baseline --allow-additions` and commit the larger file, say so in the pull request. On a first adoption `--init` writes it. Rules you did not list never appear, so a repo is never flagged for a rule it did not choose.
+
+**2. Declare a machine.** When a suspect is confirmed, its owner is one module, declared as a top-level `[[state_machines]]` table in `.fleet.toml`. `name` is the concept, `module` the one file that owns it, `type` the declared state type defined there, `derive` the optional function that computes the state from the facts. Code in a declared module is never reported; any other module that re-derives the state stays a hit.
+
+```toml
+[[state_machines]]                       # a Python owner: a class, Enum or type alias
+name   = "job"
+module = "src/jobs/state.py"
+type   = "JobState"
+derive = "derive_job_state"
+
+[[state_machines]]                       # a JavaScript or TypeScript owner: a top-level const, class, enum or type
+name   = "upload"
+module = "app/webapp/static/upload-state.js"
+type   = "UploadState"
+derive = "deriveUploadState"
+```
+
+A declaration that names a module, type or function that is not there is **not confirmed** (exit 3), never a skip. After declaring, migrate the other readers to the type or the derive function one at a time, then shrink the baseline (step 5).
+
+**3. Add an illegal-transition test.** A machine counts as proven when at least one test shows it refuses a transition it must not allow. Mark that test with `state-machine-proof: <name>` (the machine's `name`) in the comment block right above its `def`, in its docstring or in a comment in its body:
+
+```python
+# state-machine-proof: job
+def test_done_job_cannot_become_running():
+    with pytest.raises(ValueError):
+        derive_job_state(finished=True, process_alive=True)
+```
+
+Only Python functions named `test*` in a test file count; the scoreboard counts the marker, it does not run the test, so a reviewer checks that the test really asserts the refusal. JavaScript tests are not read yet: a machine whose owner is a JS module shows `no proof` until a Python test carries its marker, so write the JS test anyway and mark the Python one that drives the same table.
+
+**4. Read your row in the scoreboard.** `scripts/state_scoreboard.py` is a scaffold script, not vendored; run it from a scaffold checkout with that checkout's interpreter and point `--root` at the folder holding your repos:
+
+```
+python scripts/state_scoreboard.py --root <folder-with-your-repos> --repo <your-repo> --at default
+```
+
+The row carries the three rules' counts split Python / JavaScript, the duplicate derivations (`state-write` plus `state-set-repeat`: places outside the owner that write its flag or re-spell its states), the declared machines and how many of them have `no proof`. The first two targets are 0. A `?` means the repo could not be read (no committed baseline, a `.fleet.toml` that does not parse) and is never zero; `-` means the repo has not listed a state rule. The command reads committed state only, so the same commit prints the same bytes; the exit code is 3 when any repo is unknown. The columns are defined in [implicit-state-machines.md](implicit-state-machines.md), "Scoreboard".
+
+**5. Burn the baseline to zero.** Work the repo's own list, one separable change at a time:
+
+1. Run `python scripts/conventions_ratchet.py`; it prints every hit of a risen rule, and the baseline file lists the files that still carry debt.
+2. For each file, confirm the suspect. A real implicit machine is declared (step 2) and its readers migrated; a vocabulary that belongs to a remote or browser API is translated once, in the derive function; a deliberate exception takes `# state-literal-exempt: <reason>` (`// state-literal-exempt: <reason>` in JavaScript) on the line or in the comment block above.
+3. Run `python scripts/conventions_ratchet.py --update-baseline` and commit the smaller file with the fix. `--allow-additions` is never part of a burn-down.
+4. Stop at 0 findings and 0 machines without proof, then keep the three rules in `rules`: from there a new lifecycle comparison fails the gate.
+
 ## Updating later
 
 Re-run `adopt_ratchets.py` from a newer scaffold checkout. Unchanged copies are skipped. A copy the scaffold has since changed reads as "differs" and is refused, so delete the old copy first, re-run, and review the diff. The `sha` in each `[vendored]` line records which scaffold commit it came from.
