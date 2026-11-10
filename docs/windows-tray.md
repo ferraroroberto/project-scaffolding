@@ -156,7 +156,25 @@ The port-reclaim and single-instance guarantees make a *restart* deterministic; 
 
 **`rearm()` is what stops a failed respawn going silent forever.** The watchdog is edge-triggered: `on_wedge` fires once and does not fire again until a *recovery* re-arms it. A handler that respawned and failed would therefore wait for a recovery that a genuinely-dead process can never produce on its own. Calling `rearm()` from inside the handler says "I acted; re-evaluate me next tick".
 
-**`on_failing(count)` is the level-triggered counterpart, for a recovery policy that outlives the first alert.** Pass it as the optional `on_failing=` constructor argument and it fires on every failed probe while the watchdog is alerted — on the alert tick itself (right after `on_wedge`) and on each failing tick after it — with the running consecutive-failure count. It stops at the first success and starts over at the next alert. Use it for "restart once the service has been failing past a grace period" or a back-off retry: the callback owns the grace period and the retry, the watchdog stays ignorant of both. Unlike `rearm()` it needs no state in the handler and does not re-fire `on_wedge`. A handler that calls `rearm()` has declared itself un-alerted, so no `on_failing` call follows until the next alert. Omitted (the default `None`), the watchdog behaves exactly as without it.
+**The watchdog is a declared four-state machine** (`WatchState`, read-only through `watchdog.state`; the one transition function is `next_watch_state`, declared as `tray-watchdog` in `.fleet.toml` `[[state_machines]]`). A tooltip or status route reads `state`; it never re-derives the mode from private fields.
+
+| State | Meaning | Reached by |
+|---|---|---|
+| `healthy` | no failing probe on the books | start, or any passing probe |
+| `failing` | failing probes, below the threshold, no alert yet | a failing probe |
+| `wedged` | at or past the threshold, `on_wedge` fired, awaiting a recovery | the threshold probe |
+| `rearmed` | at or past the threshold, alert already sent, handler called `rearm()` | `rearm()` from `wedged` |
+
+| From | Probe passes | Probe fails |
+|---|---|---|
+| `healthy` | `healthy` | `failing`, or `wedged` when the threshold is 1 (fires `on_wedge`) |
+| `failing` | `healthy`, silent | `failing`, or `wedged` at the threshold (fires `on_wedge`, then `on_failing`) |
+| `wedged` | `healthy`, fires `on_recover` | `wedged`, fires `on_failing` |
+| `rearmed` | `healthy`, fires `on_recover` | `wedged`, fires `on_wedge` again, then `on_failing` unless the handler re-armed |
+
+`rearm()` moves `wedged` to `rearmed` and does nothing in any other state. A recovery fires `on_recover` from both alerted states, because the owner already got the wedge alert: a respawn that failed and a webapp that later came back still ends in a "recovered" line. A state and count pair that cannot occur (`healthy` with failures, `wedged` below the threshold) raises `ValueError` rather than being read as the nearest legal state.
+
+**`on_failing(count)` is the level-triggered counterpart, for a recovery policy that outlives the first alert.** Pass it as the optional `on_failing=` constructor argument and it fires on every failed probe while the watchdog is alerted — on the alert tick itself (right after `on_wedge`) and on each failing tick after it — with the running consecutive-failure count. It stops at the first success and starts over at the next alert. Use it for "restart once the service has been failing past a grace period" or a back-off retry: the callback owns the grace period and the retry, the watchdog stays ignorant of both. Unlike `rearm()` it needs no state in the handler and does not re-fire `on_wedge`. A handler that calls `rearm()` has declared itself un-alerted (`rearmed`), so no `on_failing` call follows on that tick. Omitted (the default `None`), the watchdog behaves exactly as without it.
 
 The canonical wiring, at the end of `run_tray()`:
 
