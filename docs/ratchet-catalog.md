@@ -666,7 +666,7 @@ conn = get_db()          # defined in src/db.py, the only module that connects
 
 #### `state-literal`
 
-A lifecycle string (`running`, `failed`, `pending`, `ready`, …) compared or stored as a state: the name on the other side ends in `status`, `state`, `phase`, `stage` or `lifecycle`. Each one is a suspect implicit state machine ([implicit-state-machines.md](implicit-state-machines.md)); an agent confirms it before anything is declared. Code in a module the top-level `[[state_machines]]` table declares is never reported.
+A lifecycle string (`running`, `failed`, `pending`, `ready`, …) compared or stored as a state: the name on the other side ends in `status`, `state`, `phase`, `stage` or `lifecycle`. Each one is a suspect implicit state machine ([implicit-state-machines.md](implicit-state-machines.md)); an agent confirms it before anything is declared. Code in a module the top-level `[[state_machines]]` table declares is never reported. Python and JavaScript/TypeScript (`.js` `.mjs` `.cjs` `.ts` `.jsx` `.tsx`) are both read; in JS a `case` in a `switch` over a state and `[...].includes(x.status)` count too.
 
 ```python
 # bad: src/jobs/queue.py
@@ -678,9 +678,17 @@ if derive_job_state(latest).is_active:   # the one declared JobState, in src/job
     ...
 ```
 
+```js
+// bad: app/webapp/static/jobs.js
+const isLive = job.status === 'running' || job.status === 'pending';
+
+// fixed: app/webapp/static/jobs.js
+const isLive = deriveJobState(job).live;   // the one declared JobState, in job-state.js
+```
+
 #### `state-set-repeat`
 
-One set of two or more lifecycle strings (a tuple, list or set literal, `frozenset({...})`, `Literal[...]`, or an `Enum`'s values) spelled out in more than one module. A declared module's spelling counts, so a second module that re-spells the declared states is a hit.
+One set of two or more lifecycle strings (a tuple, list or set literal, `frozenset({...})`, `Literal[...]`, or an `Enum`'s values; in JS/TS an array, a string-literal union, an `enum`, or an enum-shaped `{ RUNNING: 'running' }` object) spelled out in more than one module. A declared module's spelling counts, so a second module that re-spells the declared states is a hit. A JS spelling also counts the same set spelled in Python (a frontend re-spelling its backend); a Python spelling counts only Python.
 
 ```python
 # bad: the active set, in two modules
@@ -691,9 +699,17 @@ if status not in {"running", "pending"}:  # app/routers/jobs.py
 from src.jobs.state import ACTIVE_STATES
 ```
 
+```js
+// bad: the backend's active set, re-spelled in the frontend
+const LIVE = new Set(['pending', 'running']);   // app/webapp/static/jobs.js
+
+// fixed: the server sends the derived state, so the frontend holds no set
+if (job.live) { ... }
+```
+
 #### `state-write`
 
-A boolean or `None` written to a lifecycle-named flag (`ready`, `_loading`, `is_started`, `scan_pending`) on the same receiver name from more than one module: no single owner sets it. A bare local name is never a write.
+A boolean or `None` written to a lifecycle-named flag (`ready`, `_loading`, `is_started`, `scan_pending`) on the same receiver name from more than one module: no single owner sets it. A bare local name is never a write. In JS/TS the values are `true`, `false`, `null`, `undefined`, `!x` or a comparison.
 
 ```python
 # bad: load.ready set in the declared module and again in the process module
@@ -709,6 +725,12 @@ name   = "serving"
 module = "src/process/serving_state.py"
 type   = "ServingState"
 derive = "derive_serving_state"
+
+[[state_machines]]
+name   = "upload"
+module = "app/webapp/static/upload-state.js"   # a JS/TS owner: its top-level const, class, enum or type
+type   = "UploadState"
+derive = "deriveUploadState"
 ```
 
 ### Runtime write ratchet

@@ -29,7 +29,7 @@ One sign is a hint; two or more on the same concept is a suspect worth a deep-di
 
 ## Finding them: two passes
 
-1. **Deterministic scan.** A cheap, repeatable pass over the code flags suspects from the signs above. It is three opt-in rules of the [conventions ratchet](conventions-ratchet.md): `state-literal` (a lifecycle string compared or stored as a status), `state-set-repeat` (one set of states spelled in two modules) and `state-write` (one lifecycle flag written from two modules). It runs in the gate on every change and never decides anything; its output is a list of suspects, not a verdict. It cannot see a state held in names that say nothing, a mode inferred from an empty field or a timer, or an in-memory restart latch: those stay signs for the agent pass.
+1. **Deterministic scan.** A cheap, repeatable pass over the code flags suspects from the signs above. It is three opt-in rules of the [conventions ratchet](conventions-ratchet.md): `state-literal` (a lifecycle string compared or stored as a status), `state-set-repeat` (one set of states spelled in two modules) and `state-write` (one lifecycle flag written from two modules). It reads Python and JavaScript/TypeScript, so a web app's frontend state is scanned with its backend, and a frontend that re-spells its backend's states is a suspect too. It runs in the gate on every change and never decides anything; its output is a list of suspects, not a verdict. It cannot see a state held in names that say nothing, a mode inferred from an empty field or a timer, or an in-memory restart latch: those stay signs for the agent pass.
 2. **Agent deep-dive.** An agent takes each suspect and confirms it against the code and the live behaviour before anything is declared. For each machine it records:
    - the variables that together hold the state, and where each is written and read;
    - the **reachable states** (combinations that actually occur) against the **declared states** (what the code or UI names today);
@@ -70,7 +70,7 @@ Without a guardrail, each quick change adds one more flag or one more local guar
 4. Write the derive function and its table test.
 5. Migrate the readers one at a time, deleting each re-derivation as it moves.
 6. Document the machine in the repo's own `docs/<concept>-state.md`: why it is declared, the state table, who reads it.
-7. Declare it in the repo's `.fleet.toml` as a `[[state_machines]]` table (`name`, `module`, `type`, optional `derive`; see [conventions-ratchet.md](conventions-ratchet.md)), so the state rules stop reporting its module and keep reporting any other module that re-derives it. Shrink the conventions baseline with `--update-baseline`.
+7. Declare it in the repo's `.fleet.toml` as a `[[state_machines]]` table (`name`, `module`, `type`, optional `derive`; the module may be Python or JS/TS; see [conventions-ratchet.md](conventions-ratchet.md)), so the state rules stop reporting its module and keep reporting any other module that re-derives it. Shrink the conventions baseline with `--update-baseline`.
 8. Prove the machine refuses an illegal transition: at least one test carries the `state-machine-proof: <name>` marker (see the scoreboard below).
 
 ## Scoreboard: is the fleet ending in a better state?
