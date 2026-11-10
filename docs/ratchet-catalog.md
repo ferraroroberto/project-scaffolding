@@ -709,7 +709,7 @@ if (job.live) { ... }
 
 #### `state-write`
 
-A boolean or `None` written to a lifecycle-named flag (`ready`, `_loading`, `is_started`, `scan_pending`) on the same receiver name from more than one module: no single owner sets it. A bare local name is never a write. In JS/TS the values are `true`, `false`, `null`, `undefined`, `!x` or a comparison.
+A boolean, `None`, comparison or `not ...` written to a lifecycle-named flag (`ready`, `_loading`, `is_started`, `scan_pending`) on the same receiver name from more than one module: no single owner sets it. A bare local name is never a write. In JS/TS the values are `true`, `false`, `null`, `undefined`, `!x` or a comparison (`===`, `!==`, `==`, `!=`, `<=`, `>=`). A JS write counts a Python write of the same key; a Python write never counts a JS one.
 
 ```python
 # bad: load.ready set in the declared module and again in the process module
