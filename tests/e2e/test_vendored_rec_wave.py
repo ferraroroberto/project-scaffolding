@@ -21,6 +21,7 @@ from contextlib import AbstractContextManager
 
 from playwright.sync_api import Page, expect
 
+from tests.e2e import _mic_notice_checks
 from tests.e2e._cases import cases
 from tests.e2e._color_assertions import set_theme as _set_theme
 from tests.e2e._color_assertions import style as _style
@@ -253,7 +254,7 @@ def _check_reduced_motion_option_draws_one_meter(gallery: Page) -> None:
 
 
 def test_rec_wave_contract(new_gallery: Callable[[], AbstractContextManager[Page]]) -> None:
-    """The record wave: gallery legs, meter motion, audio-context lifecycle and reduced motion."""
+    """The record wave and the mic notice: gallery legs, meter motion, audio-context lifecycle, reduced motion, the silence rule."""
     with cases() as c:
         with c.case("gallery_legs_render_their_states"), new_gallery() as gallery:
             _check_gallery_legs_render_their_states(gallery=gallery)
@@ -281,3 +282,24 @@ def test_rec_wave_contract(new_gallery: Callable[[], AbstractContextManager[Page
             _check_the_media_query_picks_the_meter_when_no_option_is_given(gallery=gallery)
         with c.case("reduced_motion_option_draws_one_meter"), new_gallery() as gallery:
             _check_reduced_motion_option_draws_one_meter(gallery=gallery)
+        with c.case("gallery_live_leg_names_the_input_and_shows_the_strip"), new_gallery() as gallery:
+            _mic_notice_checks.check_gallery_live_leg_names_the_input_and_shows_the_strip(gallery=gallery)
+        with c.case("gallery_no_label_leg_keeps_the_strip_without_an_input_line"), new_gallery() as gallery:
+            _mic_notice_checks.check_gallery_no_label_leg_keeps_the_strip_without_an_input_line(gallery=gallery)
+        with c.case("notice_colors_in_both_themes"), new_gallery() as gallery:
+            _mic_notice_checks.check_notice_colors_in_both_themes(gallery=gallery)
+        with c.case("silent_after_exactly_three_seconds_then_signal_clears_it"), new_gallery() as gallery:
+            _mic_notice_checks.check_silent_after_exactly_three_seconds_then_signal_clears_it(gallery=gallery)
+        with c.case("sound_inside_the_window_never_warns"), new_gallery() as gallery:
+            _mic_notice_checks.check_sound_inside_the_window_never_warns(gallery=gallery)
+        with c.case("remote_audio_points_at_the_remote_desktop_setting"), new_gallery() as gallery:
+            _mic_notice_checks.check_remote_audio_points_at_the_remote_desktop_setting(gallery=gallery)
+        for label in ["iPhone Microphone", "AirPods", "Studio headset", ""]:
+            with c.case(f"every_other_input_keeps_the_bluetooth_text[{label}]"), new_gallery() as gallery:
+                _mic_notice_checks.check_every_other_input_keeps_the_bluetooth_text(gallery=gallery, label=label)
+        with c.case("stop_empties_and_hides_the_notice_and_leaves_the_source_open"), new_gallery() as gallery:
+            _mic_notice_checks.check_stop_empties_and_hides_the_notice_and_leaves_the_source_open(gallery=gallery)
+        with c.case("a_withheld_label_still_shows_the_notice"), new_gallery() as gallery:
+            _mic_notice_checks.check_a_withheld_label_still_shows_the_notice(gallery=gallery)
+        with c.case("a_stream_with_no_track_api_does_not_throw"), new_gallery() as gallery:
+            _mic_notice_checks.check_a_stream_with_no_track_api_does_not_throw(gallery=gallery)

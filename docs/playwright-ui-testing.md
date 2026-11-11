@@ -659,7 +659,7 @@ rooted in the worktree and `remove-worktree` returned `rc=1 Worktree NOT
 removed`.
 
 Pin the arrangement with a test, not with prose —
-`tests/e2e/test_helper_cwd_isolation.py` asserts that neither the driver nor
+`tests/e2e/_cwd_isolation_checks.py` (a case of `test_harness_helpers.py`) asserts that neither the driver nor
 any live helper holds a cwd under the checkout. A wedge itself is a
 load-sensitive teardown race and cannot be reproduced on demand; the *rooting*
 that turns one into a permanent pin is deterministic and cheap to check while a
@@ -1071,7 +1071,7 @@ into the app's `tests/e2e/` and record it in the app's `.fleet.toml`
 `[vendored]` table (manifest key `surface_capture`); it imports only the
 stdlib, `pytest` and `playwright.sync_api`, and nothing from fleet-config,
 which supplies the script as a file. It is proven by
-`tests/e2e/test_surface_hook.py` against a static fixture page
+`tests/e2e/_surface_hook_checks.py` (cases of `test_harness_helpers.py`) against a static fixture page
 (`tests/e2e/fixtures/surface/`), including the unset no-op, both themes,
 restore, first-call-wins, name validation and the collection filter.
 
@@ -1245,7 +1245,7 @@ runs. Apps that follow `prefers-color-scheme` need nothing.
 
 **Streamlit.** The same helper, against the suite's disposable
 `streamlit run` on its e2e port; a state navigates by URL or drives
-widgets, then waits for its content. `tests/e2e/test_layout_lint.py`'s
+widgets, then waits for its content. `tests/e2e/test_harness_helpers.py`'s
 Streamlit node lints this scaffold's Welcome view, allowing only
 Streamlit's own chrome by its `data-testid` hooks.
 
@@ -1257,7 +1257,7 @@ about 3 s static, about 5.5 s Streamlit. Cap the cost with
 `viewports=`/`themes=` only where a state truly cannot differ, and lint
 only the states a change creates.
 
-**Proven here** by `tests/e2e/test_layout_lint.py` against
+**Proven here** by `tests/e2e/test_harness_helpers.py` against
 `tests/e2e/fixtures/layout/sheet.html`: loaded bare it carries a reason
 line in a `white-space: nowrap` span overflowing a phone sheet, an
 ellipsized chip label with no title, and a button laid over another, and

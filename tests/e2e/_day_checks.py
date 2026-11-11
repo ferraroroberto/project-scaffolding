@@ -1,7 +1,6 @@
-"""Render harness for the day-row and day-marks components.
+"""Checks for the day-row and day-marks components.
 
-Drives the `demo.html` gallery through the shared `gallery` fixture in `conftest.py`;
-split from `test_vendored_components.py` to keep each harness module small.
+Run as a case of `test_vendored_components.py` on a freshly loaded `demo.html` gallery.
 """
 
 from __future__ import annotations
@@ -110,11 +109,10 @@ def _assert_day_mark_theme(page: Page) -> None:
     assert len(legend) == 5 and min(legend) >= _FONT_MIN, legend
 
 
-def test_day_row_and_day_marks_contract(gallery: Page) -> None:
+def check_day_row_and_day_marks_contract(gallery: Page) -> None:
     """day-row + day-marks (#350, fleet-config#1356): tile floor, text floor, AA, shapes.
 
-    One node for both components and both themes: the suite's node budget is
-    ratcheted (.fleet.toml [e2e] test_budget).
+    One check for both components and both themes.
     """
     # --- day-row: structure, truncation, the open / read-only split.
     rows = gallery.locator(f"{_DAY_ROWS} .day-row")

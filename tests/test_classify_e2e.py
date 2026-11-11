@@ -417,17 +417,15 @@ def test_load_config_reads_surfaces_relative_to_the_toml(tmp_path: Path) -> None
     assert classify(["app/board/x.js"], cfg).tier == "surface"
 
 
-# The row-menu placement harness loads row-menu.js and the real pill by URL, so
-# both surfaces that own those files run it (#393).
+# The row-menu harness's placement case loads row-menu.js and the real pill by
+# URL, so both surfaces that own those files run it (#393).
 _NAV_TARGETS = (
-    "tests/e2e/test_nav_offset.py tests/e2e/test_vendored_font_inherit.py "
-    "tests/e2e/test_vendored_nav.py tests/e2e/test_vendored_row_menu_placement.py")
+    "tests/e2e/test_nav_offset.py tests/e2e/test_vendored_base.py "
+    "tests/e2e/test_vendored_nav.py tests/e2e/test_vendored_row_menu.py")
 _COMPONENTS_TARGETS = (
-    "tests/e2e/test_vendored_action_row_avatar.py tests/e2e/test_vendored_base_color_scheme.py "
-    "tests/e2e/test_vendored_code_listing.py tests/e2e/test_vendored_components.py "
-    "tests/e2e/test_vendored_day.py tests/e2e/test_vendored_font_inherit.py tests/e2e/test_vendored_home_head.py "
-    "tests/e2e/test_vendored_mic_notice.py tests/e2e/test_vendored_nav.py tests/e2e/test_vendored_page_foot.py "
-    "tests/e2e/test_vendored_rec_wave.py tests/e2e/test_vendored_row_menu.py tests/e2e/test_vendored_row_menu_placement.py")
+    "tests/e2e/test_vendored_base.py tests/e2e/test_vendored_components.py "
+    "tests/e2e/test_vendored_home_head.py tests/e2e/test_vendored_nav.py "
+    "tests/e2e/test_vendored_rec_wave.py tests/e2e/test_vendored_row_menu.py")
 
 
 def test_real_surfaces_route_representative_paths() -> None:
@@ -467,14 +465,12 @@ def test_real_surfaces_route_representative_paths() -> None:
     # The nav harness imports the helper too (#348), so it runs on a helper edit.
     assert route("tests/e2e/_geometry.py") == (
         "surface",
-        "tests/e2e/test_geometry_helper.py tests/e2e/test_layout_lint.py "
-        "tests/e2e/test_vendored_action_row_avatar.py tests/e2e/test_vendored_code_listing.py "
-            "tests/e2e/test_vendored_components.py "
-        "tests/e2e/test_vendored_day.py tests/e2e/test_vendored_home_head.py "
+        "tests/e2e/test_geometry_helper.py tests/e2e/test_harness_helpers.py "
+        "tests/e2e/test_vendored_components.py tests/e2e/test_vendored_home_head.py "
         "tests/e2e/test_vendored_nav.py tests/e2e/test_vendored_row_menu.py")
     # The layout lint: the helper, its proof and its fixture page run only that proof.
-    assert route("tests/e2e/_layout_lint.py") == ("surface", "tests/e2e/test_layout_lint.py")
-    assert route("tests/e2e/fixtures/layout/sheet.html") == ("surface", "tests/e2e/test_layout_lint.py")
+    assert route("tests/e2e/_layout_lint.py") == ("surface", "tests/e2e/test_harness_helpers.py")
+    assert route("tests/e2e/fixtures/layout/sheet.html") == ("surface", "tests/e2e/test_harness_helpers.py")
     # The usage log (#349): the client, its router under src/ (a full rule ahead
     # of src/ -> none) and its harness all run only that harness.
     assert route("app/webapp/static/_vendored/usage-log/usage-log.js") == (

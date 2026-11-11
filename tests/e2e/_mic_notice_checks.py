@@ -1,4 +1,4 @@
-"""Render and lifecycle harness for the vendored `mic-notice` component.
+"""Checks for the vendored `mic-notice` component, run as cases of `test_vendored_rec_wave.py`.
 
 Two halves, both in a real browser over the `demo.html` gallery:
 
@@ -11,12 +11,8 @@ Two halves, both in a real browser over the `demo.html` gallery:
 
 from __future__ import annotations
 
-from collections.abc import Callable
-from contextlib import AbstractContextManager
-
 from playwright.sync_api import Page, expect
 
-from tests.e2e._cases import cases
 from tests.e2e._color_assertions import set_theme, style
 
 _DEFAULT_TEXT = "No sound from the microphone — check Bluetooth/AirPods"
@@ -71,7 +67,7 @@ def _warning_hidden(page: Page) -> bool:
 # ------------------------------------------------------------------ gallery
 
 
-def _check_gallery_live_leg_names_the_input_and_shows_the_strip(gallery: Page) -> None:
+def check_gallery_live_leg_names_the_input_and_shows_the_strip(gallery: Page) -> None:
     box = gallery.locator("#demoMicLive")
     expect(box).to_be_visible()
     expect(box.locator(".mic-notice-input")).to_have_text("Mic: AirPods")
@@ -79,7 +75,7 @@ def _check_gallery_live_leg_names_the_input_and_shows_the_strip(gallery: Page) -
     expect(box.locator(".mic-notice-silent")).to_be_hidden()
 
 
-def _check_gallery_no_label_leg_keeps_the_strip_without_an_input_line(gallery: Page) -> None:
+def check_gallery_no_label_leg_keeps_the_strip_without_an_input_line(gallery: Page) -> None:
     box = gallery.locator("#demoMicNoLabel")
     expect(box).to_be_visible()
     expect(box.locator(".mic-notice-input")).to_be_hidden()
@@ -88,7 +84,7 @@ def _check_gallery_no_label_leg_keeps_the_strip_without_an_input_line(gallery: P
     expect(box.locator(".rec-wave-time")).to_have_count(0)
 
 
-def _check_notice_colors_in_both_themes(gallery: Page) -> None:
+def check_notice_colors_in_both_themes(gallery: Page) -> None:
     """The input line is muted, the strip accent, the warning the attention treatment."""
     gallery.evaluate(_SETUP)
     gallery.evaluate(_ATTACH, "AirPods")
@@ -105,7 +101,7 @@ def _check_notice_colors_in_both_themes(gallery: Page) -> None:
 # ---------------------------------------------------------------- lifecycle
 
 
-def _check_silent_after_exactly_three_seconds_then_signal_clears_it(gallery: Page) -> None:
+def check_silent_after_exactly_three_seconds_then_signal_clears_it(gallery: Page) -> None:
     _clocked(gallery).evaluate(_ATTACH, "AirPods")
     assert gallery.evaluate("() => window.__box.hidden") is False
     assert _warning_hidden(gallery)
@@ -126,7 +122,7 @@ def _check_silent_after_exactly_three_seconds_then_signal_clears_it(gallery: Pag
     gallery.evaluate("() => window.__stop()")
 
 
-def _check_sound_inside_the_window_never_warns(gallery: Page) -> None:
+def check_sound_inside_the_window_never_warns(gallery: Page) -> None:
     _clocked(gallery).evaluate(_ATTACH, "AirPods")
     gallery.clock.run_for(2500)
     gallery.evaluate("() => { window.__lvl.level = 0.2; }")
@@ -136,7 +132,7 @@ def _check_sound_inside_the_window_never_warns(gallery: Page) -> None:
     gallery.evaluate("() => window.__stop()")
 
 
-def _check_remote_audio_points_at_the_remote_desktop_setting(gallery: Page) -> None:
+def check_remote_audio_points_at_the_remote_desktop_setting(gallery: Page) -> None:
     _clocked(gallery).evaluate(_ATTACH, "Remote Audio")
     gallery.clock.run_for(3200)
     assert gallery.evaluate("() => window.__box.querySelector('.mic-notice-silent').textContent") == _REMOTE_TEXT
@@ -144,7 +140,7 @@ def _check_remote_audio_points_at_the_remote_desktop_setting(gallery: Page) -> N
     gallery.evaluate("() => window.__stop()")
 
 
-def _check_every_other_input_keeps_the_bluetooth_text(gallery: Page, label: str) -> None:
+def check_every_other_input_keeps_the_bluetooth_text(gallery: Page, label: str) -> None:
     _clocked(gallery).evaluate(_ATTACH, label)
     gallery.clock.run_for(3200)
     text = gallery.evaluate("() => window.__box.querySelector('.mic-notice-silent').textContent")
@@ -152,7 +148,7 @@ def _check_every_other_input_keeps_the_bluetooth_text(gallery: Page, label: str)
     gallery.evaluate("() => window.__stop()")
 
 
-def _check_stop_empties_and_hides_the_notice_and_leaves_the_source_open(gallery: Page) -> None:
+def check_stop_empties_and_hides_the_notice_and_leaves_the_source_open(gallery: Page) -> None:
     _clocked(gallery).evaluate(_ATTACH, "AirPods")
     gallery.clock.run_for(3200)
     gallery.evaluate("() => { window.__stop(); window.__stop(); }")  # twice is fine
@@ -165,14 +161,14 @@ def _check_stop_empties_and_hides_the_notice_and_leaves_the_source_open(gallery:
     assert gallery.evaluate("() => window.__events.length") == 1
 
 
-def _check_a_withheld_label_still_shows_the_notice(gallery: Page) -> None:
+def check_a_withheld_label_still_shows_the_notice(gallery: Page) -> None:
     _clocked(gallery).evaluate(_ATTACH, "")
     assert gallery.evaluate("() => window.__box.hidden") is False
     assert gallery.evaluate("() => window.__box.querySelector('.mic-notice-input').hidden") is True
     gallery.evaluate("() => window.__stop()")
 
 
-def _check_a_stream_with_no_track_api_does_not_throw(gallery: Page) -> None:
+def check_a_stream_with_no_track_api_does_not_throw(gallery: Page) -> None:
     _clocked(gallery)
     gallery.evaluate(
         """async () => {
@@ -182,29 +178,3 @@ def _check_a_stream_with_no_track_api_does_not_throw(gallery: Page) -> None:
     )
     assert gallery.evaluate("() => window.__box.querySelector('.mic-notice-input').hidden") is True
     gallery.evaluate("() => window.__stop()")
-
-
-def test_mic_notice_contract(new_gallery: Callable[[], AbstractContextManager[Page]]) -> None:
-    """The mic notice: gallery legs, colours, the three-second silence rule and the per-input text."""
-    with cases() as c:
-        with c.case("gallery_live_leg_names_the_input_and_shows_the_strip"), new_gallery() as gallery:
-            _check_gallery_live_leg_names_the_input_and_shows_the_strip(gallery=gallery)
-        with c.case("gallery_no_label_leg_keeps_the_strip_without_an_input_line"), new_gallery() as gallery:
-            _check_gallery_no_label_leg_keeps_the_strip_without_an_input_line(gallery=gallery)
-        with c.case("notice_colors_in_both_themes"), new_gallery() as gallery:
-            _check_notice_colors_in_both_themes(gallery=gallery)
-        with c.case("silent_after_exactly_three_seconds_then_signal_clears_it"), new_gallery() as gallery:
-            _check_silent_after_exactly_three_seconds_then_signal_clears_it(gallery=gallery)
-        with c.case("sound_inside_the_window_never_warns"), new_gallery() as gallery:
-            _check_sound_inside_the_window_never_warns(gallery=gallery)
-        with c.case("remote_audio_points_at_the_remote_desktop_setting"), new_gallery() as gallery:
-            _check_remote_audio_points_at_the_remote_desktop_setting(gallery=gallery)
-        for label in ["iPhone Microphone", "AirPods", "Studio headset", ""]:
-            with c.case(f"every_other_input_keeps_the_bluetooth_text[{label}]"), new_gallery() as gallery:
-                _check_every_other_input_keeps_the_bluetooth_text(gallery=gallery, label=label)
-        with c.case("stop_empties_and_hides_the_notice_and_leaves_the_source_open"), new_gallery() as gallery:
-            _check_stop_empties_and_hides_the_notice_and_leaves_the_source_open(gallery=gallery)
-        with c.case("a_withheld_label_still_shows_the_notice"), new_gallery() as gallery:
-            _check_a_withheld_label_still_shows_the_notice(gallery=gallery)
-        with c.case("a_stream_with_no_track_api_does_not_throw"), new_gallery() as gallery:
-            _check_a_stream_with_no_track_api_does_not_throw(gallery=gallery)

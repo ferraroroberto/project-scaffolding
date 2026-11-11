@@ -13,6 +13,10 @@ Assertions are the contracts from `~/.claude/design.md` v2 ("Component
 contracts" + the component token blocks); expected colors are the sRGB spec
 values (the demo page omits the P3 twins on purpose).
 
+The action-row avatar, code-listing and day-row/day-marks checks live in
+`_action_row_avatar_checks.py`, `_code_listing_checks.py` and `_day_checks.py`
+and run as cases of the one test below.
+
 The `nav/` component has its own harness — `test_vendored_nav.py` — because a
 fixed, body-level nav can't share the gallery's scrolling page. The
 computed-style primitives both harnesses need (`style`, `set_theme`, `rgba`)
@@ -27,6 +31,7 @@ from contextlib import AbstractContextManager
 
 from playwright.sync_api import Browser, Page, expect
 
+from tests.e2e import _action_row_avatar_checks, _code_listing_checks, _day_checks
 from tests.e2e._action_row_assertions import (
     assert_action_row,
     assert_action_row_colors,
@@ -811,3 +816,16 @@ def test_gallery_component_contracts(new_gallery: Callable[[], AbstractContextMa
             _check_dark_labelled_surfaces_follow_the_control_fill(gallery=gallery)
         with c.case("dark_theme_values"), new_gallery() as gallery:
             _check_dark_theme_values(gallery=gallery)
+        for avatar in _action_row_avatar_checks.AVATARS:
+            with c.case(f"avatar_hit_box_reaches_44px_without_growing_the_paint[{avatar}]"), new_gallery() as gallery:
+                _action_row_avatar_checks.check_avatar_hit_box_reaches_44px_without_growing_the_paint(gallery=gallery, avatar=avatar)
+        with c.case("avatar_hit_area_does_not_replace_the_badge"), new_gallery() as gallery:
+            _action_row_avatar_checks.check_avatar_hit_area_does_not_replace_the_badge(gallery=gallery)
+        with c.case("code_listing_copy_is_an_unpainted_icon_button_in_a_list_item"), new_gallery() as gallery:
+            _code_listing_checks.check_code_listing_copy_is_an_unpainted_icon_button_in_a_list_item(gallery=gallery)
+        with c.case("code_listing_copy_puts_the_listing_on_the_clipboard_and_confirms"), new_gallery() as gallery:
+            _code_listing_checks.check_code_listing_copy_puts_the_listing_on_the_clipboard_and_confirms(gallery=gallery)
+        with c.case("code_listing_copy_failure_is_said_not_swallowed"), new_gallery() as gallery:
+            _code_listing_checks.check_code_listing_copy_failure_is_said_not_swallowed(gallery=gallery)
+        with c.case("day_row_and_day_marks_contract"), new_gallery() as gallery:
+            _day_checks.check_day_row_and_day_marks_contract(gallery=gallery)

@@ -118,7 +118,7 @@ def _neutral_driver_cwd() -> Iterator[str]:
     Only the driver's *spawn* needs the neutral cwd — the driver's own working
     directory is fixed at spawn and is what every later `launch()` inherits —
     so this restores the caller's cwd immediately and pytest carries on from
-    the checkout as before. `tests/e2e/test_helper_cwd_isolation.py` pins it.
+    the checkout as before. `tests/e2e/_cwd_isolation_checks.py` pins it.
     """
     original = os.getcwd()
     neutral = tempfile.gettempdir()

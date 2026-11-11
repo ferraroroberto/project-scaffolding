@@ -1,8 +1,8 @@
 """Graft the real nav skeleton onto the gallery's tokens, for the render harnesses.
 
 The nav can't join `demo.html`'s gallery (it is a fixed, body-level bar), so
-three harnesses — `test_vendored_nav.py`, `test_vendored_row_menu_placement.py`
-and `test_vendored_font_inherit.py` — each load the gallery for its token blocks,
+three harnesses — `test_vendored_nav.py`, `test_vendored_row_menu.py`
+and `test_vendored_base.py` — each load the gallery for its token blocks,
 add `nav/nav-tabs.css` and insert the `nav/nav-tabs.html` skeleton. They had
 re-typed that recipe, each with its own wait, so a change to how the skeleton
 mounts (it must stay a direct `<body>` child) would have been found and applied
