@@ -62,7 +62,7 @@ The presets and every layout check live in the sibling `scripts/structure_layout
 | `pipeline-cli` | `tests` | `src`, `common`, `scripts`, `config`, `data` | none |
 | `skills-governance` | `skills`, `tests` | `hooks`, `scripts`, `architecture` | none |
 | `node` | `src` | `test`, `scripts`, `patches` | none |
-| `static-site` | none | `css`, `js`, `assets`, `games`, `content`, `site`, `scripts` | none |
+| `static-site` | none | `css`, `js`, `assets`, `games`, `content`, `site`, `scripts`, `tests` | none |
 | `agent-workspace` | none | `scripts` | none |
 | `service` | `src`, `tests`, `app_web`, `tray` | `scripts`, `config`, `launchers`, `assets` | none |
 

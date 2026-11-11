@@ -135,7 +135,7 @@ SHAPES = {
     ),
     "node": Shape(("src",), ("test", "scripts", "patches"), folder_types=(("test", "code"), ("patches", "patch"))),
     "static-site": Shape(
-        (), ("css", "js", "assets", "games", "content", "site", "scripts"),
+        (), ("css", "js", "assets", "games", "content", "site", "scripts", "tests"),
         root_files=("*.html",), folder_types=(("css", "css"), ("js", "js")),
     ),
     "agent-workspace": Shape((), ("scripts",)),

@@ -270,7 +270,7 @@ Hand-written HTML, CSS and JS with no build step.
 
 | Contract | |
 |---|---|
-| Root folders | required none; also `css`, `js`, `assets`, `games`, `content`, `site`, `scripts` |
+| Root folders | required none; also `css`, `js`, `assets`, `games`, `content`, `site`, `scripts`, `tests` |
 | Root files | the common set, plus `*.html` |
 | Folder types | the common set, plus `css/` `css`, `js/` `js` |
 | Homes | none: one adopter is hand-written at the root and the other is built from content/, so they share no second level |
@@ -281,10 +281,11 @@ css/
 js/
 assets/
 games/<name>.html           one self-contained page each, where used
+tests/                      where the site has tests: functions, end-to-end flows, link and build checks
 docs/layout.md
 ```
 
-Where new code goes: a new page is a root `<page>.html` (or `games/<name>.html` for a self-contained game); its styles and scripts go in `css/` and `js/`, never inline beyond a few lines.
+Where new code goes: a new page is a root `<page>.html` (or `games/<name>.html` for a self-contained game); its styles and scripts go in `css/` and `js/`, never inline beyond a few lines. A test goes in `tests/`, grouped by what it tests.
 
 **A built static site** is the same shape with a build step that runs locally, never on the host. The source lives in `content/`, the build writes the publish folder `site/`, which is committed so the host serves it as-is, and `scripts/` holds the build, the preview server and the gate:
 
