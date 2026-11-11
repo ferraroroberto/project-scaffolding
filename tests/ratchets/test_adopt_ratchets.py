@@ -15,8 +15,8 @@ from pathlib import Path
 
 import pytest
 
-from scripts.tools import adopt_ratchets as ar
 from scripts import run_ratchets as rr
+from scripts.tools import adopt_ratchets as ar
 from src.no_window import NO_WINDOW
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
