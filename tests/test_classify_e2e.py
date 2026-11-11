@@ -418,9 +418,10 @@ def test_load_config_reads_surfaces_relative_to_the_toml(tmp_path: Path) -> None
 
 
 # The row-menu harness's placement case loads row-menu.js and the real pill by
-# URL, so both surfaces that own those files run it (#393).
+# URL, so both surfaces that own those files run it (#393). The shot capture
+# holds the pill-at-rest screenshots, so a nav edit recaptures them.
 _NAV_TARGETS = (
-    "tests/e2e/test_nav_offset.py tests/e2e/test_vendored_base.py "
+    "tests/e2e/test_nav_offset.py tests/e2e/test_shot_capture.py tests/e2e/test_vendored_base.py "
     "tests/e2e/test_vendored_nav.py tests/e2e/test_vendored_row_menu.py")
 _COMPONENTS_TARGETS = (
     "tests/e2e/test_vendored_base.py tests/e2e/test_vendored_components.py "
@@ -442,6 +443,8 @@ def test_real_surfaces_route_representative_paths() -> None:
 
     assert route("app/webapp/static/_vendored/nav/nav-tabs.css") == (
         "surface", _NAV_TARGETS)
+    # The slide checks are the nav harness's own helper.
+    assert route("tests/e2e/_nav_slide_checks.py") == ("surface", _NAV_TARGETS)
     assert route("app/webapp/static/_vendored/card/card.css") == (
         "surface",
         _COMPONENTS_TARGETS)

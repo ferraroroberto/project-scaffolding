@@ -248,10 +248,17 @@ extensions = ["bat"]
 name           = "nav"
 prefixes       = ["app/webapp/static/_vendored/nav/"]
 # The base harness also mounts the real nav, and the row-menu harness lays out
-# the real pill the menu fits against, so a nav edit runs both.
-paths          = ["tests/e2e/test_nav_offset.py", "tests/e2e/test_vendored_nav.py"]
+# the real pill the menu fits against, so a nav edit runs both. The shot
+# capture holds the pill-at-rest screenshots, so a nav edit recaptures them
+# and the screenshot baseline compares them.
+paths          = [
+    "tests/e2e/_nav_slide_checks.py",
+    "tests/e2e/test_nav_offset.py",
+    "tests/e2e/test_vendored_nav.py",
+]
 pytest_targets = [
     "tests/e2e/test_nav_offset.py",
+    "tests/e2e/test_shot_capture.py",
     "tests/e2e/test_vendored_base.py",
     "tests/e2e/test_vendored_nav.py",
     "tests/e2e/test_vendored_row_menu.py",

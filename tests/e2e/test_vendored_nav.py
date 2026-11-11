@@ -23,6 +23,7 @@ from contextlib import AbstractContextManager, contextmanager
 import pytest
 from playwright.sync_api import Browser, Page, expect
 
+from tests.e2e import _nav_slide_checks
 from tests.e2e._cases import cases
 from tests.e2e._color_assertions import contrast as _contrast
 from tests.e2e._color_assertions import rgba as _rgba
@@ -392,9 +393,9 @@ def _check_mobile_pill_active_tab_is_accent_text_on_a_translucent_capsule(
     Regression for the dark-mode "black hole": the active tab used to fill
     with `--card-off` (dark canvas-subtle, true black), which read as a hole
     punched through the translucent tabbar. The capsule must stay translucent.
-    Before `initNavTabs` has placed the sliding capsule the active tab paints
-    the same fill itself (`.tabs:not(.has-pill)`), so frame one is already right;
-    after it the sliding `.tab-pill` carries the fill and the tab is clear.
+    Before `initNavTabs` has mounted the sliding capsule the active tab paints
+    the same fill itself (`.tabs:not(:has(.tab-pill))`), so frame one is already
+    right; after it the sliding `.tab-pill` carries the fill and the tab is clear.
     """
     assert _style(nav_mobile, "#tabHome", "color") == _ACCENT_TEXT
     assert 0 < _alpha(_style(nav_mobile, "#tabHome", "backgroundColor")) < 1
@@ -427,12 +428,6 @@ def _init_nav(page: Page) -> None:
     page.evaluate(
         "async () => { const m = await import('/_vendored/nav/nav-tabs.js');"
         " window.__nav = m.initNavTabs(); }"
-    )
-    # The sliding capsule starts `.no-anim` and drops it two frames later; a DOM
-    # snapshot taken before that would differ from one taken after.
-    page.wait_for_function(
-        "() => { const p = document.querySelector('.tab-pill');"
-        " return !p || !p.classList.contains('no-anim'); }"
     )
 
 
@@ -857,7 +852,7 @@ def _check_glass_is_rebuilt_on_every_return_to_the_foreground(nav_mobile: Page) 
 def test_nav_contract(
     new_page: Callable[..., AbstractContextManager[Page]], static_server: str, browser: Browser
 ) -> None:
-    """The nav's desktop control, mobile pill, badges, capsule and glass rebuild, one case per contract."""
+    """The nav's desktop control, mobile pill, badges, capsule, press-and-slide and glass rebuild, one case per contract."""
     with cases() as c:
         with c.case("desktop_control_and_wide_rail"), _nav(new_page, static_server) as nav:
             _check_desktop_control_and_wide_rail(nav=nav)
@@ -903,6 +898,14 @@ def test_nav_contract(
             _check_capsule_follows_the_bar_width_settling(nav_mobile=nav_mobile)
         with c.case("resize_without_cell_change_leaves_the_capsule_untouched"), phone_nav(browser, static_server) as nav_mobile:
             _check_resize_without_cell_change_leaves_the_capsule_untouched(nav_mobile=nav_mobile)
+        with c.case("slide_follows_the_finger_and_lifting_chooses_the_tab"), phone_nav(browser, static_server) as nav_mobile:
+            _nav_slide_checks.check_slide_follows_the_finger_and_lifting_chooses_the_tab(nav_mobile=nav_mobile)
+        with c.case("a_tap_and_a_press_that_wanders_still_switch"), phone_nav(browser, static_server) as nav_mobile:
+            _nav_slide_checks.check_a_tap_and_a_press_that_wanders_still_switch(nav_mobile=nav_mobile)
+        with c.case("lifting_on_the_open_tab_or_a_cancelled_touch_changes_nothing"), phone_nav(browser, static_server) as nav_mobile:
+            _nav_slide_checks.check_lifting_on_the_open_tab_or_a_cancelled_touch_changes_nothing(nav_mobile=nav_mobile)
+        with c.case("a_drag_on_the_inline_control_is_not_a_slide"), _nav(new_page, static_server) as nav:
+            _nav_slide_checks.check_a_drag_on_the_inline_control_is_not_a_slide(nav=nav)
         with c.case("standalone_start_rebuilds_the_glass_once_and_restores_it"), phone_nav(browser, static_server) as nav_mobile:
             _check_standalone_start_rebuilds_the_glass_once_and_restores_it(nav_mobile=nav_mobile)
         with c.case("glass_rebuild_waits_for_the_viewport_to_stop_resizing"), phone_nav(browser, static_server) as nav_mobile:
