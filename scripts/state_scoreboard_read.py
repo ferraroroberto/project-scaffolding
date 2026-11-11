@@ -20,7 +20,14 @@ from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from scripts.conventions_state import JS_SUFFIXES, StateMachine, Tok, is_js_source, js_parse, parse_machines  # noqa: E402 -- needs the sys.path line above
+from scripts.conventions_state import (  # noqa: E402 -- needs the sys.path line above
+    JS_SUFFIXES,
+    StateMachine,
+    Tok,
+    is_js_source,
+    js_parse,
+    parse_machines,
+)
 from src.no_window import NO_WINDOW  # noqa: E402 -- needs the sys.path line above
 
 STATE_RULES = ("state-literal", "state-set-repeat", "state-write")
