@@ -55,6 +55,9 @@ logger =logging.getLogger("ios_sim_smoke")
 BOOT_TIMEOUT_S = 600.0
 #: One simctl verb (openurl, screenshot, shutdown) answers in seconds; a hang is a wedge.
 SIMCTL_TIMEOUT_S = 120.0
+#: simctl's `openurl` can time out (POSIX 60) right after `bootstatus -b` returns; one more try clears it.
+OPENURL_ATTEMPTS = 2
+OPENURL_RETRY_DELAY_S = 5.0
 #: Safari's first launch on a fresh device shows a sheet before the page paints.
 DEFAULT_SETTLE_S = 8.0
 #: The synthetic command's own default when the adopter declares none.
@@ -152,15 +155,32 @@ def _boot(udid: str) -> None:
         raise SmokeUnknown(f"simulator never finished booting: {status.stderr.strip()[:200]}")
 
 
+def _open_url(udid: str, url: str, view: str) -> bool:
+    """Hand `url` to Mobile Safari; one retry absorbs simctl's timeout on a just-booted device.
+
+    A second failure is a real failure and is returned as such, never folded into a pass.
+    """
+    for attempt in range(1, OPENURL_ATTEMPTS + 1):
+        opened = _simctl("openurl", udid, url)
+        if opened.returncode == 0:
+            logger.info("ℹ️ openurl %s ok (attempt %d/%d)", view, attempt, OPENURL_ATTEMPTS)
+            return True
+        logger.warning(
+            "⚠️ openurl failed for %s (attempt %d/%d): %s",
+            view, attempt, OPENURL_ATTEMPTS, opened.stderr.strip()[:200],
+        )
+        if attempt < OPENURL_ATTEMPTS:
+            time.sleep(OPENURL_RETRY_DELAY_S)
+    return False
+
+
 def _shoot(udid: str, base: str, views: Sequence[str], out: Path, settle_s: float) -> list[str]:
     """Open each view and screenshot it; returns the views that produced no usable image."""
     missing: list[str] = []
     for view in views:
         url = base.rstrip("/") + (view if view.startswith("/") else "/" + view)
         target = out / f"{view_slug(view)}.png"
-        opened = _simctl("openurl", udid, url)
-        if opened.returncode != 0:
-            logger.warning("⚠️ openurl failed for %s: %s", view, opened.stderr.strip()[:200])
+        if not _open_url(udid, url, view):
             missing.append(view)
             continue
         time.sleep(settle_s)

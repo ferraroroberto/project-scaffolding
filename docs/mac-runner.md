@@ -294,7 +294,7 @@ No logs, paths, test names or images. The test ids behind `flaky` stay in the ru
 | Line | Exit | Meaning |
 |---|---|---|
 | `SMOKE=pass shots=<n>` | 0 | every view opened in Mobile Safari and produced a screenshot |
-| `SMOKE=fail reason=...` | 1 | a view did not open or gave no usable screenshot |
+| `SMOKE=fail reason=...` | 1 | a view did not open (after one retry of `openurl`, which the first command on a just-booted simulator can time out) or gave no usable screenshot |
 | `SMOKE=unknown reason=...` | 3 | a prerequisite is missing: no `simctl`, no iPhone simulator, no synthetic command, or the instance never printed its URL |
 
 A pass proves Mobile Safari reached the instance and painted something for each view; whether the page looks right is read from the screenshots.
