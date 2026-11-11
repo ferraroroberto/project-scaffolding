@@ -181,6 +181,7 @@ def _check_top_fade_is_off_at_rest_and_on_after_one_band_of_scroll(
         padding = page.evaluate("() => getComputedStyle(document.querySelector('.app')).paddingTop")
         assert padding == "0px", padding
         seen = []
+        shown = []
         for y in (0, _BAND // 2, _BAND * 10, 0):
             page.evaluate(f"() => window.scrollTo(0, {y})")
             page.wait_for_function(
@@ -188,7 +189,13 @@ def _check_top_fade_is_off_at_rest_and_on_after_one_band_of_scroll(
                 f".getPropertyValue('--nav-fade-on') === String(Math.min(1, {y} / {_BAND}))"
             )
             seen.append(page.evaluate("() => Number(getComputedStyle(document.body, '::after').opacity)"))
+            shown.append(page.evaluate("() => getComputedStyle(document.body, '::after').content"))
         assert seen == pytest.approx([0, 0.5, 1, 0], abs=0.01), seen
+        # At rest the glass layer is not generated at all: an opacity of 0 on a
+        # promoted backdrop-filter layer still painted a frosted smear over the
+        # header in the installed iOS app. `content`, not `display`: headless
+        # engines report reduced transparency, which hides the layer outright.
+        assert shown == ["none", '""', '""', "none"], shown
     finally:
         context.close()
 
