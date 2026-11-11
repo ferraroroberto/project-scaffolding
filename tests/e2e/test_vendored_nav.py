@@ -452,6 +452,65 @@ def _badge_text(page: Page, tab: str) -> str | None:
     )
 
 
+_KEYBOARD_INIT_JS = """async () => {
+  const m = await import('/_vendored/nav/nav-tabs.js');
+  window.__changes = [];
+  window.__nav = m.initNavTabs({ onChange: (tab) => window.__changes.push(tab) });
+}"""
+
+_KEYBOARD_STATE_JS = """() => {
+  const nav = document.querySelector('.tabs');
+  return {
+    open: nav.dataset.activeTab,
+    focused: document.activeElement.dataset ? document.activeElement.dataset.tab ?? null : null,
+    stops: [...nav.querySelectorAll('.tab')].filter((tab) => tab.tabIndex === 0).map((tab) => tab.dataset.tab),
+    selected: [...nav.querySelectorAll('.tab[aria-selected="true"]')].map((tab) => tab.dataset.tab),
+    shown: [...document.querySelectorAll('.pane')].filter((pane) => !pane.hidden).map((pane) => pane.id),
+  };
+}"""
+
+
+def _check_arrow_home_and_end_move_focus_and_selection(nav: Page) -> None:
+    """WAI-ARIA tabs: arrows, Home and End move focus and selection; Tab lands on the open tab only."""
+    nav.evaluate(_KEYBOARD_INIT_JS)
+
+    def press(key: str) -> dict[str, object]:
+        nav.keyboard.press(key)
+        return nav.evaluate(_KEYBOARD_STATE_JS)
+
+    # Roving tabindex: one tab stop, on the open tab, and Tab from before the bar lands on it.
+    nav.locator(".tabs .tab[data-tab=home]").focus()
+    start = nav.evaluate(_KEYBOARD_STATE_JS)
+    assert start["stops"] == ["home"] and start["focused"] == "home", start
+
+    for key, tab in (
+        ("ArrowRight", "stats"),
+        ("ArrowRight", "history"),
+        ("ArrowRight", "home"),  # past the last tab wraps to the first
+        ("ArrowLeft", "history"),  # before the first wraps to the last
+        ("Home", "home"),
+        ("End", "history"),
+        ("ArrowLeft", "stats"),
+    ):
+        state = press(key)
+        assert state["focused"] == tab and state["open"] == tab, (key, state)
+        assert state["selected"] == [tab] and state["stops"] == [tab], (key, state)
+        assert state["shown"] == [f"pane{tab.capitalize()}"], (key, state)
+    assert nav.evaluate("() => window.__changes") == [
+        "home", "stats", "history", "home", "history", "home", "history", "stats",
+    ]
+
+    # Keys the pattern does not name, or with a modifier held, leave the bar alone.
+    for key in ("a", "Alt+ArrowRight", "Control+Home"):
+        state = press(key)
+        assert state["focused"] == "stats" and state["open"] == "stats", (key, state)
+
+    # A tab the app has hidden is skipped, and its tabindex stays out of the tab order.
+    nav.evaluate("() => { document.querySelector('.tab[data-tab=history]').style.display = 'none'; }")
+    state = press("ArrowRight")
+    assert state["focused"] == "home" and state["open"] == "home", state
+
+
 def _check_no_set_badge_call_leaves_the_dom_untouched(nav: Page) -> None:
     """An app that never calls setBadge has no badge nodes, and a round trip restores the DOM."""
     _init_nav(nav)
@@ -904,6 +963,10 @@ def test_nav_contract(
             _nav_slide_checks.check_a_tap_and_a_press_that_wanders_still_switch(nav_mobile=nav_mobile)
         with c.case("lifting_on_the_open_tab_or_a_cancelled_touch_changes_nothing"), phone_nav(browser, static_server) as nav_mobile:
             _nav_slide_checks.check_lifting_on_the_open_tab_or_a_cancelled_touch_changes_nothing(nav_mobile=nav_mobile)
+        with c.case("arrow_home_and_end_move_focus_and_selection"), _nav(new_page, static_server) as nav:
+            _check_arrow_home_and_end_move_focus_and_selection(nav=nav)
+        with c.case("arrow_keys_work_on_the_phone_pill"), phone_nav(browser, static_server) as nav_mobile:
+            _check_arrow_home_and_end_move_focus_and_selection(nav=nav_mobile)
         with c.case("a_drag_on_the_inline_control_is_not_a_slide"), _nav(new_page, static_server) as nav:
             _nav_slide_checks.check_a_drag_on_the_inline_control_is_not_a_slide(nav=nav)
         with c.case("standalone_start_rebuilds_the_glass_once_and_restores_it"), phone_nav(browser, static_server) as nav_mobile:
