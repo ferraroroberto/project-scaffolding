@@ -60,7 +60,7 @@ def _driver_pid(playwright: Any) -> int | None:
     return None
 
 
-def test_no_playwright_process_roots_in_this_checkout(page: Any, playwright: Any) -> None:
+def check_no_playwright_process_roots_in_this_checkout(page: Any, playwright: Any) -> None:
     """Neither the driver nor any browser helper may hold this checkout as its cwd."""
     page.goto("data:text/html,<h1>#236 helper cwd isolation</h1>")
 

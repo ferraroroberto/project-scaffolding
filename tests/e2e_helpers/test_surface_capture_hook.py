@@ -4,7 +4,7 @@
 missing capture directory before it touches the page, and in capture mode the
 collection hook deselects every test whose own source never calls `surface(`.
 The page stand-in fails on any use, so none of this can reach a browser; the
-in-page capture itself is pinned by `tests/e2e/test_surface_hook.py`.
+in-page capture itself is pinned by `tests/e2e/_surface_hook_checks.py`.
 """
 
 from __future__ import annotations

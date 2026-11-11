@@ -66,7 +66,7 @@ full_pytest_target    = "tests/e2e"
 # Suite-size ratchet in collected pytest nodes, read by fleet-config's /e2e
 # budget step (not classify_e2e.py); adopters set their own count, or omit it
 # for the scaffold's default of 15 (#260).
-test_budget           = 24
+test_budget           = 15
 
 # Inert image/font assets under the vendored static tree -> smoke is enough.
 [[e2e.rule]]
@@ -239,7 +239,7 @@ extensions = ["bat"]
 # static-tier path sits in ONE surface below runs only that surface's
 # pytest_targets. Anything shared stays OUT of every surface on purpose --
 # conftest.py, _color_assertions.py, _nav_graft.py (the nav, row-menu and
-# font-inherit harnesses' shared mount), demo.html (both vendored harnesses drive
+# base harnesses' shared mount), demo.html (both vendored harnesses drive
 # the gallery), icons/ (the nav harness renders the sprite), the Streamlit app
 # -- so a change there keeps the whole suite. A path in two surfaces, or a diff
 # spanning two, also keeps the whole suite. tests/test_classify_e2e.py pins
@@ -247,20 +247,19 @@ extensions = ["bat"]
 [[e2e.surface]]
 name           = "nav"
 prefixes       = ["app/webapp/static/_vendored/nav/"]
-# The font-inherit harness also mounts the real nav (#319), and the row-menu
-# placement harness lays out the real pill the menu fits against (#362), so a
-# nav edit runs both.
+# The base harness also mounts the real nav, and the row-menu harness lays out
+# the real pill the menu fits against, so a nav edit runs both.
 paths          = ["tests/e2e/test_nav_offset.py", "tests/e2e/test_vendored_nav.py"]
 pytest_targets = [
     "tests/e2e/test_nav_offset.py",
-    "tests/e2e/test_vendored_font_inherit.py",
+    "tests/e2e/test_vendored_base.py",
     "tests/e2e/test_vendored_nav.py",
-    "tests/e2e/test_vendored_row_menu_placement.py",
+    "tests/e2e/test_vendored_row_menu.py",
 ]
 
 # The gallery components. test_vendored_nav.py mounts on the same gallery
 # page, so a component stylesheet can reach it -- both harnesses run. The
-# row-menu placement harness loads row-menu.js by URL (#362/#373), so every
+# row-menu harness's placement case loads row-menu.js by URL, so every
 # component edit runs it too.
 [[e2e.surface]]
 name     = "components"
@@ -290,32 +289,23 @@ prefixes = [
     "app/webapp/static/_vendored/toast/",
 ]
 paths          = [
-    "tests/e2e/test_vendored_action_row_avatar.py",
-    "tests/e2e/test_vendored_base_color_scheme.py",
-    "tests/e2e/test_vendored_code_listing.py",
+    "tests/e2e/_action_row_avatar_checks.py",
+    "tests/e2e/_code_listing_checks.py",
+    "tests/e2e/_day_checks.py",
+    "tests/e2e/_mic_notice_checks.py",
+    "tests/e2e/test_vendored_base.py",
     "tests/e2e/test_vendored_components.py",
-    "tests/e2e/test_vendored_day.py",
-    "tests/e2e/test_vendored_font_inherit.py",
     "tests/e2e/test_vendored_home_head.py",
-    "tests/e2e/test_vendored_mic_notice.py",
-    "tests/e2e/test_vendored_page_foot.py",
     "tests/e2e/test_vendored_rec_wave.py",
     "tests/e2e/test_vendored_row_menu.py",
 ]
 pytest_targets = [
-    "tests/e2e/test_vendored_action_row_avatar.py",
-    "tests/e2e/test_vendored_base_color_scheme.py",
-    "tests/e2e/test_vendored_code_listing.py",
+    "tests/e2e/test_vendored_base.py",
     "tests/e2e/test_vendored_components.py",
-    "tests/e2e/test_vendored_day.py",
-    "tests/e2e/test_vendored_font_inherit.py",
     "tests/e2e/test_vendored_home_head.py",
-    "tests/e2e/test_vendored_mic_notice.py",
     "tests/e2e/test_vendored_nav.py",
-    "tests/e2e/test_vendored_page_foot.py",
     "tests/e2e/test_vendored_rec_wave.py",
     "tests/e2e/test_vendored_row_menu.py",
-    "tests/e2e/test_vendored_row_menu_placement.py",
 ]
 
 # The rendered-geometry helper and its hermetic fixtures. The component
@@ -328,11 +318,8 @@ prefixes       = ["tests/e2e/fixtures/geometry/"]
 paths          = ["tests/e2e/_geometry.py", "tests/e2e/test_geometry_helper.py"]
 pytest_targets = [
     "tests/e2e/test_geometry_helper.py",
-    "tests/e2e/test_layout_lint.py",
-    "tests/e2e/test_vendored_action_row_avatar.py",
-    "tests/e2e/test_vendored_code_listing.py",
+    "tests/e2e/test_harness_helpers.py",
     "tests/e2e/test_vendored_components.py",
-    "tests/e2e/test_vendored_day.py",
     "tests/e2e/test_vendored_home_head.py",
     "tests/e2e/test_vendored_nav.py",
     "tests/e2e/test_vendored_row_menu.py",
@@ -343,8 +330,13 @@ pytest_targets = [
 [[e2e.surface]]
 name           = "layout-lint"
 prefixes       = ["tests/e2e/fixtures/layout/"]
-paths          = ["tests/e2e/_layout_lint.py", "tests/e2e/test_layout_lint.py"]
-pytest_targets = ["tests/e2e/test_layout_lint.py"]
+paths          = [
+    "tests/e2e/_cwd_isolation_checks.py",
+    "tests/e2e/_layout_lint.py",
+    "tests/e2e/_surface_hook_checks.py",
+    "tests/e2e/test_harness_helpers.py",
+]
+pytest_targets = ["tests/e2e/test_harness_helpers.py"]
 
 # The usage log (#349): client module + server router, driven end to end by
 # its own harness. The gallery loads the client in a separate module script,

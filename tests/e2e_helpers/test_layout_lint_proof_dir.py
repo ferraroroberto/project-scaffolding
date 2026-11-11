@@ -1,7 +1,7 @@
 """The layout lint writes its proof images outside the checkout, never inside it.
 
 A pure path check on `proof_dir()`, so it runs in the unit stage; the lint's
-browser behaviour is pinned by `tests/e2e/test_layout_lint.py`.
+browser behaviour is pinned by `tests/e2e/test_harness_helpers.py`.
 """
 
 from __future__ import annotations

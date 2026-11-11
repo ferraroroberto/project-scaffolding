@@ -1,4 +1,4 @@
-"""The design-surface capture hook's own suite (issue #408).
+"""Checks for the design-surface capture hook, run as cases of `test_harness_helpers.py`.
 
 Drives `_surface.py` against the hermetic static page in `fixtures/surface/`
 with a stub in-page script, so nothing here depends on fleet-config. Pins the
@@ -11,20 +11,16 @@ the capture-mode collection filter.
 from __future__ import annotations
 
 import json
-from collections.abc import Callable, Iterator
-from contextlib import AbstractContextManager, nullcontext
 from pathlib import Path
 from typing import Any, cast
 
 import pytest
 from playwright.sync_api import Page
 
-from tests.e2e._cases import cases
 from tests.e2e._surface import (
     CAPTURE_ENV,
     surface,
 )
-from tests.e2e.conftest import serve_directory
 
 _FIXTURES = Path(__file__).resolve().parent / "fixtures" / "surface"
 
@@ -45,13 +41,6 @@ _STUB_SCRIPT = """(params) => {
 }"""
 
 
-@pytest.fixture(scope="session")
-def surface_server() -> Iterator[str]:
-    """Serve tests/e2e/fixtures/surface over HTTP for the session."""
-    with serve_directory(_FIXTURES) as base_url:
-        yield base_url
-
-
 def _capture_dir(root: Path, *, script: str = _STUB_SCRIPT, storage_key: str | None = None) -> Path:
     root.mkdir(parents=True, exist_ok=True)
     (root / "script.js").write_text(script, encoding="utf-8")
@@ -65,7 +54,7 @@ def _read(path: Path) -> dict[str, Any]:
     return cast("dict[str, Any]", json.loads(path.read_text(encoding="utf-8")))
 
 
-def _check_capture_flips_both_themes_in_place_and_restores(
+def check_capture_flips_both_themes_in_place_and_restores(
     page: Page, surface_server: str, monkeypatch: pytest.MonkeyPatch, tmp_path: Path, storage_key: str | None
 ) -> None:
     out = _capture_dir(tmp_path / "cap", storage_key=storage_key)
@@ -112,7 +101,7 @@ def _check_capture_flips_both_themes_in_place_and_restores(
     assert (out / "jobs.sort-sheet.light.json").read_bytes() == before
 
 
-def _check_a_throwing_script_is_recorded_not_swallowed(
+def check_a_throwing_script_is_recorded_not_swallowed(
     page: Page, surface_server: str, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     out = _capture_dir(tmp_path / "cap", script="(params) => { throw new Error('boom'); }")
@@ -125,7 +114,7 @@ def _check_a_throwing_script_is_recorded_not_swallowed(
         assert "boom" in record["error"]
 
 
-def _check_two_runs_write_identical_json(
+def check_two_runs_write_identical_json(
     page: Page, surface_server: str, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     runs: list[dict[str, bytes]] = []
@@ -137,15 +126,3 @@ def _check_two_runs_write_identical_json(
         runs.append({p.name: p.read_bytes() for p in sorted(out.glob("*.json")) if p.name != "params.json"})
     assert runs[0].keys() == {"jobs.sort-sheet.light.json", "jobs.sort-sheet.dark.json"}
     assert runs[0] == runs[1]
-
-
-def test_surface_capture_in_the_page(new_page: Callable[..., AbstractContextManager[Page]], tmp_path_factory: pytest.TempPathFactory, surface_server: str) -> None:
-    """The capture hook in a real page: both themes flipped and restored, a throwing script recorded, output byte-stable."""
-    with cases() as c:
-        for storage_key in [None, "fixture-theme"]:
-            with c.case(f"capture_flips_both_themes_in_place_and_restores[{storage_key}]"), new_page() as page, pytest.MonkeyPatch.context() as monkeypatch, nullcontext(tmp_path_factory.mktemp("case")) as tmp_path:
-                _check_capture_flips_both_themes_in_place_and_restores(page=page, surface_server=surface_server, monkeypatch=monkeypatch, tmp_path=tmp_path, storage_key=storage_key)
-        with c.case("a_throwing_script_is_recorded_not_swallowed"), new_page() as page, pytest.MonkeyPatch.context() as monkeypatch, nullcontext(tmp_path_factory.mktemp("case")) as tmp_path:
-            _check_a_throwing_script_is_recorded_not_swallowed(page=page, surface_server=surface_server, monkeypatch=monkeypatch, tmp_path=tmp_path)
-        with c.case("two_runs_write_identical_json"), new_page() as page, pytest.MonkeyPatch.context() as monkeypatch, nullcontext(tmp_path_factory.mktemp("case")) as tmp_path:
-            _check_two_runs_write_identical_json(page=page, surface_server=surface_server, monkeypatch=monkeypatch, tmp_path=tmp_path)
