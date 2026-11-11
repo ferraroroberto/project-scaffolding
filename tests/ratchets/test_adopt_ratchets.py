@@ -1,4 +1,4 @@
-"""scripts/adopt_ratchets.py and scripts/run_ratchets.py: the kit for a repo outside the fleet.
+"""scripts/tools/adopt_ratchets.py and scripts/run_ratchets.py: the kit for a repo outside the fleet.
 
 The sibling table and the stage order are cross-checked against the scripts and
 the scaffold's own gate, so a new sibling or stage cannot go unlisted; the
@@ -15,7 +15,7 @@ from pathlib import Path
 
 import pytest
 
-from scripts import adopt_ratchets as ar
+from scripts.tools import adopt_ratchets as ar
 from scripts import run_ratchets as rr
 from src.no_window import NO_WINDOW
 

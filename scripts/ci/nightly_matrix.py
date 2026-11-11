@@ -35,7 +35,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from src import runtime_files  # noqa: E402 -- needs the sys.path line above
 from src.no_window import NO_WINDOW  # noqa: E402 -- needs the sys.path line above

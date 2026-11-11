@@ -56,7 +56,7 @@ data_dir_env   = "FS_DATA_DIR"                            # default: <APP>_DATA_
 ## Generate and adopt
 
 1. Add `[verify]` to the adopter's `.fleet.toml`.
-2. From the scaffold checkout: `& .\.venv\Scripts\python.exe scripts\gen_verify_skill.py --repo <adopter>`. The default output is `<adopter>\.claude\skills\verify-<app>`; `--out <dir>` writes the skill directory elsewhere (use your scratchpad to try it first). `--app` overrides the slug (default: the folder name, minus a `-wt-N` suffix).
+2. From the scaffold checkout: `& .\.venv\Scripts\python.exe scripts\tools\gen_verify_skill.py --repo <adopter>`. The default output is `<adopter>\.claude\skills\verify-<app>`; `--out <dir>` writes the skill directory elsewhere (use your scratchpad to try it first). `--app` overrides the slug (default: the folder name, minus a `-wt-N` suffix).
 3. Apply the `.gitignore` allowlist the run prints (the generator never edits `.gitignore`; the rule text is the one in `docs/agents/project-skills.md`).
 4. Fill the `## Gotchas` of the views you drive; that is the only hand-written part.
 5. Execute Launch, Doctor, Drive, Evidence, Cleanup once and record the node list, the pass output and the build line in the PR. A skill that was never executed has not been delivered.

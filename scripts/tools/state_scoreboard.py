@@ -1,6 +1,6 @@
 """Fleet scoreboard for the implicit-state-machine work: numbers from committed state only.
 
-    python scripts/state_scoreboard.py [--at <date|sha|rev>] [--root DIR] [--repo NAME ...] [--json]
+    python scripts/tools/state_scoreboard.py [--at <date|sha|rev>] [--root DIR] [--repo NAME ...] [--json]
                                        [--bug-split <date>]
 
 For every fleet repo (a git checkout under the fleet root that has a `.fleet.toml`) it reads only
@@ -25,11 +25,11 @@ import sys
 from pathlib import Path
 from typing import Any
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from scripts.conventions_state import is_js_source, js_state_names  # noqa: E402 -- need the sys.path line above
-from scripts.state_scoreboard_bugs import GhRunner, closed_bugs, count_bugs, github_slug, run_gh  # noqa: E402
-from scripts.state_scoreboard_read import (  # noqa: E402 -- need the sys.path line above
+from scripts.tools.state_scoreboard_bugs import GhRunner, closed_bugs, count_bugs, github_slug, run_gh  # noqa: E402
+from scripts.tools.state_scoreboard_read import (  # noqa: E402 -- need the sys.path line above
     STATE_RULES,
     ReadError,
     count_proofs,

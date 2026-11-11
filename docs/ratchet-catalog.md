@@ -939,4 +939,4 @@ Which ratchets take which:
 
 ## Adoption order
 
-[adopting-ratchets.md](adopting-ratchets.md) has the steps and the prerequisites table, and `scripts/adopt_ratchets.py` does them. A sensible order: start with the set that is Python only and needs no choices (comment, docs, structure, instruction, doc references, dead code, runtime write), then add static once `ruff` is installed, then conventions and usage track by choosing the rules that match the repository. Run `--init` on each, review the baseline, and burn it down in later changes.
+[adopting-ratchets.md](adopting-ratchets.md) has the steps and the prerequisites table, and `scripts/tools/adopt_ratchets.py` does them. A sensible order: start with the set that is Python only and needs no choices (comment, docs, structure, instruction, doc references, dead code, runtime write), then add static once `ruff` is installed, then conventions and usage track by choosing the rules that match the repository. Run `--init` on each, review the baseline, and burn it down in later changes.

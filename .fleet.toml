@@ -38,7 +38,7 @@ extra_root_files = []
 
 # Nightly CI on the Mac Mini (docs/mac-runner.md, "The [ci.nightly] table"). A
 # public repo opts in with this table plus one line in project-scaffolding's
-# .github/nightly-adopters.txt; scripts/nightly_matrix.py reads it from `main`
+# .github/nightly-adopters.txt; scripts/ci/nightly_matrix.py reads it from `main`
 # and refuses unknown keys or values outside a safe character set. The scaffold
 # itself has no web app to check, so it is not an adopter. Uncomment and edit:
 # [ci.nightly]
@@ -491,7 +491,7 @@ allow_refs = [
 enabled = true
 allow   = [
     "app/log_panel.py:render_log_panel",
-    "scripts/brand_gen.py:render_set",
+    "scripts/tools/brand_gen.py:render_set",
 ]
 
 # ---------------------------------------------------------------------------

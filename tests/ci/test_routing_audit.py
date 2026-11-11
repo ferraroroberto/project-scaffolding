@@ -1,4 +1,4 @@
-"""`scripts/routing_audit.py`: the nightly audit of what per-change routing skipped.
+"""`scripts/tools/routing_audit.py`: the nightly audit of what per-change routing skipped.
 
 Builds a throwaway adopter repo (a `.fleet.toml` `[e2e]` table plus commits) and
 drives `run_audit` over it. The point of the suite is the verdict logic: a miss
@@ -16,7 +16,7 @@ from pathlib import Path
 
 import pytest
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts" / "tools"))
 
 import routing_audit as audit  # noqa: E402 -- needs the sys.path line above
 

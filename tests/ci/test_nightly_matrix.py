@@ -1,4 +1,4 @@
-"""`scripts/nightly_matrix.py`: the nightly Mac run's matrix, selection, legs and READY.
+"""`scripts/ci/nightly_matrix.py`: the nightly Mac run's matrix, selection, legs and READY.
 
 The point of the suite is the decisions the runner makes alone at night: which
 adopters run (changed since the last green night, all of them on Sunday or on
@@ -20,7 +20,7 @@ from pathlib import Path
 
 import pytest
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts" / "ci"))
 
 import nightly_matrix as nm  # noqa: E402 -- needs the sys.path line above
 

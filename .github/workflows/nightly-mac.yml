@@ -6,7 +6,7 @@
 # One hub runner serves the fleet: it is registered on this repo only, and this
 # workflow checks out each adopter in turn. The adopter list is
 # .github/nightly-adopters.txt; each adopter's settings are the `[ci.nightly]`
-# table in its own .fleet.toml, read by scripts/nightly_matrix.py. Setup,
+# table in its own .fleet.toml, read by scripts/ci/nightly_matrix.py. Setup,
 # labels, the table contract and the safety settings: docs/mac-runner.md. The
 # per-change contract stays each repo's local gate; this checks what landed on
 # `main`.
@@ -99,7 +99,7 @@ jobs:
         env:
           FULL: ${{ inputs.full }}
         run: >
-          python scaffold/scripts/nightly_matrix.py build
+          python scaffold/scripts/ci/nightly_matrix.py build
           --adopters scaffold/.github/nightly-adopters.txt
           --url-base https://github.com/ferraroroberto/
           --state-root "$HOME/mac-nightly-results"
@@ -216,7 +216,7 @@ jobs:
         if: ${{ !cancelled() && steps.seed.outcome == 'success' && matrix.unit != '' }}
         run: |
           set +e
-          "$TOOL_PY" scaffold/scripts/nightly_matrix.py leg --name unit \
+          "$TOOL_PY" scaffold/scripts/ci/nightly_matrix.py leg --name unit \
             --python "$PWD/adopter/.venv/bin/python" --cwd adopter \
             --args "$UNIT" --marker "$EXCLUDE" \
             --junit "$RESULTS/unit.xml" --retry-junit "$RESULTS/unit-retry.xml" \
@@ -232,7 +232,7 @@ jobs:
         if: ${{ !cancelled() && steps.seed.outcome == 'success' && matrix.e2e != '' }}
         run: |
           set +e
-          "$TOOL_PY" scaffold/scripts/nightly_matrix.py leg --name e2e \
+          "$TOOL_PY" scaffold/scripts/ci/nightly_matrix.py leg --name e2e \
             --python "$PWD/adopter/.venv/bin/python" --cwd adopter \
             --args "$E2E_ARGS --browser webkit --tracing retain-on-failure --screenshot only-on-failure --output $RESULTS/e2e" \
             --retry-args "--output $RESULTS/e2e/retry" \
@@ -251,7 +251,7 @@ jobs:
           view_args=()
           for v in $VIEWS; do view_args+=(--view "$v"); done
           set +e
-          adopter/.venv/bin/python scaffold/scripts/ios_sim_smoke.py \
+          adopter/.venv/bin/python scaffold/scripts/ci/ios_sim_smoke.py \
             --repo adopter --python "$PWD/adopter/.venv/bin/python" \
             --out "$RESULTS/ios" "${view_args[@]}" | tee "$RUNNER_TEMP/smoke.log"
           code=${PIPESTATUS[0]}
@@ -274,7 +274,7 @@ jobs:
           E2E: ${{ steps.e2e.outcome }}
         run: |
           set +e
-          python scaffold/scripts/routing_audit.py audit \
+          python scaffold/scripts/tools/routing_audit.py audit \
             --repo-dir adopter --repo "$REPO" --e2e-outcome "${E2E:-}" \
             --junit "$RESULTS/junit.xml" \
             --state "$HOME/mac-nightly-results/$REPO/audit-state.json" \
@@ -326,7 +326,7 @@ jobs:
           if [ -n "$UNIT" ]; then declared="$declared,unit"; fi
           if [ -n "$E2E_ARGS" ]; then declared="$declared,e2e"; fi
           if [ -n "$VIEWS" ]; then declared="$declared,smoke"; fi
-          "$TOOL_PY" scaffold/scripts/nightly_matrix.py ready \
+          "$TOOL_PY" scaffold/scripts/ci/nightly_matrix.py ready \
             --results "$RESULTS" --state "$STATE" --run "$GITHUB_RUN_ID" \
             --repo "$REPO" --sha "$SHA" --status "$STATUS" \
             --declared "$declared" \

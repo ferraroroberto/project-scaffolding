@@ -1,4 +1,4 @@
-"""Tests for the fleet state scoreboard (`scripts/state_scoreboard.py` and its readers).
+"""Tests for the fleet state scoreboard (`scripts/tools/state_scoreboard.py` and its readers).
 
 Each case builds throwaway git repos in a temp "fleet root" and reads them back: the numbers come
 from committed state at a commit, two runs agree byte for byte, and whatever cannot be read is
@@ -16,10 +16,10 @@ from typing import Any
 
 import pytest
 
-from scripts import state_scoreboard as sb
+from scripts.tools import state_scoreboard as sb
 from scripts.conventions_state import js_state_names
-from scripts.state_scoreboard_bugs import count_bugs, github_slug
-from scripts.state_scoreboard_read import ReadError, read_machines, resolve_ref, state_names
+from scripts.tools.state_scoreboard_bugs import count_bugs, github_slug
+from scripts.tools.state_scoreboard_read import ReadError, read_machines, resolve_ref, state_names
 from src.no_window import NO_WINDOW
 from tests._git_repo import git, write
 

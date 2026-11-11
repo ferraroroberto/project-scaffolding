@@ -201,14 +201,14 @@ docs/adopting-ratchets.md"]
   NIGHTLYMAC[".github/workflows/nightly-mac.yml
 the fleet's nightly CI on the self-hosted Mac runner
 schedule + dispatch only, fork-guarded, no secrets
-select job: scripts/nightly_matrix.py reads .github/nightly-adopters.txt
+select job: scripts/ci/nightly_matrix.py reads .github/nightly-adopters.txt
 + each adopter's [ci.nightly] table, changed repos only (all on Sunday)
-per adopter: unit + WebKit e2e (one retry) + scripts/ios_sim_smoke.py
+per adopter: unit + WebKit e2e (one retry) + scripts/ci/ios_sim_smoke.py
 results + READY stay on the runner host"]
-  MACDOC["docs/mac-runner.md + scripts/mac_runner_setup.sh
+  MACDOC["docs/mac-runner.md + scripts/ci/mac_runner_setup.sh
 runner install, labels, safety settings
-scripts/audio_latency_probe.py: speech-to-text p95 during a run
-scripts/routing_audit.py: nightly audit of what per-change e2e routing skipped"]
+scripts/ci/audio_latency_probe.py: speech-to-text p95 during a run
+scripts/tools/routing_audit.py: nightly audit of what per-change e2e routing skipped"]
   MACDOC -.->|sets up the runner for| NIGHTLYMAC
   CLAUDEMD -.->|documents the Actions precondition for| GATEWATCH
   CONVDOCS -.->|documents the adoption steps for| CITEMPLATE

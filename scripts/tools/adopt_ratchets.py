@@ -1,6 +1,6 @@
 """Adopt this scaffold's gate ratchets into another repo, in one command.
 
-    python scripts/adopt_ratchets.py <target-repo> [--ratchets comment,structure,...]
+    python scripts/tools/adopt_ratchets.py <target-repo> [--ratchets comment,structure,...]
 
 For every chosen ratchet it copies the script and its sibling modules into
 `<target>/scripts/` byte for byte, records each copy in the target's
@@ -29,7 +29,7 @@ import tomllib
 from dataclasses import dataclass
 from pathlib import Path
 
-SCAFFOLD_ROOT = Path(__file__).resolve().parent.parent
+SCAFFOLD_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(SCAFFOLD_ROOT))  # a script's own dir is sys.path[0], not the repo root
 
 from src import runtime_files  # noqa: E402 -- needs the sys.path line above

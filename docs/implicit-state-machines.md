@@ -75,12 +75,12 @@ Without a guardrail, each quick change adds one more flag or one more local guar
 
 ## Scoreboard: is the fleet ending in a better state?
 
-`scripts/state_scoreboard.py` answers that with numbers read from committed state only, so the same command at the same commit prints the same bytes and a "before" taken now is comparable with an "after" taken later. It lives in this scaffold and is not vendored: it reads the adopters from outside and writes to none of them.
+`scripts/tools/state_scoreboard.py` answers that with numbers read from committed state only, so the same command at the same commit prints the same bytes and a "before" taken now is comparable with an "after" taken later. It lives in this scaffold and is not vendored: it reads the adopters from outside and writes to none of them.
 
 ```
-scripts/state_scoreboard.py --at default          # each repo's shipped tip (origin/HEAD)
-scripts/state_scoreboard.py --at 2026-11-01       # the state at the start of that day (UTC), per repo
-scripts/state_scoreboard.py --at default --json   # the same, as data
+scripts/tools/state_scoreboard.py --at default          # each repo's shipped tip (origin/HEAD)
+scripts/tools/state_scoreboard.py --at 2026-11-01       # the state at the start of that day (UTC), per repo
+scripts/tools/state_scoreboard.py --at default --json   # the same, as data
 ```
 
 Run it with the scaffold's `.venv` interpreter. `--at` takes a date (UTC; resolved on each repo's default branch), any revision, `default` (each repo's `origin/HEAD` tip: use it for "today", because a checkout that is behind or on a feature branch would otherwise be what gets measured) or nothing (each repo's checked-out `HEAD`). `--root` names the folder holding the repos (default: the fleet root), `--repo` limits the run. The fleet is every git checkout there with a committed `.fleet.toml`.

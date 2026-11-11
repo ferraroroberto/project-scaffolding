@@ -1,6 +1,6 @@
 # jobs-app feature map
 
-One file per view. Seeded from the repo's committed inventories, never hand-written: the e2e suite's `surface()` names first, then `[[design.review.extra_steps]]`, then the `## UX surface` key views in `CLAUDE.md`. Regenerate with project-scaffolding's `scripts/gen_verify_skill.py`; add traps to a view's `## Gotchas`, the only hand-written part.
+One file per view. Seeded from the repo's committed inventories, never hand-written: the e2e suite's `surface()` names first, then `[[design.review.extra_steps]]`, then the `## UX surface` key views in `CLAUDE.md`. Regenerate with project-scaffolding's `scripts/tools/gen_verify_skill.py`; add traps to a view's `## Gotchas`, the only hand-written part.
 
 <!-- gen:begin index -->
 | Feature | Sub-features | Driving nodes | Seeded from |

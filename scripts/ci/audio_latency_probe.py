@@ -25,9 +25,9 @@ Subcommands:
             exit 0 / 1 / 3 respectively.
 
 Usage:
-  python scripts/audio_latency_probe.py probe --label baseline --out baseline.json
-  python scripts/audio_latency_probe.py probe --label during --out during.json
-  python scripts/audio_latency_probe.py compare baseline.json during.json \
+  python scripts/ci/audio_latency_probe.py probe --label baseline --out baseline.json
+  python scripts/ci/audio_latency_probe.py probe --label during --out during.json
+  python scripts/ci/audio_latency_probe.py compare baseline.json during.json \
       [--from T --to T]   # restrict the during window to a unix-time range
 """
 
@@ -49,7 +49,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urlsplit
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))  # a script's own dir is sys.path[0], not the repo root
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))  # a script's own dir is sys.path[0], not the repo root
 
 from src import runtime_files  # noqa: E402 -- needs the sys.path line above
 

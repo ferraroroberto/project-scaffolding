@@ -4,7 +4,7 @@ The Mac Mini nightly is the fleet's one CI (decision: [architecture-decisions.md
 
 - the adopter's **unit suite**, with Windows-only tests excluded by marker;
 - its e2e suite on **Playwright WebKit with the iPhone projection** (macOS WebKit is far closer to Safari than the Windows build); and
-- an **iOS Simulator Mobile Safari smoke** (`scripts/ios_sim_smoke.py`): the adopter's throwaway instance opened in real Mobile Safari on an iPhone simulator, one screenshot per key view.
+- an **iOS Simulator Mobile Safari smoke** (`scripts/ci/ios_sim_smoke.py`): the adopter's throwaway instance opened in real Mobile Safari on an iPhone simulator, one screenshot per key view.
 
 Each leg is optional per adopter, and a failed test is retried once (see "Legs and retries"). The nightly is not a merge gate. Each repo's local pre-ship gate stays the per-change contract, and the nightly checks what landed on `main`, on the real engine.
 
@@ -18,7 +18,7 @@ A personal GitHub account has no organization-level runners, and one runner per 
 - **Every job's `if:` refuses everything else**: any other event, any fork pull-request payload, and any copy of the workflow running in a fork (`github.repository` must be this repo).
 - **Least privilege**: `permissions: contents: read`, and every checkout sets `persist-credentials: false`.
 - **No secrets.** The runner holds only its own registration. Nothing in the workflow reads `secrets.*`.
-- **Adopter settings are data, not script.** An adopter's `[ci.nightly]` values reach the steps as environment variables, never as `${{ }}` text inside a `run:` script, and `scripts/nightly_matrix.py` refuses any value outside a conservative character set (no spaces, quotes, `$`, backticks, `;`, `|`, `&`, redirects or globs), so a table cannot inject a command.
+- **Adopter settings are data, not script.** An adopter's `[ci.nightly]` values reach the steps as environment variables, never as `${{ }}` text inside a `run:` script, and `scripts/ci/nightly_matrix.py` refuses any value outside a conservative character set (no spaces, quotes, `$`, backticks, `;`, `|`, `&`, redirects or globs), so a table cannot inject a command.
 - **Anonymous reads only.** The selection job reads each adopter's `main` with a shallow `git fetch` over HTTPS, with no credential helper and no prompt; an adopter must be public.
 - **Results stay private.** A public repo's logs and artifacts are public, so the log and the step summary carry pass/fail lines only. Screenshots, failure traces, junit files and flaky test ids go to `~/mac-nightly-results/<repo>/<run id>/` in the runner user's home, outside every checkout, and nothing is uploaded. Runs older than 14 days are pruned.
 - **Fork approval stays on.** Repo Settings → Actions → General → "Approval for running fork pull request workflows from contributors" is set to require approval for all outside contributors. The workflow has no pull-request trigger, so this is depth, not the main line.
@@ -49,7 +49,7 @@ The Mac is also a whisper host. The hub places whisper on the gaming PC first, t
 
 ### Fallback trigger
 
-GitHub's `schedule` trigger has not created a run for this workflow on any night, whatever the cron minute, so a PC-side job also starts it. `scripts/nightly_mac_fallback.py` runs `gh workflow run nightly-mac.yml --ref main` once a night, at 02:23 local, from a daily app-launcher Job. It needs `gh` logged in with write access to the repo, which the PC already has; the Mac never holds a GitHub token.
+GitHub's `schedule` trigger has not created a run for this workflow on any night, whatever the cron minute, so a PC-side job also starts it. `scripts/ci/nightly_mac_fallback.py` runs `gh workflow run nightly-mac.yml --ref main` once a night, at 02:23 local, from a daily app-launcher Job. It needs `gh` logged in with write access to the repo, which the PC already has; the Mac never holds a GitHub token.
 
 It lists the workflow's recent runs first and does nothing when one of any event was already created for today's UTC date, so a schedule that starts working never doubles up. Each path ends in one log line:
 
@@ -68,7 +68,7 @@ The Job entry, as a committed example (`launcher.py` registers it through `POST 
 {
   "id": "nightly-mac-fallback",
   "name": "nightly-mac fallback trigger (02:23)",
-  "script_path": "E:\\automation\\project-scaffolding\\scripts\\nightly_mac_fallback.py",
+  "script_path": "E:\\automation\\project-scaffolding\\scripts\\ci\\nightly_mac_fallback.py",
   "args": "",
   "schedule": { "type": "daily", "at": "02:23" },
   "alert_on_failure": true,
@@ -80,7 +80,7 @@ The Job entry, as a committed example (`launcher.py` registers it through `POST 
 
 ### Speech-to-text latency during a run
 
-What the Mac serves is the hub's `audio_transcribe` role: parakeet on the Neural Engine, with whisper only as the fallback when parakeet is down. `scripts/audio_latency_probe.py` measures it through the hub's audio route only: `probe` sends short synthetic tone clips (no recording of anyone) at a fixed spacing and records each round trip with the host and model that served it, and `compare` judges a during-run window against a baseline. Negligible means up to +10 % at p95 plus 150 ms; anything unestablished (a failed request, fewer than 20 samples, a different serving host or model) is `unknown`, exit 3, never a pass.
+What the Mac serves is the hub's `audio_transcribe` role: parakeet on the Neural Engine, with whisper only as the fallback when parakeet is down. `scripts/ci/audio_latency_probe.py` measures it through the hub's audio route only: `probe` sends short synthetic tone clips (no recording of anyone) at a fixed spacing and records each round trip with the host and model that served it, and `compare` judges a during-run window against a baseline. Negligible means up to +10 % at p95 plus 150 ms; anything unestablished (a failed request, fewer than 20 samples, a different serving host or model) is `unknown`, exit 3, never a pass.
 
 Measured on a manual `workflow_dispatch` run of the one current adopter (the job took 2 min 22 s), 4 s clips every 5 s, all served by the Mac's parakeet and all answered 200:
 
@@ -94,10 +94,10 @@ The median does not move; the tail does. The six slow requests (1.3 s to 6.8 s) 
 Re-measure after any change to the runner's concurrency, an adopter's suite, or the hub's placement of the transcribe role:
 
 ```sh
-python scripts/audio_latency_probe.py probe --label baseline --count 40 --interval-s 5 --out baseline.json
+python scripts/ci/audio_latency_probe.py probe --label baseline --count 40 --interval-s 5 --out baseline.json
 # start a run, then probe across it
-python scripts/audio_latency_probe.py probe --label during --count 100 --interval-s 5 --out during.json
-python scripts/audio_latency_probe.py compare baseline.json during.json --from <job start, unix> --to <job end, unix>
+python scripts/ci/audio_latency_probe.py probe --label during --count 100 --interval-s 5 --out during.json
+python scripts/ci/audio_latency_probe.py compare baseline.json during.json --from <job start, unix> --to <job end, unix>
 ```
 
 ## Mac prerequisites
@@ -138,10 +138,10 @@ Minting it elsewhere and passing it in keeps the runner user free of a GitHub lo
 As the runner user, in its GUI session, from a checkout of this repo:
 
 ```sh
-RUNNER_TOKEN=<token> bash scripts/mac_runner_setup.sh install
+RUNNER_TOKEN=<token> bash scripts/ci/mac_runner_setup.sh install
 ```
 
-`scripts/mac_runner_setup.sh install` checks for macOS arm64, `simctl` and an iPhone simulator (it creates one for this user when the runtime is installed but the user has no device), downloads the latest `actions/runner` macOS arm64 release, verifies its SHA-256 against the release notes, registers it with `config.sh`, installs and starts the service, and prints its status. Without `RUNNER_TOKEN` it mints the token with `gh api` (that needs a `gh` login with admin; `gh auth logout` afterwards). `RUNNER_REPO`, `RUNNER_NAME` and `RUNNER_DIR` override the repo, the name (`mac-mini`) and the folder (`~/actions-runner`).
+`scripts/ci/mac_runner_setup.sh install` checks for macOS arm64, `simctl` and an iPhone simulator (it creates one for this user when the runtime is installed but the user has no device), downloads the latest `actions/runner` macOS arm64 release, verifies its SHA-256 against the release notes, registers it with `config.sh`, installs and starts the service, and prints its status. Without `RUNNER_TOKEN` it mints the token with `gh api` (that needs a `gh` login with admin; `gh auth logout` afterwards). `RUNNER_REPO`, `RUNNER_NAME` and `RUNNER_DIR` override the repo, the name (`mac-mini`) and the folder (`~/actions-runner`).
 
 ## Install by hand
 
@@ -170,7 +170,7 @@ gh api -X POST repos/ferraroroberto/project-scaffolding/actions/runners/<id>/lab
 
 ## Check it is online
 
-- `bash scripts/mac_runner_setup.sh status` prints the launchd state and, with a `gh` login, GitHub's view (`online`, `busy`, labels).
+- `bash scripts/ci/mac_runner_setup.sh status` prints the launchd state and, with a `gh` login, GitHub's view (`online`, `busy`, labels).
 - Or repo Settings → Actions → Runners: `mac-mini` shows **Idle**.
 - Or from any machine: `gh api repos/ferraroroberto/project-scaffolding/actions/runners`.
 
@@ -197,15 +197,15 @@ Auto-login is turned on in System Settings → Users & Groups → Automatically 
 ## Re-register or remove
 
 ```sh
-bash scripts/mac_runner_setup.sh remove                      # stop, uninstall the service, deregister
-RUNNER_TOKEN=<new token> bash scripts/mac_runner_setup.sh install
+bash scripts/ci/mac_runner_setup.sh remove                      # stop, uninstall the service, deregister
+RUNNER_TOKEN=<new token> bash scripts/ci/mac_runner_setup.sh install
 ```
 
 `remove` mints a removal token with `gh api` (or reads `RUNNER_REMOVE_TOKEN`; the web UI's runner page shows one too). It leaves `~/actions-runner` on disk for you to delete. A runner that has been offline for 14 days is removed by GitHub automatically and needs a fresh `install`.
 
 ## Routing audit
 
-The per-change gate routes e2e with `classify_e2e` (skip, static, surface or full), so the nightly full WebKit run is the check on that routing: a failure on a night whose merged commits were routed `skip`, or `static` for a node outside the declared `static_pytest_target`, means the adopter's `[e2e]` rules are too narrow. `scripts/routing_audit.py` has two halves split by trust.
+The per-change gate routes e2e with `classify_e2e` (skip, static, surface or full), so the nightly full WebKit run is the check on that routing: a failure on a night whose merged commits were routed `skip`, or `static` for a node outside the declared `static_pytest_target`, means the adopter's `[e2e]` rules are too narrow. `scripts/tools/routing_audit.py` has two halves split by trust.
 
 **`audit` (runner, no network).** It runs after the e2e and smoke legs of an adopter that declares `e2e`, even when they failed, and reads the adopter checkout (full history), the pytest junit file and a state file in the runner user's home, `mac-nightly-results/<repo>/audit-state.json`, which holds the last green commit. It writes `audit.json` into the run folder and appends one line to the step summary, counts only: `Routing audit: nights audited N, misses found M`.
 
@@ -219,7 +219,7 @@ A green night advances the state to the adopter's `HEAD`. A red or unknown night
 
 `unknown` is its own state, never folded into clean: the e2e leg was skipped or cancelled, the junit file is missing or has no failing test under a failed leg, the adopter's `[e2e]` table is missing or unusable, there is no earlier green night yet (the first run only records a baseline when it is green), the last green commit is gone from the history, git cannot list the window, or a failing node sits in a module that cannot be located on disk under a `static` change.
 
-**`file` (trusted host, needs `gh`).** `python scripts/routing_audit.py file --audit <audit.json>` reads a pulled `audit.json` and files nothing unless it records a miss. For a miss it keeps exactly one open issue in the adopter titled `e2e routing: nightly audit found a miss`, labelled `bug`: it creates it, or comments on the open one only when the failing-node set changed (a hidden marker holds the set's digest). The body carries the failing node ids, the tier counts and an acceptance checklist, nothing else. `audit.json` is untrusted data (adopter code named the nodes), so the tool checks its shape and size, strips backticks and control characters, and prints node ids inside a code fence. It ends on `FILE=none|created|commented|unchanged`, or `FILE=unknown` (exit 3) when `gh` could not confirm. `--dry-run` prints the body. The runner holds no `gh` or token; the pull job in `local-llm-hub` runs `file` after it copies a run that has `READY`.
+**`file` (trusted host, needs `gh`).** `python scripts/tools/routing_audit.py file --audit <audit.json>` reads a pulled `audit.json` and files nothing unless it records a miss. For a miss it keeps exactly one open issue in the adopter titled `e2e routing: nightly audit found a miss`, labelled `bug`: it creates it, or comments on the open one only when the failing-node set changed (a hidden marker holds the set's digest). The body carries the failing node ids, the tier counts and an acceptance checklist, nothing else. `audit.json` is untrusted data (adopter code named the nodes), so the tool checks its shape and size, strips backticks and control characters, and prints node ids inside a code fence. It ends on `FILE=none|created|commented|unchanged`, or `FILE=unknown` (exit 3) when `gh` could not confirm. `--dry-run` prints the body. The runner holds no `gh` or token; the pull job in `local-llm-hub` runs `file` after it copies a run that has `READY`.
 
 ## Adding an adopter
 
@@ -249,7 +249,7 @@ A listed repo whose `main` cannot be fetched, or whose table is missing or refus
 
 ### Selection and state
 
-The `select` job runs `scripts/nightly_matrix.py build`: for each listed repo it reads the `main` commit and `.fleet.toml` from one shallow fetch (so the settings always belong to the commit that gets tested) and compares that commit with `last_green_sha` in `~/mac-nightly-results/<repo>/state.json`.
+The `select` job runs `scripts/ci/nightly_matrix.py build`: for each listed repo it reads the `main` commit and `.fleet.toml` from one shallow fetch (so the settings always belong to the commit that gets tested) and compares that commit with `last_green_sha` in `~/mac-nightly-results/<repo>/state.json`.
 
 - **Weekdays:** a repo runs only when its `main` differs from its last green SHA. A repo with no green night yet always runs.
 - **Sunday** (the run's UTC date) **or a dispatch with `full: true`:** every repo runs.
@@ -259,7 +259,7 @@ The platform job checks out the exact commit the selection read. Only a green ni
 
 ### Legs and retries
 
-`scripts/nightly_matrix.py leg` runs the unit leg and the e2e leg. Each runs pytest once; on a failure it runs `--last-failed` once more.
+`scripts/ci/nightly_matrix.py leg` runs the unit leg and the e2e leg. Each runs pytest once; on a failure it runs `--last-failed` once more.
 
 | Leg result | Meaning |
 |---|---|
@@ -289,7 +289,7 @@ No logs, paths, test names or images. The test ids behind `flaky` stay in the ru
 
 ## Smoke results
 
-`scripts/ios_sim_smoke.py` ends with one line:
+`scripts/ci/ios_sim_smoke.py` ends with one line:
 
 | Line | Exit | Meaning |
 |---|---|---|

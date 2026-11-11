@@ -1,4 +1,4 @@
-"""`scripts/audio_latency_probe.py`: the verdict logic that decides whether a nightly run hurts STT.
+"""`scripts/ci/audio_latency_probe.py`: the verdict logic that decides whether a nightly run hurts STT.
 
 The probe's network half needs the live hub; these cover what turns two sets of
 samples into a verdict: the percentile, the window filter, and that anything
@@ -13,7 +13,7 @@ import sys
 import wave
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts" / "ci"))
 
 import audio_latency_probe as probe  # noqa: E402 -- needs the sys.path line above
 

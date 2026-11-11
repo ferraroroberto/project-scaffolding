@@ -14,7 +14,7 @@ imports it.
 Usage (from a downstream project's own ``scripts/gen_icons.py``):
 
     import sys
-    sys.path.insert(0, r"E:\\automation\\project-scaffolding\\scripts")
+    sys.path.insert(0, r"E:\\automation\\project-scaffolding\\scripts\tools")
     from brand_gen import render_set
 
     render_set(

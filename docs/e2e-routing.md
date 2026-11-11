@@ -211,7 +211,7 @@ Keep both. When you add a new e2e-relevant directory, add its `full` rule to `.f
 
 ## Auditing the routing
 
-The nightly full run audits these rules after the fact: `scripts/routing_audit.py` flags a failure that routing would have skipped (`docs/mac-runner.md`, "Routing audit").
+The nightly full run audits these rules after the fact: `scripts/tools/routing_audit.py` flags a failure that routing would have skipped (`docs/mac-runner.md`, "Routing audit").
 
 ## Diff-proportionate e2e routing (`.fleet.toml` `[e2e]` + `classify_e2e.py`)
 
