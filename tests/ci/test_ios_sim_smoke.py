@@ -8,6 +8,8 @@ instance is found.
 
 from __future__ import annotations
 
+import logging
+import subprocess
 import sys
 from pathlib import Path
 
@@ -80,6 +82,67 @@ def test_run_reports_unknown_without_a_synthetic_command(tmp_path: Path) -> None
     code, line = smoke.run(tmp_path, sys.executable, ["/"], tmp_path / "out", 0.0)
     assert code == 3
     assert line.startswith("SMOKE=unknown reason=")
+
+
+class _FakeSimctl:
+    """A `_simctl` stand-in: `openurl` answers from `openurl_codes` in order, a screenshot writes a real-sized file."""
+
+    def __init__(self, openurl_codes: list[int]) -> None:
+        self.openurl_codes = list(openurl_codes)
+        self.openurl_calls: list[str] = []
+
+    def __call__(self, *args: str, timeout: float = 0.0) -> subprocess.CompletedProcess[str]:
+        if args[0] == "openurl":
+            self.openurl_calls.append(args[2])
+            code = self.openurl_codes.pop(0)
+            return subprocess.CompletedProcess(args, code, "", "Operation timed out" if code else "")
+        if args[0] == "io" and args[2] == "screenshot":
+            Path(args[3]).write_bytes(b"x" * smoke.MIN_SHOT_BYTES)
+        return subprocess.CompletedProcess(args, 0, "", "")
+
+
+@pytest.fixture
+def sleeps(monkeypatch: pytest.MonkeyPatch) -> list[float]:
+    recorded: list[float] = []
+    monkeypatch.setattr(smoke.time, "sleep", recorded.append)
+    return recorded
+
+
+def test_one_openurl_failure_then_success_is_a_pass(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, sleeps: list[float],
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    fake = _FakeSimctl([60, 0])
+    monkeypatch.setattr(smoke, "_simctl", fake)
+    with caplog.at_level(logging.INFO, logger="ios_sim_smoke"):
+        missing = smoke._shoot("udid", "http://127.0.0.1:1", ["/"], tmp_path, settle_s=0.0)
+    assert missing == []
+    assert fake.openurl_calls == ["http://127.0.0.1:1/"] * 2
+    assert smoke.OPENURL_RETRY_DELAY_S in sleeps
+    assert "attempt 1/2" in caplog.text
+    assert "attempt 2/2" in caplog.text
+
+
+def test_two_openurl_failures_name_the_view(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, sleeps: list[float],
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    fake = _FakeSimctl([60, 60, 0])
+    monkeypatch.setattr(smoke, "_simctl", fake)
+    with caplog.at_level(logging.INFO, logger="ios_sim_smoke"):
+        missing = smoke._shoot("udid", "http://127.0.0.1:1", ["/settings"], tmp_path, settle_s=0.0)
+    assert missing == ["/settings"]
+    assert len(fake.openurl_calls) == 2
+    assert "attempt 1/2" in caplog.text
+    assert "attempt 2/2" in caplog.text
+
+
+def test_a_failed_first_view_does_not_spare_the_next(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, sleeps: list[float],
+) -> None:
+    monkeypatch.setattr(smoke, "_simctl", _FakeSimctl([60, 60, 0]))
+    missing = smoke._shoot("udid", "http://127.0.0.1:1", ["/", "/settings"], tmp_path, settle_s=0.0)
+    assert missing == ["/"]
 
 
 @pytest.mark.skipif(sys.platform == "darwin", reason="checks the off-macOS refusal")
