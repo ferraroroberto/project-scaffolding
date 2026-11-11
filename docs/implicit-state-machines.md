@@ -88,7 +88,7 @@ Run it with the scaffold's `.venv` interpreter. `--at` takes a date (UTC; resolv
 | Metric | What it counts | Target |
 |---|---|---|
 | Findings | The `state-literal`, `state-set-repeat` and `state-write` counts in each repo's committed conventions baseline, split `py` / `js` (a baseline key that is not a `.py` file counts as `js`). The baseline is the ceiling on today's hits: the ratchet fails any rise and a fixed hit only shrinks it | 0 |
-| Declared machines | The `[[state_machines]]` entries and their owner modules | up, as suspects are confirmed |
+| Declared machines | The `[[state_machines]]` entries and their owner modules, each with its declared state count: a Python owner's class members and `Literal` strings, a JavaScript/TypeScript owner's `enum`, `class`, object, array or string-literal union, read with the conventions ratchet's own tokenizer | up, as suspects are confirmed |
 | Transition proof | Per machine, the test functions carrying a `state-machine-proof: <machine name>` marker. A machine with 0 is flagged `no proof` | at least 1 per machine |
 | Duplicate derivations | `state-write` plus `state-set-repeat`: places outside any declared owner that write a lifecycle flag the owner also writes or re-spell the owner's set of states | 0 |
 | Bug signal | With `--bug-split <date>`: closed `bug` issues that name a machine (its name, its type, or two of its states), before vs after the date. Reads GitHub through `gh` | none: lagging and noisy, read it as a trend |

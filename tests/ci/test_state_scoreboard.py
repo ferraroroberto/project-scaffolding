@@ -17,6 +17,7 @@ from typing import Any
 import pytest
 
 from scripts import state_scoreboard as sb
+from scripts.conventions_state import js_state_names
 from scripts.state_scoreboard_bugs import count_bugs, github_slug
 from scripts.state_scoreboard_read import ReadError, read_machines, resolve_ref, state_names
 from src.no_window import NO_WINDOW
@@ -185,6 +186,31 @@ def test_state_names_reads_enum_members_and_literal_aliases() -> None:
     assert state_names("from typing import Literal\nJobState = Literal['Up', 'down']\n", "JobState") == ["down", "up"]
     assert state_names("class Other:\n    pass\n", "JobState") == []
     assert state_names("def (:", "JobState") == []
+
+
+def test_js_state_names_reads_the_declared_type_in_every_js_shape() -> None:
+    assert js_state_names("export enum JobState { Idle = 'idle', Running = 'running' }", "JobState") == ["idle", "running"]
+    assert js_state_names("export type JobState = 'Up' | 'down';", "JobState") == ["down", "up"]
+    multiline = "type JobState =\n  | 'idle'\n  | 'running';\ntype Other = 'x' | 'y';"
+    assert js_state_names(multiline, "JobState") == ["idle", "running"]
+    assert js_state_names("export const JobState = Object.freeze({ IDLE: 'idle', RUNNING: 'running' });", "JobState") == [
+        "idle", "running"]
+    assert js_state_names("const JobState = ['idle', 'running'];", "JobState") == ["idle", "running"]
+    assert js_state_names("const JobState = new Set(['idle', 'running']);", "JobState") == ["idle", "running"]
+    assert js_state_names("class JobState { static IDLE = 'idle'; static RUNNING = 'running'; go() { return 'x'; } }",
+                          "JobState") == ["idle", "running"]
+    assert js_state_names("const Other = { A: 'a' };", "JobState") == []
+    assert js_state_names("const JobState = {{{", "JobState") == []
+
+
+def test_a_js_declared_owner_shows_its_state_count(tmp_path: Path) -> None:
+    machine = '[[state_machines]]\nname = "session"\nmodule = "src/session_end.ts"\ntype = "SessionEnd"\n'
+    owner = "export type SessionEnd = 'idle' | 'ending' | 'ended';\n"
+    make_repo(tmp_path, "jsrepo", good_files(**{".fleet.toml": toml(machines=machine), "src/session_end.ts": owner}))
+    make_repo(tmp_path, "pyrepo", good_files())
+    _, rows = run(tmp_path)
+    assert rows["jsrepo"]["machines"]["items"][0]["states"] == 3
+    assert rows["pyrepo"]["machines"]["items"][0]["states"] == 2
 
 
 def test_bug_signal_counts_only_issues_naming_the_machine(tmp_path: Path) -> None:

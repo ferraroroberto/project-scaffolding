@@ -27,6 +27,7 @@ from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from scripts.conventions_state import is_js_source, js_state_names  # noqa: E402 -- need the sys.path line above
 from scripts.state_scoreboard_bugs import GhRunner, closed_bugs, count_bugs, github_slug, run_gh  # noqa: E402
 from scripts.state_scoreboard_read import (  # noqa: E402 -- need the sys.path line above
     STATE_RULES,
@@ -89,8 +90,10 @@ def _machines(repo: Path, sha: str, config: dict[str, Any], split: str | None, g
         except ReadError as exc:
             bug_reason = str(exc)
     for machine in declared:
-        source = read_file(repo, sha, machine.module) if machine.module.endswith(".py") else None
-        states = state_names(source, machine.type) if source else []
+        js = is_js_source(machine.module)
+        source = read_file(repo, sha, machine.module) if js or machine.module.endswith(".py") else None
+        reader = js_state_names if js else state_names
+        states = reader(source, machine.type) if source else []
         item: dict[str, Any] = {"name": machine.name, "module": machine.module, "states": len(states),
                                 "proof_tests": proofs.get(machine.name)}
         if split:
