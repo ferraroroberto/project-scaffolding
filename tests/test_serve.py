@@ -189,7 +189,7 @@ async def _unanswered_h2_requests(total: int, batch: int) -> list[int]:
                 try:
                     # A healthy answer takes milliseconds; the stall is the 5 s keep-alive.
                     data = await asyncio.wait_for(reader.read(65_536), 2)
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     return sorted(pending)
                 if not data:
                     return sorted(pending)
