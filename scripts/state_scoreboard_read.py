@@ -20,7 +20,14 @@ from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from scripts.conventions_state import StateMachine, parse_machines  # noqa: E402 -- needs the sys.path line above
+from scripts.conventions_state import (  # noqa: E402 -- needs the sys.path line above
+    JS_SUFFIXES,
+    StateMachine,
+    Tok,
+    is_js_source,
+    js_parse,
+    parse_machines,
+)
 from src.no_window import NO_WINDOW  # noqa: E402 -- needs the sys.path line above
 
 STATE_RULES = ("state-literal", "state-set-repeat", "state-write")
@@ -166,12 +173,19 @@ def read_findings(repo: Path, sha: str, config: dict[str, Any], rules: tuple[str
 
 
 def _is_test_path(path: str) -> bool:
+    """A Python or JS/TS file in a `tests/` or `test/` folder, or named like a test (`test_*.py`, `*_test.py`, `*.test.*`, `*.spec.*`)."""
     pure = PurePosixPath(path)
-    return bool({"tests", "test"} & set(pure.parts[:-1])) or pure.name.startswith("test_") or pure.name.endswith("_test.py")
+    in_test_folder = bool({"tests", "test"} & set(pure.parts[:-1]))
+    if pure.suffix == ".py":
+        return in_test_folder or pure.name.startswith("test_") or pure.name.endswith("_test.py")
+    if is_js_source(path):
+        return in_test_folder or bool(re.search(r"\.(test|spec)\.[^.]+$", pure.name, re.IGNORECASE))
+    return False
 
 
 def _proof_files(repo: Path, sha: str) -> list[str]:
-    done = run_git(repo, "grep", "-I", "-l", "-z", "-e", PROOF_MARKER, sha, "--", "*.py")
+    pathspecs = ["*.py", *(f"*{suffix}" for suffix in JS_SUFFIXES)]
+    done = run_git(repo, "grep", "-I", "-l", "-z", "-e", PROOF_MARKER, sha, "--", *pathspecs)
     if done.returncode == 1:
         return []
     if done.returncode != 0:
@@ -201,14 +215,59 @@ def _proofs_in(text: str, path: str) -> list[set[str]]:
     return found
 
 
+_JS_TEST_CALLS = frozenset({"test", "it"})
+_JS_TEST_MODIFIERS = frozenset({"only", "skip", "todo", "concurrent", "serial", "fails", "fixme"})
+
+
+def _js_test_calls(toks: list[Tok], pairs: dict[int, int]) -> list[tuple[int, int]]:
+    """The (first line, last line) of each `test(...)` / `it(...)` call, with `.only` / `.skip` style modifiers."""
+    spans = []
+    for k, tok in enumerate(toks):
+        if tok.kind != "name" or tok.text not in _JS_TEST_CALLS or (k and toks[k - 1].text in (".", "?.")):
+            continue
+        opener = k + 1
+        if opener + 2 < len(toks) and toks[opener].text == "." and toks[opener + 1].text in _JS_TEST_MODIFIERS:
+            opener += 2
+        if opener < len(toks) and toks[opener].kind == "punct" and toks[opener].text == "(" and opener in pairs:
+            spans.append((tok.line, toks[pairs[opener]].line))
+    return spans
+
+
+def _js_proofs_in(text: str, path: str) -> list[set[str]]:
+    """For each `test`/`it` call in a JS/TS module, the machine names its marker comments carry.
+
+    A marker counts in the comment block that ends on the line right above the call, or in a comment
+    inside the call. Comments are read from the tokenizer, so a marker in a string counts for nothing.
+    """
+    comments: list[tuple[int, int, str]] = []
+    try:
+        toks, pairs = js_parse(text, comments)
+    except ValueError as exc:
+        raise ReadError(f"{path} does not parse: {exc}") from exc
+    code_lines = {t.line for t in toks}
+    own_line = [c for c in comments if c[0] not in code_lines]  # a trailing comment belongs to its code line
+    found = []
+    for first, last in _js_test_calls(toks, pairs):
+        wanted = [c for c in comments if first <= c[0] <= last]
+        above = first
+        for start, end, body in reversed(own_line):
+            if end == above - 1:
+                wanted.append((start, end, body))
+                above = start
+        names = set(_PROOF_RE.findall("\n".join(body for _, _, body in wanted)))
+        if names:
+            found.append(names)
+    return found
+
+
 def count_proofs(repo: Path, sha: str, machines: tuple[StateMachine, ...]) -> dict[str, int]:
-    """Per declared machine, the test functions carrying `state-machine-proof: <name>`."""
+    """Per declared machine, the Python test functions and JS/TS `test`/`it` calls carrying `state-machine-proof: <name>`."""
     counts = {m.name: 0 for m in machines}
     for path in _proof_files(repo, sha):
         text = read_file(repo, sha, path)
         if text is None:
             raise ReadError(f"{path} vanished at {sha[:7]}")
-        for names in _proofs_in(text, path):
+        for names in (_proofs_in if path.endswith(".py") else _js_proofs_in)(text, path):
             for name in names & counts.keys():
                 counts[name] += 1
     return counts

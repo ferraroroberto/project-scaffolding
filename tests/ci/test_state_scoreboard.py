@@ -162,6 +162,42 @@ def test_an_unparseable_test_module_makes_the_proof_unknown(tmp_path: Path) -> N
     assert sb.totals(list(rows.values()))["machines_proof_unknown"] == 1
 
 
+JS_PROOFS = (
+    "import { test, it, describe } from 'node:test';\n\n"
+    "// the closed set is exhaustive\n// state-machine-proof: job\ntest('refuses an illegal move', () => {\n  run();\n});\n\n"
+    "it.skip('marker in the body', () => {\n  /* state-machine-proof: job */\n  run();\n});\n\n"
+    "// state-machine-proof: job\ndescribe('a suite is not a test', () => {});\n\n"
+    "test('other machine', () => {\n  // state-machine-proof: elsewhere\n});\n\n"
+    "test('unmarked', () => {\n  const s = 'state-machine-proof: job';\n});\n\n"
+    "// state-machine-proof: job\n\nit('a blank line breaks the block', () => {});\n"
+)
+
+
+def test_proof_tests_in_javascript_are_counted_by_test_and_it_calls_only(tmp_path: Path) -> None:
+    make_repo(tmp_path, "jsproof", good_files(**{"test/job.test.js": JS_PROOFS}))
+    make_repo(tmp_path, "tsspec", good_files(**{"web/job.spec.ts": JS_PROOFS.replace("node:test", "vitest")}))
+    make_repo(tmp_path, "prod", good_files(**{"web/job.js": JS_PROOFS}))
+    make_repo(tmp_path, "pyonly", good_files(**{"tests/test_job.py": "# state-machine-proof: job\ndef test_a():\n    pass\n"}))
+    _, rows = run(tmp_path)
+    assert rows["jsproof"]["machines"]["items"][0]["proof_tests"] == 2
+    assert rows["tsspec"]["machines"]["items"][0]["proof_tests"] == 2
+    assert rows["prod"]["machines"]["items"][0]["proof_tests"] == 0
+    assert rows["pyonly"]["machines"]["items"][0]["proof_tests"] == 1
+
+
+def test_javascript_and_python_proofs_add_up(tmp_path: Path) -> None:
+    files = {"test/job.test.mjs": JS_PROOFS, "tests/test_job.py": "# state-machine-proof: job\ndef test_a():\n    pass\n"}
+    make_repo(tmp_path, "both", good_files(**files))
+    _, rows = run(tmp_path)
+    assert rows["both"]["machines"]["items"][0]["proof_tests"] == 3
+
+
+def test_an_unreadable_javascript_test_makes_the_proof_unknown(tmp_path: Path) -> None:
+    make_repo(tmp_path, "alpha", good_files(**{"test/job.test.js": "// state-machine-proof: job\ntest('x', () => {\n"}))
+    _, rows = run(tmp_path)
+    assert rows["alpha"]["machines"]["items"][0]["proof_tests"] is None and rows["alpha"]["status"] == "unknown"
+
+
 def test_a_malformed_machine_table_is_unknown_machines_but_findings_still_read(tmp_path: Path) -> None:
     make_repo(tmp_path, "alpha", {**good_files(), ".fleet.toml": toml(machines='[[state_machines]]\nname = "job"\n')})
     _, rows = run(tmp_path)
