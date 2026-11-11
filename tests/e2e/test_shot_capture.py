@@ -1,9 +1,10 @@
 """The screenshot baseline, proven on the scaffold's own component gallery.
 
 `test_gallery_shots` is the capture the pre-ship gate compares: it writes the
-gallery at phone and desktop, light and dark, into the committed baseline
-folder, and `scripts/shot_baseline.py --check-tree` then compares those files
-with git's copy and restores them.
+gallery at phone and desktop, light and dark, and the gallery's nav mode (the
+real phone pill at rest) in light and dark, into the committed baseline folder,
+and `scripts/shot_baseline.py --check-tree` then compares those files with
+git's copy and restores them.
 
 The other two prove the comparison itself end to end, on real captures in a
 throwaway git repo so the scaffold's own baseline is never touched: two
@@ -30,6 +31,8 @@ pytestmark = pytest.mark.only_browser("chromium")
 
 #: The two corners of the matrix: most pixels (phone, scale 3) and the other theme.
 _PROOF_VARIANTS = (Variant(PHONE, "light"), Variant(DESKTOP, "dark"))
+#: The floating pill exists only on a coarse pointer at phone width.
+_PILL_VARIANTS = (Variant(PHONE, "light"), Variant(PHONE, "dark"))
 
 
 def _shots_dir() -> Path:
@@ -44,6 +47,26 @@ def _gallery_ready(page: Page, variant: Variant) -> None:
     page.evaluate("(t) => { document.documentElement.dataset.theme = t; }", variant.theme)
 
 
+def _pill_at_rest(page: Page, variant: Variant) -> None:
+    """`demo.html?nav`: the real phone pill, mounted, its capsule parked on the first tab.
+
+    Headless Chromium can report Reduce Transparency, which drops the pill's
+    scroll-edge fade, so the feature is pinned off: the fade is part of the look.
+    """
+    page.context.new_cdp_session(page).send(
+        "Emulation.setEmulatedMedia",
+        {"features": [{"name": "prefers-reduced-transparency", "value": "no-preference"}]},
+    )
+    _gallery_ready(page, variant)
+    page.wait_for_selector("body[data-nav-demo-ready='1']")
+    page.wait_for_function(
+        "() => { const pill = document.querySelector('.tabs .tab-pill');"
+        " const on = document.querySelector('.tabs .tab.active');"
+        " return pill && on && pill.style.getPropertyValue('--pill-x') === on.offsetLeft + 'px'"
+        " && pill.style.getPropertyValue('--pill-w') === on.offsetWidth + 'px'; }"
+    )
+
+
 def _visibly_changed(page: Page, variant: Variant) -> None:
     """The kind of slip a move-only refactor makes: one rule lost, so headings shift."""
     _gallery_ready(page, variant)
@@ -53,9 +76,12 @@ def _visibly_changed(page: Page, variant: Variant) -> None:
 def test_gallery_shots(browser: Browser, static_server: str) -> None:
     written = capture_screen(browser, f"{static_server}/_vendored/demo.html", "gallery", _shots_dir(),
                              prepare=_gallery_ready)
+    written += capture_screen(browser, f"{static_server}/_vendored/demo.html?nav", "gallery-nav", _shots_dir(),
+                              prepare=_pill_at_rest, only=_PILL_VARIANTS)
     assert [p.name for p in written] == [
         "gallery-phone-light.png", "gallery-phone-dark.png",
         "gallery-desktop-light.png", "gallery-desktop-dark.png",
+        "gallery-nav-phone-light.png", "gallery-nav-phone-dark.png",
     ]
 
 
