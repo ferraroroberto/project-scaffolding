@@ -114,7 +114,7 @@ A hit is a FastAPI route decorator `@<anything>.post("<path>")`, the path given 
 - the module imports nothing named `login_lockout` (`from src.login_lockout import ...`, `import src.login_lockout as ll`, `from src import login_lockout`, any folder the app copied it to), or
 - it does, but the handler's body never calls `retry_after(...)`, the check that refuses a locked client before the password is read.
 
-A route registered any other way (`add_api_route`, `api_route(methods=["POST"])`) or with a computed path is not seen. The rule does not check that the handler also calls `record_failure` and `reset`: the route's own test (6 wrong passwords: five `401`s, then a `429` with `Retry-After`) proves the lock-out works.
+A route registered any other way (`add_api_route`, `api_route(methods=["POST"])`) or with a computed path is not seen. The rule does not check that the handler also calls `record_failure` and `reset`: the route's own test (6 wrong passwords: six `401`s, then the next attempt gets a `429` with `Retry-After`) proves the lock-out works.
 
 A password route whose lock-out lives elsewhere (an auth middleware in front of it) keeps its exception with a reasoned marker in the comment block right above its decorator:
 
