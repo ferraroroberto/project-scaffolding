@@ -130,7 +130,14 @@ def test_done_job_cannot_become_running():
         derive_job_state(finished=True, process_alive=True)
 ```
 
-Only Python functions named `test*` in a test file count; the scoreboard counts the marker, it does not run the test, so a reviewer checks that the test really asserts the refusal. JavaScript tests are not read yet: a machine whose owner is a JS module shows `no proof` until a Python test carries its marker, so write the JS test anyway and mark the Python one that drives the same table.
+Only Python functions named `test*` in a test file count; the scoreboard counts the marker, it does not run the test, so a reviewer checks that the test really asserts the refusal. A JavaScript or TypeScript test is marked the same way, in a `//` or `/* */` comment right above its `test(...)` / `it(...)` call or inside it:
+
+```js
+// state-machine-proof: job
+test('a done job cannot become running', () => {
+  assert.throws(() => deriveJobState({ finished: true, processAlive: true }));
+});
+```
 
 **4. Read your row in the scoreboard.** `scripts/state_scoreboard.py` is a scaffold script, not vendored; run it from a scaffold checkout with that checkout's interpreter and point `--root` at the folder holding your repos:
 
