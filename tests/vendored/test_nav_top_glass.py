@@ -76,3 +76,14 @@ def test_readme_states_the_recipe_and_drops_the_offset() -> None:
     assert "--standalone-head-offset" not in readme
     assert "| `--nav-fade-band` | `16px` |" in readme
     assert "Every standalone surface follows the same top rule." in readme
+
+
+def test_top_glass_is_not_generated_at_rest() -> None:
+    """An installed iOS app paints a promoted backdrop-filter layer even at
+    opacity 0, frosting the header at scroll-top, so the layer only exists
+    once nav-tabs.js marks the page as scrolled."""
+    declarations = [line.strip() for line in _phone_rule("body::after").strip().splitlines()]
+    assert "content: none;" in declarations, declarations
+    assert "content: '';" in _phone_rule("html[data-nav-top-glass] body::after")
+    js = (NAV / "nav-tabs.js").read_text(encoding="utf-8")
+    assert "root.toggleAttribute('data-nav-top-glass', reveal > 0);" in js
