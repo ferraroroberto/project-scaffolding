@@ -1,4 +1,4 @@
-"""`scripts/nightly_mac_fallback.py`: dispatch, skip and failure are three different outcomes.
+"""`scripts/ci/nightly_mac_fallback.py`: dispatch, skip and failure are three different outcomes.
 
 ``gh`` is always a fake here: nothing in this file can dispatch the real workflow.
 """
@@ -15,7 +15,7 @@ from pathlib import Path
 
 import pytest
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts" / "ci"))
 
 import nightly_mac_fallback as fb  # noqa: E402 -- needs the sys.path line above
 

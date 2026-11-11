@@ -1,6 +1,6 @@
 streamlit>=1.36.0
 
-# Fleet icon-brand generator (scripts/brand_gen.py) — dev-only: the generated
+# Fleet icon-brand generator (scripts/tools/brand_gen.py) — dev-only: the generated
 # PNGs/ICOs are committed per downstream project, so no project's runtime
 # webapp ever imports these. resvg-py renders the vendored Lucide SVG masters
 # to PNG (prebuilt Windows wheel, no Cairo/GTK system deps); Pillow assembles

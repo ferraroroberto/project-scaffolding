@@ -18,7 +18,7 @@ import tomllib
 from pathlib import Path, PurePosixPath
 from typing import Any
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from scripts.conventions_state import (  # noqa: E402 -- needs the sys.path line above
     JS_SUFFIXES,

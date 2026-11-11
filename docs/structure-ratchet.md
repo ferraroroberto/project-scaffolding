@@ -214,7 +214,7 @@ The fix for a failure is to put the code where the layout says. `--allow-additio
 
 Re-vendoring the script never breaks a repo that has not opted in: an absent `[structure_ratchet]` table, or `enabled = false`, prints `structure ratchet: not enabled` and exits 0 (declared, not inferred).
 
-1. Vendor `scripts/structure_ratchet.py` and its siblings `scripts/structure_layout.py` and `scripts/structure_band.py` byte-for-byte (`python scripts/adopt_ratchets.py <repo> --ratchets structure` from a scaffold checkout copies and declares them, see [adopting-ratchets.md](adopting-ratchets.md); inside the fleet, `/propagate-vendored structure_ratchet,structure_layout,structure_band`; manifest keys `structure_ratchet`, `structure_layout` and `structure_band`) and declare all three in the repo's `[vendored]` table. It is stdlib-only and needs Python 3.11+ (`tomllib`).
+1. Vendor `scripts/structure_ratchet.py` and its siblings `scripts/structure_layout.py` and `scripts/structure_band.py` byte-for-byte (`python scripts/tools/adopt_ratchets.py <repo> --ratchets structure` from a scaffold checkout copies and declares them, see [adopting-ratchets.md](adopting-ratchets.md); inside the fleet, `/propagate-vendored structure_ratchet,structure_layout,structure_band`; manifest keys `structure_ratchet`, `structure_layout` and `structure_band`) and declare all three in the repo's `[vendored]` table. It is stdlib-only and needs Python 3.11+ (`tomllib`).
 2. Add to the repo's own `.fleet.toml`:
 
    ```toml

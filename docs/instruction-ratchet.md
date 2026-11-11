@@ -127,7 +127,7 @@ A failing check names each file, the rule and its title, the count against its b
 
 Re-vendoring the script never breaks a repo that has not opted in: an absent `[instruction_ratchet]` table, or `enabled = false`, prints `instruction ratchet: not enabled` and exits 0 (declared, not inferred).
 
-1. Vendor `scripts/instruction_ratchet.py` and its siblings `scripts/instruction_frontmatter.py` and `scripts/instruction_repeats.py` byte-for-byte (`python scripts/adopt_ratchets.py <repo> --ratchets instruction` from a scaffold checkout copies and declares them, see [adopting-ratchets.md](adopting-ratchets.md); inside the fleet, `/propagate-vendored instruction_ratchet,instruction_frontmatter,instruction_repeats`; manifest keys of the same names) and declare all three in the repo's `[vendored]` table. A script without `instruction_frontmatter` exits 3, never a pass; without `instruction_repeats` it exits 3 only once `repeated_text_words` is set. It needs Python 3.11+ (`tomllib`).
+1. Vendor `scripts/instruction_ratchet.py` and its siblings `scripts/instruction_frontmatter.py` and `scripts/instruction_repeats.py` byte-for-byte (`python scripts/tools/adopt_ratchets.py <repo> --ratchets instruction` from a scaffold checkout copies and declares them, see [adopting-ratchets.md](adopting-ratchets.md); inside the fleet, `/propagate-vendored instruction_ratchet,instruction_frontmatter,instruction_repeats`; manifest keys of the same names) and declare all three in the repo's `[vendored]` table. A script without `instruction_frontmatter` exits 3, never a pass; without `instruction_repeats` it exits 3 only once `repeated_text_words` is set. It needs Python 3.11+ (`tomllib`).
 2. Add to the repo's own `.fleet.toml`:
 
    ```toml

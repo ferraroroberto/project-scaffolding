@@ -25,7 +25,7 @@ from pathlib import Path
 
 import pytest
 
-from scripts import gen_verify_skill as gen
+from scripts.tools import gen_verify_skill as gen
 from src.no_window import NO_WINDOW
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures" / "verify_skill"

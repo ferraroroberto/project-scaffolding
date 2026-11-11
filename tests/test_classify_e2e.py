@@ -197,7 +197,7 @@ def test_real_rules_route_representative_paths() -> None:
     assert tier(".usage-track-ratchet-baseline.json") == "skip"
     # A fixture adopter's dotfile has no extension to match, so its folder is declared inert.
     assert tier("tests/fixtures/verify_skill/repo/.fleet.toml") == "skip"
-    assert tier("scripts/verify_skill_templates.py") == "skip"
+    assert tier("scripts/tools/verify_skill_templates.py") == "skip"
 
     # Mixed real diff (static asset + backend) -> static; add a page -> full.
     assert tier("app/webapp/static/icons/foo.svg", "src/x.py") == "static"

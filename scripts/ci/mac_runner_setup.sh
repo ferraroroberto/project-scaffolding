@@ -4,9 +4,9 @@
 # Simulator needs one). Guide, prerequisites and safety settings:
 # docs/mac-runner.md.
 #
-#   scripts/mac_runner_setup.sh install   # download, verify, register, start
-#   scripts/mac_runner_setup.sh status    # service state + GitHub's view of it
-#   scripts/mac_runner_setup.sh remove    # stop, uninstall, deregister
+#   scripts/ci/mac_runner_setup.sh install   # download, verify, register, start
+#   scripts/ci/mac_runner_setup.sh status    # service state + GitHub's view of it
+#   scripts/ci/mac_runner_setup.sh remove    # stop, uninstall, deregister
 #
 # The registration token is read from RUNNER_TOKEN when set. Otherwise it is
 # minted with `gh api`, which needs a gh login with admin on the repo; that

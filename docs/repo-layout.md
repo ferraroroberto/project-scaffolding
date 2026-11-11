@@ -389,4 +389,4 @@ The scaffold is a `streamlit` repo and conforms to that section. It also publish
 - `tray.bat.template` and `launch_server.{bat,sh}`: copy-to-adapt launchers. The `streamlit` preset lists `tray.bat.template`, because every repo cloned from the scaffold starts with it at the root.
 - The component sources under `app/` (`app/site/`, `app/tray/`, `app/webapp/`) are catalogued in `[components]`, so placement and folder types skip them: each lives at its adopters' path, where that tree holds the copy. Each `_vendored/` channel folder is skipped whole, so its readme and the gallery page (`demo.html` and its scripts) beside the components are skipped too. `app/tray/` and `app/webapp/` are namespace packages, with no `__init__.py` of their own.
 - `src/` is flat (under 40 modules) with two domain packages, `src/notify/` and `src/doc_capture/`.
-- `scripts/verify_skill_templates.py`: the templates `scripts/gen_verify_skill.py` renders, as string constants, so the folder takes code only.
+- `scripts/tools/verify_skill_templates.py`: the templates `scripts/tools/gen_verify_skill.py` renders, as string constants, so the folder takes code only.

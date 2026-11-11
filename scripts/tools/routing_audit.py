@@ -37,8 +37,8 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import Any
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from classify_e2e import E2EConfig, classify, load_config  # noqa: E402 -- needs the sys.path lines above
 

@@ -135,6 +135,6 @@ Each public repo's `main` is checked nightly on the Mac Mini self-hosted runner 
 
 Why: one engine, one result format and no hosted minutes for the whole fleet, running only where something changed, with flakes counted rather than hidden.
 
-Enforcement: `tests/ci/test_nightly_mac_workflow.py` (the safety rules) and `scripts/nightly_matrix.py` (the table contract, selection and retry); contract in [mac-runner.md](mac-runner.md).
+Enforcement: `tests/ci/test_nightly_mac_workflow.py` (the safety rules) and `scripts/ci/nightly_matrix.py` (the table contract, selection and retry); contract in [mac-runner.md](mac-runner.md).
 
 Issue: https://github.com/ferraroroberto/project-scaffolding/issues/661

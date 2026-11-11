@@ -5,9 +5,9 @@ state from an empty data dir), Doctor (read-only health check), Drive (real
 selectors, one pytest node per feature), Evidence, Cleanup and Maintain, plus a
 feature map: `features/README.md` and one `features/<view>.md` per view.
 
-    python scripts/gen_verify_skill.py --repo <adopter> [--app NAME] [--out DIR]
-    python scripts/gen_verify_skill.py --repo <adopter> --check
-    python scripts/gen_verify_skill.py --repo <adopter> --check --live-url URL --junit XML
+    python scripts/tools/gen_verify_skill.py --repo <adopter> [--app NAME] [--out DIR]
+    python scripts/tools/gen_verify_skill.py --repo <adopter> --check
+    python scripts/tools/gen_verify_skill.py --repo <adopter> --check --live-url URL --junit XML
 
 **Seeded from committed inventories, read statically** (`ast` + `tomllib`; no
 browser, nothing of the adopter imported or executed), in this order:
@@ -68,10 +68,10 @@ import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
+REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO_ROOT))  # a script's own dir is sys.path[0], not the repo root
 
-from scripts.verify_skill_templates import TEMPLATES  # noqa: E402
+from scripts.tools.verify_skill_templates import TEMPLATES  # noqa: E402
 from src import runtime_files  # noqa: E402
 from src.runtime_data import app_dir_env_var  # noqa: E402
 

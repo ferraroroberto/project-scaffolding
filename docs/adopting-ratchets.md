@@ -43,7 +43,7 @@ Clone this repository anywhere (it is the source; nothing is installed from it),
 1. **Copy and initialise in one command:**
 
    ```
-   python <scaffold>/scripts/adopt_ratchets.py <target> [--ratchets comment,structure,runtime_write]
+   python <scaffold>/scripts/tools/adopt_ratchets.py <target> [--ratchets comment,structure,runtime_write]
    ```
 
    `--ratchets` takes a comma list, `recommended` (the default, the **Start** column) or `all`. For each ratchet it copies the script and siblings into `<target>/scripts/`, records every copy in `<target>/.fleet.toml` under `[vendored]`, appends a minimal `[<name>_ratchet]` table with `enabled = true`, copies the runner `run_ratchets.py`, and runs `--init` to write the first baseline, printing each exit code. Run it again at any time: an identical copy, an existing table and an existing baseline are left alone. A copy that differs from the scaffold's is **refused, never overwritten**, and the run exits 1 naming it.
@@ -139,10 +139,10 @@ test('a done job cannot become running', () => {
 });
 ```
 
-**4. Read your row in the scoreboard.** `scripts/state_scoreboard.py` is a scaffold script, not vendored; run it from a scaffold checkout with that checkout's interpreter and point `--root` at the folder holding your repos:
+**4. Read your row in the scoreboard.** `scripts/tools/state_scoreboard.py` is a scaffold script, not vendored; run it from a scaffold checkout with that checkout's interpreter and point `--root` at the folder holding your repos:
 
 ```
-python scripts/state_scoreboard.py --root <folder-with-your-repos> --repo <your-repo> --at default
+python scripts/tools/state_scoreboard.py --root <folder-with-your-repos> --repo <your-repo> --at default
 ```
 
 The row carries the three rules' counts split Python / JavaScript, the duplicate derivations (`state-write` plus `state-set-repeat`: places outside the owner that write its flag or re-spell its states), the declared machines and how many of them have `no proof`. The first two targets are 0. A `?` means the repo could not be read (no committed baseline, a `.fleet.toml` that does not parse) and is never zero; `-` means the repo has not listed a state rule. The command reads committed state only, so the same commit prints the same bytes; the exit code is 3 when any repo is unknown. The columns are defined in [implicit-state-machines.md](implicit-state-machines.md), "Scoreboard".
@@ -162,4 +162,4 @@ Re-run `adopt_ratchets.py` from a newer scaffold checkout. Unchanged copies are 
 
 Paste this into a coding agent working in the target repo:
 
-> Adopt the baseline-and-ratchet gate stages from the public repository `ferraroroberto/project-scaffolding` in this repo. Clone it to a temporary folder outside this repo and read its `docs/adopting-ratchets.md`, which is the whole procedure. Check the prerequisites table first and tell me which are missing. Run `python <clone>/scripts/adopt_ratchets.py .` with the default set (add `--ratchets static` only if ruff is installed). Show me each printed exit code. Any exit other than 0 is a finding to report, never something to work around. Then run `python scripts/run_ratchets.py --tests <this repo's test command>`, show the summary, and wire that same command into this repo's existing check script or CI. Commit nothing until I have reviewed `scripts/`, `.fleet.toml` and the baseline files.
+> Adopt the baseline-and-ratchet gate stages from the public repository `ferraroroberto/project-scaffolding` in this repo. Clone it to a temporary folder outside this repo and read its `docs/adopting-ratchets.md`, which is the whole procedure. Check the prerequisites table first and tell me which are missing. Run `python <clone>/scripts/tools/adopt_ratchets.py .` with the default set (add `--ratchets static` only if ruff is installed). Show me each printed exit code. Any exit other than 0 is a finding to report, never something to work around. Then run `python scripts/run_ratchets.py --tests <this repo's test command>`, show the summary, and wire that same command into this repo's existing check script or CI. Commit nothing until I have reviewed `scripts/`, `.fleet.toml` and the baseline files.

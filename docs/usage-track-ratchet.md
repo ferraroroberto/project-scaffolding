@@ -157,7 +157,7 @@ A failing check prints every hit of the risen rule in the file, as `<path>:<line
 
 Re-vendoring the script never breaks a repo that has not opted in: an absent `[usage_track_ratchet]` table, or `enabled = false`, prints `usage track ratchet: not enabled` and exits 0.
 
-1. Vendor `scripts/usage_track_ratchet.py` and its sibling reader `scripts/usage_track_scan.py` byte-for-byte (`python scripts/adopt_ratchets.py <repo> --ratchets usage_track` from a scaffold checkout copies and declares them, see [adopting-ratchets.md](adopting-ratchets.md); inside the fleet, `/propagate-vendored usage_track_ratchet,usage_track_scan`; manifest keys `usage_track_ratchet` and `usage_track_scan`), together with the current `usage-log` client, whose sheet watch the `untracked-sheet` rule relies on. Declare all three in `[vendored]`. The ratchet loads the sibling by path and exits 3 when it is missing. It needs Python 3.11+ (`tomllib`) and `git`.
+1. Vendor `scripts/usage_track_ratchet.py` and its sibling reader `scripts/usage_track_scan.py` byte-for-byte (`python scripts/tools/adopt_ratchets.py <repo> --ratchets usage_track` from a scaffold checkout copies and declares them, see [adopting-ratchets.md](adopting-ratchets.md); inside the fleet, `/propagate-vendored usage_track_ratchet,usage_track_scan`; manifest keys `usage_track_ratchet` and `usage_track_scan`), together with the current `usage-log` client, whose sheet watch the `untracked-sheet` rule relies on. Declare all three in `[vendored]`. The ratchet loads the sibling by path and exits 3 when it is missing. It needs Python 3.11+ (`tomllib`) and `git`.
 2. Add to the repo's own `.fleet.toml`:
 
    ```toml

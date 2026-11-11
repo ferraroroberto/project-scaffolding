@@ -201,7 +201,7 @@ def test_delivery_is_pull_only_no_outbound_calls() -> None:
 def test_routing_audit_step_stays_on_the_runner() -> None:
     body = _body()
     step = body.split("name: Routing audit", 1)[1].split("      - name:", 1)[0]
-    assert "scripts/routing_audit.py audit" in step, "the runner half is the `audit` subcommand only"
+    assert "scripts/tools/routing_audit.py audit" in step, "the runner half is the `audit` subcommand only"
     assert " file " not in step, "filing needs `gh`; it runs on the trusted host, never here"
     assert "!cancelled()" in step, "an audit must run after a red e2e leg, which is when it matters"
     assert '--junit "$RESULTS/junit.xml"' in step and '--junit "$RESULTS/junit.xml"' in _jobs()["platform"].split(

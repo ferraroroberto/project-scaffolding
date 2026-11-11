@@ -14,7 +14,7 @@ from collections.abc import Callable, Sequence
 from pathlib import Path
 
 from scripts.conventions_state import StateMachine
-from scripts.state_scoreboard_read import ReadError, run_git
+from scripts.tools.state_scoreboard_read import ReadError, run_git
 from src.no_window import NO_WINDOW
 
 GH_TIMEOUT_S = 120

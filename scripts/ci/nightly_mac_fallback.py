@@ -30,7 +30,7 @@ import time
 from collections.abc import Callable, Sequence
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from src.no_window import NO_WINDOW  # noqa: E402 -- needs the sys.path line above
 

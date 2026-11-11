@@ -93,7 +93,7 @@ An absent table, or `enabled = false`, skips both halves with a line saying so. 
 
 ## Enabling it in a repo with hits today
 
-1. Copy `scripts/runtime_write_ratchet.py` and `scripts/runtime_write_resolve.py` byte-for-byte and declare both in the repo's `[vendored]` table (`python scripts/adopt_ratchets.py <repo> --ratchets runtime_write` from a scaffold checkout does both, see [adopting-ratchets.md](adopting-ratchets.md); manifest keys `runtime_write_ratchet` and `runtime_write_resolve`).
+1. Copy `scripts/runtime_write_ratchet.py` and `scripts/runtime_write_resolve.py` byte-for-byte and declare both in the repo's `[vendored]` table (`python scripts/tools/adopt_ratchets.py <repo> --ratchets runtime_write` from a scaffold checkout does both, see [adopting-ratchets.md](adopting-ratchets.md); manifest keys `runtime_write_ratchet` and `runtime_write_resolve`).
 2. Add the `[runtime_write_ratchet]` table with `enabled = true`.
 3. Record today's hits rather than fixing them first: `python scripts/runtime_write_ratchet.py --init`. Commit the baseline in the same PR.
 4. Wire the gate: the check after the conventions ratchet, `--snapshot` before the first pytest stage, `--probe` after the last test stage. `scripts/run_ratchets.py --tests <test command>` draws this bracket on any OS; this scaffold's `scripts/verify-before-ship.ps1` does the same in PowerShell.

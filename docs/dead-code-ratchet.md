@@ -91,7 +91,7 @@ A failing check prints `<path>:<line>: <kind> `<qualname>` is never referenced (
 
 Re-vendoring the script never breaks a repo that has not opted in: an absent `[dead_code_ratchet]` table, or `enabled = false`, prints `dead code ratchet: not enabled` and exits 0 (declared, not inferred).
 
-1. Vendor `scripts/dead_code_ratchet.py` byte-for-byte (`python scripts/adopt_ratchets.py <repo> --ratchets dead_code` from a scaffold checkout copies and declares them, see [adopting-ratchets.md](adopting-ratchets.md); inside the fleet, `/propagate-vendored dead_code_ratchet`; manifest key `dead_code_ratchet`) and declare it in the repo's `[vendored]` table. It needs Python 3.11+ (`tomllib`) and `git`; it parses code with the running interpreter's grammar, so run it with the interpreter the project targets.
+1. Vendor `scripts/dead_code_ratchet.py` byte-for-byte (`python scripts/tools/adopt_ratchets.py <repo> --ratchets dead_code` from a scaffold checkout copies and declares them, see [adopting-ratchets.md](adopting-ratchets.md); inside the fleet, `/propagate-vendored dead_code_ratchet`; manifest key `dead_code_ratchet`) and declare it in the repo's `[vendored]` table. It needs Python 3.11+ (`tomllib`) and `git`; it parses code with the running interpreter's grammar, so run it with the interpreter the project targets.
 2. Add to the repo's own `.fleet.toml`:
 
    ```toml

@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from scripts.brand_gen import _glyph_paths, _render_tile
+from scripts.tools.brand_gen import _glyph_paths, _render_tile
 
 ROOT = Path(__file__).resolve().parent.parent
 BRAND_DIR = ROOT / "brand"

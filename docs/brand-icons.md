@@ -40,7 +40,7 @@ never edit per-app").
 24×24 Lucide SVG contract, and rasterizes every master through `brand_gen`. An uncatalogued,
 malformed, unlicensed, or non-renderable master fails the project gate.
 
-## `scripts/brand_gen.py` — the generator
+## `scripts/tools/brand_gen.py` — the generator
 
 `render_set(master, out_dir, tray_out_dir, stream_deck_out_dir, project_slug)` renders the master
 onto a dark tile via [`resvg-py`](https://pypi.org/project/resvg-py/) at every size the fleet needs,
@@ -82,7 +82,7 @@ render_set(
 )
 ```
 
-Consumption is a known local path (`E:\automation\project-scaffolding\scripts\brand_gen.py`), not a
+Consumption is a known local path (`E:\automation\project-scaffolding\scripts\tools\brand_gen.py`), not a
 package install or git submodule — this is a single-machine fleet, so the simplest wiring is the
 right one. If that ever stops being true (a second machine, CI), revisit packaging then.
 

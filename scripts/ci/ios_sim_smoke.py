@@ -25,7 +25,7 @@ Exit codes and the last stdout line:
                                   the instance never printed its URL)
 
 Usage (from the workflow, with the adopter's venv python):
-  python scripts/ios_sim_smoke.py --repo <checkout> --python <venv python> \
+  python scripts/ci/ios_sim_smoke.py --repo <checkout> --python <venv python> \
       --out <results dir> --view / --view /settings
 """
 
@@ -45,7 +45,7 @@ from collections.abc import Sequence
 from pathlib import Path
 from typing import IO, Any
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))  # a script's own dir is sys.path[0], not the repo root
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))  # a script's own dir is sys.path[0], not the repo root
 
 from src import runtime_files  # noqa: E402 -- needs the sys.path line above
 

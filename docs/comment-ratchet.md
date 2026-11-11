@@ -86,7 +86,7 @@ A failing check names each file with its count and baseline, and lists every ref
 
 Re-vendoring the script never breaks a repo that has not opted in: an absent `[comment_ratchet]` table, or `enabled = false`, prints `comment ratchet: not enabled` and exits 0 (declared, not inferred).
 
-1. Vendor `scripts/comment_ratchet.py` byte-for-byte (`python scripts/adopt_ratchets.py <repo> --ratchets comment` from a scaffold checkout copies and declares them, see [adopting-ratchets.md](adopting-ratchets.md); inside the fleet, `/propagate-vendored comment_ratchet`; manifest key `comment_ratchet`), and declare it in the repo's `[vendored]` table. It is stdlib-only and needs Python 3.11+ (`tomllib`).
+1. Vendor `scripts/comment_ratchet.py` byte-for-byte (`python scripts/tools/adopt_ratchets.py <repo> --ratchets comment` from a scaffold checkout copies and declares them, see [adopting-ratchets.md](adopting-ratchets.md); inside the fleet, `/propagate-vendored comment_ratchet`; manifest key `comment_ratchet`), and declare it in the repo's `[vendored]` table. It is stdlib-only and needs Python 3.11+ (`tomllib`).
 2. Add to the repo's own `.fleet.toml`:
 
    ```toml

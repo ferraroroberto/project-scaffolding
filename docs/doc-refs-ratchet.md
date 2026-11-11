@@ -119,7 +119,7 @@ A failing check prints `<doc>:<line>: <kind> `<reference>` does not exist` with 
 
 Re-vendoring the script never breaks a repo that has not opted in: an absent `[doc_refs_ratchet]` table, or `enabled = false`, prints `doc refs ratchet: not enabled` and exits 0 (declared, not inferred).
 
-1. Vendor `scripts/doc_refs_ratchet.py` byte-for-byte (`python scripts/adopt_ratchets.py <repo> --ratchets doc_refs` from a scaffold checkout copies and declares them, see [adopting-ratchets.md](adopting-ratchets.md); inside the fleet, `/propagate-vendored doc_refs_ratchet`; manifest key `doc_refs_ratchet`) and declare it in the repo's `[vendored]` table. It needs Python 3.11+ (`tomllib`) and `git`.
+1. Vendor `scripts/doc_refs_ratchet.py` byte-for-byte (`python scripts/tools/adopt_ratchets.py <repo> --ratchets doc_refs` from a scaffold checkout copies and declares them, see [adopting-ratchets.md](adopting-ratchets.md); inside the fleet, `/propagate-vendored doc_refs_ratchet`; manifest key `doc_refs_ratchet`) and declare it in the repo's `[vendored]` table. It needs Python 3.11+ (`tomllib`) and `git`.
 2. Add to the repo's own `.fleet.toml`:
 
    ```toml

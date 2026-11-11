@@ -1,4 +1,4 @@
-"""`scripts/ios_sim_smoke.py`: device choice, view names and the adopter contract.
+"""`scripts/ci/ios_sim_smoke.py`: device choice, view names and the adopter contract.
 
 The simulator itself only exists on the Mac, so these cover the parts that
 decide what runs there: which iPhone is picked, what a missing prerequisite
@@ -15,7 +15,7 @@ from pathlib import Path
 
 import pytest
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts" / "ci"))
 
 import ios_sim_smoke as smoke  # noqa: E402 -- needs the sys.path line above
 
