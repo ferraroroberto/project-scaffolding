@@ -24,6 +24,10 @@
  * open <dialog>) lives in nav-tabs.css.
  */
 
+// Arrow key to tab-row direction. Up and Down also move, so the wide layout's
+// vertical rail answers the keys its tabs are stacked along.
+const ARROW_STEP = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 };
+
 // How far a finger may wander before a press becomes a slide; less is a tap.
 const SLIDE_SLOP_PX = 8;
 // iOS may still send a click after a short slide; one inside this window is dropped.
@@ -36,8 +40,8 @@ const GLASS_QUIET_MS = 250;
 
 /**
  * Wire up a .tabs nav: restore the last-active tab, switch panes on a tap or
- * on a press-and-slide across the phone pill, and keep ARIA and the roving
- * tabindex in sync.
+ * on a press-and-slide across the phone pill, move between tabs with the arrow
+ * keys, Home and End, and keep ARIA and the roving tabindex in sync.
  *
  * @param {object} [opts]
  * @param {string} [opts.navSelector='.tabs']   selector for the <nav> element.
@@ -99,6 +103,23 @@ export function initNavTabs({ navSelector = '.tabs', storageKey = null, onChange
     button.addEventListener('click', (event) => {
       if (!slide.strayClick(event)) setTab(button.dataset.tab);
     });
+  });
+
+  // WAI-ARIA tabs, automatic activation: an arrow moves focus to the next tab
+  // laid out (wrapping at the ends) and opens it; Home and End jump to the
+  // first and last. Tab itself reaches only the open tab (roving tabindex).
+  nav.addEventListener('keydown', (event) => {
+    const step = ARROW_STEP[event.key];
+    const edge = event.key === 'Home' ? 0 : event.key === 'End' ? -1 : null;
+    const from = event.target.closest?.('.tab[data-tab]');
+    if ((step === undefined && edge === null) || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey || !from) return;
+    const row = capsule.cells();
+    const at = row.indexOf(from);
+    if (at < 0) return;
+    const to = edge === null ? row[(at + step + row.length) % row.length] : row.at(edge);
+    event.preventDefault();
+    setTab(to.dataset.tab);
+    to.focus({ preventScroll: true });
   });
 
   let saved = null;

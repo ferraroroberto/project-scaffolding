@@ -6,7 +6,7 @@ The fleet's canonical **primary navigation**: a top segmented control on desktop
 
 | File | Role |
 | --- | --- |
-| `nav-tabs.js` | Behaviour. ESM module — `initNavTabs(opts)`. Discovers tabs/panes from the DOM, persists the active tab, keeps ARIA + roving `tabindex` in sync, switches on a tap or on a press-and-slide across the phone pill, and returns `{ setTab, getTab, setBadge }`. |
+| `nav-tabs.js` | Behaviour. ESM module — `initNavTabs(opts)`. Discovers tabs/panes from the DOM, persists the active tab, keeps ARIA + roving `tabindex` in sync, switches on a tap, on the arrow keys, Home and End, or on a press-and-slide across the phone pill, and returns `{ setTab, getTab, setBadge }`. |
 | `nav-tabs.css` | Visual contract. The desktop segmented control, the wide-layout left rail, the `@media (pointer: coarse)` floating pill and its sliding capsule, the optional count badge and the modal-hide rule. References design tokens only. |
 | `nav-tabs.html` | Markup skeleton to copy and adapt (3 example tabs). |
 
@@ -39,12 +39,11 @@ The fleet's canonical **primary navigation**: a top segmented control on desktop
    const nav = initNavTabs({
      storageKey: 'my-app.tab',   // omit to disable PWA persistence
      onChange: (tab) => { /* lazy-load that pane, change poll rate, … */ },
-     navEvent: (msg) => { /* optional: wire to a nav-debug recorder for on-device forensics */ },
-     scrollResetSelector: '.app', // element scroller reset to top on tab switch (default; null to skip)
+     defaultTab: 'home',         // tab to open when nothing is stored (default: the first tab)
    });
    ```
 
-   `initNavTabs` also self-heals the pinned bar (home-automation #300/#303 lessons): it clears the browser-tab transform when a `<dialog>` scroll-lock engages (`scroll-lock:engaged`/`released` events — apps without scroll-lock.js simply never fire them), re-pins after `[hidden]` overlay toggles, on `visibilitychange`/`load`, and via a 400 ms watchdog. Standalone PWAs still never get a measured translate.
+   Every switch scrolls the window to the top: the document is the only scroller. The options are `navSelector` (default `.tabs`), `storageKey`, `onChange` and `defaultTab`; there are no others.
 
 ## Markup contract
 
@@ -60,9 +59,21 @@ The fleet's canonical **primary navigation**: a top segmented control on desktop
 
 Each `.tab` carries `data-tab` (its name) and `aria-controls` (the id of the pane it shows). Start every non-default `.pane` with `hidden` so there's no flash before JS runs. A tab may omit its pane (e.g. an external link) — only its button state toggles.
 
+## Keyboard
+
+The tablist follows the WAI-ARIA tabs pattern with automatic activation. Exactly one tab is in the Tab order, the open one (roving `tabindex`: `0` on it, `-1` on the rest), so Tab enters the bar on the open tab and the next Tab leaves it.
+
+- **Right Arrow** and **Down Arrow** move focus to the next tab and open it; **Left Arrow** and **Up Arrow** move to the previous one. Past either end it wraps. Up and Down are accepted too because the wide layout stacks the tabs vertically.
+- **Home** and **End** move to the first and last tab.
+- A tab an app has hidden (not laid out) is skipped. A key with Alt, Ctrl, Meta or Shift held is left to the browser.
+- Opening a tab this way is the same switch as a tap: `aria-selected`, the pane, `data-active-tab`, the stored tab and `onChange` all change once. Focus stays on the tab and the page is not scrolled to bring it into view.
+- Enter and Space on the focused tab click it, as on any button.
+
+`tests/e2e/test_vendored_nav.py` drives the keys in the desktop control and in the phone pill.
+
 ## Tab icons
 
-Each `.tab` holds one `<svg class="tab-icon">` stroke glyph and one `<span class="tab-label">` — and the icon is visible on **both** surfaces: beside the label in the desktop segmented control, above it in the mobile pill. Give the SVG a `24 24` viewBox and `<path>`s with no `fill`/`stroke` attributes of their own; `nav-tabs.css` paints them (`fill: none; stroke: currentColor`) so they inherit the active/inactive tab colour. Desktop sizes the icon at `1.05em` of the label's font-size; the pill uses `--bottom-tabs-icon`. Every icon size is scoped as `.tabs .tab-icon`, so an app's own single-class icon utility (a `.icon { width: 1em }` you also put on the glyph) can't resize it, whatever order the stylesheets load in (#303). Below 520px on a fine pointer (a squeezed desktop window) the tab stacks the icon over its label, the pill's shape at the `--font-caption` size, since an icon beside a 7–8 letter label no longer fits five tabs there. The nav never goes icon-only (`design.md` navigation contract, fleet-config#966); the label ellipsizes only as a last resort (#278).
+Each `.tab` holds one `<svg class="tab-icon">` stroke glyph and one `<span class="tab-label">` — and the icon is visible on **both** surfaces: beside the label in the desktop segmented control, above it in the mobile pill. Give the SVG a `24 24` viewBox and `<path>`s with no `fill`/`stroke` attributes of their own; `nav-tabs.css` paints them (`fill: none; stroke: currentColor`) so they inherit the active/inactive tab colour. Desktop sizes the icon at `1.05em` of the label's font-size; the stacked layouts (the rail and a squeezed desktop window) use `--icon-feature`, and the phone pill fixes it at 24px, the iOS tab-bar glyph size, so the 11px label cannot shrink it. Every icon size is scoped as `.tabs .tab-icon`, so an app's own single-class icon utility (a `.icon { width: 1em }` you also put on the glyph) can't resize it, whatever order the stylesheets load in (#303). Below 520px on a fine pointer (a squeezed desktop window) the tab stacks the icon over its label, the pill's shape at the `--font-caption` size, since an icon beside a 7–8 letter label no longer fits five tabs there. The nav never goes icon-only (`design.md` navigation contract, fleet-config#966); the label ellipsizes only as a last resort (#278).
 
 ## Count badge (optional)
 
@@ -145,7 +156,7 @@ Reduce Transparency (`prefers-reduced-transparency: reduce`) drops both layers. 
 | `--row-sm` | `44px` | tab min-height on a narrow fine pointer and on any coarse pointer wider than the pill (`hit-target.min`) |
 | `--row-lg` | `60px` | rail tab min-height |
 | `--space-sm` | `8px` | rail tab padding |
-| `--icon-feature` | `24px` | rail icon size (`icons.size.feature`) — optional, falls back to `24px` |
+| `--icon-feature` | `24px` | icon size where the tab stacks icon over label: the rail and a squeezed desktop window (`icons.size.feature`) — optional, falls back to `24px` |
 | `--layout-measure` | `772px` | desktop column the control spans — optional, falls back to `772px` |
 | `--layout-rail` | `80px` | wide-layout rail width + content offset — optional, falls back to `80px` |
 | `--radius-md` | `12px` | bar corners (desktop) |
@@ -158,14 +169,13 @@ Reduce Transparency (`prefers-reduced-transparency: reduce`) drops both layers. 
 | `--nav-fade-tail` | `24px` | how far the bottom fade reaches above the pill's top edge, and so part of the phone bottom reserve — optional, falls back to `24px` |
 | `--bottom-tabs-padding` | `4px` | mobile bar inner padding — optional, falls back to `4px` |
 | `--bottom-tabs-gap` | `4px` | mobile tab gap — optional, falls back to `4px` |
-| `--bottom-tabs-icon` | `20px` | mobile SVG icon size — optional, falls back to `20px` |
 | `--bottom-tabs-label` | `11px` | mobile label font size — optional, falls back to `11px` |
 | `--tabbar-bg` | `rgba(255,255,255,0.62)` (dark `rgba(42,45,52,0.55)`) | floating bar clear-glass fill |
 | `--tabbar-border` | `rgba(0,0,0,0.08)` (dark `rgba(255,255,255,0.14)`) | floating bar hairline rim |
 | `--tabbar-pill` | `rgba(0,0,0,0.07)` (dark `rgba(255,255,255,0.14)`) | the sliding capsule behind the active tab; **required**, with it undefined the active tab has no capsule |
 | `--tabbar-shadow` | `0 8px 28px -6px rgba(20,24,40,0.2), 0 1px 4px rgba(20,24,40,0.06)` (dark `0 10px 30px -6px rgba(0,0,0,0.6)`) | floating bar drop shadow |
 
-The tokens marked optional (`--icon-feature`, `--layout-measure`, `--layout-rail`, `--bottom-tabs-height`, `--bottom-tabs-margin`, `--bottom-tabs-pill-height`, `--bottom-tabs-padding`, `--bottom-tabs-gap`, `--bottom-tabs-icon`, `--bottom-tabs-label`) are optional per-context knob settings: `nav-tabs.css` reads each with an inline fallback, so an app that leaves one undefined gets the fallback named in its row and nothing renders wrong. Define one only to override it. Every unmarked token is read with no fallback and must be defined.
+The tokens marked optional (`--icon-feature`, `--layout-measure`, `--layout-rail`, `--bottom-tabs-height`, `--bottom-tabs-margin`, `--bottom-tabs-pill-height`, `--bottom-tabs-padding`, `--bottom-tabs-gap`, `--bottom-tabs-label`) are optional per-context knob settings: `nav-tabs.css` reads each with an inline fallback, so an app that leaves one undefined gets the fallback named in its row and nothing renders wrong. Define one only to override it. Every unmarked token is read with no fallback and must be defined.
 
 ## The modal-hide rule
 
@@ -179,14 +189,14 @@ The floating bar hides whenever a modal is open so it never floats over a dialog
 Hard-won contract, validated extensively on a real iPhone (`home-automation` #205/#214/#229/#232). The short version: **in an installed PWA the floating bar is pinned by CSS alone, and the nav must be outside the content wrapper/scroller.**
 
 - **Body-level nav is load-bearing.** `nav-tabs.html` places `<nav class="tabs">` as a direct `<body>` child before `<main class="app">`. Do not move it inside `.app`. iOS can capture a fixed-position element nested inside a momentum/content scroller and position it against the scrolled content bottom; on a short tab that makes the bar float mid-screen. A body-level sibling pins against the viewport instead.
-- **Standalone PWA → no measured JS transform.** `nav-tabs.css` positions the bar `fixed; bottom: …`, which is correct on its own in a fullscreen installed PWA (no browser chrome). The VisualViewport transform only ever existed to chase Safari's collapsing *browser* toolbar; in standalone every measured offset eventually risks stranding the bar **up** because iOS's layout and rendered geometry disagree there. So `initNavTabs` detects `display-mode: standalone` / `navigator.standalone` and never applies a measured translate.
-- **Browser tab → minimal transform.** Only in a real browser tab (where the toolbar genuinely collapses) does it translate the bar up by the hidden slice — clamped to a toolbar's height (~160px) and suppressed while the soft keyboard is up (a focused field, or a viewport shrink past a toolbar's worth). Desktop's sticky top control is untouched; feature-detected on `window.visualViewport`.
+- **No measured JS transform, anywhere.** `nav-tabs.css` positions the bar `fixed; bottom: …` and `nav-tabs.js` never moves it: it neither reads the visual viewport to chase a browser toolbar nor translates the bar. Every measured offset risked stranding the bar **up** on iOS, where layout and rendered geometry disagree. What the script does write is state the CSS reads: `data-active-tab`, the `.sliding` and `.glass-rebuild` classes, the capsule's `--pill-x` and `--pill-w`, and the top glass's `data-nav-top-glass` and `--nav-fade-on` on `<html>`.
+- **The first scroll is nudged in the installed app.** At startup, when `display-mode: standalone` matches and the page has not been scrolled, `initNavTabs` scrolls 1px and back to the top on the next frame. That asks iOS for the full-height viewport at once rather than growing it over ~3s.
 - **Force the page scrollable.** `nav-tabs.css` sets `html { min-height: calc(100dvh + 1px) }` on the phone pill. An installed iOS app shrinks its viewport 59px whenever the document can't scroll (a tab shorter than the screen, or the body pinned by `scroll-lock.js` under an open dialog) and grows it back 1px at a time over ~3s, painting nothing below the moving edge. The rule is on the root, not `.app`, so it still holds while the body is pinned. (Cost: a barely-perceptible scroll on short tabs.) In the installed app (`display-mode: standalone`) the floor is `calc(100lvh + 1px)` instead: iOS resizes that viewport on a cold launch and each time the keyboard closes, and a `dvh` floor re-laid out the document on every frame of the resize, which painted as the page sliding; `lvh` never moves. For the same reason the capsule is re-placed only when a tab cell changes size, so a keyboard resize writes nothing to the bar.
 - **The capsule follows the cells, not the window.** `initNavTabs` parks the capsule at the active tab's own `offsetLeft` and `offsetWidth` and re-places it, without the spring, whenever a tab cell changes size: a rotation, an app revealing or hiding a tab after its data arrives (the equal-column grid re-divides), the bar's width settling after a cold launch. A placement that would not move the capsule writes nothing, and an iOS keyboard resize changes no cell, so it writes nothing to the bar.
 - **The glass is rebuilt each time the viewport settles.** In the installed app iOS can keep the bar's `backdrop-filter` texture at stale bounds while the viewport is still changing, painting a frosted smear over the top of the page until something repaints. `initNavTabs` adds `.glass-rebuild` to the bar for one frame, so WebKit discards the layer and builds it again at its final bounds. That frame turns the filter off and also drops the layer promotion on the bar, its labels and its badges (`transform: none`, `will-change: auto`). A promoted layer keeps its bitmap across a filter toggle, so text and icons rasterized while the viewport was still growing would otherwise stay soft. The promotion returns on the next frame. The rebuild waits until the viewport has gone 250 ms without a resize, rather than firing at a fixed frame. It runs at load and again on every return to the foreground, because iOS resumes a kept-alive home-screen app without reloading the page. Only resizes within 4 s of a launch or a return re-arm it, so a keyboard opened later rebuilds nothing. Browser tabs never rebuild.
 - **Standalone anchors the bar from the top.** Document scroll is the same in a browser tab and the installed app, but in `@media (display-mode: standalone)` the bar and its bottom fade are placed with `top: calc(100lvh - …)`: iOS still grows the installed app's viewport after a cold launch, and `100lvh` is the final height from the first frame, so the bar never rides that growth. A browser tab keeps `bottom:`, since there `lvh` would put the bar under the toolbar.
 - **The page head is part of the contract.** The top glass is written for `apple-mobile-web-app-status-bar-style: black-translucent` plus `viewport-fit=auto`, with `theme-color` following the page colour (How to vendor, step 4). `tests/test_nav_standalone_head.py` pins that head in the skeleton, the gallery and this README.
-- **An app that pins its body under dialogs needs the same `scroll-lock.js` change.** Neither the nav nor `modal/` carries standalone-shell code any more, and `initNavTabs` no longer listens for `scroll-lock:engaged` / `scroll-lock:released`. An app-side `scroll-lock.js` that pins the body with `position: fixed` while a `<dialog>` is open must therefore be the plain pin (save `scrollY`, pin at `-scrollY`, restore on close) with no "standalone shell" branch and no event dispatch; it keeps working because the `html` min-height rule above leaves the document scrollable even while the body is pinned. home-automation's `scroll-lock.js` is the reference; the script is app code and is not vendored here.
+- **An app that pins its body under dialogs needs the same `scroll-lock.js` change.** Neither the nav nor `modal/` carries standalone-shell code, and `initNavTabs` listens for no scroll-lock events. An app-side `scroll-lock.js` that pins the body with `position: fixed` while a `<dialog>` is open must be the plain pin (save `scrollY`, pin at `-scrollY`, restore on close) with no "standalone shell" branch and no event dispatch; it keeps working because the `html` min-height rule above leaves the document scrollable even while the body is pinned. home-automation's `scroll-lock.js` is the reference; the script is app code and is not vendored here.
 
 **Recommended app-level hardening:**
 
