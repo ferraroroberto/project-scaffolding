@@ -1,17 +1,15 @@
 """The vendored nav's standalone page-head dependency is shipped and stated.
 
-The installed-app (standalone) pill is a plain bottom-anchored fixed bar that is
-in place from the first frame of a cold launch only when the page sets
-`apple-mobile-web-app-status-bar-style: default` (the status bar is then painted
-in the page colour by `theme-color`) plus `viewport-fit=cover`. With
-`black-translucent` the installed app grows its viewport after launch and the
-bar rides that growth.
+The nav's top glass is one half of the translucent top-bar recipe the owner
+validated on the installed iPhone app; the page head is the other half:
+`apple-mobile-web-app-status-bar-style: black-translucent` plus
+`viewport-fit=auto`, with `theme-color` following the page colour.
 
-No desktop engine reproduces that, so the guard is textual: the markup skeleton
-an adopter pastes, the CSS it copies and the README contract all name the pair,
-and the gallery page that plays the app's head carries it. The same skeleton is
-also held to the tab shape every new app copies: icon and label only, and no
-Settings tab.
+No desktop engine reproduces the installed app, so the guard is textual: the
+markup skeleton an adopter pastes, the CSS it copies and the README contract
+all name the pair, and the gallery page that plays the app's head carries it.
+The same skeleton is also held to the tab shape every new app copies: icon and
+label only, and no Settings tab.
 """
 
 from __future__ import annotations
@@ -21,10 +19,10 @@ from pathlib import Path
 VENDORED = Path(__file__).resolve().parent.parent / "app" / "webapp" / "static" / "_vendored"
 NAV = VENDORED / "nav"
 
-_STATUS_BAR_META = '<meta name="apple-mobile-web-app-status-bar-style" content="default">'
-_WRONG_STATUS_BAR_META = (
+_STATUS_BAR_META = (
     '<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">'
 )
+_WRONG_STATUS_BAR_META = '<meta name="apple-mobile-web-app-status-bar-style" content="default">'
 
 
 def _read(path: Path) -> str:
@@ -40,7 +38,7 @@ def test_skeleton_ships_the_standalone_head() -> None:
     assert _STATUS_BAR_META in skeleton
     assert _WRONG_STATUS_BAR_META not in skeleton
     viewports = _viewport_metas(skeleton)
-    assert viewports and all("viewport-fit=cover" in v for v in viewports), viewports
+    assert viewports and all("viewport-fit=auto" in v for v in viewports), viewports
 
 
 def test_gallery_head_carries_the_standalone_head() -> None:
@@ -49,18 +47,18 @@ def test_gallery_head_carries_the_standalone_head() -> None:
     assert _STATUS_BAR_META in head
     assert _WRONG_STATUS_BAR_META not in head
     viewports = _viewport_metas(head)
-    assert len(viewports) == 1 and "viewport-fit=cover" in viewports[0], viewports
+    assert len(viewports) == 1 and "viewport-fit=auto" in viewports[0], viewports
 
 
 def test_css_and_readme_state_the_dependency() -> None:
     css = _read(NAV / "nav-tabs.css")
-    assert "`default` status-bar" in css
+    assert "`black-translucent` status-bar" in css
 
     readme = _read(NAV / "README.md")
     for needle in (
         "apple-mobile-web-app-status-bar-style",
-        'content="default"',
-        "viewport-fit=cover",
+        'content="black-translucent"',
+        "viewport-fit=auto",
         "scroll-lock.js",
     ):
         assert needle in readme, f"README.md does not mention {needle}"

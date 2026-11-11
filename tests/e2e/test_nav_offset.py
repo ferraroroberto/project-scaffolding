@@ -48,7 +48,8 @@ _FADE_JS = """pseudo => {
   const bar = getComputedStyle(document.querySelector('.tabs'));
   return {
     position: s.position, top: s.top, bottom: s.bottom, height: parseFloat(s.height),
-    image: s.backgroundImage, pointerEvents: s.pointerEvents,
+    image: s.backgroundImage, color: s.backgroundColor, pointerEvents: s.pointerEvents,
+    mask: s.webkitMaskImage || s.maskImage, filter: s.webkitBackdropFilter || s.backdropFilter,
     z: Number(s.zIndex), barZ: Number(bar.zIndex),
   };
 }"""
@@ -83,9 +84,9 @@ def _check_bar_sits_at_the_same_offset_on_every_tab(nav_phone: Page) -> None:
     assert set(offsets.values()) == {offsets["home"]}, offsets
 
 
-# `--nav-fade-band` (the top band) and `--nav-fade-tail` (the bottom band's
-# reach above the bar) defaults.
-_BAND = 12
+# `--nav-fade-band` (the top glass's fade and reveal distance) and
+# `--nav-fade-tail` (the bottom band's reach above the bar) defaults.
+_BAND = 16
 _TAIL = 24
 # The one eased curve, as page-colour coverage from the screen edge inward:
 # (fraction of the band, coverage). Content opacity is one minus coverage.
@@ -125,39 +126,44 @@ def _check_scroll_edge_fades_top_and_bottom(nav_phone: Page) -> None:
 
     top = page.evaluate(_FADE_JS, "::after")
     assert top["position"] == "fixed", top
-    # From the viewport top (safe area 0 here), one thin band.
+    # From the viewport top (safe area 0 here), one thin glass layer.
     assert top["top"] == "0px", top
     assert top["height"] == _BAND, top
+    assert top["image"] == "none", top
+    assert "blur(20px)" in top["filter"], top
+    assert "saturate(180%)" in top["filter"] or "saturate(1.8)" in top["filter"], top
+    assert "linear-gradient" in top["mask"] and "calc(100% - 16px)" in top["mask"], top
 
+    assert "linear-gradient" in bottom["image"], bottom
+    assert "to top" not in bottom["image"], bottom
     for fade in (bottom, top):
-        assert "linear-gradient" in fade["image"], fade
-        assert "to top" not in fade["image"], fade
         assert fade["pointerEvents"] == "none", fade
         assert fade["z"] < fade["barZ"], fade
 
 
 def _check_fades_follow_one_eased_curve_to_the_edge(nav_phone: Page, theme: str) -> None:
-    """Both edges: content stays at least half visible over the inner three
+    """Bottom: content stays at least half visible over the inner three
     quarters of the band and vanishes only at the screen edge, with no solid
     zone (on the owner's iPhone a solid band behind the bar read as a wall and
-    a short ramp as a hard cut). In the page colour of either theme."""
+    a short ramp as a hard cut). Top: the glass is the page colour at half
+    strength. In the page colour of either theme."""
     page = nav_phone
     if theme == "dark":
         page.evaluate("() => { document.documentElement.dataset.theme = 'dark'; }")
     bg = page.evaluate(
         r"() => getComputedStyle(document.body).backgroundColor.match(/\d+/g).slice(0, 3).join(',')"
     )
-    bottom_image, top_image = (page.evaluate(_FADE_JS, p)["image"] for p in ("::before", "::after"))
+    bottom_image = page.evaluate(_FADE_JS, "::before")["image"]
+    top_color = page.evaluate(_FADE_JS, "::after")["color"]
 
-    # Top, drawn from the screen edge down, offsets in px of the band.
-    top = _stops(top_image)
-    assert [round(a, 2) for a, _, _ in top] == [c for _, c in _CURVE], top_image
-    assert [o for _, _, o in top] == pytest.approx([f * _BAND for f, _ in _CURVE], abs=0.01), top
+    # Top: --bg mixed 50% with transparent, as either engine serializes it.
+    [(top_alpha, top_rgb, _)] = _stops(top_color + " 0px")
+    assert round(top_alpha, 2) == 0.5 and top_rgb == bg, (bg, top_color)
     # Bottom, drawn from the content down to the screen edge, offsets in %.
     bottom = _stops(bottom_image)
     assert [round(a, 2) for a, _, _ in bottom] == [c for _, c in reversed(_CURVE)], bottom_image
     assert [o for _, _, o in bottom] == pytest.approx([100 - f * 100 for f, _ in reversed(_CURVE)]), bottom
-    assert all(rgb == bg for a, rgb, _ in top + bottom if a > 0), (bg, top, bottom)
+    assert all(rgb == bg for a, rgb, _ in bottom if a > 0), (bg, bottom)
 
 
 def _check_top_fade_is_off_at_rest_and_on_after_one_band_of_scroll(
