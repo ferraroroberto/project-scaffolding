@@ -27,9 +27,34 @@ Both default to off, so re-vendoring changes nothing for an adopter that has not
 | Key | Counts | Files |
 |---|---|---|
 | `docstrings = true` | `#NNN` references (the same shape as above, including a single digit and `repo#NNN`) in module, class, function and async-function docstrings, found with `ast` | `.py` only |
-| `history_phrases = true` | the phrases below, case-insensitive on whole words, in comments of every scanned language and in Python docstrings | every scanned language |
+| `history_phrases = true` | the phrases and patterns below, case-insensitive, in comments of every scanned language and in Python docstrings | every scanned language |
 
-The phrase list is `HISTORY_PHRASES` in the script: `used to be`, `formerly`, `extracted verbatim`, `pure code move`, `previously recorded`, `had drifted`. It is short on purpose. A sweep of every adopter's comments and docstrings found these read as history in practice, while broader candidates (`used to`, `no longer`, `previously`, `the old`, `originally`) mostly matched legitimate present-tense text, so they are not in the list. A phrase matches across a line break inside a docstring (the whitespace is joined), but not across two `#` comment lines, because each is its own comment. Phrases inside string literals that are not docstrings never count.
+The phrase list is `HISTORY_PHRASES` in the script: `used to be`, `formerly`, `extracted verbatim`, `pure code move`, `previously recorded`, `had drifted`, each matched on whole words. It is short on purpose. A sweep of every adopter's comments and docstrings found these read as history in practice, while broader candidates (`used to`, `no longer`, `previously`, `the old`, `originally`) mostly matched legitimate present-tense text, so they are not in the list. A phrase matches across a line break inside a docstring (the whitespace is joined), but not across two `#` comment lines, because each is its own comment. Phrases inside string literals that are not docstrings never count.
+
+Some narration needs a number or a symbol, so the same rule also runs `HISTORY_PATTERNS`, a short list of regexes:
+
+| Pattern | Catches |
+|---|---|
+| `epic §` | a pointer into a planning epic (`see epic §4.2`) |
+| `step-N decision` | `the step-6 decision`, with or without the hyphen |
+| decided in step or phase N | `decided`, `chosen`, `picked`, `agreed` or `settled`, then `in`, `at` or `by`, then `step N` or `phase N` |
+| `each used to` | `each used to carry its own copy` |
+| a dated decision | `decision`, `decided`, `chose`, `chosen`, `agreed` or `settled` within 40 characters of an ISO date on the same line, in either order |
+
+Every pattern was swept over all adopters' comments and docstrings, and each hit was real history. The broad shapes that repository-local guards rely on were swept too and left out: a bare `step N` is mostly procedure (`Step 1: fetch…`), `phase N` mostly domain vocabulary, a bare `§N` mostly a spec section, a private decision id (`D1`) mostly a product name, and a bare ISO date mostly a CLI example or a data fact.
+
+### Per-repository patterns
+
+A shape that is history in one repository and noise in the rest of the fleet goes in that repository's own list:
+
+```toml
+[comment_ratchet]
+enabled                = true
+history_phrases        = true
+extra_history_patterns = ['\bstep \d+\b', '\bD\d+\b']
+```
+
+Each entry is a Python regex, compiled case-insensitively when the config loads. Its hits count under the same `<path>::history` key as the shared rule, and a hit that overlaps a shared one (the same words matched twice) counts once. The list is valid only with `history_phrases = true`; without it the table is a configuration error (exit 2), and so is an entry that is not a non-empty string or that matches empty text. **An entry that does not compile is NOT CONFIRMED (exit 3)**: the history count cannot be established, so the stage neither passes nor runs without it. Use TOML literal strings (single quotes) so a backslash reaches the regex unchanged.
 
 A Python file the parser rejects is NOT CONFIRMED (exit 3) under either rule, the same as an unscannable file under the comment rule. A `SyntaxWarning` from an adopter's own source (an invalid escape, say) is silenced; it is not this stage's to report.
 
@@ -51,7 +76,7 @@ Files come from `git ls-files --cached --others --exclude-standard`, spawned wit
 | `0` | Pass (no file above its baseline), or the stage is **not enabled** | continues |
 | `1` | A file's count rose, a new file carries references, or the baseline file is missing | fails |
 | `2` | Bad `[comment_ratchet]` table, unreadable baseline, bad arguments | fails |
-| `3` | **NOT CONFIRMED**: `git` unusable, or a file could not be scanned (unterminated string, comment, template or here-string; a Python file `tokenize` rejects; bytes that are not UTF-8). The message names the file. | fails |
+| `3` | **NOT CONFIRMED**: `git` unusable, a file could not be scanned (unterminated string, comment, template or here-string; a Python file `tokenize` rejects; bytes that are not UTF-8), or an `extra_history_patterns` entry is not a valid regex. The message names the file or the entry. | fails |
 
 Exit 3 is its own state and never folded into a pass or a clean tree. An unscannable file is never skipped. A file whose count fell, or that disappeared, passes and prints `N file(s) are below the baseline -- run --update-baseline`.
 
@@ -96,7 +121,8 @@ Re-vendoring the script never breaks a repo that has not opted in: an absent `[c
    include  = ["app/", "src/"]                    # path prefixes; default: the whole tree
    exclude  = ["**/generated/**"]                 # globs, added to the built-in set
    docstrings      = true                         # optional: `#NNN` inside Python docstrings
-   history_phrases = true                         # optional: curated history phrases
+   history_phrases = true                         # optional: curated history phrases and patterns
+   extra_history_patterns = ['\bstep \d+\b']      # optional, needs history_phrases: this repo's own regexes
    ```
 
    `exclude` globs are anchored at the repo root; `**/` means "any depth".
@@ -110,8 +136,8 @@ The vendored ratchets share config-loading and glob helpers, because each vendor
 
 ## Cost
 
-A read-only dry run over a ~280-file Python/JS/CSS/PowerShell adopter (24 vendored destinations excluded) scanned every file without a "not confirmed" and took about **0.5 s**, so there is nothing to tune. It counted roughly 2,400 references (about 660 in Python, 1,330 in JS, 350 in CSS, 40 in PowerShell), which is what that adopter's first `--init` will record. This scaffold's own baseline is empty, vendored components included.
+A read-only dry run over a ~280-file Python/JS/CSS/PowerShell adopter (24 vendored destinations excluded) scanned every file without a "not confirmed" and took about **0.5 s**, so there is nothing to tune. It counted roughly 2,400 references (about 660 in Python, 1,330 in JS, 350 in CSS, 40 in PowerShell), which is what that adopter's first `--init` will record. This scaffold's own baseline holds one entry, vendored components included: a dated decision in the `row-menu` component's stylesheet, under the history rule.
 
 ## Tests
 
-`tests/ratchets/test_comment_ratchet.py`: counting per language on fixture strings (including the strings, templates, regex literals, URLs and entities that must not count, and the two pinned limitations above), the docstring and phrase rules (each phrase, wrapping, separate baseline keys, off by default), scope and exclusions, and every mode and exit code on throwaway git repos. A missing prerequisite is a hard failure there, never `pytest.skip`. The scaffold's own gate stage doubles as the guard that its committed baseline is current.
+`tests/ratchets/test_comment_ratchet.py`: counting per language on fixture strings (including the strings, templates, regex literals, URLs and entities that must not count, and the two pinned limitations above), the docstring and phrase rules (each phrase and pattern, the broad shapes that must not count, per-repository patterns and their config errors, wrapping, separate baseline keys, off by default), scope and exclusions, and every mode and exit code on throwaway git repos. A missing prerequisite is a hard failure there, never `pytest.skip`. The scaffold's own gate stage doubles as the guard that its committed baseline is current.

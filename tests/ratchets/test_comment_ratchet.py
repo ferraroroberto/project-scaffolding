@@ -13,6 +13,7 @@ Three layers, mirroring `test_static_ratchet.py`:
 
 from __future__ import annotations
 
+import re
 import warnings
 from pathlib import Path
 
@@ -741,6 +742,92 @@ def test_enabling_a_rule_on_an_existing_baseline_demands_baselining_its_debt(rep
 
 def test_unparseable_python_is_not_confirmed_for_the_new_rules(repo_new_rules: Path, capsys: pytest.CaptureFixture[str]) -> None:
     assert_unreadable_file_not_confirmed(cr, run_mode, repo_new_rules, "src/bad.py", b"def f(:\n", "rejected the file", capsys)
+
+
+# ------------------------------------------- shared history patterns and per-repo extras
+
+@pytest.mark.parametrize(
+    "narration",
+    [
+        pytest.param("see epic §4.2 for the split", id="epic-section"),
+        pytest.param("the step-6 decision keeps one queue", id="step-n-decision"),
+        pytest.param("the limit was chosen in step 3", id="decided-in-step"),
+        pytest.param("each used to carry its own copy", id="each-used-to"),
+        pytest.param("the menu surface (owner's decision 2026-10-13): one elevation", id="decision-then-date"),
+        pytest.param("2026-10-13: owner decided on one elevation", id="date-then-decision"),
+    ],
+)
+def test_each_shared_history_pattern_counts_in_a_comment_and_a_docstring(narration: str) -> None:
+    assert scan(f"x = 1  # {narration}\n", "py", HIST_CFG) == {cr.HISTORY_SUFFIX: 1}
+    assert scan(f'def f() -> None:\n    """{narration.upper()}."""\n', "py", HIST_CFG) == {cr.HISTORY_SUFFIX: 1}
+    assert scan(f"/* {narration} */\n", "css", HIST_CFG) == {cr.HISTORY_SUFFIX: 1}
+
+
+@pytest.mark.parametrize(
+    "prose",
+    [
+        pytest.param("Step 1: fetch the page, then parse it", id="procedural-step"),
+        pytest.param("phase 2 of the moon drives the tide table", id="domain-phase"),
+        pytest.param("per YAML 1.2 §7.3.3 a plain scalar ends here", id="spec-section"),
+        pytest.param("bind the Cloudflare D1 database", id="private-id-shape"),
+        pytest.param("run with --since 2026-01-01 to backfill", id="cli-date"),
+        pytest.param("the decision table is keyed by user, and rows written on 2026-01-01 are migrated", id="date-far"),
+    ],
+)
+def test_broad_shapes_the_sweep_rejected_never_count(prose: str) -> None:
+    assert scan(f"x = 1  # {prose}\n", "py", HIST_CFG) == {}
+
+
+def test_extra_patterns_are_compiled_case_insensitively_and_need_history_phrases() -> None:
+    cfg = cr.parse_config(
+        '[comment_ratchet]\nenabled = true\nhistory_phrases = true\nextra_history_patterns = ["\\\\bstep \\\\d+\\\\b"]\n'
+    )
+    assert cfg is not None and [p.pattern for p in cfg.extra_history_patterns] == [r"\bstep \d+\b"]
+    assert cfg.extra_history_patterns[0].search("STEP 4")
+    with pytest.raises(cr.ConfigError, match="needs history_phrases"):
+        cr.parse_config('[comment_ratchet]\nenabled = true\nextra_history_patterns = ["x"]\n')
+    for bad in ('extra_history_patterns = "x"\n', 'extra_history_patterns = [""]\n', 'extra_history_patterns = ["a*"]\n'):
+        with pytest.raises(cr.ConfigError):
+            cr.parse_config("[comment_ratchet]\nenabled = true\nhistory_phrases = true\n" + bad)
+
+
+def test_a_repo_local_pattern_counts_under_the_history_key() -> None:
+    cfg = cr.Config(cr.DEFAULT_BASELINE, (), (), history_phrases=True,
+                    extra_history_patterns=(re.compile(r"\bD\d+\b", re.IGNORECASE),))
+    src = 'x = 1  # per D7 we keep two queues\ndef f() -> None:\n    """Settled by d12."""\n'
+    assert [r.line for r in cr.scan_file(src, "py", cfg)[cr.HISTORY_SUFFIX]] == [1, 3]
+    assert scan(src, "py", HIST_CFG) == {}  # without the extra, the shared rule leaves the repo's ids alone
+
+
+def test_a_repo_pattern_overlapping_a_shared_phrase_counts_once() -> None:
+    cfg = cr.Config(cr.DEFAULT_BASELINE, (), (), history_phrases=True,
+                    extra_history_patterns=(re.compile(r"used to", re.IGNORECASE),))
+    assert scan("x = 1  # it used to be slow\n", "py", cfg) == {cr.HISTORY_SUFFIX: 1}
+
+
+def test_an_invalid_extra_pattern_is_not_confirmed(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    git(tmp_path, "init", "-q")
+    (tmp_path / ".fleet.toml").write_text(
+        '[comment_ratchet]\nenabled = true\nhistory_phrases = true\nextra_history_patterns = ["step (\\\\d+"]\n',
+        encoding="utf-8",
+    )
+    write(tmp_path, "src/a.py", "x = 1\n")
+    assert run_mode(tmp_path, init=True) == cr.EXIT_NOT_CONFIRMED
+    out = capsys.readouterr().out
+    assert "NOT CONFIRMED" in out and "extra_history_patterns[0]" in out
+    assert not (tmp_path / cr.DEFAULT_BASELINE).exists()
+
+
+def test_a_repo_local_pattern_hit_fails_the_ratchet(repo_new_rules: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    run_mode(repo_new_rules, init=True)
+    (repo_new_rules / ".fleet.toml").write_text(
+        "[comment_ratchet]\nenabled = true\ndocstrings = true\nhistory_phrases = true\n"
+        'extra_history_patterns = ["\\\\bstep \\\\d+\\\\b"]\n',
+        encoding="utf-8",
+    )
+    write(repo_new_rules, "src/b.py", "x = 1  # done in step 4\n")
+    assert run_mode(repo_new_rules) == cr.EXIT_RISE
+    assert "src/b.py::history: 1 (baseline none" in capsys.readouterr().out
 
 
 # ------------------------------------------------------------ self-adoption

@@ -401,8 +401,9 @@ exclude = ["scripts/*_ratchet.py"]
 # (an adopter's `[vendored]` table excludes its copies automatically).
 # Two further rules are opt-in per adopter, each under its own baseline key:
 # `docstrings = true` (`#NNN` inside Python docstrings) and `history_phrases =
-# true` (a short curated list of decision-history phrases in comments and
-# docstrings). Both are on here.
+# true` (a short curated list of decision-history phrases and patterns in
+# comments and docstrings). Both are on here. An adopter may add its own
+# regexes with `extra_history_patterns`; the scaffold needs none.
 [comment_ratchet]
 enabled = true
 docstrings = true
