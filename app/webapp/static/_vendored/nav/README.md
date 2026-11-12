@@ -6,7 +6,7 @@ The fleet's canonical **primary navigation**: a top segmented control on desktop
 
 | File | Role |
 | --- | --- |
-| `nav-tabs.js` | Behaviour. ESM module — `initNavTabs(opts)`. Discovers tabs/panes from the DOM, persists the active tab, keeps ARIA + roving `tabindex` in sync, switches on a tap, on the arrow keys, Home and End, or on a press-and-slide across the phone pill, and returns `{ setTab, getTab, setBadge }`. |
+| `nav-tabs.js` | Behaviour. ESM module — `initNavTabs(opts)`. Discovers tabs/panes from the DOM, persists the active tab, keeps ARIA + roving `tabindex` in sync, switches on a tap, on the arrow keys, Home and End, or on a press-and-slide across the phone pill, and returns `{ setTab, getTab, setBadge }` (`setTab(null)` clears the selection for a screen that is not a tab). |
 | `nav-tabs.css` | Visual contract. The desktop segmented control, the wide-layout left rail, the `@media (pointer: coarse)` floating pill and its sliding capsule, the optional count badge and the modal-hide rule. References design tokens only. |
 | `nav-tabs.html` | Markup skeleton to copy and adapt (3 example tabs). |
 
@@ -70,6 +70,18 @@ The tablist follows the WAI-ARIA tabs pattern with automatic activation. Exactly
 - Enter and Space on the focused tab click it, as on any button.
 
 `tests/e2e/test_vendored_nav.py` drives the keys in the desktop control and in the phone pill.
+
+## A screen that is not a tab
+
+When the app shows a screen no tab owns (Settings, an archive, a detail opened from elsewhere), call `setTab(null)`. It is the one supported way to say "no tab active"; never clear `.active` or `aria-selected` on the buttons yourself, because the nav paints those from its own state and puts them back on the next re-layout.
+
+- No tab carries the accent, `aria-selected="true"` or the phone pill's capsule, `data-active-tab` is removed, and `getTab()` returns `null`.
+- The nav keeps that state, through rotations and tab cells re-laying out, until the next real selection: a tap, a slide, a key or `setTab('<name>')`. The capsule then appears on that tab without springing from where it last was.
+- Nothing else changes. The panes, the stored tab, the scroll position and `onChange` are the app's to handle, since the app opened the screen; a reload still restores the last real tab.
+- The bar stays in the Tab order: its first laid-out tab holds the one tab stop, and the arrow keys open tabs from there.
+- Any other unknown name, `undefined` included, still selects the default tab, as before.
+
+`tests/e2e/_nav_state_checks.py` selects a tab, sets no tab, and asserts that none is active in the desktop control and in the phone pill.
 
 ## Tab icons
 

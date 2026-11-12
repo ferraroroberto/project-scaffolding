@@ -23,7 +23,7 @@ from contextlib import AbstractContextManager, contextmanager
 import pytest
 from playwright.sync_api import Browser, Page, expect
 
-from tests.e2e import _nav_slide_checks
+from tests.e2e import _nav_slide_checks, _nav_state_checks
 from tests.e2e._cases import cases
 from tests.e2e._color_assertions import contrast as _contrast
 from tests.e2e._color_assertions import rgba as _rgba
@@ -969,6 +969,10 @@ def test_nav_contract(
             _check_arrow_home_and_end_move_focus_and_selection(nav=nav_mobile)
         with c.case("a_drag_on_the_inline_control_is_not_a_slide"), _nav(new_page, static_server) as nav:
             _nav_slide_checks.check_a_drag_on_the_inline_control_is_not_a_slide(nav=nav)
+        with c.case("set_tab_null_leaves_no_tab_active_desktop"), _nav(new_page, static_server) as nav:
+            _nav_state_checks.check_set_tab_null_leaves_no_tab_active(nav, pill=False)
+        with c.case("set_tab_null_leaves_no_tab_active_phone"), phone_nav(browser, static_server) as nav_mobile:
+            _nav_state_checks.check_set_tab_null_leaves_no_tab_active(nav_mobile, pill=True)
         with c.case("standalone_start_rebuilds_the_glass_once_and_restores_it"), phone_nav(browser, static_server) as nav_mobile:
             _check_standalone_start_rebuilds_the_glass_once_and_restores_it(nav_mobile=nav_mobile)
         with c.case("glass_rebuild_waits_for_the_viewport_to_stop_resizing"), phone_nav(browser, static_server) as nav_mobile:

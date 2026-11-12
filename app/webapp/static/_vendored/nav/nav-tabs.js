@@ -52,8 +52,8 @@ const GLASS_QUIET_MS = 250;
  * @param {string|null} [opts.defaultTab=null]  tab to select when nothing is
  *   stored; defaults to the first tab in DOM order.
  * @returns {{
- *   setTab: (tab: string) => void,
- *   getTab: () => string,
+ *   setTab: (tab: string|null) => void,
+ *   getTab: () => string|null,
  *   setBadge: (tab: string, count: number|null|undefined, noun?: string, tone?: string) => void,
  * }} setBadge shows a count badge on the tab named by data-tab: 1–9 render the
  *   digit, 10 and up render "9+", and 0 / null / undefined / a non-number remove
@@ -62,6 +62,12 @@ const GLASS_QUIET_MS = 250;
  *   waiting". The optional `tone` is 'attention' (the default) or 'danger', set
  *   as `data-tone` on the badge; any other value renders as attention. An unknown
  *   tab is ignored, so a poll loop can call it freely.
+ *
+ *   setTab(null) is "no tab active", for a screen that is not a tab (Settings,
+ *   an archive): no tab carries the accent, aria-selected or the capsule, and
+ *   getTab() returns null until the next real selection. It changes nothing
+ *   else: the panes, the stored tab, the scroll and onChange are left to the
+ *   app that opened the screen. Any other unknown name selects the fallback.
  */
 export function initNavTabs({ navSelector = '.tabs', storageKey = null, onChange = () => {}, defaultTab = null } = {}) {
   const nav = document.querySelector(navSelector);
@@ -74,7 +80,20 @@ export function initNavTabs({ navSelector = '.tabs', storageKey = null, onChange
   const capsule = createCapsule(buttons);
   let current = fallback;
 
+  function clearTab() {
+    current = null;
+    // The bar stays reachable with Tab: its first laid-out tab holds the stop.
+    const stop = capsule.cells()[0] || buttons[0];
+    buttons.forEach((button) => {
+      button.setAttribute('aria-selected', 'false');
+      button.tabIndex = button === stop ? 0 : -1;
+    });
+    delete nav.dataset.activeTab;
+    capsule.show(null);
+  }
+
   function setTab(tab) {
+    if (tab === null) return clearTab();
     current = names.includes(tab) ? tab : fallback;
     buttons.forEach((button) => {
       const on = button.dataset.tab === current;
@@ -178,9 +197,16 @@ function createCapsule(buttons) {
 
   // The accent on `tab` and the capsule under it, or at the fractional cell
   // index `at` while a finger drags it. At rest the capsule takes the tab's
-  // own offsetLeft and offsetWidth, whole pixels.
+  // own offsetLeft and offsetWidth, whole pixels. No tab and no finger hides
+  // the capsule; it keeps its size, so the slide still finds the phone pill.
   function show(tab, at, jump) {
     buttons.forEach((button) => button.classList.toggle('active', button.dataset.tab === tab));
+    const wasOff = pill.classList.contains('off');
+    const off = tab === null && at === undefined;
+    pill.classList.toggle('off', off);
+    if (off) return;
+    // Back from no tab, the capsule appears in place instead of springing.
+    jump = jump || wasOff;
     const row = cells();
     if (!row.length) return;
     const i = at ?? Math.max(0, row.findIndex((button) => button.dataset.tab === tab));
