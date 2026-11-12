@@ -969,10 +969,6 @@ def test_nav_contract(
             _check_arrow_home_and_end_move_focus_and_selection(nav=nav_mobile)
         with c.case("a_drag_on_the_inline_control_is_not_a_slide"), _nav(new_page, static_server) as nav:
             _nav_slide_checks.check_a_drag_on_the_inline_control_is_not_a_slide(nav=nav)
-        with c.case("set_tab_null_leaves_no_tab_active_desktop"), _nav(new_page, static_server) as nav:
-            _nav_state_checks.check_set_tab_null_leaves_no_tab_active(nav, pill=False)
-        with c.case("set_tab_null_leaves_no_tab_active_phone"), phone_nav(browser, static_server) as nav_mobile:
-            _nav_state_checks.check_set_tab_null_leaves_no_tab_active(nav_mobile, pill=True)
         with c.case("standalone_start_rebuilds_the_glass_once_and_restores_it"), phone_nav(browser, static_server) as nav_mobile:
             _check_standalone_start_rebuilds_the_glass_once_and_restores_it(nav_mobile=nav_mobile)
         with c.case("glass_rebuild_waits_for_the_viewport_to_stop_resizing"), phone_nav(browser, static_server) as nav_mobile:
@@ -981,3 +977,14 @@ def test_nav_contract(
             _check_glass_rebuild_drops_and_restores_the_layer_promotion(nav_mobile=nav_mobile)
         with c.case("glass_is_rebuilt_on_every_return_to_the_foreground"), phone_nav(browser, static_server) as nav_mobile:
             _check_glass_is_rebuilt_on_every_return_to_the_foreground(nav_mobile=nav_mobile)
+
+
+def test_nav_no_tab_active(
+    new_page: Callable[..., AbstractContextManager[Page]], static_server: str, browser: Browser
+) -> None:
+    """setTab(null) leaves no tab active, in the desktop control and in the phone pill."""
+    with cases() as c:
+        with c.case("desktop"), _nav(new_page, static_server) as nav:
+            _nav_state_checks.check_set_tab_null_leaves_no_tab_active(nav, pill=False)
+        with c.case("phone"), phone_nav(browser, static_server) as nav_mobile:
+            _nav_state_checks.check_set_tab_null_leaves_no_tab_active(nav_mobile, pill=True)
