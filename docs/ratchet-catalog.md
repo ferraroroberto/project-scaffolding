@@ -237,6 +237,7 @@ include         = ["app/", "src/"]
 exclude         = ["**/generated/**"]
 docstrings      = false
 history_phrases = false
+extra_history_patterns = []   # only with history_phrases = true
 ```
 
 #### `comment-issue-reference`
@@ -272,6 +273,63 @@ A phrase from a short curated list, matched case-insensitively on whole words, i
 # this used to be a float loop
 # fixed
 # a generator keeps memory flat for large inputs
+```
+
+#### `history-pattern`
+
+Narration that needs a number or a symbol, so it cannot be a literal phrase, from a short curated list (`HISTORY_PATTERNS`): a pointer into a planning epic (`epic §`), a step decision (`step-6 decision`), a value decided in a step or phase (`chosen in step 3`), `each used to`, and a decision word (`decision`, `decided`, `chose`, `chosen`, `agreed`, `settled`) within 40 characters of an ISO date on the same line. Case-insensitive, in the same places as `history-phrase` and counted under the same `<path>::history` key. Broader shapes (a bare `step N`, `phase N`, `§N`, a bare date) are left out: across the fleet they are mostly procedure, domain words or spec sections. **Default:** opt-in, `history_phrases = true`.
+
+```python
+# bad
+# split per tenant, see epic §4.2
+# fixed
+# split per tenant: one tenant's backlog never delays another's
+```
+
+```python
+# bad
+# the step-6 decision keeps one queue
+# fixed
+# one queue keeps the jobs in arrival order
+```
+
+```python
+# bad
+# limit chosen in step 3
+# fixed
+# 50 keeps one page under the API's 1 MB response cap
+```
+
+```python
+# bad
+# the services each used to carry their own copy
+# fixed
+# one shared copy, so the services cannot drift apart
+```
+
+```css
+/* bad */
+/* one elevation (owner's decision 2026-10-13) */
+/* fixed */
+/* one elevation: menus sit on the same surface as the sheet */
+```
+
+#### `extra-history-pattern`
+
+The repository's own case-insensitive regexes, listed in `extra_history_patterns`, for narration that is history there and noise elsewhere (a bare `step N`, a private decision id such as `D7`). Matched in the same places as `history-phrase` and counted under the same `<path>::history` key; a hit that overlaps a shared phrase counts once. Valid only with `history_phrases = true`. A regex that does not compile is NOT CONFIRMED (exit 3), never skipped; one that matches empty text is a configuration error. **Default:** off (empty list).
+
+```toml
+[comment_ratchet]
+enabled                = true
+history_phrases        = true
+extra_history_patterns = ['\bstep \d+\b', '\bD\d+\b']
+```
+
+```python
+# bad
+# per D7 we keep two queues
+# fixed
+# two queues: a slow export never blocks the interactive path
 ```
 
 ### Docs ratchet
@@ -920,7 +978,7 @@ Which ratchets take which:
 | Ratchet | Per-hit marker | Settings that except |
 |---|---|---|
 | static | `# noqa: <code>` | `exclude`, `ruff_rules` |
-| comment | none | `include`, `exclude` |
+| comment | none | `include`, `exclude`; `extra_history_patterns` widens the history rule |
 | docs | none | `include`, `exclude`, `allow_refs` |
 | structure | none | `exclude`, `layers`, `extra_roots`, `extra_root_files` |
 | instruction | none | `skill_dirs`, `extra_files` widen the scope; no exclusion |
