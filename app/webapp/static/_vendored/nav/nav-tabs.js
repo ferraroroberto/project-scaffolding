@@ -137,6 +137,7 @@ export function initNavTabs({ navSelector = '.tabs', storageKey = null, onChange
   buttons.forEach((button) => observer.observe(button));
 
   if (window.matchMedia('(display-mode: standalone)').matches) {
+    mountTopEdge(nav);
     expandStandaloneViewport();
     watchGlassSettle(nav);
   }
@@ -238,6 +239,19 @@ function watchSlide(nav, capsule, getTab, setTab) {
     active: () => slide !== null,
     strayClick: (event) => event.timeStamp - slidAt <= SLIDE_CLICK_MS,
   };
+}
+
+// iOS blurs an installed web app's top edge unless a real fixed element with a
+// painted background sits there; a pseudo-element does not count. The strip
+// (styled in nav-tabs.css) is inserted by the script, like the capsule, so
+// every app's markup stays as it is: a direct <body> child just before the
+// nav, never inside a scroller. Once, however often the nav is initialised.
+function mountTopEdge(nav) {
+  if (nav.parentElement.querySelector(':scope > .nav-top-edge')) return;
+  const edge = document.createElement('div');
+  edge.className = 'nav-top-edge';
+  edge.setAttribute('aria-hidden', 'true');
+  nav.before(edge);
 }
 
 // An installed iOS app opens with its viewport 59px short of the screen and,
