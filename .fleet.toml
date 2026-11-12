@@ -253,6 +253,7 @@ prefixes       = ["app/webapp/static/_vendored/nav/"]
 # and the screenshot baseline compares them.
 paths          = [
     "tests/e2e/_nav_slide_checks.py",
+    "tests/e2e/_nav_state_checks.py",
     "tests/e2e/test_nav_offset.py",
     "tests/e2e/test_vendored_nav.py",
 ]

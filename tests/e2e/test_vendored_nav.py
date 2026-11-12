@@ -23,7 +23,7 @@ from contextlib import AbstractContextManager, contextmanager
 import pytest
 from playwright.sync_api import Browser, Page, expect
 
-from tests.e2e import _nav_slide_checks
+from tests.e2e import _nav_slide_checks, _nav_state_checks
 from tests.e2e._cases import cases
 from tests.e2e._color_assertions import contrast as _contrast
 from tests.e2e._color_assertions import rgba as _rgba
@@ -977,3 +977,14 @@ def test_nav_contract(
             _check_glass_rebuild_drops_and_restores_the_layer_promotion(nav_mobile=nav_mobile)
         with c.case("glass_is_rebuilt_on_every_return_to_the_foreground"), phone_nav(browser, static_server) as nav_mobile:
             _check_glass_is_rebuilt_on_every_return_to_the_foreground(nav_mobile=nav_mobile)
+
+
+def test_nav_no_tab_active(
+    new_page: Callable[..., AbstractContextManager[Page]], static_server: str, browser: Browser
+) -> None:
+    """setTab(null) leaves no tab active, in the desktop control and in the phone pill."""
+    with cases() as c:
+        with c.case("desktop"), _nav(new_page, static_server) as nav:
+            _nav_state_checks.check_set_tab_null_leaves_no_tab_active(nav, pill=False)
+        with c.case("phone"), phone_nav(browser, static_server) as nav_mobile:
+            _nav_state_checks.check_set_tab_null_leaves_no_tab_active(nav_mobile, pill=True)

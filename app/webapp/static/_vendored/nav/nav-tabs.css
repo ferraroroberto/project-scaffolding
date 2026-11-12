@@ -456,6 +456,8 @@
   @media (prefers-reduced-motion: reduce) {
     .tabs .tab-pill { transition: none; }
   }
+  /* setTab(null): a screen that is not a tab shows no capsule. */
+  .tabs .tab-pill.off { visibility: hidden; }
 
   .tab {
     /* Above the capsule. */
