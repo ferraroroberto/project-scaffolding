@@ -12,11 +12,8 @@ from typing import Any
 
 from playwright.sync_api import Page
 
-_INIT_JS = """async () => {
-  const m = await import('/_vendored/nav/nav-tabs.js');
-  window.__changes = [];
-  window.__nav = m.initNavTabs({ onChange: (tab) => window.__changes.push(tab) });
-}"""
+# The same init as the slide checks: the real initNavTabs, onChange recorded.
+from tests.e2e._nav_slide_checks import _INIT_JS
 
 _STATE_JS = """() => {
   const nav = document.querySelector('.tabs');
