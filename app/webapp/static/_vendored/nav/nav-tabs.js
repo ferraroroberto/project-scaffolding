@@ -124,22 +124,7 @@ export function initNavTabs({ navSelector = '.tabs', storageKey = null, onChange
     });
   });
 
-  // WAI-ARIA tabs, automatic activation: an arrow moves focus to the next tab
-  // laid out (wrapping at the ends) and opens it; Home and End jump to the
-  // first and last. Tab itself reaches only the open tab (roving tabindex).
-  nav.addEventListener('keydown', (event) => {
-    const step = ARROW_STEP[event.key];
-    const edge = event.key === 'Home' ? 0 : event.key === 'End' ? -1 : null;
-    const from = event.target.closest?.('.tab[data-tab]');
-    if ((step === undefined && edge === null) || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey || !from) return;
-    const row = capsule.cells();
-    const at = row.indexOf(from);
-    if (at < 0) return;
-    const to = edge === null ? row[(at + step + row.length) % row.length] : row.at(edge);
-    event.preventDefault();
-    setTab(to.dataset.tab);
-    to.focus({ preventScroll: true });
-  });
+  watchKeys(nav, capsule, setTab);
 
   let saved = null;
   if (storageKey) {
@@ -221,6 +206,25 @@ function createCapsule(buttons) {
   }
 
   return { pill, cells, show };
+}
+
+// WAI-ARIA tabs, automatic activation: an arrow moves focus to the next tab
+// laid out (wrapping at the ends) and opens it; Home and End jump to the
+// first and last. Tab itself reaches only the open tab (roving tabindex).
+function watchKeys(nav, capsule, setTab) {
+  nav.addEventListener('keydown', (event) => {
+    const step = ARROW_STEP[event.key];
+    const edge = event.key === 'Home' ? 0 : event.key === 'End' ? -1 : null;
+    const from = event.target.closest?.('.tab[data-tab]');
+    if ((step === undefined && edge === null) || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey || !from) return;
+    const row = capsule.cells();
+    const at = row.indexOf(from);
+    if (at < 0) return;
+    const to = edge === null ? row[(at + step + row.length) % row.length] : row.at(edge);
+    event.preventDefault();
+    setTab(to.dataset.tab);
+    to.focus({ preventScroll: true });
+  });
 }
 
 // Press-and-slide: past the slop the capsule follows the finger, the tab
