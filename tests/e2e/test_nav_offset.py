@@ -55,6 +55,33 @@ _FADE_JS = """pseudo => {
 }"""
 
 
+# No engine here emulates the standalone display mode: matchMedia answers yes
+# for that one query (so nav-tabs.js mounts its standalone parts), and the nav's
+# own standalone block is re-applied unconditionally through a constructed
+# stylesheet, which only Chromium accepts here.
+_PLAY_STANDALONE_JS = """() => {
+  const real = window.matchMedia.bind(window);
+  window.matchMedia = q => q.includes('display-mode: standalone')
+    ? { matches: true, media: q, addEventListener() {}, removeEventListener() {} }
+    : real(q);
+  const found = [];
+  const walk = rules => {
+    for (const r of rules) {
+      if (r.media && r.conditionText.includes('display-mode: standalone')) found.push(r);
+      else if (r.cssRules) walk(r.cssRules);
+    }
+  };
+  for (const sheet of document.styleSheets) {
+    if (sheet.href && sheet.href.includes('nav-tabs.css')) walk(sheet.cssRules);
+  }
+  const sheet = new CSSStyleSheet();
+  sheet.replaceSync(found.map(r => Array.from(r.cssRules, c => c.cssText).join(' ')).join(' '));
+  document.adoptedStyleSheets = [...document.adoptedStyleSheets, sheet];
+  window.__standaloneRules = found;
+  return found.length;
+}"""
+
+
 @contextmanager
 def _nav_phone(static_server: str, browser: Browser) -> Iterator[Page]:
     """The real `initNavTabs` on the phone pill, over short (empty) tabs."""
@@ -211,20 +238,9 @@ def _check_installed_app_anchors_the_bar_from_the_large_viewport_top(
     if browser_name != "chromium":
         pytest.skip("the standalone rules are applied through a constructed stylesheet; Chromium only")
 
+    page.evaluate(_PLAY_STANDALONE_JS)
     m = page.evaluate("""() => {
-      const found = [];
-      const walk = rules => {
-        for (const r of rules) {
-          if (r.media && r.conditionText.includes('display-mode: standalone')) found.push(r);
-          else if (r.cssRules) walk(r.cssRules);
-        }
-      };
-      for (const sheet of document.styleSheets) {
-        if (sheet.href && sheet.href.includes('nav-tabs.css')) walk(sheet.cssRules);
-      }
-      const sheet = new CSSStyleSheet();
-      sheet.replaceSync(found.map(r => Array.from(r.cssRules, c => c.cssText).join(' ')).join(' '));
-      document.adoptedStyleSheets = [...document.adoptedStyleSheets, sheet];
+      const found = window.__standaloneRules;
       // Grow the bar: a top-anchored bar keeps its top edge, a bottom-anchored
       // one keeps its bottom edge.
       const bar = document.querySelector('.tabs');
@@ -474,6 +490,96 @@ def _check_first_card_top_edge_is_undimmed_at_rest(
         assert _undimmed(page, "#testHead")
 
 
+_TOP_EDGE_JS = r"""() => {
+  const edges = document.querySelectorAll('.nav-top-edge');
+  const edge = document.querySelector('body > .nav-top-edge');
+  if (!edge) return { count: edges.length };
+  const s = getComputedStyle(edge);
+  const r = edge.getBoundingClientRect();
+  return {
+    count: edges.length,
+    beforeNav: edge.nextElementSibling === document.querySelector('.tabs'),
+    position: s.position, top: r.top, left: r.left, width: r.width, height: r.height,
+    viewportWidth: document.documentElement.clientWidth,
+    color: s.backgroundColor, filter: s.webkitBackdropFilter || s.backdropFilter,
+    z: Number(s.zIndex), pointerEvents: s.pointerEvents,
+    bodyAfter: getComputedStyle(document.body, '::after').content,
+    bg: getComputedStyle(document.body).backgroundColor.match(/\d+/g).slice(0, 3).join(','),
+    headTop: document.getElementById('testHead').getBoundingClientRect().top,
+  };
+}"""
+
+
+def _check_installed_app_pins_an_opaque_top_edge_strip(
+    static_server: str, browser: Browser, browser_name: str, theme: str, reduce: bool
+) -> None:
+    """iOS blurs an installed web app's top edge unless a real, fixed,
+    full-width element painting a background sits there. In the installed app
+    the nav inserts that element: an opaque 12px page-colour strip at rest,
+    with the first card starting below it, and the top glass on it once
+    scrolled, replacing the body pseudo-element. Under Reduce Transparency it
+    stays solid when scrolled."""
+    if browser_name != "chromium":
+        pytest.skip("the standalone rules are applied through a constructed stylesheet; Chromium only")
+    with phone_nav(browser, static_server) as page:
+        # Headless engines report reduced transparency, so pin the feature.
+        page.context.new_cdp_session(page).send(
+            "Emulation.setEmulatedMedia",
+            {"features": [{"name": "prefers-reduced-transparency", "value": "reduce" if reduce else "no-preference"}]},
+        )
+        page.evaluate(_SHORT_TABS_JS)
+        page.evaluate(_HEADER_CARD_JS, [False])
+        if theme == "dark":
+            page.evaluate("() => { document.documentElement.dataset.theme = 'dark'; }")
+        assert page.evaluate(_PLAY_STANDALONE_JS) == 1
+        for _ in range(2):  # a second init must not add a second strip
+            page.evaluate(
+                "async () => { const m = await import('/_vendored/nav/nav-tabs.js');"
+                " window.__nav = m.initNavTabs(); }"
+            )
+        page.wait_for_function("() => scrollY === 0 && !document.documentElement.hasAttribute('data-nav-top-glass')")
+
+        rest = page.evaluate(_TOP_EDGE_JS)
+        assert rest["count"] == 1 and rest["beforeNav"], rest
+        assert rest["position"] == "fixed" and rest["top"] == 0 and rest["left"] == 0, rest
+        assert rest["width"] == rest["viewportWidth"] and rest["height"] == 12, rest
+        assert rest["z"] == 110 and rest["pointerEvents"] == "none", rest
+        [(alpha, rgb, _)] = _stops(rest["color"] + " 0px")
+        assert alpha == 1 and rgb == rest["bg"], rest
+        assert rest["filter"] == "none", rest
+        # Nothing hides under the strip at rest, even past an app's own
+        # `.app { padding-top }` rule.
+        assert rest["headTop"] == 12, rest
+
+        page.evaluate("() => window.scrollTo(0, 200)")
+        page.wait_for_function("() => document.documentElement.hasAttribute('data-nav-top-glass')")
+        scrolled = page.evaluate(_TOP_EDGE_JS)
+        assert scrolled["position"] == "fixed" and scrolled["top"] == 0, scrolled
+        assert scrolled["bodyAfter"] == "none", "the strip replaces the body pseudo-element"
+        [(alpha, rgb, _)] = _stops(scrolled["color"] + " 0px")
+        if reduce:
+            assert alpha == 1 and rgb == scrolled["bg"] and scrolled["filter"] == "none", scrolled
+        else:
+            assert round(alpha, 2) == 0.5 and rgb == scrolled["bg"], scrolled
+            assert scrolled["filter"] == "blur(20px) saturate(1.8)", scrolled
+            assert scrolled["height"] == _BAND, scrolled
+
+        page.evaluate("() => window.scrollTo(0, 0)")
+        page.wait_for_function("() => !document.documentElement.hasAttribute('data-nav-top-glass')")
+        back = page.evaluate(_TOP_EDGE_JS)
+        [(alpha, _, _)] = _stops(back["color"] + " 0px")
+        assert alpha == 1 and back["filter"] == "none" and back["height"] == 12, back
+
+
+def _check_browser_tab_has_no_top_edge_strip(nav_phone: Page) -> None:
+    """A Safari tab has no system top-edge blur, so it gets no strip and keeps
+    the body pseudo-element's glass and the safe-area-only top padding."""
+    page = nav_phone
+    assert page.evaluate(_TOP_EDGE_JS) == {"count": 0}
+    padding = page.evaluate("() => getComputedStyle(document.querySelector('.app')).paddingTop")
+    assert padding == "0px", padding
+
+
 def test_nav_offset_and_fades(static_server: str, browser: Browser, browser_name: str) -> None:
     """The phone pill's offset, scroll-edge fades and installed-app anchoring, one case per pinned behaviour."""
     with cases() as c:
@@ -502,6 +608,14 @@ def test_nav_offset_and_fades(static_server: str, browser: Browser, browser_name
         for tail in [None, 60]:
             with c.case(f"build_footer_ends_a_gap_above_the_bottom_fade[{tail}]"), _nav_phone(static_server, browser) as nav_phone:
                 _check_build_footer_ends_a_gap_above_the_bottom_fade(nav_phone=nav_phone, tail=tail)
+        for theme in ["light", "dark"]:
+            for reduce in [False, True]:
+                with c.case(f"installed_app_pins_an_opaque_top_edge_strip[{theme}-{reduce}]"):
+                    _check_installed_app_pins_an_opaque_top_edge_strip(
+                        static_server=static_server, browser=browser, browser_name=browser_name, theme=theme, reduce=reduce
+                    )
+        with c.case("browser_tab_has_no_top_edge_strip"), _nav_phone(static_server, browser) as nav_phone:
+            _check_browser_tab_has_no_top_edge_strip(nav_phone=nav_phone)
         for standalone in [False, True]:
             for sticky in [False, True]:
                 with c.case(f"first_card_top_edge_is_undimmed_at_rest[{standalone}-{sticky}]"):
