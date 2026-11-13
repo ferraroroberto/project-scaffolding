@@ -126,7 +126,7 @@ SHAPES = {
         (("app", "code"), ("app/styles", "css")),
     ),
     "pipeline-cli": Shape(
-        ("tests",), ("src", "common", "scripts", "config", "data"),
+        ("tests",), ("src", "common", "tools", "scripts", "config", "data"),
         root_files=("main.py", "launch_*.bat"), folder_types=(("common", "code"),),
     ),
     "skills-governance": Shape(

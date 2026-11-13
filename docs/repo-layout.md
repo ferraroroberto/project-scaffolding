@@ -176,10 +176,10 @@ A command-line tool or batch job with no UI. Two variants.
 
 | Contract | |
 |---|---|
-| Root folders | required `tests`; also `src`, `common`, `scripts`, `config`, `data` |
+| Root folders | required `tests`; also `src`, `common`, `tools`, `scripts`, `config`, `data` |
 | Root files | the common set, plus `main.py`, `launch_*.bat` |
 | Folder types | the common set, plus `common/` `code` |
-| Homes | none: a single tool keeps one package under src/, a multi-tool repo keeps one root package per tool, so no second-level rule fits both |
+| Homes | none: a single tool keeps one package under src/, a multi-tool repo keeps one package per tool under tools/, so no second-level rule fits both |
 
 ### Single tool
 
@@ -197,7 +197,7 @@ docs/layout.md
 ### Multi-tool repo
 
 ```
-<tool>/                     one root package per tool
+tools/<tool>/               one package per tool, any file type: code, launchers, Markdown, HTML, images, samples
 common/                     shared by two or more tools
 tests/<tool>/               never co-located with the tool
 scripts/
@@ -207,9 +207,9 @@ docs/layout.md              lists every tool in one line
 Where new code goes:
 
 - A new command is a subcommand of the one entry point, never another root `main_<name>.py`. A scheduled job that calls a script by path keeps a thin wrapper at that path.
-- In a multi-tool repo, a new tool gets a new root package and a line in `docs/layout.md`. Code a second tool needs moves to `common/`.
+- In a multi-tool repo, a new tool gets a new `tools/<tool>/` package and a line in `docs/layout.md`. `src/` stays code-only, so a tool folder that holds more than code never goes there. Code a second tool needs moves to `common/`.
 
-Allowed extra roots: `data/`, and in a multi-tool repo each declared tool package.
+Allowed extra roots: `data/`. A multi-tool repo needs none for its tools.
 
 ## skills-governance
 

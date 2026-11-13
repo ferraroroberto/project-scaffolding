@@ -581,7 +581,7 @@ def test_main_rejects_allow_additions_without_update(capsys: pytest.CaptureFixtu
 EXPECTED_SHAPES: dict[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
     "webapp-tray": (("app", "src", "tests", "docs"), ("scripts", "data", "brand", "assets", "config", "webapp")),
     "streamlit": (("app", "src", "tests"), ("scripts", "data", "brand", "config")),
-    "pipeline-cli": (("tests",), ("src", "common", "scripts", "config", "data")),
+    "pipeline-cli": (("tests",), ("src", "common", "tools", "scripts", "config", "data")),
     "skills-governance": (("skills", "tests"), ("hooks", "scripts", "architecture")),
     "node": (("src",), ("test", "scripts", "patches")),
     "static-site": ((), ("css", "js", "assets", "games", "content", "site", "scripts", "tests")),
@@ -664,6 +664,26 @@ def test_the_same_folder_declared_in_extra_roots_passes(
 ) -> None:
     shape_repo(tmp_path, shape, (*EXPECTED_SHAPES[shape][0], "utils2"), extra_roots=["utils2"])
     assert_layout_passes(tmp_path, shape, capsys)
+
+
+def test_a_multi_tool_pipeline_cli_keeps_its_tools_under_tools_with_no_extra_roots(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    shape_repo(tmp_path, "pipeline-cli", ("tests", "common"), extra_roots=[])
+    for rel in ("tools/scan/run.bat", "tools/scan/notes.md", "tools/scan/page.html", "tools/scan/shot.png",
+                "tools/scan/sample.json", "tools/scan/__main__.py", "tools/report/__main__.py", "tools/report/README.md"):
+        write(tmp_path, rel, "x\n")
+    assert_layout_passes(tmp_path, "pipeline-cli", capsys)
+    assert run_mode(tmp_path) == sr.EXIT_PASS
+
+
+def test_a_tool_folder_at_the_root_of_a_pipeline_cli_still_needs_a_declaration(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    shape_repo(tmp_path, "pipeline-cli", ("tests", "scan"))
+    capsys.readouterr()
+    assert run_mode(tmp_path) == sr.EXIT_RISE
+    assert "shape pipeline-cli: scan/ is not a folder this shape lists" in capsys.readouterr().out
 
 
 def test_extra_roots_never_waive_a_required_folder(tmp_path: Path) -> None:
