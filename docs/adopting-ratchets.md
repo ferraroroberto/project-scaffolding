@@ -43,7 +43,7 @@ Clone this repository anywhere (it is the source; nothing is installed from it),
 1. **Copy and initialise in one command:**
 
    ```
-   python <scaffold>/scripts/tools/adopt_ratchets.py <target> [--ratchets comment,structure,runtime_write]
+   <scaffold>/.venv/Scripts/python.exe <scaffold>/scripts/tools/adopt_ratchets.py <target> [--ratchets comment,structure,runtime_write]
    ```
 
    `--ratchets` takes a comma list, `recommended` (the default, the **Start** column) or `all`. For each ratchet it copies the script and siblings into `<target>/scripts/`, records every copy in `<target>/.fleet.toml` under `[vendored]`, appends a minimal `[<name>_ratchet]` table with `enabled = true`, copies the runner `run_ratchets.py`, and runs `--init` to write the first baseline, printing each exit code. Run it again at any time: an identical copy, an existing table and an existing baseline are left alone. A copy that differs from the scaffold's is **refused, never overwritten**, and the run exits 1 naming it.
@@ -57,7 +57,7 @@ Clone this repository anywhere (it is the source; nothing is installed from it),
 4. **Wire the gate.** Run the runner wherever the repo's checks run (a pre-push script, a Makefile target, CI):
 
    ```
-   python scripts/run_ratchets.py --tests python -m pytest -q
+   .venv/Scripts/python.exe scripts/run_ratchets.py --tests .venv/Scripts/python.exe -m pytest -q
    ```
 
    Everything after `--tests` is the test command. The runner runs every enabled ratchet in stage order, then takes the runtime write snapshot, runs the tests and runs the probe, so a file the tests leave under a code folder fails the gate. Without `--tests` the probe prints OFF. On GitHub Actions, copy `.github/workflows/ci-ratchets.yml.template` to `ci-ratchets.yml` in the target's workflows folder.
@@ -142,7 +142,7 @@ test('a done job cannot become running', () => {
 **4. Read your row in the scoreboard.** `scripts/tools/state_scoreboard.py` is a scaffold script, not vendored; run it from a scaffold checkout with that checkout's interpreter and point `--root` at the folder holding your repos:
 
 ```
-python scripts/tools/state_scoreboard.py --root <folder-with-your-repos> --repo <your-repo> --at default
+.venv/Scripts/python.exe scripts/tools/state_scoreboard.py --root <folder-with-your-repos> --repo <your-repo> --at default
 ```
 
 The row carries the three rules' counts split Python / JavaScript, the duplicate derivations (`state-write` plus `state-set-repeat`: places outside the owner that write its flag or re-spell its states), the declared machines and how many of them have `no proof`. The first two targets are 0. A `?` means the repo could not be read (no committed baseline, a `.fleet.toml` that does not parse) and is never zero; `-` means the repo has not listed a state rule. The command reads committed state only, so the same commit prints the same bytes; the exit code is 3 when any repo is unknown. The columns are defined in [implicit-state-machines.md](implicit-state-machines.md), "Scoreboard".

@@ -103,10 +103,10 @@ The baseline is committed, sorted JSON, one entry per line so diffs review clean
 ## Modes
 
 ```
-python scripts/static_ratchet.py                                   # check (what the gate runs)
-python scripts/static_ratchet.py --init                            # first baseline; refuses to overwrite
-python scripts/static_ratchet.py --update-baseline                 # drop stale entries; exit 1 + write nothing if any finding is new
-python scripts/static_ratchet.py --update-baseline --allow-additions   # the explicit flag that adds entries
+.venv/Scripts/python.exe scripts/static_ratchet.py                 # check (what the gate runs)
+.venv/Scripts/python.exe scripts/static_ratchet.py --init          # first baseline; refuses to overwrite
+.venv/Scripts/python.exe scripts/static_ratchet.py --update-baseline  # drop stale entries; exit 1 + write nothing if any finding is new
+.venv/Scripts/python.exe scripts/static_ratchet.py --update-baseline --allow-additions  # the explicit flag that adds entries
 ```
 
 Normal use can only shrink the baseline. Adding entries needs `--allow-additions` and shows in review as added lines in the baseline file.

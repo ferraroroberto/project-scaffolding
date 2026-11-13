@@ -145,10 +145,10 @@ There are no line numbers, so edits elsewhere in a file never churn it. A fix an
 ## Modes
 
 ```
-python scripts/usage_track_ratchet.py                                   # check (what the gate runs)
-python scripts/usage_track_ratchet.py --init                            # first baseline; refuses to overwrite
-python scripts/usage_track_ratchet.py --update-baseline                 # drop hits now gone; exit 1 + write nothing if anything was added
-python scripts/usage_track_ratchet.py --update-baseline --allow-additions   # the explicit flag that adds entries
+.venv/Scripts/python.exe scripts/usage_track_ratchet.py                 # check (what the gate runs)
+.venv/Scripts/python.exe scripts/usage_track_ratchet.py --init          # first baseline; refuses to overwrite
+.venv/Scripts/python.exe scripts/usage_track_ratchet.py --update-baseline  # drop hits now gone; exit 1 + write nothing if anything was added
+.venv/Scripts/python.exe scripts/usage_track_ratchet.py --update-baseline --allow-additions  # the explicit flag that adds entries
 ```
 
 A failing check prints every hit of the risen rule in the file, as `<path>:<line>: [<rule>] <message>`, under a `<path>: [<rule>] <n> hit(s), baseline <m>:` header.

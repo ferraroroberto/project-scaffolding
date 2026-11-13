@@ -79,10 +79,10 @@ There are no line numbers, so edits elsewhere in a file never churn it. Renaming
 ## Modes
 
 ```
-python scripts/dead_code_ratchet.py                                   # check (what the gate runs)
-python scripts/dead_code_ratchet.py --init                            # first baseline; refuses to overwrite
-python scripts/dead_code_ratchet.py --update-baseline                 # drop what is now referenced or gone; exit 1 + write nothing if anything was added
-python scripts/dead_code_ratchet.py --update-baseline --allow-additions   # the explicit flag that adds entries
+.venv/Scripts/python.exe scripts/dead_code_ratchet.py                 # check (what the gate runs)
+.venv/Scripts/python.exe scripts/dead_code_ratchet.py --init          # first baseline; refuses to overwrite
+.venv/Scripts/python.exe scripts/dead_code_ratchet.py --update-baseline  # drop what is now referenced or gone; exit 1 + write nothing if anything was added
+.venv/Scripts/python.exe scripts/dead_code_ratchet.py --update-baseline --allow-additions  # the explicit flag that adds entries
 ```
 
 A failing check prints `<path>:<line>: <kind> `<qualname>` is never referenced (confidence <n>)`. The fix is to delete the definition or call it. A real entry point the rules miss (a framework hook called by name, a callback a template names) goes in `entry_decorators` or `allow`.

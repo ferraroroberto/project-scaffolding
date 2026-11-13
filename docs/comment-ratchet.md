@@ -99,10 +99,10 @@ A file not in the baseline may not appear with a count above 0. The cost: moving
 ## Modes
 
 ```
-python scripts/comment_ratchet.py                                   # check (what the gate runs)
-python scripts/comment_ratchet.py --init                            # first baseline; refuses to overwrite
-python scripts/comment_ratchet.py --update-baseline                 # lower or drop entries; exit 1 + write nothing if any count rose
-python scripts/comment_ratchet.py --update-baseline --allow-additions   # the explicit flag that raises or adds entries
+.venv/Scripts/python.exe scripts/comment_ratchet.py                 # check (what the gate runs)
+.venv/Scripts/python.exe scripts/comment_ratchet.py --init          # first baseline; refuses to overwrite
+.venv/Scripts/python.exe scripts/comment_ratchet.py --update-baseline  # lower or drop entries; exit 1 + write nothing if any count rose
+.venv/Scripts/python.exe scripts/comment_ratchet.py --update-baseline --allow-additions  # the explicit flag that raises or adds entries
 ```
 
 A failing check names each file with its count and baseline, and lists every reference in it with its line. The fix is to reword the comment (state the why in words); raising the baseline needs `--allow-additions` and shows in review as changed lines in the baseline file.

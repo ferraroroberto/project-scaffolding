@@ -31,7 +31,7 @@ include  = ["src/"]                            # path prefixes; the default is t
 The first run writes the baseline. It is sorted JSON with one entry per line and no line numbers, so an edit above a finding never churns it:
 
 ```
-$ python scripts/comment_ratchet.py --init
+$ .venv/Scripts/python.exe scripts/comment_ratchet.py --init
 comment ratchet: wrote .comment-ratchet-baseline.json with 1 entr(ies), 1 finding(s)
 ```
 
@@ -47,7 +47,7 @@ comment ratchet: wrote .comment-ratchet-baseline.json with 1 entr(ies), 1 findin
 A change that adds a finding fails by name, with the line and the fix:
 
 ```
-$ python scripts/comment_ratchet.py
+$ .venv/Scripts/python.exe scripts/comment_ratchet.py
 comment ratchet: 1 entr(ies) with MORE findings than the baseline:
   src/orders.py: 1 (baseline none -- not baselined)
       line 2: #77  | # retry once, added for #77
@@ -56,7 +56,7 @@ comment ratchet: 1 entr(ies) with MORE findings than the baseline:
 Paying debt down is a separate, visible step:
 
 ```
-$ python scripts/comment_ratchet.py --update-baseline
+$ .venv/Scripts/python.exe scripts/comment_ratchet.py --update-baseline
 comment ratchet: .comment-ratchet-baseline.json now has 0 entr(ies), 0 finding(s) (1 lowered or dropped, 0 raised or added)
 ```
 
@@ -334,7 +334,7 @@ extra_history_patterns = ['\bstep \d+\b', '\bD\d+\b']
 
 ### Docs ratchet
 
-[docs-ratchet.md](docs-ratchet.md). Reads the root `README.md` and `docs/**/*.md`. Fenced code blocks, HTML comments, bare URLs, link targets and `href`/`src` values are not read; an issue reference inside inline code still counts, because a backtick is not a way around the rule. Except by `exclude` (generated reports) or `allow_refs` (exact reference text, for an intentional link); there is no per-hit marker.
+[docs-ratchet.md](docs-ratchet.md). Reads the root `README.md` and `docs/**/*.md`. For history markers, fenced code blocks, HTML comments, bare URLs, link targets and `href`/`src` values are not read; an issue reference inside inline code still counts, because a backtick is not a way around the rule. Except by `exclude` (generated reports) or `allow_refs` (exact reference text, for an intentional link); there is no per-hit marker for history. Fenced shell blocks are read only by `bare-command`, which has a per-block exemption.
 
 ```toml
 [docs_ratchet]
@@ -386,6 +386,26 @@ A heading that opens with `Changelog`, `Release notes`, `Release history` or `Wh
 # fixed
 (no section: the pull requests and `git log` are the changelog)
 ```
+
+#### `bare-command`
+
+A command in a fenced shell block (untagged, `bash`, `sh`, `powershell`, `ps1`, `bat`, `cmd`, `console`, ...) that calls bare `python`, `pip` or a venv-installed tool (`pytest`, `ruff`, `mypy`, `streamlit`, ...), which resolves to the system interpreter. The venv interpreter by path and venv creation (`python -m venv .venv`, `py -m venv .venv`) are legal. **Default:** on where the root `.gitignore` lists `.venv`, off elsewhere. Except a block with `<!-- bare-command-exempt: <reason> -->` on the line above it.
+
+<!-- bare-command-exempt: the bad example of this rule -->
+````
+# bad
+```bash
+python -m venv .venv
+pip install -r requirements.txt
+streamlit run app/app.py
+```
+# fixed
+```bash
+python -m venv .venv
+.venv/Scripts/python.exe -m pip install -r requirements.txt
+.venv/Scripts/python.exe -m streamlit run app/app.py
+```
+````
 
 ### Doc references ratchet
 
@@ -836,9 +856,9 @@ def save(text):
 A file the test run added under a code folder, found by comparing two snapshots around the run. Bytecode and tool caches aside. **Default:** on when run with a test command (`scripts/run_ratchets.py --tests <command>`); without one the probe prints OFF. Never baselined.
 
 ```
-$ python scripts/runtime_write_ratchet.py --snapshot snap.json
+$ .venv/Scripts/python.exe scripts/runtime_write_ratchet.py --snapshot snap.json
 $ <run the tests>
-$ python scripts/runtime_write_ratchet.py --probe snap.json
+$ .venv/Scripts/python.exe scripts/runtime_write_ratchet.py --probe snap.json
 runtime write probe: FAIL: the run wrote 1 file(s) under the code folders:
   src/run.log
 ```
