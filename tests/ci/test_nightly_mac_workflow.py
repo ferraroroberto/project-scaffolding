@@ -208,3 +208,15 @@ def test_routing_audit_step_stays_on_the_runner() -> None:
         "name: Routing audit", 1)[0], "the audit reads the e2e leg's first-attempt junit file"
     assert re.search(r"^          fetch-depth: 0$", body, re.M), "the audit walks the adopter's history"
     assert '--audit "$AUDIT"' in body, "READY carries the audit outcome for the puller"
+
+
+def test_scaffold_scripts_never_run_on_the_adopters_bare_python() -> None:
+    # In the platform job a bare `python` is the adopter's setup-python interpreter, and a traceback there
+    # exits 1, which the routing-audit step reads as "a miss is a finding", so the crash would go green.
+    # The select job installs only the tool Python, so a bare `python` is right there; an explicit
+    # `adopter/.venv/bin/python` is deliberate.
+    platform = _jobs()["platform"]
+    tooled = re.findall(r'^\s*"\$TOOL_PY" scaffold/scripts/', platform, re.M)
+    bare = re.findall(r"^\s*python3? scaffold/scripts/\S+", platform, re.M)
+    assert tooled, "no platform step runs a scaffold script on $TOOL_PY; this guard has gone stale"
+    assert not bare, bare

@@ -27,7 +27,7 @@ from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from scripts.conventions_state import is_js_source, js_state_names  # noqa: E402 -- need the sys.path line above
+from scripts.conventions_state import is_js_source  # noqa: E402 -- need the sys.path line above
 from scripts.tools.state_scoreboard_bugs import GhRunner, closed_bugs, count_bugs, github_slug, run_gh  # noqa: E402
 from scripts.tools.state_scoreboard_read import (  # noqa: E402 -- need the sys.path line above
     STATE_RULES,
@@ -36,6 +36,7 @@ from scripts.tools.state_scoreboard_read import (  # noqa: E402 -- need the sys.
     enrolled_rules,
     epoch,
     is_date,
+    js_state_names,
     parse_config,
     read_file,
     read_findings,
