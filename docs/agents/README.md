@@ -8,8 +8,6 @@ Single source of truth for the **project-shaped** AI agent instructions across a
 - **`AGENTS.master.md`** — one-line pointer template. Copy verbatim into any repo's `./AGENTS.md`. Other agents (Cursor, Codex) discover it and hop to CLAUDE.md.
 - **`project-skills.md`** — the portable project/nested skill layout, single-source and scoped-link contract, privacy/ignore rules, native capability evidence and clone/worktree verification.
 - **`ADAPT_PROMPT.md`** — copy-paste prompt to install the canonical instructions in a new repo.
-- **`LOGGING_MIGRATION_PROMPT.md`** — separate, future-use prompt for migrating `print()` → `logging` across a repo.
-- **`ROLLOUT_RUNBOOK.md`** — followable plan to replicate this whole consolidation on another machine across a different set of repos.
 - **`skills/`** — pointers to machine-wide Claude Code skills. User-level skills sit *above* all projects, so their canonical home is the machine config (`ferraroroberto/fleet-config` → `skills/`), which installs them once into `~/.claude/skills/`. This folder keeps only a pointer per skill, never a verbatim fork.
   - **`skills/handoff-commit/`** — pointer to the canonical `/handoff-commit` skill in `fleet-config`. (`/handoff-commit [<commit-ish>]` generates a copy-paste markdown prompt that hands a specific pushed GitHub commit to another LLM, so it can replicate the same logical change in a sister project — e.g. public repo → private fork — without copy-pasting code.)
 
@@ -25,5 +23,5 @@ This repo's own `./CLAUDE.md` is the master copied verbatim — only the `## Thi
 
 When the master changes:
 1. Edit `CLAUDE.master.md` here **and** mirror the same edit into this repo's `./CLAUDE.md`.
-2. Re-run the rollout (see `ROLLOUT_RUNBOOK.md`) to propagate to every sibling repo.
+2. Copy the new body verbatim into each existing adopter's `./CLAUDE.md` (a repo stood up later gets it from `ADAPT_PROMPT.md`).
 3. Each repo's `## This repository` footer stays untouched.

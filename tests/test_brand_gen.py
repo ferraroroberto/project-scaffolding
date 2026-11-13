@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
@@ -50,3 +51,13 @@ def test_master_retains_lucide_contract_and_renders(icon: dict[str, object]) -> 
     image = _render_tile(_glyph_paths(text), 32, 0.12)
     assert image.mode == "RGB"
     assert image.size == (32, 32)
+
+
+def test_doc_snippet_import_path_holds_the_generator() -> None:
+    # Adopters copy the thin-caller snippet; its sys.path entry must still hold brand_gen.py.
+    doc = (ROOT / "docs" / "brand-icons.md").read_text(encoding="utf-8")
+    match = re.search(
+        r'sys\.path\.insert\(0, r"E:\\automation\\project-scaffolding\\([^"]+)"\)', doc
+    )
+    assert match, "docs/brand-icons.md lost its thin-caller sys.path line"
+    assert (ROOT / Path(match.group(1).replace("\\", "/")) / "brand_gen.py").is_file()

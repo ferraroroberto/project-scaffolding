@@ -67,7 +67,7 @@ A downstream project's own `scripts/gen_icons.py` becomes a thin caller:
 import sys
 from pathlib import Path
 
-sys.path.insert(0, r"E:\automation\project-scaffolding\scripts")
+sys.path.insert(0, r"E:\automation\project-scaffolding\scripts\tools")
 from brand_gen import render_set
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
