@@ -403,3 +403,11 @@ def test_an_ignored_file_is_still_skipped(repo: Path) -> None:
     write(repo, ".gitignore", "src/ignored.py\n")
     write(repo, "src/ignored.py", 'x = 1\n\ndef forgotten_helper():\n    return x\n', track=False)
     assert run_mode(repo) == dc.EXIT_PASS
+
+
+def test_another_ratchets_baseline_does_not_count_as_a_reference(repo: Path) -> None:
+    # The structure ratchet's baseline lists `fn:<path>:<qualname>` for its own debt.
+    write(repo, ".structure-ratchet-baseline.json", '{"entries": ["fn:src/a.py:old_helper"]}\n')
+    git(repo, "add", "-f", ".structure-ratchet-baseline.json")
+    assert run_mode(repo, init=True) == dc.EXIT_PASS
+    assert '"names": ["old_helper"]' in baseline_text(repo)
