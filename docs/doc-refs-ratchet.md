@@ -107,10 +107,10 @@ A reference that appears twice is recorded twice. There are no line numbers, so 
 ## Modes
 
 ```
-python scripts/doc_refs_ratchet.py                                   # check (what the gate runs)
-python scripts/doc_refs_ratchet.py --init                            # first baseline; refuses to overwrite
-python scripts/doc_refs_ratchet.py --update-baseline                 # drop what now resolves; exit 1 + write nothing if anything was added
-python scripts/doc_refs_ratchet.py --update-baseline --allow-additions   # the explicit flag that adds entries
+.venv/Scripts/python.exe scripts/doc_refs_ratchet.py                 # check (what the gate runs)
+.venv/Scripts/python.exe scripts/doc_refs_ratchet.py --init          # first baseline; refuses to overwrite
+.venv/Scripts/python.exe scripts/doc_refs_ratchet.py --update-baseline  # drop what now resolves; exit 1 + write nothing if anything was added
+.venv/Scripts/python.exe scripts/doc_refs_ratchet.py --update-baseline --allow-additions  # the explicit flag that adds entries
 ```
 
 A failing check prints `<doc>:<line>: <kind> `<reference>` does not exist` with the line's text. The fix is to point the reference at what exists now, drop it, or (for an intentional pointer) add it to `allow_refs`.

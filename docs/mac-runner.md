@@ -94,10 +94,10 @@ The median does not move; the tail does. The six slow requests (1.3 s to 6.8 s) 
 Re-measure after any change to the runner's concurrency, an adopter's suite, or the hub's placement of the transcribe role:
 
 ```sh
-python scripts/ci/audio_latency_probe.py probe --label baseline --count 40 --interval-s 5 --out baseline.json
+.venv/Scripts/python.exe scripts/ci/audio_latency_probe.py probe --label baseline --count 40 --interval-s 5 --out baseline.json
 # start a run, then probe across it
-python scripts/ci/audio_latency_probe.py probe --label during --count 100 --interval-s 5 --out during.json
-python scripts/ci/audio_latency_probe.py compare baseline.json during.json --from <job start, unix> --to <job end, unix>
+.venv/Scripts/python.exe scripts/ci/audio_latency_probe.py probe --label during --count 100 --interval-s 5 --out during.json
+.venv/Scripts/python.exe scripts/ci/audio_latency_probe.py compare baseline.json during.json --from <job start, unix> --to <job end, unix>
 ```
 
 ## Mac prerequisites

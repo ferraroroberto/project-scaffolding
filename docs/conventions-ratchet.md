@@ -360,10 +360,10 @@ There are no line numbers, so edits elsewhere in a file never churn it. Counting
 ## Modes
 
 ```
-python scripts/conventions_ratchet.py                                   # check (what the gate runs)
-python scripts/conventions_ratchet.py --init                            # first baseline; refuses to overwrite
-python scripts/conventions_ratchet.py --update-baseline                 # drop hits now gone; exit 1 + write nothing if anything was added
-python scripts/conventions_ratchet.py --update-baseline --allow-additions   # the explicit flag that adds entries
+.venv/Scripts/python.exe scripts/conventions_ratchet.py                 # check (what the gate runs)
+.venv/Scripts/python.exe scripts/conventions_ratchet.py --init          # first baseline; refuses to overwrite
+.venv/Scripts/python.exe scripts/conventions_ratchet.py --update-baseline  # drop hits now gone; exit 1 + write nothing if anything was added
+.venv/Scripts/python.exe scripts/conventions_ratchet.py --update-baseline --allow-additions  # the explicit flag that adds entries
 ```
 
 A failing check prints every hit of the risen rule in the file, as `<path>:<line>: [<rule>] <message>`, under a `<path>: [<rule>] <n> hit(s), baseline <m>:` header: without line numbers in the baseline, the stage cannot tell which one is new.

@@ -1,6 +1,6 @@
 # Docs ratchet
 
-`scripts/docs_ratchet.py` is a baseline-and-ratchet stage for the pre-ship gate. It enforces the [README and docs convention](readme-and-docs.md) with two measures, both per file: the **size of the root `README.md`** in bytes, and the number of **history markers** in `README.md` and `docs/**/*.md`. It fails when either **rises** above a committed baseline. Existing debt never blocks work; it cannot grow either.
+`scripts/docs_ratchet.py` is a baseline-and-ratchet stage for the pre-ship gate. It enforces the [README and docs convention](readme-and-docs.md) with two measures, both per file: the **size of the root `README.md`** in bytes, and the number of **markers** in `README.md` and `docs/**/*.md`: history markers, plus fenced commands that call bare `python` or `pip` in a repo that uses a `.venv`. It fails when either **rises** above a committed baseline. Existing debt never blocks work; it cannot grow either.
 
 It reuses the shape of the [static-analysis ratchet](static-ratchet.md) and the [comment ratchet](comment-ratchet.md): an opt-in `.fleet.toml` table, a committed baseline, the same flags, and exit 3 for "not confirmed". It is a separate script from the comment ratchet because the scanner differs (a Markdown line scan, not four language comment extractors), the measures differ, and a repo can adopt one without the other.
 
@@ -13,6 +13,7 @@ A **marker** is one of:
 | `ref` | `#` plus one to five digits: `#NNN`, `repo#NNN`, `owner/repo#NNN`. Not preceded by `&`, `#` or `/`; not followed by a word character or `-` |
 | `dated-heading` | An ATX heading line (`#` to `######`) that holds an ISO date (`YYYY-MM-DD`, valid month and day) |
 | `changelog-heading` | A heading whose text opens with `Changelog`, `Release notes`, `Release history` or `What's new` (optional leading numbering or emoji) |
+| `bare-command` | A command in a fenced shell block that calls bare `python`, `pip` or a venv-installed tool. On only where the root `.gitignore` lists `.venv`; see [Bare commands](#bare-commands) |
 
 A heading that is both a changelog heading and dated counts once. References are counted per occurrence; several on a line count separately. The count is per **file**, so a new marker in one file cannot hide behind a removal in another.
 
@@ -20,13 +21,26 @@ A heading that is both a changelog heading and dated counts once. References are
 
 | Text | Why |
 |---|---|
-| Fenced code blocks, backtick or tilde | Code and command output are not prose. The closing fence must be the same character and at least as long as the opener; fences inside list items and block quotes are recognised |
+| History markers inside fenced code blocks, backtick or tilde | Code and command output are not prose. The closing fence must be the same character and at least as long as the opener; fences inside list items and block quotes are recognised |
 | HTML comments, including multi-line | Not rendered |
 | Bare URLs, `<autolinks>`, `[text](target)` targets, `![alt](target)` targets, reference-definition URLs, `href` and `src` attribute values | An anchor or an issue link is not a citation. A linked reference such as ``[#N](https://…)`` counts once, through its text |
 | `&#123;`-style entities, `#12-style` anchors, six-digit numbers | Not issue references |
 | Prose dates, dates in table cells, "as of" stamps | Expiry and rotation dates must stay legal in a README |
 
 **A reference inside inline code counts.** A backticked `#NNN` is still a citation; exempting backticks would be a one-character bypass. A `<!--` inside an inline code span is code, not a comment opener.
+
+### Bare commands
+
+The fleet never activates a virtual environment: a command calls the interpreter by path (`.venv/Scripts/python.exe` on Windows, `./.venv/bin/python` on POSIX), so it works pasted into a script, a hook or an agent tool call. A README step that runs bare `python` right after creating `.venv` resolves to the system interpreter instead. The rule makes that convention a check.
+
+- **When it is on:** the repo's root `.gitignore` lists `.venv` (`.venv`, `.venv/` or `/.venv`). A repo without that convention gets no `bare-command` markers.
+- **Blocks read:** fences tagged `bash`, `sh`, `shell`, `zsh`, `powershell`, `pwsh`, `ps`, `ps1`, `bat`, `batch`, `cmd`, `console`, `shell-session`, and untagged fences. A `python`, `toml`, `text` or other fence is never read.
+- **Lines read:** each command, and each command after `&&`, `||` or `;`. A leading shell prompt (`$`, `>`, `PS ...>`, `C:\...>`), the PowerShell call operator `&` and `NAME=value` prefixes are stripped first. In a `console` block only prompt lines are commands; the rest is output. Comment lines (`#`, `REM`, `::`) and the continuation of a line ending in `\`, `` ` `` or `^` are skipped.
+- **Flagged:** a command whose first word is `python`, `python3`, `pip`, `pip3`, `pytest`, `ruff`, `mypy`, `streamlit`, `uvicorn`, `hypercorn`, `playwright` or `pre-commit` (`.exe` suffix included).
+- **Legal:** the venv interpreter or tool by path, venv creation (`python -m venv .venv`, `python3 -m venv .venv`, `py -m venv .venv`, `py -3.12 -m venv .venv`), and every other command.
+- **Exempt:** a block whose nearest non-blank line above holds `<!-- bare-command-exempt: <reason> -->` (a container image, a system tool on purpose). The reason is required; the comment covers that one block.
+
+Each hit adds one to the file's marker count, so it is baselined and ratcheted like a history marker.
 
 ### Allowed references
 
@@ -83,10 +97,10 @@ Committed, sorted JSON, one entry per line, keyed by repo-relative path, with no
 ## Modes
 
 ```
-python scripts/docs_ratchet.py                                   # check (what the gate runs)
-python scripts/docs_ratchet.py --init                            # first baseline; refuses to overwrite
-python scripts/docs_ratchet.py --update-baseline                 # lower or drop entries; exit 1 + write nothing if anything rose
-python scripts/docs_ratchet.py --update-baseline --allow-additions   # the explicit flag that raises or adds entries
+.venv/Scripts/python.exe scripts/docs_ratchet.py                 # check (what the gate runs)
+.venv/Scripts/python.exe scripts/docs_ratchet.py --init          # first baseline; refuses to overwrite
+.venv/Scripts/python.exe scripts/docs_ratchet.py --update-baseline  # lower or drop entries; exit 1 + write nothing if anything rose
+.venv/Scripts/python.exe scripts/docs_ratchet.py --update-baseline --allow-additions  # the explicit flag that raises or adds entries
 ```
 
 A failing check names each file with its count, its baseline and every marker with its kind and line, or the README's size against the budget and its baseline. The fix is to state the present-tense why in words, or to move README detail into `docs/<topic>.md`.
@@ -123,3 +137,5 @@ A dry run over throwaway copies of the README and `docs/` folder of seven fleet 
 ## Tests
 
 `tests/ratchets/test_docs_ratchet.py`: counting on fixture strings (every marker kind, and the fences, URLs, link targets, autolinks, HTML comments, anchors and entities that must not count), the README budget cases (new over budget fails, shrink passes, growth fails, under budget needs no entry, entry dropped when back under, CRLF normalised), scope and exclusions, and every mode and exit code on throwaway git repos. A missing prerequisite is a hard failure there, never `pytest.skip`. The scaffold's own gate stage doubles as the guard that its committed baseline is current, and a test pins that the two docs for this stage carry no marker themselves.
+
+`tests/ratchets/test_docs_ratchet_commands.py`: the `bare-command` rule. Each flagged command and shell tag, the legal forms (venv paths, venv creation, comments, continuation lines, console output), the exemption comment and its scope, the `.gitignore` signal, a rise on a throwaway repo, and that the scaffold's own docs carry no bare command.

@@ -95,13 +95,15 @@ launch_server.bat         # Windows
 Or directly:
 
 ```bash
-streamlit run app/app.py
+.venv/Scripts/python.exe -m streamlit run app/app.py   # Windows
+./.venv/bin/python -m streamlit run app/app.py         # macOS / Linux
 ```
 
 Standalone pipeline run (no UI):
 
 ```bash
-python -m src.pipelines.example_pipeline
+.venv/Scripts/python.exe -m src.pipelines.example_pipeline   # Windows
+./.venv/bin/python -m src.pipelines.example_pipeline         # macOS / Linux
 ```
 
 ## Layout

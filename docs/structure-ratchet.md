@@ -202,10 +202,10 @@ Each entry records the count at the last baseline write; `root_extras` and `shap
 ## Modes
 
 ```
-python scripts/structure_ratchet.py                                     # check (what the gate runs)
-python scripts/structure_ratchet.py --init                              # first baseline; refuses to overwrite
-python scripts/structure_ratchet.py --update-baseline                   # lower or drop entries; exit 1 + write nothing if anything rose
-python scripts/structure_ratchet.py --update-baseline --allow-additions # the explicit flag that raises or adds entries
+.venv/Scripts/python.exe scripts/structure_ratchet.py                   # check (what the gate runs)
+.venv/Scripts/python.exe scripts/structure_ratchet.py --init            # first baseline; refuses to overwrite
+.venv/Scripts/python.exe scripts/structure_ratchet.py --update-baseline  # lower or drop entries; exit 1 + write nothing if anything rose
+.venv/Scripts/python.exe scripts/structure_ratchet.py --update-baseline --allow-additions # the explicit flag that raises or adds entries
 ```
 
 The fix for a failure is to put the code where the layout says. `--allow-additions` exists for the reviewed exception, and shows in the baseline diff.

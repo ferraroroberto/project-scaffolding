@@ -115,10 +115,10 @@ Committed, sorted JSON, one entry per line, keyed by repo-relative path, with no
 ## Modes
 
 ```
-python scripts/instruction_ratchet.py                                   # check (what the gate runs)
-python scripts/instruction_ratchet.py --init                            # first baseline; refuses to overwrite
-python scripts/instruction_ratchet.py --update-baseline                 # lower or drop entries; exit 1 + write nothing if anything rose
-python scripts/instruction_ratchet.py --update-baseline --allow-additions   # the explicit flag that raises or adds entries
+.venv/Scripts/python.exe scripts/instruction_ratchet.py                 # check (what the gate runs)
+.venv/Scripts/python.exe scripts/instruction_ratchet.py --init          # first baseline; refuses to overwrite
+.venv/Scripts/python.exe scripts/instruction_ratchet.py --update-baseline  # lower or drop entries; exit 1 + write nothing if anything rose
+.venv/Scripts/python.exe scripts/instruction_ratchet.py --update-baseline --allow-additions  # the explicit flag that raises or adds entries
 ```
 
 A failing check names each file, the rule and its title, the count against its baseline (or the size against the cap), and every hit with its line. Over a size cap, the fix is to move scoped detail into a skill, a rules file or a referenced doc; an `@path` import does not shrink the budget, and deleting directives to pass is never the fix.
