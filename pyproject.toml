@@ -32,6 +32,10 @@ known-first-party = ["views"]
 [tool.ruff.lint.per-file-ignores]
 # The one place streamlit may be imported. Never widen this to make src/ pass.
 "app/**" = ["TID251"]
+# Vendored into apps that still run Python 3.9, where `X | None` annotations and
+# `datetime.UTC` fail at import (tests/usage_log/test_usage_log_py39.py); UP007/UP045/UP017
+# would rewrite them back for this repo's 3.12 target.
+"src/usage_log.py" = ["UP007", "UP045", "UP017"]
 
 [tool.mypy]
 # `mypy --strict` is what consumers run on vendored modules; the scaffold gates
