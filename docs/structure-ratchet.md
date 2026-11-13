@@ -59,14 +59,14 @@ The presets and every layout check live in the sibling `scripts/structure_layout
 |---|---|---|---|
 | `webapp-tray` | `app`, `src`, `tests`, `docs` | `scripts`, `data`, `brand`, `assets`, `config`, `webapp` | `[["src", "app"]]` |
 | `streamlit` | `app`, `src`, `tests` | `scripts`, `data`, `brand`, `config` | `[["src", "app"]]` |
-| `pipeline-cli` | `tests` | `src`, `common`, `scripts`, `config`, `data` | none |
+| `pipeline-cli` | `tests` | `src`, `common`, `tools`, `scripts`, `config`, `data` | none |
 | `skills-governance` | `skills`, `tests` | `hooks`, `scripts`, `architecture` | none |
 | `node` | `src` | `test`, `scripts`, `patches` | none |
 | `static-site` | none | `css`, `js`, `assets`, `games`, `content`, `site`, `scripts`, `tests` | none |
 | `agent-workspace` | none | `scripts` | none |
 | `service` | `src`, `tests`, `app_web`, `tray` | `scripts`, `config`, `launchers`, `assets` | none |
 
-`docs`, `.github` and every hidden folder are allowed in every shape. A set is required only where every repo of the shape has the folder, because `extra_roots` can add a folder but never waive one. A multi-tool `pipeline-cli` repo declares each tool package in `extra_roots`.
+`docs`, `.github` and every hidden folder are allowed in every shape. A set is required only where every repo of the shape has the folder, because `extra_roots` can add a folder but never waive one. A multi-tool `pipeline-cli` repo keeps each tool package under `tools/`, an untyped root folder that takes any file type, so it declares nothing in `extra_roots`.
 
 - **A required folder with no tracked file** fails by name; the fix is to add it, or to correct `shape`.
 - **A tracked root folder** that is in neither the preset nor `extra_roots` fails by name. The message names the shape, the folder and both fixes: move the code into a listed folder, or declare the folder in `extra_roots` with a line in the repo's `docs/layout.md`.
