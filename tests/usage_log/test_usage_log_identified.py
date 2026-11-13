@@ -21,6 +21,7 @@ import pytest
 
 from src.no_window import NO_WINDOW
 from src.usage_log import UsageLog, parse_batch
+from tests.usage_log._summary import summary_of
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 HERE = Path(__file__).resolve().parent
@@ -196,7 +197,7 @@ def test_the_python_summary_counts_returning_visitors_like_the_worker(tmp_path: 
             [("-40 days", "v1"), ("-1 days", "v1"), ("-1 days", "v2"), ("-0 days", "v2")],
         )
     conn.close()
-    out = log.summary(30)
+    out = summary_of(log.db_path, 30)
     assert out["visitors"] == 2
     assert out["returning"] == 2  # v2 on two days inside the window, v1 across its start
 
@@ -205,4 +206,4 @@ def test_the_python_summary_reports_zero_returning_for_an_app(tmp_path: Path) ->
     db = tmp_path / "usage.sqlite3"
     log = UsageLog(db)
     log.record(parse_batch(_body([{"kind": "view", "id": "home"}])))
-    assert log.summary(7)["returning"] == 0
+    assert summary_of(log.db_path, 7)["returning"] == 0

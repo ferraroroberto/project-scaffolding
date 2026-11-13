@@ -354,14 +354,6 @@ class UsageLog:
             (self.max_rows,),
         )
 
-    def summary(self, days: int, *, now: datetime | None = None) -> dict[str, Any]:
-        """Aggregate the last ``days`` days (see :func:`summarize`)."""
-        conn = self._connect()
-        try:
-            return summarize(conn, days, now=now)
-        finally:
-            conn.close()
-
 
 def open_read_only(db_path: Path) -> sqlite3.Connection:
     """Open an existing ``usage.sqlite3`` without the right to write it.
