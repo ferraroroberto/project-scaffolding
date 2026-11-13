@@ -12,6 +12,4 @@ if [ ! -f ".venv/bin/python" ]; then
 fi
 
 .venv/bin/python -m streamlit run app/app.py \
-    --server.enableXsrfProtection false \
-    --server.enableCORS false \
     --browser.gatherUsageStats=false

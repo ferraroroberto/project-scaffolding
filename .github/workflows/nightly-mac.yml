@@ -274,7 +274,7 @@ jobs:
           E2E: ${{ steps.e2e.outcome }}
         run: |
           set +e
-          python scaffold/scripts/tools/routing_audit.py audit \
+          "$TOOL_PY" scaffold/scripts/tools/routing_audit.py audit \
             --repo-dir adopter --repo "$REPO" --e2e-outcome "${E2E:-}" \
             --junit "$RESULTS/junit.xml" \
             --state "$HOME/mac-nightly-results/$REPO/audit-state.json" \

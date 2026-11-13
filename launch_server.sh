@@ -28,9 +28,8 @@ fi
 echo "[1/2] Starting Streamlit on port $PORT ..."
 .venv/bin/python -m streamlit run app/app.py \
     --server.port "$PORT" \
-    --server.enableXsrfProtection false \
-    --server.enableCORS false \
-    --server.headless true &
+    --server.headless true \r
+    --browser.gatherUsageStats=false &
 STREAMLIT_PID=$!
 
 sleep 3

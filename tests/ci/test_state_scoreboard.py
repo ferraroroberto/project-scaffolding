@@ -16,10 +16,9 @@ from typing import Any
 
 import pytest
 
-from scripts.conventions_state import js_state_names
 from scripts.tools import state_scoreboard as sb
 from scripts.tools.state_scoreboard_bugs import count_bugs, github_slug
-from scripts.tools.state_scoreboard_read import ReadError, read_machines, resolve_ref, state_names
+from scripts.tools.state_scoreboard_read import ReadError, js_state_names, read_machines, resolve_ref, state_names
 from src.no_window import NO_WINDOW
 from tests._git_repo import git, write
 
