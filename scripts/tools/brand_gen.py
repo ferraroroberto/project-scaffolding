@@ -1,4 +1,4 @@
-"""Shared fleet icon generator — render one master Lucide SVG onto a dark tile
+r"""Shared fleet icon generator — render one master Lucide SVG onto a dark tile
 at every size the fleet's PWA / tray / Stream Deck outputs need.
 
 The master art *is* the vendored Lucide glyph itself (see ``brand/*.svg`` in
@@ -14,11 +14,11 @@ imports it.
 Usage (from a downstream project's own ``scripts/gen_icons.py``):
 
     import sys
-    sys.path.insert(0, r"E:\\automation\\project-scaffolding\\scripts\tools")
+    sys.path.insert(0, r"E:\automation\project-scaffolding\scripts\tools")
     from brand_gen import render_set
 
     render_set(
-        master=Path(r"E:\\automation\\project-scaffolding\\brand\\rocket.svg"),
+        master=Path(r"E:\automation\project-scaffolding\brand\rocket.svg"),
         out_dir=STATIC_DIR,
         tray_out_dir=PROJECT_ROOT / "assets" / "tray",
         stream_deck_out_dir=PROJECT_ROOT / "assets" / "stream-deck",

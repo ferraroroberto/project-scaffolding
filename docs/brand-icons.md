@@ -82,6 +82,8 @@ render_set(
 )
 ```
 
+An older `gen_icons.py` that puts `scripts` (not `scripts\tools`) on `sys.path` still works: `scripts/brand_gen.py` re-exports `render_set`.
+
 Consumption is a known local path (`E:\automation\project-scaffolding\scripts\tools\brand_gen.py`), not a
 package install or git submodule — this is a single-machine fleet, so the simplest wiring is the
 right one. If that ever stops being true (a second machine, CI), revisit packaging then.
