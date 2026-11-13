@@ -36,6 +36,7 @@ from src.usage_log import (
     usage_router,
     validate_event,
 )
+from tests.usage_log._summary import summary_of
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 CLIENT_DIR = REPO_ROOT / "app" / "webapp" / "static" / "_vendored" / "usage-log"
@@ -193,7 +194,7 @@ def test_summary_counts_views_taps_and_device_split(tmp_path: Path) -> None:
     ])
     log.record(phone, now=NOW)
     log.record(desk, now=NOW)
-    out = log.summary(30, now=NOW)
+    out = summary_of(log.db_path, 30, now=NOW)
     assert out["sessions"] == 2
     assert out["events"] == 7
     assert out["views"] == {"board": 2, "settings": 1}
@@ -208,7 +209,7 @@ def test_summary_window_excludes_older_rows(tmp_path: Path) -> None:
     log = UsageLog(tmp_path / "usage.sqlite3")
     log.insert_rows([(format_ts(NOW - timedelta(days=40)), SESSION, "view", "old", None,
                       "phone", "ios")], now=NOW)
-    out = log.summary(30, now=NOW)
+    out = summary_of(log.db_path, 30, now=NOW)
     assert out["events"] == 0 and out["views"] == {}
 
 
@@ -350,7 +351,7 @@ def test_cli_existing_empty_db_is_zero_usage_not_no_data(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     db = tmp_path / "usage.sqlite3"
-    UsageLog(db).summary(1)  # creates the schema, no rows
+    UsageLog(db).insert_rows([])  # creates the schema, no rows
     assert usage_summary.main(["--app", "demo", "--db", str(db)]) == 0
     assert "0 sessions" in capsys.readouterr().out
 
@@ -622,7 +623,7 @@ def test_referrer_events_are_stored_with_their_host(tmp_path: Path) -> None:
     assert batch.rejected == 2
     log = UsageLog(db)
     log.record(batch)
-    out = log.summary(7)
+    out = summary_of(log.db_path, 7)
     assert out["referrers"] == {"linkedin.com": 1}
     assert out["countries"] == {} and out["visitors"] == 0
 
@@ -659,6 +660,6 @@ def test_summary_counts_countries_and_daily_visitors_when_present(tmp_path: Path
             [("s-aaaaaaaa", "ES", "v1"), ("s-bbbbbbbb", "ES", "v1"), ("s-cccccccc", "IT", "v2")],
         )
     conn.close()
-    out = UsageLog(db).summary(7)
+    out = summary_of(db, 7)
     assert out["countries"] == {"ES": 2, "IT": 1}
     assert out["visitors"] == 2
