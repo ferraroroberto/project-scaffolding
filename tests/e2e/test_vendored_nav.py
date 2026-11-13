@@ -804,114 +804,67 @@ def _check_resize_without_cell_change_leaves_the_capsule_untouched(nav_mobile: P
     assert writes == 0, f"{writes} attribute writes on a no-op resize"
 
 
-def _stub_standalone_and_count_rebuilds(page: Page) -> None:
-    """Pretend to be the installed app and count the bar's `.glass-rebuild` drops.
+def _stub_standalone_and_record_glass_writes(page: Page) -> None:
+    """Pretend to be the installed app and record every write that drops the glass.
 
     Chromium has no `display-mode: standalone` emulation, so matchMedia is
-    stubbed for that one query.
+    stubbed for that one query. Recorded: the bar gaining `glass-rebuild`, and
+    `data-nav-top-glass` leaving <html> while the page is still scrolled.
     """
     page.evaluate(
         "() => { const real = window.matchMedia.bind(window);"
         " window.matchMedia = (q) => q === '(display-mode: standalone)'"
         "   ? { matches: true, media: q, addEventListener() {}, removeEventListener() {} }"
         "   : real(q);"
-        " window.__rebuilds = 0;"
+        " window.__drops = [];"
+        " const nav = document.querySelector('.tabs');"
         " new MutationObserver(() => {"
-        "   if (document.querySelector('.tabs').classList.contains('glass-rebuild'))"
-        "     window.__rebuilds += 1; })"
-        "   .observe(document.querySelector('.tabs'), { attributes: true, attributeFilter: ['class'] }); }"
-    )
-
-
-def _wait_rebuilds(page: Page, count: int) -> None:
-    page.wait_for_function(
-        "(n) => window.__rebuilds === n"
-        " && !document.querySelector('.tabs').classList.contains('glass-rebuild')",
-        arg=count,
-        timeout=2000,
-    )
-
-
-def _check_standalone_start_rebuilds_the_glass_once_and_restores_it(nav_mobile: Page) -> None:
-    """Installed-app start: the bar's filter drops for one frame after the viewport settles.
-
-    Only a device shows whether the rebuild clears the iOS smear; this pins
-    that it happens, once, and that the glass returns.
-    """
-    _stub_standalone_and_count_rebuilds(nav_mobile)
-    _init_nav(nav_mobile)
-    _wait_rebuilds(nav_mobile, 1)
-    assert "blur" in _style(nav_mobile, ".tabs", "backdropFilter")
-    assert nav_mobile.evaluate("window.scrollY") == 0
-    _wait_pill_on_active(nav_mobile)
-
-
-def _check_glass_rebuild_waits_for_the_viewport_to_stop_resizing(nav_mobile: Page) -> None:
-    """While the installed app's viewport keeps resizing, the glass is not rebuilt yet.
-
-    A rebuild at a fixed frame can land while iOS is still growing the
-    viewport and leave the texture stale again; it must follow the last resize.
-    """
-    _stub_standalone_and_count_rebuilds(nav_mobile)
-    during = nav_mobile.evaluate(
-        "async () => { const m = await import('/_vendored/nav/nav-tabs.js');"
-        " window.__nav = m.initNavTabs();"
-        " for (let i = 0; i < 12; i++) {"
-        "   window.dispatchEvent(new Event('resize'));"
-        "   await new Promise((r) => setTimeout(r, 60)); }"
-        " return window.__rebuilds; }"
-    )
-    assert during == 0, f"glass rebuilt {during}x while the viewport was still resizing"
-    _wait_rebuilds(nav_mobile, 1)
-    assert "blur" in _style(nav_mobile, ".tabs", "backdropFilter")
-
-
-def _check_glass_rebuild_drops_and_restores_the_layer_promotion(nav_mobile: Page) -> None:
-    """The rebuild frame also drops the bar's and labels' own layers, then restores them.
-
-    A promoted layer keeps its bitmap across a filter toggle, so a raster made
-    while the viewport was still growing would survive the rebuild. Dropping
-    the promotion for that frame makes WebKit paint the contents again; the
-    promotion returns so the bar still repaints after a modal closes.
-    """
-    _stub_standalone_and_count_rebuilds(nav_mobile)
-    nav_mobile.evaluate(
-        "() => { const nav = document.querySelector('.tabs');"
-        " const read = () => { const label = nav.querySelector('.tab-label');"
-        "   const s = getComputedStyle(nav);"
-        "   return { bar: s.transform, hint: s.willChange,"
-        "     label: label ? getComputedStyle(label).transform : null }; };"
-        " window.__during = null;"
-        " new MutationObserver(() => {"
-        "   if (nav.classList.contains('glass-rebuild') && !window.__during)"
-        "     window.__during = read(); })"
+        "   if (nav.classList.contains('glass-rebuild')) window.__drops.push('bar'); })"
         "   .observe(nav, { attributes: true, attributeFilter: ['class'] });"
-        " window.__readLayers = read; }"
+        " new MutationObserver(() => {"
+        "   if (scrollY > 0 && !document.documentElement.hasAttribute('data-nav-top-glass'))"
+        "     window.__drops.push('top'); })"
+        "   .observe(document.documentElement, { attributes: true, attributeFilter: ['data-nav-top-glass'] });"
+        " const tall = document.createElement('div');"
+        " tall.style.height = '3000px';"
+        " document.querySelector('.app').append(tall); }"
     )
-    _init_nav(nav_mobile)
-    _wait_rebuilds(nav_mobile, 1)
-    during = nav_mobile.evaluate("window.__during")
-    assert during == {"bar": "none", "hint": "auto", "label": "none"}, during
-    after = nav_mobile.evaluate("window.__readLayers()")
-    assert after["bar"] != "none" and after["hint"] == "transform", after
-    assert after["label"] != "none", after
 
 
-def _check_glass_is_rebuilt_on_every_return_to_the_foreground(nav_mobile: Page) -> None:
-    """iOS resumes a kept-alive home-screen app without a reload: rebuild on each return."""
-    _stub_standalone_and_count_rebuilds(nav_mobile)
+def _check_glass_follows_scroll_only_in_the_installed_app(nav_mobile: Page) -> None:
+    """Installed app: no launch, resize or return to the foreground drops the glass.
+
+    The installed app's top-edge blur is the system scroll-edge effect, which
+    the real .nav-top-edge strip turns off; it is not a stale backdrop texture,
+    so the bar's filter and the top glass are never dropped to "rebuild" them.
+    The top glass switches on scroll alone, and the 1px startup scroll still
+    returns the page to the top with the capsule on its tab.
+    """
+    _stub_standalone_and_record_glass_writes(nav_mobile)
     _init_nav(nav_mobile)
-    _wait_rebuilds(nav_mobile, 1)
-    for expected in (2, 3):
-        nav_mobile.evaluate("() => document.dispatchEvent(new Event('visibilitychange'))")
-        _wait_rebuilds(nav_mobile, expected)
+    nav_mobile.wait_for_function("() => scrollY === 0", timeout=2000)
+    _wait_pill_on_active(nav_mobile)
+    nav_mobile.evaluate("() => window.scrollTo(0, 200)")
+    nav_mobile.wait_for_function("() => document.documentElement.hasAttribute('data-nav-top-glass')", timeout=2000)
+    drops = nav_mobile.evaluate(
+        "async () => { const pause = (ms) => new Promise((r) => setTimeout(r, ms));"
+        " for (let i = 0; i < 6; i++) { window.dispatchEvent(new Event('resize')); await pause(40); }"
+        " document.dispatchEvent(new Event('visibilitychange'));"
+        " window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true }));"
+        " await pause(800);"
+        " return window.__drops; }"
+    )
+    assert drops == [], f"the glass was dropped: {drops}"
     assert "blur" in _style(nav_mobile, ".tabs", "backdropFilter")
+    assert nav_mobile.evaluate("document.documentElement.hasAttribute('data-nav-top-glass')")
+    nav_mobile.evaluate("() => window.scrollTo(0, 0)")
+    nav_mobile.wait_for_function("() => !document.documentElement.hasAttribute('data-nav-top-glass')", timeout=2000)
 
 
 def test_nav_contract(
     new_page: Callable[..., AbstractContextManager[Page]], static_server: str, browser: Browser
 ) -> None:
-    """The nav's desktop control, mobile pill, badges, capsule, press-and-slide and glass rebuild, one case per contract."""
+    """The nav's desktop control, mobile pill, badges, capsule, press-and-slide and installed-app glass, one case per contract."""
     with cases() as c:
         with c.case("desktop_control_and_wide_rail"), _nav(new_page, static_server) as nav:
             _check_desktop_control_and_wide_rail(nav=nav)
@@ -969,14 +922,8 @@ def test_nav_contract(
             _check_arrow_home_and_end_move_focus_and_selection(nav=nav_mobile)
         with c.case("a_drag_on_the_inline_control_is_not_a_slide"), _nav(new_page, static_server) as nav:
             _nav_slide_checks.check_a_drag_on_the_inline_control_is_not_a_slide(nav=nav)
-        with c.case("standalone_start_rebuilds_the_glass_once_and_restores_it"), phone_nav(browser, static_server) as nav_mobile:
-            _check_standalone_start_rebuilds_the_glass_once_and_restores_it(nav_mobile=nav_mobile)
-        with c.case("glass_rebuild_waits_for_the_viewport_to_stop_resizing"), phone_nav(browser, static_server) as nav_mobile:
-            _check_glass_rebuild_waits_for_the_viewport_to_stop_resizing(nav_mobile=nav_mobile)
-        with c.case("glass_rebuild_drops_and_restores_the_layer_promotion"), phone_nav(browser, static_server) as nav_mobile:
-            _check_glass_rebuild_drops_and_restores_the_layer_promotion(nav_mobile=nav_mobile)
-        with c.case("glass_is_rebuilt_on_every_return_to_the_foreground"), phone_nav(browser, static_server) as nav_mobile:
-            _check_glass_is_rebuilt_on_every_return_to_the_foreground(nav_mobile=nav_mobile)
+        with c.case("glass_follows_scroll_only_in_the_installed_app"), phone_nav(browser, static_server) as nav_mobile:
+            _check_glass_follows_scroll_only_in_the_installed_app(nav_mobile=nav_mobile)
 
 
 def test_nav_no_tab_active(
