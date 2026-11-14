@@ -1,9 +1,9 @@
 """The vendored nav's top glass emits the owner-validated translucent top bar.
 
-nav-lab's exporter turns the validated recipe (`black-translucent`,
+The owner-validated recipe (`black-translucent`,
 `viewport-fit=auto`, env inset, status-header region with no header row,
 layer target, blur 20px, saturate 180%, page tint at 50%, 16px masked fade,
-promoted layer, no hairline, revealed on scroll, content offset 0) into one
+promoted layer, no hairline, revealed on scroll, content offset 0) is one
 fixed layer from the viewport top through the safe area plus the fade, and
 content padding of the safe area alone. A desktop engine cannot emulate the
 installed app, so the guard is structural: the phone block's `body::after`
