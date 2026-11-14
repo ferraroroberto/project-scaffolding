@@ -150,6 +150,8 @@ def test_an_openai_rule_does_not_apply_inside_a_claude_scoped_file(tmp_path: Pat
         ("Never use bullet points.", "R-06"),
         ("Think step by step.", "R-07"),
         ("Do not think before answering.", "R-08"),
+        ("Reply without deliberating.", "R-08"),
+        ("Answer directly without a preamble.", "R-08"),
         ("Be conservative in review.", "R-09"),
         ("Prefill the answer.", "R-10"),
         ("As of March 2026 the API changed.", "R-11"),
