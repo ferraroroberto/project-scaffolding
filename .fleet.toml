@@ -655,6 +655,8 @@ page-foot       = { src = "app/webapp/static/_vendored/page-foot" }
 action-row      = { src = "app/webapp/static/_vendored/action-row" }
 text-size       = { src = "app/webapp/static/_vendored/text-size" }
 toast           = { src = "app/webapp/static/_vendored/toast" }
+# The "New version available · Reload" prompt, on the toast's glass.
+build-watch     = { src = "app/webapp/static/_vendored/build-watch" }
 rec-wave        = { src = "app/webapp/static/_vendored/rec-wave" }
 # The recorder's input name and silent-mic warning, built on rec-wave.
 mic-notice      = { src = "app/webapp/static/_vendored/mic-notice" }
