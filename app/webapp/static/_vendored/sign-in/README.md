@@ -139,6 +139,26 @@ def alert_owner(alert: LockoutAlert) -> None:
 
 The message carries the app, the client address and the failure count, and nothing else. An app that has no notifier config of its own can send the same text through `fleet-config`'s Telegram transport instead: `notify_send.py --category attention --text "..."` from its `hooks/` folder, spawned with `CREATE_NO_WINDOW`. That transport resolves the `coding alerts` chat itself.
 
+## The password — `src/password.py`
+
+Every app stores, checks and sets its sign-in password through the vendored, stdlib-only `src/password.py` (manifest key `password`; copy it byte-for-byte with `/propagate-vendored password`). No app keeps its own setter script, plaintext config key or compare helper for it.
+
+- **Stored** as one salted PBKDF2-SHA256 hash (`pbkdf2_sha256$<iterations>$<salt>$<digest>`) in `config/app_password.json` beside `src/`, a file of its own so no config loader rewrites it. It is git-ignored in every adopter. `APP_PASSWORD_FILE` overrides the path; tests set it to a temp file, so a test run never reads or writes the live one.
+- **Any non-empty password** is accepted, a 4-digit PIN as much as a passphrase. There are no complexity rules: the lock-out above is what limits guessing.
+- **Set** from the repo root: `python -m src.password set` prompts twice and never takes the password as an argument, echoes it or logs it. `--stdin` reads one line instead, for the fleet script that sets the same password in every app. `python -m src.password status` says whether a hash is stored. A login reads the file each time, so no restart is needed.
+- **Checked** in the login route, in place of the plaintext compare. `legacy` is the app's old stored value (`""` when it has none):
+
+```python
+from src import password
+
+if not password.is_configured(legacy=cfg.auth_password):
+    raise HTTPException(503, "password auth not configured")
+if not password.check_password(presented, legacy=cfg.auth_password):
+    ...                                                        # record_failure, 401
+```
+
+**Migration without a lock-out.** Until the setter runs there is no stored hash, so the app's old value is checked instead, in constant time. Once a hash is stored, the old value is ignored. To finish an app's migration, run `python -m src.password set` in its repo; the old key in its config can then be deleted by hand.
+
 ## Usage log
 
 The sheet is `data-track-view="sign-in"` and its primary is `data-track="sign-in-submit"`, so the usage log records each open, its time on screen and each submit. The password, the hint and the server reply are never recorded.

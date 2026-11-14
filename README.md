@@ -35,6 +35,7 @@ Clone this directory, rename it, and start building.
 - `app/webapp/serve.py` — vendor-verbatim HTTP/2 launch module (manifest key `webapp_serve`): `python -m app.webapp.serve` serves the app with hypercorn (`h2` + `http/1.1` by ALPN over the TLS cert) and keeps `--server uvicorn` as the HTTP/1.1 fallback. See [`docs/webapp-pwa-conventions.md`](docs/webapp-pwa-conventions.md) ("Webapp PWA HTTP/2 launch").
 - `src/compression.py` — vendor-verbatim stream-safe gzip middleware (manifest key `compression`). See [`docs/webapp-pwa-conventions.md`](docs/webapp-pwa-conventions.md).
 - `src/login_lockout.py` — vendor-verbatim per-client login lock-out: `429` + `Retry-After` after repeated wrong passwords, one owner alert per guessing streak (manifest key `login_lockout`). See the sign-in sheet's [README](app/webapp/static/_vendored/sign-in/README.md) ("Server side").
+- `src/password.py` — vendor-verbatim app sign-in password (manifest key `password`): one salted PBKDF2 hash in the git-ignored `config/app_password.json`, `check_password()` for the login route (the app's old value still works until the setter runs), and `python -m src.password set` to set it. See the sign-in sheet's [README](app/webapp/static/_vendored/sign-in/README.md) ("The password").
 - `src/no_window.py` — vendor-verbatim `CREATE_NO_WINDOW` subprocess-flag definitions, `NO_WINDOW` and `NEW_GROUP_NO_WINDOW` for a `CTRL_BREAK_EVENT` child (manifest key `no_window`); a file copied byte-identical into adopters (e.g. `_browser_sweep.py`, `classify_e2e.py`) keeps its own local flag instead, since importing this module would not resolve there. See `CLAUDE.md` ("Windows console-subprocess suppression").
 - `src/runtime_data.py` — vendor-verbatim runtime-data location resolver (manifest key `runtime_data`), so always-on SQLite writes land on a fast local drive. See `CLAUDE.md` ("Runtime data lives on a fast drive").
 - `src/fleet_root.py` — vendor-verbatim fleet-root resolver (manifest key `fleet_root`): `fleet_root()` from `FLEET_ROOT`, a machine-local config, or the checkout's parent, never a drive letter. See [`docs/conventions-ratchet.md`](docs/conventions-ratchet.md) (`no-drive-path`).
@@ -133,6 +134,7 @@ src/
   usage_log_starlette.py    vendor-verbatim Starlette route + owner-only reads for the usage log
   compression.py            vendor-verbatim stream-safe gzip middleware
   login_lockout.py          vendor-verbatim per-client login lock-out (429 + Retry-After) + guessing alert
+  password.py               vendor-verbatim app password: PBKDF2 hash store, check, `python -m src.password set`
   resource_probe.py         vendor-verbatim thread/handle/RSS sampler + runtime breadcrumb
   build_info.py             vendor-verbatim process build-identity capture (git_sha + built_at, captured once at import)
   notify/                   vendor-verbatim Telegram notifier (send_text + factory/config)
