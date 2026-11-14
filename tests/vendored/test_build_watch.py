@@ -103,3 +103,9 @@ def test_unknown_is_never_stale(probe: dict[str, Any], case: str) -> None:
 
 def test_a_callers_own_reader_replaces_fetch(probe: dict[str, Any]) -> None:
     assert probe["ownReader"] == {"started": True, "urls": ["/x/version"], "fetchCalls": 0}
+
+
+def test_the_entry_module_stamp_is_the_boot_build(probe: dict[str, Any]) -> None:
+    # Live == the entry script's stamp is current even though a stylesheet
+    # carries a different per-file stamp; live == that stylesheet stamp is stale.
+    assert probe["entry"] == {"eee": False, "sss": True}
