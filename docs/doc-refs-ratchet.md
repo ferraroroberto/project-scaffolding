@@ -16,6 +16,7 @@ Read outside fenced code blocks and HTML comments, line by line:
 | `module` | The token after `-m` in an inline code span, when its first segment is a tracked top-level folder or a root `.py` file | `` `python -m scripts.classify_e2e` `` |
 | `link` | A relative Markdown link or image target, a reference definition, an `href` or `src` attribute, resolved from the doc's own folder | `[guide](../README.md)` |
 | `port` | `localhost:N`, `127.0.0.1:N`, `0.0.0.0:N` or `[::1]:N` anywhere on the line, or an inline code span that is only `:N` | `` `127.0.0.1:8447` ``, `` `:8447` `` |
+| `tree` | An entry of a fenced layout tree, with `trees = true` only. Resolved under the tree's root and reported by its repo-relative path, exactly as an inline mention of it would be (see [Layout trees](#layout-trees)) | `├── scripts/` then `│   └── old.py` |
 | `retired` | A term the repo lists in `retired`, anywhere in the text: prose, inline code and fenced blocks alike. It is never resolved; every occurrence is a hit | `--old-flag`, `/old-skill`, `OLD_ENV_VAR` |
 
 Before resolving, a path drops its `./` prefix and any line, symbol or test-id suffix (`:12`, `:12-30`, `#L12`, `:func`, `::test_x[param]`); backslashes become slashes. A link drops its `#fragment` and `?query` and is URL-decoded.
@@ -37,7 +38,8 @@ The tree of record is `git ls-files --cached --others --exclude-standard` (spawn
 | Placeholders, globs and variables | `<`, `>`, `*`, `?`, `{}`, `[]`, `$`, `%`, `\|`, `=`, `…` or `...` in the token |
 | Absolute, home and drive paths, URLs, `..` segments in a span | Machine-local, or not a claim about this tree |
 | A link that leaves the repo | `../../other-repo/x.md` points at a sibling checkout this stage cannot see |
-| Fenced code blocks (for paths, modules, links and ports) | Example trees, sample config and command transcripts are full of paths the reader creates; the cost is that a stale command inside a fence is not caught |
+| Fenced code blocks (for paths, modules, links and ports) | Sample config and command transcripts are full of paths the reader creates; the cost is that a stale command inside a fence is not caught. A fenced layout tree is the one exception, and only when `trees = true` ([Layout trees](#layout-trees)) |
+| The reverse of a tree: a folder on disk that a tree omits | Trees are routinely partial on purpose, and a precise check needs an explicit "complete listing" marker; not built |
 | Skills, slash commands, environment variables | Their source of truth is outside the repo (user-scope skill folders, the shell) |
 | `stdlib` and installed modules | `python -m pytest` names someone else's module |
 
@@ -48,6 +50,27 @@ The tree of record is `git ls-files --cached --others --exclude-standard` (spawn
 - **An intentional pointer cannot be told from a stale one.** A doc that tells the reader to create a file (`docs/layout.md` in an adopter, a workflow copied from a template) names a path that does not exist on purpose. Put it in `allow_refs`.
 - **Code spans do not continue across lines.** A backtick run with no partner on its own line is literal text.
 - **Indented code blocks are read as prose.** They cannot be told from list continuation.
+
+## Layout trees
+
+A README's fenced `├──` / `└──` diagram is a claim about the tree on disk, and it goes stale when a folder is renamed. With `trees = true` the stage reads those diagrams too:
+
+```text
+acme/
+├── api/
+│   ├── routes.py            # comments and descriptions after the name are ignored
+│   └── legacy/
+└── web/
+    └── static/
+```
+
+- **Which blocks.** A fence whose info string is empty or `text`, `txt`, `tree`, `plain` or `plaintext`; a `python`, `json` or `mermaid` fence is never a tree. Lines are read when they carry the two-dash connector (`├──` or `└──`), so a one-dash `└─` DOM or flow diagram is not a tree. A block needs at least two entries. The fence may sit inside a list item or a blockquote.
+- **Nesting** comes from the column of the connector, so 2-, 3- and 4-wide indents, `│` guide lines and `│   # comment` continuation lines all read the same.
+- **Entry names.** Only the first token after the connector is read (`a.bat / b.bat` checks `a.bat`), and a trailing `/` is dropped. A token that is not a plain path (a placeholder, `…`, `...`, a glob, a `~`, absolute or `..` path, markdown) is skipped together with everything below it. Reading less than the line says is the safe side.
+- **Root.** The first non-blank line before the first connector is the root label. A label that is a tracked folder (`tests/`) re-bases the tree there; anything else (`.`, `./`, the repo's name, no label) is the repo root.
+- **Anchoring.** A tree whose top-level entries include none that exist is another repo's tree, an excerpt or a diagram. It is skipped, never passed silently: the pass line says `N layout tree(s) checked, M not anchored, skipped`. The example above is skipped for that reason.
+- **Resolution.** An entry resolves when it is a tracked file or a folder holding one, by exact name (no `.py` shorthand: it would hide a stale folder name behind a same-named script), or when git ignores it. A missing entry is reported as `tree` under its repo-relative path and takes its subtree with it, so a renamed folder is one finding, not one per child. The path is the baseline key and the `allow_refs` match, so an existing `allow_refs = ["data"]` covers a `data/` entry exactly as it covers an inline mention.
+- **Off by default.** `trees` defaults to `false`: re-vendoring the script changes nothing for an adopter until it sets `trees = true` and records its first baseline.
 
 ## Retired names
 
@@ -130,6 +153,7 @@ Re-vendoring the script never breaks a repo that has not opted in: an absent `[d
    exclude    = ["docs/reports/**"]                 # globs, e.g. generated per-run reports
    allow_refs = [":8000", ":8090"]                  # globs; another service's port, a file adopters create
    retired    = [{ term = "--old-flag", why = "flag removed; use --new-flag" }]  # optional; see Retired names
+   trees      = true                                 # optional, default false; see Layout trees
    ```
 
 3. If the repo serves an app, list the ports of the other services its docs name in `allow_refs` first: a fleet web app names one to seven of them, the hub repo eighteen. Then run `python scripts/doc_refs_ratchet.py --init`, review the baseline, and commit it. Each entry is either a real stale reference worth a follow-up fix or an intentional pointer worth an `allow_refs` line. **Adoption never requires the fixes first.**
@@ -150,6 +174,12 @@ A read-only dry run with the default configuration over every fleet checkout (42
 
 Of the 2,500 hits the first draft reported, about 2,000 came from bare file names, about 165 from test ids and symbol suffixes, and about 75 from cross-repo pointers, placeholders and ignored folders, which is why those classes are skipped. Precision on paths is therefore about one in four fleet-wide, and nearly one in two (19 of 41) outside the scaffold and its configuration siblings: the first `--init` absorbs the rest, and each new false positive costs one `allow_refs` line.
 
+### Layout trees, measured
+
+A read-only dry run with `trees = true` over every fleet checkout (43 repos) checked 28 layout trees, skipped 4 as not anchored (a flow diagram, a DOM nesting, a subtree excerpt) and reported 9 stale entries in 4 repos, after the ignore probe. Eight of the nine name runtime output folders a clean checkout never has (`data/`, `logs/`, `models/` and similar), which one `allow_refs` line each absorbs; one names a file that is not in the checkout. So the first `--init` per adopter is a small, reviewable baseline. Opting a repo in is its own step: set `trees = true`, run `--update-baseline --allow-additions`, review the diff.
+
 ## Tests
+
+`tests/ratchets/test_doc_refs_trees.py` covers the layout trees: nesting at every indent width, root forms, placeholders and skipped subtrees, unanchored trees, which fences are read, list-item, blockquote and CRLF text, and the switch on throwaway git repos (default off, a stale entry fails, ignored and `allow_refs` entries, the baseline shrink, a non-bool `trees` exits 2).
 
 `tests/ratchets/test_doc_refs_ratchet.py`: extraction on fixture strings (what counts as a path, module, link or port; the placeholders, qualifiers, URLs, fences and comments that do not), resolution (files, folders, `.py` shorthand, symbols in modules and packages, module forms, the declared port), scope, and every mode and exit code on throwaway git repos, including ignored paths and folders, `allow_refs` globs and the port check. A missing prerequisite is a hard failure there, never `pytest.skip`. The scaffold's own gate stage doubles as the guard that its committed baseline is current, and a test pins that this page carries no dangling reference itself. The retired-name tests seed a retired flag and a retired skill name (hit, with its `why`) beside the compliant form and a longer word that contains the term (no hit), and cover the malformed entries, the baseline shrink, `allow_refs`, and the `SKILL.md` scope.

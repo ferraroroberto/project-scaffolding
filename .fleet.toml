@@ -466,9 +466,11 @@ repeated_text_exclude = ["docs/agents/CLAUDE.master.md"]
 # [instruction_ratchet]. `allow_refs` lists intentional pointers: here, the files
 # an adopter creates from the scaffold's templates and instructions, and the
 # folders a shape's contract names in docs/repo-layout.md that this tree lacks.
+# `trees` also checks the fenced layout trees (off by default for adopters).
 # Mechanism + limits: docs/doc-refs-ratchet.md.
 [doc_refs_ratchet]
 enabled    = true
+trees      = true
 allow_refs = [
     "docs/layout.md",
     "tests/fixtures",
