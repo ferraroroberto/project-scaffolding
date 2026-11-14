@@ -88,7 +88,7 @@ A hit is a spawn (the same calls as `no-window`) whose program is literally `git
 
 There is **no global-instruction line** for this rule. It enforces the scaffold's component contract: every web app that asks for its own password does it through the one vendored sign-in sheet (`app/webapp/static/_vendored/sign-in/`), never its own modal.
 
-It is the only rule that reads web files rather than Python: `.html`, `.htm`, `.js`, `.mjs`, `.cjs`, `.ts`, `.jsx`, `.tsx`, `.vue`, `.svelte`, `.jinja`, `.jinja2` and `.j2`. A hit is a line that makes a password input: `type="password"` (any quote, or none), `type: 'password'`, `el.type = 'password'`, or `setAttribute('type', 'password')`. It is not reported:
+It reads web files rather than Python (as `nav-standalone-head` does): `.html`, `.htm`, `.js`, `.mjs`, `.cjs`, `.ts`, `.jsx`, `.tsx`, `.vue`, `.svelte`, `.jinja`, `.jinja2` and `.j2`. A hit is a line that makes a password input: `type="password"` (any quote, or none), `type: 'password'`, `el.type = 'password'`, or `setAttribute('type', 'password')`. It is not reported:
 
 - inside a `_vendored/sign-in/` folder, wherever the app copied it: the component is the one place the field may live;
 - in a test file or anything under a `tests/` or `test/` folder (a bespoke modal fixture is how the rule is proven red);
@@ -104,6 +104,19 @@ A password field that is not this app's own sign-in keeps its own markup under a
 ```
 
 **Enabling it in an app with a bespoke modal today.** Add `"password-input-vendored"` to `rules` and record today's hit with `--update-baseline --allow-additions` (or `--init` when there is no baseline yet). Moving the app onto the sheet removes the hit, and `--update-baseline` shrinks the baseline to zero.
+
+### `nav-standalone-head`
+
+There is **no global-instruction line** for this rule. It enforces the vendored nav's page-head contract (`app/webapp/static/_vendored/nav/README.md`, step 4): a page that links the nav's `nav-tabs.css` also carries a viewport meta with `viewport-fit=auto` and the `apple-mobile-web-app-status-bar-style` meta set to `black-translucent`. The pill's bottom offset and the top glass are written for that head. Under `viewport-fit=cover` the installed iPhone app's web view runs under the home indicator, so the pill lands on the screen's bottom edge instead of above it, and the apps stop matching each other.
+
+It reads the same web files as `password-input-vendored`, and only a file that links `nav-tabs.css` (`<link ... href="...nav-tabs.css...">`) owes the head. A hit is a viewport meta without `viewport-fit=auto` among its comma-separated values, a status-bar meta with any other content, or either meta missing (reported at the stylesheet's line). A meta tag spread across lines is read whole. A head written by Python or assembled in JavaScript is not seen.
+
+A page that is never installed (a browser-only debug view) keeps its head under a marker with the reason, in the comment block right above the reported line:
+
+```html
+<!-- nav-standalone-head-exempt: browser-only debug page, never installed on a phone -->
+<meta name="viewport" content="width=device-width, initial-scale=1">
+```
 
 ### `login-lockout`
 
@@ -324,7 +337,7 @@ return subprocess.run(cmd, cwd=str(PROJECT_ROOT)).returncode
 
 ## Scope
 
-Every `.py` file git lists (tracked, or untracked and not ignored), every web file for `password-input-vendored`, every `.js`, `.mjs`, `.cjs`, `.ts`, `.jsx` and `.tsx` file for the three state rules (not minified bundles or test modules), and every `.md`, `.ps1`, `.bat`, `.cmd`, `.toml`, `.json`, `.yml` and `.yaml` file for `no-pwsh-stub` (only while that rule is listed), except:
+Every `.py` file git lists (tracked, or untracked and not ignored), every web file for `password-input-vendored` and `nav-standalone-head`, every `.js`, `.mjs`, `.cjs`, `.ts`, `.jsx` and `.tsx` file for the three state rules (not minified bundles or test modules), and every `.md`, `.ps1`, `.bat`, `.cmd`, `.toml`, `.json`, `.yml` and `.yaml` file for `no-pwsh-stub` (only while that rule is listed), except:
 
 - files under the repo's `[vendored]` destinations: a vendored copy's debt belongs to the repo it came from;
 - the `exclude` globs, plus `node_modules`, `.venv` and `venv` anywhere.

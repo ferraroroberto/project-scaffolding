@@ -353,6 +353,55 @@ def test_a_web_exempt_marker_needs_the_rule_and_a_reason() -> None:
         cr.scan_source(b"x = 'caf\xe9'\n", "src/latin.py", frozenset())
 
 
+# ------------------------------------------------------------- nav-standalone-head
+
+_NAV_LINK = '<link rel="stylesheet" href="/static/_vendored/nav/nav-tabs.css?v=1">'
+_STANDALONE_HEAD = (
+    '<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=auto">\n'
+    '<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">\n'
+)
+_COVER_HEAD = (
+    '<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">\n'
+    '<meta name="apple-mobile-web-app-status-bar-style" content="default">\n'
+)
+
+
+def test_a_nav_page_with_the_standalone_head_passes() -> None:
+    assert web_hits(f"<head>\n{_STANDALONE_HEAD}{_NAV_LINK}\n</head>\n") == []
+
+
+def test_a_nav_page_with_the_cover_head_fails_on_both_metas() -> None:
+    assert web_hits(f"<head>\n{_COVER_HEAD}{_NAV_LINK}\n</head>\n") == [
+        "nav-standalone-head:2", "nav-standalone-head:3"]
+
+
+def test_a_nav_page_missing_the_metas_fails_at_the_stylesheet() -> None:
+    assert web_hits(f"<head>\n{_NAV_LINK}\n</head>\n") == ["nav-standalone-head:2", "nav-standalone-head:2"]
+
+
+def test_the_head_is_owed_only_by_a_page_that_links_the_nav() -> None:
+    assert web_hits(f"<head>\n{_COVER_HEAD}</head>\n") == []
+    nav_off = cr.Config(cr.DEFAULT_BASELINE, ("password-input-vendored",))
+    assert web_hits(f"<head>\n{_COVER_HEAD}{_NAV_LINK}\n</head>\n", cfg=nav_off) == []
+
+
+def test_a_multi_line_meta_and_spacing_are_read() -> None:
+    head = ('<meta name="viewport"\n      content="width=device-width, viewport-fit = auto">\n'
+            "<meta content='black-translucent' name='apple-mobile-web-app-status-bar-style'>\n")
+    assert web_hits(f"{head}{_NAV_LINK}\n") == [], "spacing around = and attribute order do not matter"
+    wrapped = '<meta name="viewport"\n      content="width=device-width, viewport-fit=cover">\n'
+    status = '<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">\n'
+    assert web_hits(f"{wrapped}{status}{_NAV_LINK}\n") == ["nav-standalone-head:1"]
+
+
+def test_a_nav_head_exempt_marker_needs_a_reason() -> None:
+    reason = "a browser-only debug page, never installed"
+    page = f"<!-- nav-standalone-head-exempt: {reason} -->\n{_COVER_HEAD}{_NAV_LINK}\n"
+    assert web_hits(page) == ["nav-standalone-head:3"], "the marker covers only the line right below it"
+    bare = f"<!-- nav-standalone-head-exempt -->\n{_COVER_HEAD}{_NAV_LINK}\n"
+    assert web_hits(bare) == ["nav-standalone-head:2", "nav-standalone-head:3"]
+
+
 # ------------------------------------------------------------- login-lockout
 
 _ROUTER = "from fastapi import APIRouter\n\nrouter = APIRouter()\n"
