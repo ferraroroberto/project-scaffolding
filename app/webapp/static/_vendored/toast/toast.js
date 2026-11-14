@@ -4,18 +4,21 @@
  * nothing here varies between apps. Normalized from app-launcher's `toast()`
  * (api.js), decoupled from that app's element cache and icon helper.
  *
- * Pairs with toast.css. The message is written with `textContent`, never as
- * HTML, so a caller can pass server text without escaping it.
+ * Pairs with toast.css. The message is written as a text node, never as HTML,
+ * so a caller can pass server text without escaping it.
  */
 
 'use strict';
 
 const DEFAULT_MS = 2200;
 const ERROR_MS = 4500;
+const SVG_NS = 'http://www.w3.org/2000/svg';
 
-let timer = null;
+// One timer per toast element: the page's toast and each sheet's own toast
+// hide independently.
+const timers = new WeakMap();
 
-/** The one toast element: the page's own `#toast`, else one created on demand. */
+/** The page's one toast element: its own `#toast`, else one created on demand. */
 function toastEl() {
   let el = document.getElementById('toast');
   if (!el) {
@@ -28,6 +31,23 @@ function toastEl() {
   return el;
 }
 
+/** The vendored `icons` markup (`<svg class="icon"><use href="#i-NAME">`), built as nodes. */
+function glyph(name) {
+  const svg = document.createElementNS(SVG_NS, 'svg');
+  svg.setAttribute('class', 'icon');
+  svg.setAttribute('aria-hidden', 'true');
+  const use = document.createElementNS(SVG_NS, 'use');
+  use.setAttribute('href', '#i-' + name);
+  svg.appendChild(use);
+  return svg;
+}
+
+function clearTimer(el) {
+  const t = timers.get(el);
+  if (t) clearTimeout(t);
+  timers.delete(el);
+}
+
 /**
  * Show the toast for a user-initiated command's result. A new toast replaces
  * the one on screen and restarts the timer.
@@ -36,28 +56,36 @@ function toastEl() {
  * @param {'error'} [kind]  only `'error'` is styled: it tints and interrupts
  *        screen readers (`aria-live="assertive"`). Anything else renders
  *        neutral and polite; success, info and warning never take a colour.
- * @param {{ms?: number}} [opts]  `ms` overrides how long it stays (2200 for a
- *        message, 4500 for an error); `0` keeps it until the next call.
+ * @param {{ms?: number, icon?: string, host?: HTMLElement}} [opts]
+ *        `ms` overrides how long it stays (2200 for a message, 4500 for an
+ *        error); `0` keeps it until the next call. `icon` is a glyph name from
+ *        the page's vendored `icons` sprite, drawn before the message. `host`
+ *        is a toast element inside an open modal <dialog> (class
+ *        `sheet-toast`), used instead of the page's toast, which a dialog's
+ *        top layer would cover.
  * @returns {HTMLElement} the toast element.
  */
 export function showToast(message, kind, opts) {
-  const el = toastEl();
+  const host = opts && opts.host;
+  const el = host || toastEl();
   const isError = kind === 'error';
-  el.textContent = message;
-  el.className = isError ? 'toast error' : 'toast';
+  el.replaceChildren();
+  if (opts && opts.icon) el.append(glyph(opts.icon), ' ');
+  el.append(message == null ? '' : String(message));
+  el.className = (host ? 'sheet-toast' : 'toast') + (isError ? ' error' : '');
   el.setAttribute('role', 'status');
   el.setAttribute('aria-live', isError ? 'assertive' : 'polite');
   el.hidden = false;
-  if (timer) clearTimeout(timer);
+  clearTimer(el);
   const ms = opts && typeof opts.ms === 'number' ? opts.ms : (isError ? ERROR_MS : DEFAULT_MS);
-  timer = ms > 0 ? setTimeout(hideToast, ms) : null;
+  if (ms > 0) timers.set(el, setTimeout(() => hideToast(host), ms));
   return el;
 }
 
-/** Hide the toast now. */
-export function hideToast() {
-  if (timer) clearTimeout(timer);
-  timer = null;
-  const el = document.getElementById('toast');
-  if (el) el.hidden = true;
+/** Hide a toast now: the given sheet toast, else the page's. */
+export function hideToast(host) {
+  const el = host || document.getElementById('toast');
+  if (!el) return;
+  clearTimer(el);
+  el.hidden = true;
 }

@@ -28,10 +28,14 @@ The fleet's one transient message, for the result of a user-initiated command ("
 showToast('Saved');                                  // neutral, polite, 2.2 s
 showToast('Could not reach the server', 'error');    // tinted, assertive, 4.5 s
 showToast('Uploading…', undefined, { ms: 0 });       // stays until the next toast or hideToast()
+showToast('Link copied', undefined, { icon: 'copy' }); // a leading glyph from the page's icons sprite
+showToast('Sent', undefined, { host: sheetToastEl }); // inside an open modal sheet
 ```
 
-- **One toast at a time.** A new call replaces the one on screen and restarts the timer.
-- **Plain text only.** The message is set with `textContent`, so server text needs no escaping. A toast carries no icon, no action and no HTML; a message that needs those is an inline status or a modal.
+- **One toast at a time.** A new call replaces the one on screen and restarts the timer. Each sheet toast keeps its own timer.
+- **Plain text only.** The message is written as a text node, so server text needs no escaping. A toast carries no action and no HTML; a message that needs those is an inline status or a modal.
+- **Optional leading glyph.** `opts.icon` names a glyph in the page's vendored `icons` sprite (`'copy'` draws `#i-copy`); it takes the text colour, so it tints with an error. The page needs the sprite and the `.icon` rule (`icons/README.md`).
+- **Inside a modal sheet.** A `<dialog>` opened with `showModal()` sits in the top layer, above any `z-index`, so the page's toast is hidden behind it. A sheet that confirms an action carries its own element, `<div class="sheet-toast" role="status" aria-live="polite" hidden></div>`, as the first child of its `.detail-actions` footer (the vendored `modal`'s sticky footer is its positioned ancestor), and passes it as `opts.host`. It rides 8px above the footer, inset by the footer's 18px padding. `hideToast(host)` hides that one.
 - **Only `'error'` is a kind.** Any other value (or none) renders the neutral toast. There is deliberately no success variant: do not add a green one, and do not tint a warning.
 - **Live region.** `showToast()` sets `role="status"` and `aria-live` (`assertive` for the error, `polite` otherwise) without moving focus. If you ship the `toast.html` skeleton, that is the element it uses (`id="toast"`).
 - **Failure copy is sanitized** — no hostnames, URLs, exception classes or timeout internals in the message; the logs keep the detail (design.md, feedback altitude).
@@ -43,6 +47,7 @@ showToast('Uploading…', undefined, { ms: 0 });       // stays until the next t
 - `width: max-content` with `max-width: min(100vw - 24px, 560px)`: one line whenever the message fits. Without `max-content` the box shrinks to the 50vw left of its anchor and wraps at half the screen. `text-wrap: balance` splits a longer message evenly.
 - `padding: 12px 18px`, `font-size: var(--font-label)`, weight 700, line-height 1.5, centred.
 - `z-index: 400`, above a full-screen overlay or modal backdrop.
+- `.sheet-toast` keeps the same glass and type but is `position: absolute`, `bottom: calc(100% + 8px)` of its positioned footer, `inset-inline: 18px` with `width: fit-content` and `margin-inline: auto`, so it centres over the footer's buttons inside the sheet.
 
 ## Required design tokens
 
