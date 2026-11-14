@@ -675,7 +675,7 @@ run_git("status")
 
 #### `password-input-vendored`
 
-A password input (`type="password"`, `type: 'password'`, `.type = 'password'`, `setAttribute('type', 'password')`) in a web file outside a `_vendored/sign-in/` folder: every app's sign-in goes through the one vendored component. The only rule that reads web files (`.html`, `.htm`, `.js`, `.mjs`, `.cjs`, `.ts`, `.jsx`, `.tsx`, `.vue`, `.svelte` and the Jinja suffixes), and it reads no `.py`.
+A password input (`type="password"`, `type: 'password'`, `.type = 'password'`, `setAttribute('type', 'password')`) in a web file outside a `_vendored/sign-in/` folder: every app's sign-in goes through the one vendored component. It reads web files (`.html`, `.htm`, `.js`, `.mjs`, `.cjs`, `.ts`, `.jsx`, `.tsx`, `.vue`, `.svelte` and the Jinja suffixes), and it reads no `.py`.
 
 ```html
 <!-- bad -->
@@ -683,6 +683,20 @@ A password input (`type="password"`, `type: 'password'`, `.type = 'password'`, `
 
 <!-- fixed: the app mounts the vendored sign-in sheet and ships no password input of its own -->
 <div data-sign-in></div>
+```
+
+#### `nav-standalone-head`
+
+A page that links the vendored nav's `nav-tabs.css` without the nav's page head: a viewport meta carrying `viewport-fit=auto` and the `black-translucent` status-bar meta. Under `viewport-fit=cover` the installed iPhone app's pill lands on the screen's bottom edge. Reads the same web files as `password-input-vendored`.
+
+```html
+<!-- bad -->
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+
+<!-- fixed -->
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=auto">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 ```
 
 #### `login-lockout`

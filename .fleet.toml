@@ -513,8 +513,8 @@ allow   = [
 # Mechanism + limits: docs/conventions-ratchet.md.
 [conventions_ratchet]
 enabled = true
-rules   = ["no-window", "logging-not-print", "no-drive-path", "password-input-vendored", "login-lockout", "subprocess-timeout",
-           "state-literal", "state-set-repeat", "state-write"]
+rules   = ["no-window", "logging-not-print", "no-drive-path", "password-input-vendored", "nav-standalone-head", "login-lockout",
+           "subprocess-timeout", "state-literal", "state-set-repeat", "state-write"]
 
 # Outbound HTTP goes through the pooled session, not a bare requests call.
 [[conventions_ratchet.must_use]]
