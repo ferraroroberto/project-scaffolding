@@ -350,6 +350,7 @@ app_web/                    the admin web app the service mounts
   routers/  static/
 tray/                       the tray that starts and watches the service
 launchers/                  per-platform start scripts (.bat and .sh)
+assets/deploy/<platform>/   per-platform deploy trees (docker, linux, mac)
 config/                     checked-in config and *.example files
 scripts/
 tests/                      top level
@@ -358,7 +359,7 @@ docs/layout.md
 
 Where new code goes: service logic goes in `src/`, an admin page or endpoint in `app_web/`, tray behaviour in `tray/`. `src/` mounts `app_web/`, so this shape sets no layer pair.
 
-Allowed extra roots: `assets/`. A repo that ships per-platform deploy trees (`linux/`, `mac/`, `docker/`) declares each in `extra_roots`.
+Allowed extra roots: `assets/`, which is untyped, so it holds whatever the service ships (compose files, shell, plist, Swift). A repo that ships per-platform deploy trees puts each under `assets/deploy/<platform>/` (`assets/deploy/docker/`, `assets/deploy/linux/`, `assets/deploy/mac/`) and needs no `extra_roots` entry. Keep each leaf folder name stable, because a Compose project name derives from its directory.
 
 ## Every repo's `docs/layout.md`
 
