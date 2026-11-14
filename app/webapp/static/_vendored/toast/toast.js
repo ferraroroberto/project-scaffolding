@@ -12,6 +12,9 @@
 
 const DEFAULT_MS = 2200;
 const ERROR_MS = 4500;
+// A toast offering an action stays up longer: 4.5 s is enough to read a
+// result, not to notice an Undo, reach it and tap it.
+const ACTION_MS = 10000;
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
 // One timer per toast element: the page's toast and each sheet's own toast
@@ -42,6 +45,21 @@ function glyph(name) {
   return svg;
 }
 
+function actionButton(action, host) {
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'button-ghost toast-action';
+  btn.dataset.track = 'toast.action';
+  btn.textContent = action.label;
+  btn.addEventListener('click', () => {
+    btn.disabled = true;
+    Promise.resolve()
+      .then(() => action.onClick())
+      .finally(() => hideToast(host));
+  });
+  return btn;
+}
+
 function clearTimer(el) {
   const t = timers.get(el);
   if (t) clearTimeout(t);
@@ -56,28 +74,37 @@ function clearTimer(el) {
  * @param {'error'} [kind]  only `'error'` is styled: it tints and interrupts
  *        screen readers (`aria-live="assertive"`). Anything else renders
  *        neutral and polite; success, info and warning never take a colour.
- * @param {{ms?: number, icon?: string, host?: HTMLElement}} [opts]
+ * @param {{ms?: number, icon?: string, host?: HTMLElement,
+ *          action?: {label: string, onClick: () => any}}} [opts]
  *        `ms` overrides how long it stays (2200 for a message, 4500 for an
- *        error); `0` keeps it until the next call. `icon` is a glyph name from
- *        the page's vendored `icons` sprite, drawn before the message. `host`
- *        is a toast element inside an open modal <dialog> (class
- *        `sheet-toast`), used instead of the page's toast, which a dialog's
- *        top layer would cover.
+ *        error, 10000 with an action); `0` keeps it until the next call.
+ *        `icon` is a glyph name from the page's vendored `icons` sprite, drawn
+ *        before the message. `host` is a toast element inside an open modal
+ *        <dialog> (class `sheet-toast`), used instead of the page's toast,
+ *        which a dialog's top layer would cover. `action` is one optional
+ *        button (an Undo): a tap runs `onClick` and hides the toast. Never the
+ *        only way to an outcome, since the toast expires.
  * @returns {HTMLElement} the toast element.
  */
 export function showToast(message, kind, opts) {
   const host = opts && opts.host;
   const el = host || toastEl();
   const isError = kind === 'error';
-  el.replaceChildren();
-  if (opts && opts.icon) el.append(glyph(opts.icon), ' ');
-  el.append(message == null ? '' : String(message));
-  el.className = (host ? 'sheet-toast' : 'toast') + (isError ? ' error' : '');
+  const action = opts && opts.action && opts.action.label ? opts.action : null;
+  const text = document.createElement('span');
+  text.className = 'toast-text';
+  if (opts && opts.icon) text.append(glyph(opts.icon), ' ');
+  text.append(message == null ? '' : String(message));
+  el.replaceChildren(text);
+  if (action) el.append(actionButton(action, host));
+  el.className = (host ? 'sheet-toast' : 'toast') + (isError ? ' error' : '') + (action ? ' has-action' : '');
   el.setAttribute('role', 'status');
   el.setAttribute('aria-live', isError ? 'assertive' : 'polite');
   el.hidden = false;
   clearTimer(el);
-  const ms = opts && typeof opts.ms === 'number' ? opts.ms : (isError ? ERROR_MS : DEFAULT_MS);
+  const ms = opts && typeof opts.ms === 'number'
+    ? opts.ms
+    : (action ? ACTION_MS : (isError ? ERROR_MS : DEFAULT_MS));
   if (ms > 0) timers.set(el, setTimeout(() => hideToast(host), ms));
   return el;
 }

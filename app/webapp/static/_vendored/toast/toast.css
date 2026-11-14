@@ -80,6 +80,29 @@
    contrast under 4.5:1 (2.55:1 over a white page). 75% danger / 25% black
    keeps white text above 4.5:1 in both themes whatever is behind it
    (tests/test_toast_contrast.py). */
+/* With an action (showToast's `opts.action`, one Undo) the message and its
+   button sit on one row, the button inset to the toast's edge like the
+   build-watch prompt's Reload. `hidden` must still win over the flex. */
+.toast.has-action,
+.sheet-toast.has-action {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 6px 6px 18px;
+  text-align: start;
+  text-wrap: pretty;
+}
+
+.toast.has-action[hidden],
+.sheet-toast.has-action[hidden] {
+  display: none;
+}
+
+.toast-action {
+  flex: none;
+  min-height: var(--hit-min, 44px);
+}
+
 .sheet-toast.error,
 .toast.error {
   background: color-mix(in srgb, var(--deficit) 75%, black);

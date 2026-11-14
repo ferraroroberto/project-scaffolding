@@ -648,6 +648,25 @@ def _check_toast_contract(gallery: Page) -> None:
     expect(toast).to_have_text("Link copied")
     gallery.click("#demoToastShow")
     expect(toast.locator("svg")).to_have_count(0)
+    # opts.action: one tracked button on the same row; a tap runs it and hides the toast.
+    gallery.click("#demoToastAction")
+    action = toast.locator("button.toast-action")
+    expect(action).to_have_text("Undo")
+    expect(action).to_have_attribute("data-track", "toast.action")
+    assert _style(gallery, "#toast", "display") == "flex"
+    geo = gallery.evaluate(
+        "() => { const t = document.querySelector('#toast .toast-text').getBoundingClientRect();"
+        " const b = document.querySelector('#toast .toast-action').getBoundingClientRect();"
+        " return { tmid: (t.top + t.bottom) / 2, bmid: (b.top + b.bottom) / 2, h: b.height }; }"
+    )
+    assert abs(geo["tmid"] - geo["bmid"]) <= 1 and geo["h"] >= 44, geo  # one row, a 44px target
+    action.click()
+    expect(gallery.locator("#demoToastUndone")).to_be_visible()
+    expect(toast).to_be_hidden()
+    # The next plain toast drops the action again.
+    gallery.click("#demoToastShow")
+    expect(toast.locator("button")).to_have_count(0)
+    assert _style(gallery, "#toast", "display") == "block"
     # Dark: the same glass over the dark nav-bar fill.
     _set_theme(gallery, "dark")
     assert _style(gallery, "#toast", "backgroundColor") == "rgba(42, 45, 52, 0.55)"
