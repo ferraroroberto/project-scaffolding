@@ -16,6 +16,9 @@ venv/
 # Streamlit
 .streamlit/secrets.toml
 
+# The app password hash (src/password.py)
+config/app_password.json
+
 # Project working data
 data/logs/*
 data/output/*

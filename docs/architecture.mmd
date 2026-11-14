@@ -54,6 +54,7 @@ routing_audit, gen_verify_skill, ios_sim_smoke)"]
     RESOURCEPROBE["resource_probe.py\nsample_process(pid): threads, handles, RSS\nstart_breadcrumb(logger) logs them on an interval\nvendor-verbatim; unreadable = SampleUnavailable, never 0"]
     COMPRESSION["compression.py\nStreamSafeGZipMiddleware, registered last\nvendor-verbatim; never compresses SSE,\nMJPEG, websockets or already-compressed media"]
     LOGINLOCKOUT["login_lockout.py\nLoginLockout: retry_after / record_failure / reset\nvendor-verbatim, stdlib; 5 free, 2 s doubling to 300 s,\nforgotten after 1 h, bounded table, in memory\non_alert once per 3-failure streak, global cooldown\n(server half of _vendored/sign-in/)"]
+    PASSWORD["password.py\ncheck_password / is_configured / set_password\nvendor-verbatim, stdlib; PBKDF2-SHA256 hash in\nconfig/app_password.json (APP_PASSWORD_FILE overrides)\nold plaintext value checked until the setter runs\npython -m src.password set | status"]
   end
   VIEWS -->|orchestrates, business logic stays here| PIPELINES
   VIEWS --> LOGGER
@@ -64,6 +65,7 @@ routing_audit, gen_verify_skill, ios_sim_smoke)"]
   LOGGER -->|writes| DATALOGS
   PIPELINES -.->|optional| NOTIFY
   LOGINLOCKOUT -.->|on_alert, wired by the app| NOTIFY
+  LOGINLOCKOUT -.->|guards the check, in the app's login route| PASSWORD
 
   DATALOGS["data/\nlogs/app.log, input/, output/\n(gitignored)"]
 
