@@ -409,7 +409,7 @@ python -m venv .venv
 
 ### Doc references ratchet
 
-[doc-refs-ratchet.md](doc-refs-ratchet.md). Reads `README.md`, `CLAUDE.md` and `docs/**/*.md` (override with `include`), outside fenced blocks and HTML comments, and resolves each reference against the tracked tree. A path resolves when it is a tracked file, a folder holding one, or git-ignored. Not checked: placeholders (`<name>`, `*`, `{a,b}`, `$VAR`), absolute and home paths, URLs, links that leave the repo, bare file names, and paths whose first segment is not a tracked root folder. Except by `allow_refs`, globs over the reported text, for an intentional pointer (a file an adopter creates, another service's port).
+[doc-refs-ratchet.md](doc-refs-ratchet.md). Reads `README.md`, `CLAUDE.md` and `docs/**/*.md` (override with `include`), outside fenced blocks (except layout trees, with `trees = true`) and HTML comments, and resolves each reference against the tracked tree. A path resolves when it is a tracked file, a folder holding one, or git-ignored. Not checked: placeholders (`<name>`, `*`, `{a,b}`, `$VAR`), absolute and home paths, URLs, links that leave the repo, bare file names, and paths whose first segment is not a tracked root folder. Except by `allow_refs`, globs over the reported text, for an intentional pointer (a file an adopter creates, another service's port).
 
 ```toml
 [doc_refs_ratchet]
@@ -418,6 +418,7 @@ include    = ["README.md", "CLAUDE.md", "docs/"]
 exclude    = ["docs/reports/**"]
 allow_refs = ["docs/layout.md", ":8000"]
 retired    = [{ term = "--old-flag", why = "flag removed; use --new-flag" }]
+trees      = true   # also check fenced layout trees; default false
 ```
 
 #### `path`
@@ -463,6 +464,16 @@ Any occurrence, on word boundaries, in prose, code spans and fences alike, of a 
 ```
 # bad:   Pass `--old-flag` to enable it.
 # fixed: Pass `--new-flag` to enable it.
+```
+
+#### `tree`
+
+An entry of a fenced layout tree (`├──` / `└──` lines in a `text` or unlabelled fence) that does not exist under the tree's root. A missing folder is one finding, not one per child; a tree with no top-level entry on disk is another repo's or an excerpt and is skipped and counted. **Default:** off, set `trees = true` to enable.
+
+```
+# bad:   ├── tests/
+#        │   └── data/          (the folder is now tests/fixtures/)
+# fixed: │   └── fixtures/
 ```
 
 ## Dead and duplicate code

@@ -28,7 +28,7 @@ TEXT = CATALOG.read_text(encoding="utf-8")
 NAMED_IN_CODE = (
     "comment-issue-reference", "docstring-issue-reference", "history-phrase", "history-pattern", "extra-history-pattern",
     "readme-size", "doc-issue-reference", "dated-heading", "heading-changelog",
-    "path", "module", "link", "port", "retired",
+    "path", "module", "link", "port", "retired", "tree",
     "dead-definition",
     "duplicate-block", "F401", "F841",
     "near-limit-files", "near-limit-functions", "root-layout",
