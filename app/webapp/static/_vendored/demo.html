@@ -254,6 +254,7 @@
         <span class="demo-row-note" id="demoRowNote">Optional note</span>
       </div>
       <div class="detail-actions">
+        <div id="demoSheetToast" class="sheet-toast" role="status" aria-live="polite" hidden></div>
         <button type="button" class="button-primary detail-save-btn" id="demoSaveBtn" disabled>Save</button>
       </div>
     </div>
@@ -629,6 +630,9 @@
   <div class="card" style="display: flex; gap: var(--space-sm);">
     <button type="button" class="button-tint" id="demoToastShow">Show toast</button>
     <button type="button" class="button-tint" id="demoToastError">Show error</button>
+    <button type="button" class="button-tint" id="demoToastIcon">Show with icon</button>
+    <button type="button" class="button-tint" id="demoToastAction">Show with action</button>
+    <span id="demoToastUndone" hidden>Undone</span>
   </div>
 
   <h2>rec-wave (idle, live, silent mic, reduced motion, no Web Audio)</h2>
@@ -805,6 +809,15 @@
   });
   document.getElementById('demoToastError').addEventListener('click', () => {
     showToast('Could not reach the server', 'error', { ms: 0 });
+  });
+  document.getElementById('demoToastIcon').addEventListener('click', () => {
+    showToast('Link copied', undefined, { ms: 0, icon: 'copy' });
+  });
+  document.getElementById('demoToastAction').addEventListener('click', () => {
+    showToast('Snoozed until tomorrow', undefined, { ms: 0, action: {
+      label: 'Undo',
+      onClick: () => { document.getElementById('demoToastUndone').hidden = false; },
+    } });
   });
 
   // row-menu: the items are data. One hidden, one disabled (with its hint) and

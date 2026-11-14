@@ -642,10 +642,65 @@ def _check_toast_contract(gallery: Page) -> None:
     # The next neutral toast drops the tint again.
     gallery.click("#demoToastShow")
     assert _style(gallery, "#toast", "backgroundColor") == "rgba(255, 255, 255, 0.62)"
+    # opts.icon draws the sprite glyph before the text, as nodes, and the text stays plain.
+    gallery.click("#demoToastIcon")
+    expect(toast.locator("svg.icon use")).to_have_attribute("href", "#i-copy")
+    expect(toast).to_have_text("Link copied")
+    gallery.click("#demoToastShow")
+    expect(toast.locator("svg")).to_have_count(0)
+    # opts.action: one tracked button on the same row; a tap runs it and hides the toast.
+    gallery.click("#demoToastAction")
+    action = toast.locator("button.toast-action")
+    expect(action).to_have_text("Undo")
+    expect(action).to_have_attribute("data-track", "toast.action")
+    assert _style(gallery, "#toast", "display") == "flex"
+    geo = gallery.evaluate(
+        "() => { const t = document.querySelector('#toast .toast-text').getBoundingClientRect();"
+        " const b = document.querySelector('#toast .toast-action').getBoundingClientRect();"
+        " return { tmid: (t.top + t.bottom) / 2, bmid: (b.top + b.bottom) / 2, h: b.height }; }"
+    )
+    assert abs(geo["tmid"] - geo["bmid"]) <= 1 and geo["h"] >= 44, geo  # one row, a 44px target
+    action.click()
+    expect(gallery.locator("#demoToastUndone")).to_be_visible()
+    expect(toast).to_be_hidden()
+    # The next plain toast drops the action again.
+    gallery.click("#demoToastShow")
+    expect(toast.locator("button")).to_have_count(0)
+    assert _style(gallery, "#toast", "display") == "block"
     # Dark: the same glass over the dark nav-bar fill.
     _set_theme(gallery, "dark")
     assert _style(gallery, "#toast", "backgroundColor") == "rgba(42, 45, 52, 0.55)"
     assert _style(gallery, "#toast", "color") == "rgb(230, 237, 243)"
+
+
+def _check_sheet_toast_contract(gallery: Page) -> None:
+    """opts.host: the toast inside an open modal sheet rides above its footer, visible over the top layer."""
+    gallery.click("#openModalBtn")
+    expect(gallery.locator("#demoDialog")).to_be_visible()
+    gallery.evaluate(
+        "async () => { const m = await import('./toast/toast.js');"
+        " m.showToast('Sent', 'error', { ms: 0, host: document.getElementById('demoSheetToast') }); }"
+    )
+    sheet = gallery.locator("#demoSheetToast")
+    expect(sheet).to_be_visible()
+    expect(sheet).to_have_class("sheet-toast error")
+    expect(sheet).to_have_attribute("aria-live", "assertive")
+    # The page's own toast is untouched: the sheet carries its own.
+    expect(gallery.locator("#toast")).to_have_count(0)
+    assert _style(gallery, "#demoSheetToast", "position") == "absolute"
+    assert "blur(20px)" in _style(gallery, "#demoSheetToast", "backdropFilter")
+    geo = gallery.evaluate(
+        "() => { const t = document.getElementById('demoSheetToast').getBoundingClientRect();"
+        " const f = document.querySelector('#demoDialog .detail-actions').getBoundingClientRect();"
+        " return { gap: f.top - t.bottom, mid: (t.left + t.right) / 2, fmid: (f.left + f.right) / 2 }; }"
+    )
+    assert abs(geo["gap"] - 8) <= 1, geo  # 8px above the footer
+    assert abs(geo["mid"] - geo["fmid"]) <= 1, geo  # centred over it
+    gallery.evaluate(
+        "async () => { const m = await import('./toast/toast.js');"
+        " m.hideToast(document.getElementById('demoSheetToast')); }"
+    )
+    expect(sheet).to_be_hidden()
 
 
 # ---------------------------------------------------------------------- dark
@@ -810,6 +865,8 @@ def test_gallery_component_contracts(new_gallery: Callable[[], AbstractContextMa
             _check_select_native_contract(gallery=gallery)
         with c.case("toast_contract"), new_gallery() as gallery:
             _check_toast_contract(gallery=gallery)
+        with c.case("sheet_toast_contract"), new_gallery() as gallery:
+            _check_sheet_toast_contract(gallery=gallery)
         with c.case("dark_control_fill_is_not_true_black"), new_gallery() as gallery:
             _check_dark_control_fill_is_not_true_black(gallery=gallery)
         with c.case("dark_labelled_surfaces_follow_the_control_fill"), new_gallery() as gallery:
