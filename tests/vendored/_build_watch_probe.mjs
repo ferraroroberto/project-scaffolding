@@ -33,6 +33,7 @@ function element(tag) {
 }
 
 let stampedAssets = [];
+let entryScript = null;
 const docListeners = {};
 const body = element('body');
 body.appendChild = (el) => { body.children.push(el); return el; };
@@ -41,6 +42,7 @@ define('document', {
   hidden: false,
   body,
   createElement: element,
+  querySelector: () => entryScript,
   querySelectorAll: () => stampedAssets,
   addEventListener(type, fn) { docListeners[type] = fn; },
 });
@@ -66,7 +68,7 @@ out.constants = { throttle: mod.CHECK_THROTTLE_MS, interval: mod.CHECK_INTERVAL_
 out.verdict = {
   stale: mod.verdict('aaa', 'bbb'),
   current: mod.verdict('aaa', 'aaa'),
-  unknown: [null, undefined, '', 0].flatMap((u) => [mod.verdict('aaa', u), mod.verdict(u, 'bbb')]),
+  unknown: [null, undefined, '', 0, 'missing'].flatMap((u) => [mod.verdict('aaa', u), mod.verdict(u, 'bbb')]),
 };
 
 out.shouldCheck = [
@@ -172,5 +174,20 @@ const second = mod.initBuildWatch({
 });
 await intervals[0].fn(); await tick(); await tick();
 out.ownReader = { started: second, urls: own, fetchCalls: reads.length };
+
+// A per-file-hash app reports its entry module's stamp as asset_hash, so the
+// entry module script's ?v= is the boot build, not a stylesheet's.
+entryScript = { src: '/static/app.js?v=eee' };
+stampedAssets = [{ href: '/static/app.css?v=sss' }, { src: '/static/app.js?v=eee' }];
+out.entry = {};
+for (const live of ['eee', 'sss']) {
+  body.children = [];
+  intervals = [];
+  nextResponse = { ok: true, status: 200, body: { asset_hash: live } };
+  mod.initBuildWatch();
+  await intervals[0].fn(); await tick(); await tick();
+  const shown = prompt();
+  out.entry[live] = !!shown && shown.hidden === false;
+}
 
 process.stdout.write(JSON.stringify(out));

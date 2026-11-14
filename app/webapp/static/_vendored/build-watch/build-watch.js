@@ -34,9 +34,13 @@ const DISMISS_GLYPH =
   'stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18"/>' +
   '<path d="m6 6 12 12"/></svg>';
 
-/** 'stale' only when both hashes are known and differ; else 'current' or 'unknown'. */
+/**
+ * 'stale' only when both hashes are known and differ; else 'current' or
+ * 'unknown'. Some apps' versioning answers the literal 'missing' for a hash it
+ * could not compute, which is unknown too.
+ */
 export function verdict(bootHash, liveHash) {
-  const known = (h) => typeof h === 'string' && h !== '';
+  const known = (h) => typeof h === 'string' && h !== '' && h !== 'missing';
   if (!known(bootHash) || !known(liveHash)) return 'unknown';
   return bootHash === liveHash ? 'current' : 'stale';
 }
@@ -61,10 +65,16 @@ export function stampOf(url) {
   }
 }
 
-// The build the page booted on: this module's own stamp when the server
-// rewrites JS imports, else the first stamped script or stylesheet the shell
-// linked (the shell is served no-cache, so its stamps are the boot build's).
+// The build the page booted on. The shell is served no-cache, so its stamps
+// are the boot build's. The entry module script comes first: an app that
+// stamps each file with its own hash reports that script's stamp as
+// asset_hash, and with one fleet hash every stamp agrees anyway. Then this
+// module's own stamp (an app that rewrites JS imports), then any stamped
+// script or stylesheet.
 function bootStamp() {
+  const entry = document.querySelector('script[type="module"][src*="?v="]');
+  const fromEntry = entry ? stampOf(entry.src) : null;
+  if (fromEntry) return fromEntry;
   const own = stampOf(import.meta.url);
   if (own) return own;
   const assets = document.querySelectorAll('script[src*="?v="], link[rel="stylesheet"][href*="?v="]');
