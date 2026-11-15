@@ -31,13 +31,14 @@ from contextlib import AbstractContextManager
 
 from playwright.sync_api import Browser, Page, expect
 
-from tests.e2e import _action_row_avatar_checks, _code_listing_checks, _day_checks
+from tests.e2e import _action_row_avatar_checks, _code_listing_checks, _day_checks, _review_rule_checks
 from tests.e2e._action_row_assertions import (
     assert_action_row,
     assert_action_row_colors,
     assert_action_row_ext,
     assert_action_row_ext_colors,
     assert_action_row_meta_figures,
+    assert_action_row_split_meta,
 )
 from tests.e2e._cases import cases
 from tests.e2e._color_assertions import contrast as _contrast
@@ -104,6 +105,7 @@ def _check_card_contract(gallery: Page) -> None:
     assert _style(gallery, "#demoCard", "borderRadius") == "16px"
     assert _style(gallery, "#demoCard", "paddingTop") == "16px"
     assert _style(gallery, "#demoCard", "borderTopWidth") == "1px"
+    _review_rule_checks.check_glance_rows_exist_before_their_reads_land(gallery)
     assert _style(gallery, "#demoCard .card-title .icon", "width") == "18px"
     _assert_base_inherits(gallery)
     assert_action_row(gallery)
@@ -117,6 +119,7 @@ def _check_card_contract(gallery: Page) -> None:
         success="rgb(26, 127, 55)", danger="rgb(207, 34, 46)",
     )
     assert_action_row_meta_figures(gallery)
+    assert_action_row_split_meta(gallery)
 
 
 def _check_disclosure_contract(gallery: Page) -> None:
@@ -137,6 +140,7 @@ def _check_switch_contract(gallery: Page) -> None:
     assert _style(gallery, "#demoSwitchOn", "backgroundColor") == "rgb(9, 105, 218)"
     # off-track = control-border (fleet-config#963), a 3:1+ control boundary.
     assert _style(gallery, "#demoSwitchOff", "backgroundColor") == "rgb(129, 139, 152)"
+    _review_rule_checks.check_switch_follows_aria_checked(gallery)
 
 
 def _check_switch_builder(gallery: Page) -> None:
@@ -767,6 +771,7 @@ def _check_dark_theme_values(gallery: Page) -> None:
     _wait_bg(gallery, "#demoSwitchOn", "rgb(31, 111, 235)")
     # off-track is the dark control-border (fleet-config#963), not the hairline.
     _wait_bg(gallery, "#demoSwitchOff", "rgb(110, 118, 129)")
+    _review_rule_checks.check_switch_follows_aria_checked(gallery, dark=True)
     # icon-tile fill steps to the dark tile-blue (the emphasis step, so the
     # white glyph holds contrast).
     assert _style(gallery, "#demoTileBlue", "backgroundColor") == "rgb(31, 111, 235)"
@@ -823,6 +828,7 @@ def _check_dark_theme_values(gallery: Page) -> None:
         success="rgb(63, 185, 80)", danger="rgb(248, 81, 73)",
     )
     assert_action_row_meta_figures(gallery)
+    assert_action_row_split_meta(gallery)
 
 
 def test_gallery_component_contracts(new_gallery: Callable[[], AbstractContextManager[Page]], static_server: str, browser: Browser) -> None:

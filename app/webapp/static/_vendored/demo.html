@@ -269,6 +269,11 @@
             aria-checked="true" aria-label="Static on switch">
       <span class="knob"></span><span class="toggle-label">ON</span>
     </button>
+    <!-- aria-checked alone (no `on` class) still draws the accent track. -->
+    <button type="button" class="toggle" id="demoSwitchAria" role="switch"
+            aria-checked="true" aria-label="Attribute-only on switch">
+      <span class="knob"></span><span class="toggle-label">ON</span>
+    </button>
     <button type="button" class="toggle" id="demoSwitchOff" role="switch"
             aria-checked="false" aria-label="Static off switch">
       <span class="knob"></span><span class="toggle-label">OFF</span>
@@ -585,7 +590,19 @@
 
   <h2>action-row meta line (wraps to two lines so the trailing figures stay readable; a third line is clamped)</h2>
   <div class="card action-list" id="demoActionListMeta">
+    <h3 class="overline" id="demoOverline">Tomorrow</h3>
     <ul class="action-rows">
+      <!-- The split meta: the words truncate on one line, the figures are non-shrinking tails. -->
+      <li class="action-row" id="demoActionMetaSplit">
+        <button type="button" class="action-row-main">
+          <span class="action-row-title">Quarterly reconciliation</span>
+          <span class="action-row-meta" id="demoActionMetaSplitMeta"><span class="action-row-meta-text" id="demoActionMetaSplitText" title="project-scaffolding · Sonnet · waiting on the owner to review the longest status words a row can carry">project-scaffolding · Sonnet · waiting on the owner to review the longest status words a row can carry</span><span class="action-row-meta-tail" id="demoActionMetaSplitTail">3 failed</span><span class="action-row-meta-tail">12 min</span></span>
+        </button>
+        <button type="button" class="icon-button action-row-kebab" aria-label="More actions for Quarterly reconciliation"
+                aria-haspopup="menu" aria-expanded="false">
+          <svg class="icon" aria-hidden="true"><use href="#i-ellipsis-vertical"></use></svg>
+        </button>
+      </li>
       <!-- Before project-scaffolding#396 this meta kept one line and a phone cut
            "12 conversations" (a count) behind an ellipsis. -->
       <li class="action-row" id="demoActionMetaFigures">
@@ -695,6 +712,16 @@
         </div>
       </li>
     </ul>
+  </div>
+
+  <h2>code-inline, a header-less listing and glance rows</h2>
+  <div class="card" id="demoCodeInline">
+    <p style="margin: 0 0 var(--space-sm);">Run <code class="code-inline" id="demoCodeChip">shutdown /s /t 0</code> from a shell.</p>
+    <div class="code-listing" id="demoBareListing"><pre>(no output)</pre></div>
+  </div>
+  <div class="card" id="demoGlanceCard">
+    <div class="glance-row"><span>Next booking</span><span class="glance-value" id="demoGlanceEmpty"></span></div>
+    <div class="glance-row"><span>Open requests</span><span class="glance-value" id="demoGlanceFilled">3</span></div>
   </div>
 
   <h2>usage-log (view switches + data-track taps, sent to this origin only)</h2>
