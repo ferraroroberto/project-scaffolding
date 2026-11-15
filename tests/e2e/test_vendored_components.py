@@ -13,9 +13,9 @@ Assertions are the contracts from `~/.claude/design.md` v2 ("Component
 contracts" + the component token blocks); expected colors are the sRGB spec
 values (the demo page omits the P3 twins on purpose).
 
-The action-row avatar, code-listing and day-row/day-marks checks live in
-`_action_row_avatar_checks.py`, `_code_listing_checks.py` and `_day_checks.py`
-and run as cases of the one test below.
+The action-row avatar, code-listing, day-row/day-marks and select/settings-group
+checks live in `_action_row_avatar_checks.py`, `_code_listing_checks.py`,
+`_day_checks.py` and `_settings_group_checks.py`, run as cases of the test below.
 
 The `nav/` component has its own harness — `test_vendored_nav.py` — because a
 fixed, body-level nav can't share the gallery's scrolling page. The
@@ -51,6 +51,7 @@ from tests.e2e._geometry import (
     assert_unpainted,
     effective_rect,
 )
+from tests.e2e._settings_group_checks import check_select_native_contract, run_settings_group_cases
 from tests.e2e.conftest import STATIC_DIR
 
 _RANGE_ROWS = ("#demoRange2", "#demoRangeTabs", "#demoRange5")
@@ -605,19 +606,6 @@ def _check_segmented_contract(gallery: Page, static_server: str, browser: Browse
         context.close()
 
 
-def _check_select_native_contract(gallery: Page) -> None:
-    """select-native: control-height (36px via explicit height, not min-height), control-border border, input-bg fill."""
-    # THE iOS decision: height is an explicit `height` (respected), never
-    # `min-height` (ignored on a bare <select>, rendering it stubby).
-    assert _style(gallery, "#demoSelectNative", "height") == "36px"
-    assert _style(gallery, "#demoSelectNative", "borderRadius") == "12px"
-    assert _style(gallery, "#demoSelectNative", "borderTopWidth") == "1px"
-    assert _style(gallery, "#demoSelectNative", "borderTopColor") == "rgb(129, 139, 152)"  # control-border
-    # input-bg is card-off in light (var(--card-off) = #f6f8fa).
-    assert _style(gallery, "#demoSelectNative", "backgroundColor") == "rgb(246, 248, 250)"
-    assert _style(gallery, "#demoSelectNative", "color") == "rgb(31, 35, 40)"
-
-
 def _check_toast_contract(gallery: Page) -> None:
     """toast: nav-bar glass, centred above the nav, one line; only an error tints, never green."""
     gallery.click("#demoToastShow")
@@ -872,7 +860,7 @@ def test_gallery_component_contracts(new_gallery: Callable[[], AbstractContextMa
         with c.case("segmented_contract"), new_gallery() as gallery:
             _check_segmented_contract(gallery=gallery, static_server=static_server, browser=browser)
         with c.case("select_native_contract"), new_gallery() as gallery:
-            _check_select_native_contract(gallery=gallery)
+            check_select_native_contract(gallery=gallery)
         with c.case("toast_contract"), new_gallery() as gallery:
             _check_toast_contract(gallery=gallery)
         with c.case("sheet_toast_contract"), new_gallery() as gallery:
@@ -896,3 +884,4 @@ def test_gallery_component_contracts(new_gallery: Callable[[], AbstractContextMa
             _code_listing_checks.check_code_listing_copy_failure_is_said_not_swallowed(gallery=gallery)
         with c.case("day_row_and_day_marks_contract"), new_gallery() as gallery:
             _day_checks.check_day_row_and_day_marks_contract(gallery=gallery)
+        run_settings_group_cases(c, new_gallery)

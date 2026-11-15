@@ -292,6 +292,7 @@ prefixes = [
     "app/webapp/static/_vendored/row-menu/",
     "app/webapp/static/_vendored/segmented/",
     "app/webapp/static/_vendored/select-native/",
+    "app/webapp/static/_vendored/settings-group/",
     "app/webapp/static/_vendored/switch/",
     "app/webapp/static/_vendored/text-size/",
     "app/webapp/static/_vendored/toast/",
@@ -301,6 +302,7 @@ paths          = [
     "tests/e2e/_code_listing_checks.py",
     "tests/e2e/_day_checks.py",
     "tests/e2e/_mic_notice_checks.py",
+    "tests/e2e/_settings_group_checks.py",
     "tests/e2e/test_vendored_base.py",
     "tests/e2e/test_vendored_components.py",
     "tests/e2e/test_vendored_home_head.py",
@@ -647,6 +649,8 @@ disclosure      = { src = "app/webapp/static/_vendored/disclosure" }
 empty-state     = { src = "app/webapp/static/_vendored/empty-state" }
 select-native   = { src = "app/webapp/static/_vendored/select-native" }
 switch          = { src = "app/webapp/static/_vendored/switch" }
+# The Settings pane's inset groups: overline header, card, four row variants.
+settings-group  = { src = "app/webapp/static/_vendored/settings-group" }
 icon-tile       = { src = "app/webapp/static/_vendored/icon-tile" }
 range-tab       = { src = "app/webapp/static/_vendored/range-tab" }
 segmented       = { src = "app/webapp/static/_vendored/segmented" }
