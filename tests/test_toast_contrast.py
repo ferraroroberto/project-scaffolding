@@ -2,7 +2,7 @@
 
 Computes the contrast of ``.toast.error``'s ``color`` against its ``background``
 straight from ``toast.css``, with token values taken from the component gallery
-(``demo.html``, which transcribes the design spec's light and dark palettes).
+(``demo-tokens.css``, which transcribes the design spec's light and dark palettes).
 A translucent fill is composited over every page ground an app can put behind
 the toast, so a regression to a see-through fill fails here, not on a device.
 """
@@ -16,7 +16,7 @@ import pytest
 
 _VENDORED = Path(__file__).resolve().parent.parent / "app" / "webapp" / "static" / "_vendored"
 _TOAST_CSS = _VENDORED / "toast" / "toast.css"
-_DEMO = _VENDORED / "demo.html"
+_DEMO = _VENDORED / "demo-tokens.css"
 
 _MIN_RATIO = 4.5
 _NAMED = {"black": "#000000", "white": "#ffffff", "transparent": "rgba(0,0,0,0)"}

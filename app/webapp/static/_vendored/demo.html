@@ -13,107 +13,11 @@
   Machine use: tests/e2e/test_vendored_components.py drives this page and
   asserts each component's key computed styles in both themes.
 
-  The token blocks below are SAMPLE values transcribed from
-  ~/.claude/design.md (light) + design.dark.md (dark) — the one place a
-  consuming app would normally define them. They live inline here (not in a
-  component file) because defining tokens is the app's job; this page plays
-  the app. The P3 wide-gamut twins are intentionally omitted: the harness
-  asserts sRGB values.
+  The design tokens are SAMPLE values in demo-tokens.css, linked first:
+  defining tokens is the app's job, and this page plays the app.
 -->
+<link rel="stylesheet" href="demo-tokens.css">
 <style>
-  :root {
-    --bg: #ffffff;
-    --card: #ffffff;
-    --card-off: #f6f8fa;
-    --card-2: #f6f8fa;
-    --ink: #1f2328;
-    --muted: #656d76;
-    --line: #d1d9e0;
-    --line-muted: #d8dee4;
-    --accent: #0969da;
-    --accent-fg: #ffffff;
-    --accent-fill: #0969da;
-    --accent-text: #0550ae;
-    --control-border: #818b98;
-    --deficit: #cf222e;
-    --success: #1a7f37;
-    --shadow: 0 8px 24px rgba(31, 35, 40, 0.12);
-    --tabbar-bg: rgba(255, 255, 255, 0.62); --tabbar-border: rgba(0, 0, 0, 0.08);
-    --tabbar-pill: rgba(0, 0, 0, 0.07); --tabbar-shadow: 0 8px 28px -6px rgba(20, 24, 40, 0.2), 0 1px 4px rgba(20, 24, 40, 0.06);
-    --danger-text: #a40e26;
-    --attention: #9a6700;
-    --attention-text: #7d4e00;
-    --tile-green: #1f883d;
-    --tile-blue: #0969da;
-    --tile-purple: #8250df;
-    --tile-orange: #bc4c00;
-    --tile-yellow: #bf8700;
-    --input-bg: var(--card-off);
-    --toggle-knob: #ffffff;
-    --accent-soft: color-mix(in srgb, var(--accent) 16%, transparent);
-    --accent-border-soft: color-mix(in srgb, var(--accent) 24%, transparent);
-    --accent-border-strong: color-mix(in srgb, var(--accent) 28%, transparent);
-    --neutral-soft: color-mix(in srgb, var(--muted) 16%, transparent);
-    --radius-md: 12px;
-    --radius: 16px;
-    --radius-pill: 9999px;
-    --radius-nav: 30px;
-    --space-xs: 4px;
-    --space-sm: 8px;
-    --space-md: 16px;
-    --space-lg: 24px;
-    --space-xl: 32px;
-    --gap: 12px;
-    --row-sm: 44px;
-    --row-md: 52px;
-    --row-lg: 60px;
-    --control-h: 36px;
-    --layout-measure: 772px;
-    --layout-rail: 80px;
-    --font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-    --font-heading-xl: 2rem;
-    --font-heading-lg: 1.5rem;
-    --font-body: 1rem;
-    --font-body-sm: 0.875rem;
-    --font-label: 0.875rem;
-    --font-caption: 0.75rem;
-    --icon-inline: 16px;
-    --icon-title: 18px;
-    --icon-feature: 24px;
-    --tile-size: 48px;
-    color-scheme: light dark;
-  }
-  [data-theme="dark"] {
-    --bg: #0d1117;
-    --card: #161b22;
-    --card-off: #010409;
-    --card-2: #21262d;
-    --ink: #e6edf3;
-    --muted: #7d8590;
-    --line: #30363d;
-    --line-muted: #21262d;
-    --accent: #2f81f7;
-    --accent-fg: #ffffff;
-    --accent-fill: #1f6feb;
-    --accent-text: #58a6ff;
-    --control-border: #6e7681;
-    --deficit: #f85149;
-    --success: #3fb950;
-    --shadow: 0 8px 24px rgba(1, 4, 9, 0.6);
-    --tabbar-bg: rgba(42, 45, 52, 0.55); --tabbar-border: rgba(255, 255, 255, 0.14);
-    --tabbar-pill: rgba(255, 255, 255, 0.14); --tabbar-shadow: 0 10px 30px -6px rgba(0, 0, 0, 0.6);
-    --danger-text: #ff7b72;
-    --attention: #d29922;
-    --attention-text: #e3b341;
-    --tile-green: #238636;
-    --tile-blue: #1f6feb;
-    --tile-purple: #8957e5;
-    --tile-orange: #bd561d;
-    --tile-yellow: #9e6a03;
-    --input-bg: var(--line-muted);
-    --toggle-knob: #ffffff;
-  }
-
   /* Gallery chrome only — not part of any component. */
   * { box-sizing: border-box; }
   body {
@@ -172,6 +76,7 @@
 <link rel="stylesheet" href="page-foot/page-foot.css">
 <link rel="stylesheet" href="home-head/home-head.css">
 <link rel="stylesheet" href="select-native/select-native.css">
+<link rel="stylesheet" href="settings-group/settings-group.css">
 <link rel="stylesheet" href="action-row/action-row.css">
 <link rel="stylesheet" href="day-row/day-row.css">
 <link rel="stylesheet" href="day-marks/day-marks.css">
@@ -445,6 +350,70 @@
       <option value="b">Option B</option>
       <option value="c">Option C</option>
     </select>
+  </div>
+
+  <h2>settings-group (header outside the card; value + chevron, select, switch, number field)</h2>
+  <div id="demoSettings">
+    <h3 class="settings-overline" id="demoSettingsHead">Dictation</h3>
+    <section class="card settings-group" id="demoSettingsGroup" aria-labelledby="demoSettingsHead">
+      <button type="button" class="settings-row" id="demoSettingsLink" aria-haspopup="dialog">
+        <svg class="icon settings-row-icon" aria-hidden="true"><use href="#i-globe"></use></svg>
+        <span class="settings-row-label">Language</span>
+        <span class="settings-row-value" id="demoSettingsValue">English</span>
+        <svg class="icon settings-row-chevron" aria-hidden="true"><use href="#i-chevron-right"></use></svg>
+      </button>
+      <button type="button" class="settings-row" id="demoSettingsLong" aria-haspopup="dialog">
+        <svg class="icon settings-row-icon" aria-hidden="true"><use href="#i-folder"></use></svg>
+        <span class="settings-row-label" id="demoSettingsLongLabel">Archive folder</span>
+        <span class="settings-row-value" id="demoSettingsLongValue" title="D:\archive\mail\2026\a-folder-name-long-enough-to-ellipsize">D:\archive\mail\2026\a-folder-name-long-enough-to-ellipsize</span>
+        <svg class="icon settings-row-chevron" aria-hidden="true"><use href="#i-chevron-right"></use></svg>
+      </button>
+      <label class="settings-row" id="demoSettingsPick">
+        <svg class="icon settings-row-icon" aria-hidden="true"><use href="#i-mic"></use></svg>
+        <span class="settings-row-label">Microphone</span>
+        <select class="settings-row-select" id="demoSettingsSelect">
+          <option>System default</option>
+          <option>USB microphone</option>
+        </select>
+        <svg class="icon settings-row-chevron" aria-hidden="true"><use href="#i-chevron-down"></use></svg>
+      </label>
+      <label class="settings-row" id="demoSettingsSwitchRow">
+        <svg class="icon settings-row-icon" aria-hidden="true"><use href="#i-globe"></use></svg>
+        <span class="settings-row-text">
+          <span class="settings-row-label">Translate to English</span>
+          <span class="settings-row-hint" id="demoSettingsHint">Any language in, English out</span>
+        </span>
+        <button type="button" class="toggle" id="demoSettingsSwitch" role="switch" aria-checked="false">
+          <span class="knob"></span><span class="toggle-label">OFF</span>
+        </button>
+      </label>
+      <label class="settings-row" id="demoSettingsNumberRow">
+        <svg class="icon settings-row-icon" aria-hidden="true"><use href="#i-timer"></use></svg>
+        <span class="settings-row-label">Silence length</span>
+        <span class="settings-row-number">
+          <input class="settings-row-input" id="demoSettingsNumber" type="number" inputmode="numeric" min="1" max="60" value="3">
+          <span class="settings-row-unit">s</span>
+        </span>
+      </label>
+      <button type="button" class="settings-row" id="demoSettingsTone" aria-haspopup="dialog">
+        <svg class="icon settings-row-icon" aria-hidden="true"><use href="#i-bell"></use></svg>
+        <span class="settings-row-label">Email sign-in</span>
+        <span class="settings-row-value" id="demoSettingsToneValue" data-tone="attention">Needs setup</span>
+        <svg class="icon settings-row-chevron" aria-hidden="true"><use href="#i-chevron-right"></use></svg>
+      </button>
+    </section>
+    <p class="settings-footnote">Changes save as you make them.</p>
+    <h3 class="settings-overline" id="demoSettingsHead2">Sound</h3>
+    <section class="card settings-group" id="demoSettingsGroup2" aria-labelledby="demoSettingsHead2">
+      <label class="settings-row">
+        <svg class="icon settings-row-icon" aria-hidden="true"><use href="#i-volume-2"></use></svg>
+        <span class="settings-row-label">Boost amount</span>
+        <span class="settings-row-number">
+          <input class="settings-row-input" id="demoSettingsNumber2" type="number" inputmode="numeric" value="12">
+          <span class="settings-row-unit">dB</span>
+        </span>
+      </label>
+    </section>
   </div>
 
   <h2>action-row (filter, one line, two line, favorite, dominant verb, outlined stop verb)</h2>
@@ -786,6 +755,10 @@
   });
   live.id = 'demoSwitchBuilt';
   document.getElementById('demoSwitchHost').appendChild(live);
+
+  // settings-group: the row is a label, so a tap anywhere on it toggles its switch.
+  const settingsSwitch = document.getElementById('demoSettingsSwitch');
+  settingsSwitch.addEventListener('click', () => setSwitch(settingsSwitch, settingsSwitch.getAttribute('aria-checked') !== 'true'));
 
   // text-size: the vendored binder owns this group (it stores `demo.textsize`)
   // and sets aria-pressed on it, the same attribute segmented styles.
