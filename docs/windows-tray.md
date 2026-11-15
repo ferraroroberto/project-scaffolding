@@ -145,14 +145,23 @@ The port-reclaim and single-instance guarantees make a *restart* deterministic; 
 2. **Nothing notices a later death or wedge.** A crashed uvicorn stops listening; a wedged one still `LISTEN`s but never answers `/healthz`. Both look identical from the tray's process table.
 3. **Neither event is diagnosable afterwards.** A tray launched by `pythonw` has **no `sys.stderr`**, so `logging.basicConfig()`'s default handler writes into the void and the boot-time traceback is captured nowhere. In `photo-ocr` the webapp died at tray boot and stayed down for **six days** with a completely empty log trail. Redirecting the uvicorn child's `stdout` to `DEVNULL` (the standard windowless-child recipe) does not help either — the missing record is the *tray's* own, not the child's.
 
-**The vendored primitive is `app/tray/watchdog.py`** — `retry_with_backoff`, `HealthWatchdog` (with `rearm()`), and `BreadcrumbLog`. Copy it byte-for-byte into a tray app; everything app-specific (the probe, the respawn action, the log path, the toast) is a call-site argument, exactly as `single_instance.py`'s mutex names are.
+**The vendored primitive is `app/tray/watchdog.py`** — `retry_with_backoff`, `HealthWatchdog` (with `rearm()`), `RespawnGuard`, and `BreadcrumbLog`. Copy it byte-for-byte into a tray app; everything app-specific (the probe, the respawn action, the log path, the toast) is a call-site argument, exactly as `single_instance.py`'s mutex names are.
 
 **Dead vs wedged are not the same failure and must not get the same response.** `app-launcher`'s watchdog is deliberately **alert-only**: auto-killing a process that is listening but not answering could mask whatever is actually wrong, and the failure mode wasn't understood well enough to automate. `photo-ocr` keeps that precedent and splits the cases — the decision lives in the caller's `on_wedge`, never inside the watchdog:
 
 | Symptom | Detection | Response |
 |---|---|---|
-| **dead** — not listening at all | `manager.is_port_in_use()` is False | auto-respawn, then `rearm()` if the respawn itself failed |
+| **starting** — our own child is alive, inside its startup window | `guard.is_starting()` | back off: breadcrumb + `rearm()`, never spawn or alert |
+| **dead** — not listening at all | `manager.is_port_in_use()` is False | `guard.respawn(...)`, then `rearm()` |
 | **wedged** — listening, `/healthz` silent | port in use but the probe fails | toast + breadcrumb only; recovery stays a human clicking *Restart webapp* |
+
+**Every spawn goes through one `RespawnGuard`, or copies stack.** On a slow boot (after an unclean reboot) a child is still importing when the next probe fails. A handler that spawns again leaves both alive, and on Windows both can bind the port, so requests land on a random copy. A `manager.start(wait=True)` makes it worse: it raises on its readiness timeout with the child still running, and the next `Popen` overwrites the only reference to it. The guard owns the one child the tray spawned:
+
+- `respawn(spawn)` refuses (`RespawnOutcome.STARTING`) while the child spawned last is alive and younger than the startup window (`DEFAULT_STARTUP_WINDOW_S`, 300 s).
+- Past the window it stops that child **and its process tree** (`taskkill /T /F`), names the stopped pid in the breadcrumb, then spawns. A child that survives the stop raises instead of getting a sibling.
+- Each child stopped for never getting healthy doubles the next child's window (capped at 8×), so a boot slower than 300 s is backed off rather than cut short forever; `guard.mark_healthy()` in `on_recover` resets it.
+- `spawn` returns the new pid **without waiting for readiness** (`manager.start(wait=False).pid`); readiness is the probe's job. A spawn made elsewhere (the tray-menu restart) is reported with `guard.track(pid)`.
+- Liveness is checked by process identity (creation time on Windows), so a pid the OS reused for another process is never stopped.
 
 **`rearm()` is what stops a failed respawn going silent forever.** The watchdog is edge-triggered: `on_wedge` fires once and does not fire again until a *recovery* re-arms it. A handler that respawned and failed would therefore wait for a recovery that a genuinely-dead process can never produce on its own. Calling `rearm()` from inside the handler says "I acted; re-evaluate me next tick".
 
@@ -180,11 +189,16 @@ The canonical wiring, at the end of `run_tray()`:
 
 ```python
 from app.tray.watchdog import (
-    DEFAULT_STARTUP_RETRY_DELAYS_S, BreadcrumbLog, HealthWatchdog, retry_with_backoff,
+    DEFAULT_STARTUP_RETRY_DELAYS_S, BreadcrumbLog, HealthWatchdog, RespawnGuard,
+    retry_with_backoff,
 )
 
 # The breadcrumb file is the ONLY durable record under pythonw. Gitignored (*.log).
 wd_log = BreadcrumbLog(PROJECT_ROOT / "webapp" / "watchdog.log")
+guard = RespawnGuard(wd_log)                      # owns the one webapp child
+
+def _spawn() -> int:
+    return manager.start(wait=False).pid          # the pid, before readiness
 
 def _on_start_attempt_failed(attempt: int, exc: BaseException) -> None:
     wd_log(f"webapp start attempt {attempt} failed: {exc}")
@@ -192,11 +206,11 @@ def _on_start_attempt_failed(attempt: int, exc: BaseException) -> None:
 def _start() -> None:
     try:
         retry_with_backoff(
-            lambda: manager.start(wait=True),
+            lambda: guard.respawn(_spawn),
             DEFAULT_STARTUP_RETRY_DELAYS_S,
             _on_start_attempt_failed,
         )
-        wd_log("webapp started")
+        wd_log("webapp spawned")
     except Exception as exc:                      # exhausted -- loud, not silent
         wd_log(f"webapp start FAILED permanently: {exc}")
         _notify("<app> start failed", str(exc))
@@ -206,19 +220,23 @@ threading.Thread(target=_start, daemon=True).start()
 watchdog_stop = threading.Event()
 
 def _on_wedge(count: int) -> None:
-    if manager.is_port_in_use():                  # wedged -> alert only (#386)
+    if guard.is_starting():                       # our child is still booting -> back off
+        wd_log(f"webapp pid {guard.pid} still starting ({count} failed probes)")
+        watchdog.rearm()
+        return
+    if manager.is_port_in_use():                  # wedged -> alert only
         wd_log(f"webapp wedged ({count} consecutive failures) -- listening, not answering")
         _notify("<app> webapp wedged", "Use Restart webapp")
         return
     wd_log(f"webapp not listening ({count} consecutive failures) -- respawning")
-    try:                                          # dead -> safe to respawn
-        manager.start(wait=True)
-        wd_log("webapp respawned successfully")
+    try:                                          # dead -> stop our old child, then spawn
+        guard.respawn(_spawn)
     except Exception as exc:
         wd_log(f"webapp respawn failed: {exc}")
-        watchdog.rearm()                          # try again next interval
+    watchdog.rearm()                              # re-evaluate next interval either way
 
 def _on_recover() -> None:
+    guard.mark_healthy()
     wd_log("webapp health recovered")
 
 watchdog = HealthWatchdog(manager.is_reachable, _on_wedge, _on_recover)

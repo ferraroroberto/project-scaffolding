@@ -168,7 +168,7 @@ Examples — adapt to the project's actual tooling. Windows / PowerShell: syntax
 ## Tray webapp self-heal
 *Apply only if the project has a Windows tray app supervising a long-lived service such as a uvicorn webapp, worker or tunnel.*
 
-- Wire the vendored `app/tray/watchdog.py` (manifest key `tray_watchdog`): retry the initial spawn with backoff (loud on exhaustion), auto-respawn a **dead** webapp (`rearm()` if the respawn fails) but only alert on a **wedged** one (real `/healthz` probe), and write every attempt to the `webapp/watchdog.log` breadcrumb — `pythonw` has no stderr. Full text: `docs/long-lived-process-conventions.md` → "Tray webapp self-heal"; wiring: `docs/windows-tray.md` gotcha 5. (`#201`.)
+- Wire the vendored `app/tray/watchdog.py` (manifest key `tray_watchdog`): retry the initial spawn with backoff (loud on exhaustion), auto-respawn a **dead** webapp through one `RespawnGuard` (never a second copy while ours is still starting; the stale child and its tree stopped first) then `rearm()`, but only alert on a **wedged** one (real `/healthz` probe), and write every attempt to the `webapp/watchdog.log` breadcrumb — `pythonw` has no stderr. Full text: `docs/long-lived-process-conventions.md` → "Tray webapp self-heal"; wiring: `docs/windows-tray.md` gotcha 5. (`#201`.)
 
 ## Restart/deploy coverage — merged is not shipped
 *Apply only if the project has several long-lived runtime components, or a runtime outside the checkout, so its restart or deploy recipe may miss a live part.*
