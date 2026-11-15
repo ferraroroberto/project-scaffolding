@@ -258,6 +258,10 @@ def _check_button_contract(gallery: Page) -> None:
     assert _style(gallery, "#demoButtonDanger", "borderWidth") == "1px"
     assert _contrast(_style(gallery, "#demoButtonDanger", "color"), "rgb(255, 255, 255)",
                      "rgb(255, 255, 255)") >= 4.5
+    # The action -> variant card is the button README's table: one component per action.
+    got = gallery.eval_on_selector_all("#demoActionMap [data-action]", "els => els.map(e => e.dataset.action + '=' + e.className)")
+    assert got == ["commit=button-primary", "run=button-tint", "cancel=button-ghost", "destructive=button-tint danger", "copy=button-surface", "refresh=button-surface"] + [
+        f"{a}=icon-button" for a in ("dismiss", "edit", "filter", "search", "overflow")]
 
 
 _ICON_BUTTONS = "#demoIconButtons .icon-button"

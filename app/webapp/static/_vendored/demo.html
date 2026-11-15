@@ -294,6 +294,17 @@
     <button type="button" class="button-tint danger" id="demoButtonDanger">Delete</button>
   </div>
 
+  <h2>button: action to variant (one component per action)</h2>
+  <div class="card" id="demoActionMap" style="display: flex; flex-direction: column; gap: var(--space-sm);">
+    <div style="display: flex; align-items: center; justify-content: space-between; gap: var(--space-sm);"><span>commit</span><button type="button" class="button-primary" data-action="commit">Save</button></div>
+    <div style="display: flex; align-items: center; justify-content: space-between; gap: var(--space-sm);"><span>secondary run</span><button type="button" class="button-tint" data-action="run">Run now</button></div>
+    <div style="display: flex; align-items: center; justify-content: space-between; gap: var(--space-sm);"><span>cancel</span><button type="button" class="button-ghost" data-action="cancel">Cancel</button></div>
+    <div style="display: flex; align-items: center; justify-content: space-between; gap: var(--space-sm);"><span>destructive</span><button type="button" class="button-tint danger" data-action="destructive">Delete</button></div>
+    <div style="display: flex; align-items: center; justify-content: space-between; gap: var(--space-sm);"><span>copy</span><button type="button" class="button-surface" data-action="copy">Copy</button></div>
+    <div style="display: flex; align-items: center; justify-content: space-between; gap: var(--space-sm);"><span>refresh</span><button type="button" class="button-surface" data-action="refresh">Refresh</button></div>
+    <div style="display: flex; align-items: center; justify-content: space-between; gap: var(--space-sm);"><span>dismiss, edit, filter, search, overflow menu</span><span class="icon-button-group"><button type="button" class="icon-button" data-action="dismiss" aria-label="Close" title="Close"><svg class="icon" aria-hidden="true"><use href="#i-x"></use></svg></button><button type="button" class="icon-button" data-action="edit" aria-label="Edit" title="Edit"><svg class="icon" aria-hidden="true"><use href="#i-pencil"></use></svg></button><button type="button" class="icon-button" data-action="filter" aria-label="Filter" title="Filter"><svg class="icon" aria-hidden="true"><use href="#i-sliders-horizontal"></use></svg></button><button type="button" class="icon-button" data-action="search" aria-label="Search" title="Search"><svg class="icon" aria-hidden="true"><use href="#i-search"></use></svg></button><button type="button" class="icon-button" data-action="overflow" aria-label="More" title="More"><svg class="icon" aria-hidden="true"><use href="#i-ellipsis-vertical"></use></svg></button></span></div>
+  </div>
+
   <h2>icon-button (glyph only: no fill, border or shadow at rest)</h2>
   <div class="card" id="demoIconButtons" style="display: flex; flex-direction: column; gap: var(--space-sm);">
     <span class="icon-button-group" id="demoIconButtonGroup">
