@@ -153,6 +153,41 @@ def assert_action_row_meta_figures(page: Page) -> None:
             page.set_viewport_size(original)
 
 
+_SPLIT_META_JS = """() => {
+  const q = (s) => document.querySelector(s);
+  const text = q('#demoActionMetaSplitText'), tail = q('#demoActionMetaSplitTail'), meta = q('#demoActionMetaSplitMeta');
+  const t = text.getBoundingClientRect(), a = tail.getBoundingClientRect(), m = meta.getBoundingClientRect();
+  const lh = parseFloat(getComputedStyle(meta).lineHeight);
+  return { textCut: text.scrollWidth > text.clientWidth, tailWhole: a.right <= m.right + 0.5 && a.width > 0,
+           tailBesideText: a.left >= t.right - 0.5, oneLine: Math.round(m.height / lh) === 1,
+           tailShrink: getComputedStyle(tail).flexShrink, tailWrap: getComputedStyle(tail).whiteSpace };
+}"""
+
+
+def assert_action_row_split_meta(page: Page) -> None:
+    """action-row split meta (LAYOUT-09 + COMP-07): words truncate, figures stay whole, one line.
+
+    A long status line of words beside two non-shrinking tails, at the 390px
+    phone width: the words end in an ellipsis, every tail is whole and beside
+    them, nothing wraps (so no text node wraps inside the main button), and the
+    group header above the rows is the `overline` role, the one set in capitals.
+    """
+    original = page.viewport_size
+    page.set_viewport_size({"width": 390, "height": 844})
+    try:
+        got = page.evaluate(_SPLIT_META_JS)
+        assert got == {"textCut": True, "tailWhole": True, "tailBesideText": True, "oneLine": True,
+                       "tailShrink": "0", "tailWrap": "nowrap"}, got
+        assert page.eval_on_selector(
+            "#demoActionMetaSplitText", "el => getComputedStyle(el).textOverflow") == "ellipsis"
+        assert _style(page, "#demoOverline", "textTransform") == "uppercase"
+        assert _style(page, "#demoOverline", "fontSize") == "12px"
+        assert _style(page, "#demoOverline", "letterSpacing") != "normal"
+    finally:
+        if original:
+            page.set_viewport_size(original)
+
+
 _ACTION_EXT = "#demoActionListExt"
 _AFTER_JS ="(el, prop) => getComputedStyle(el, '::after')[prop]"
 

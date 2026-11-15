@@ -14,6 +14,7 @@ import re
 
 from playwright.sync_api import Page, expect
 
+from tests.e2e._color_assertions import rgba as _rgba
 from tests.e2e._color_assertions import style as _style
 from tests.e2e._geometry import assert_unpainted
 
@@ -45,6 +46,12 @@ def check_code_listing_copy_is_an_unpainted_icon_button_in_a_list_item(gallery: 
     assert _style(gallery, _LISTING, "backgroundColor") == "rgb(255, 255, 255)"  # --card
     assert _style(gallery, _LISTING, "borderTopLeftRadius") == "12px"  # --radius-md
     assert _style(gallery, "#demoCodeListing pre", "fontSize") == "13px"
+    # COMP-17: the inline chip is 0.875em of its 16px parent on a tinted fill (never
+    # caption-sized, never opaque black), and a header-less listing is the same 13px frame.
+    assert _style(gallery, "#demoCodeChip", "fontSize") == "14px"
+    assert _rgba(_style(gallery, "#demoCodeChip", "backgroundColor"))[3] > 0
+    assert _style(gallery, "#demoBareListing pre", "fontSize") == "13px"
+    assert _style(gallery, "#demoBareListing", "backgroundColor") == _style(gallery, _LISTING, "backgroundColor")
 
 
 def check_code_listing_copy_puts_the_listing_on_the_clipboard_and_confirms(gallery: Page) -> None:
