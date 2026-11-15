@@ -7,6 +7,8 @@ directly), and the breadcrumb file is written under ``tmp_path``.
 
 from __future__ import annotations
 
+import subprocess
+import sys
 import threading
 from pathlib import Path
 
@@ -16,9 +18,13 @@ from app.tray.watchdog import (
     DEFAULT_STARTUP_RETRY_DELAYS_S,
     BreadcrumbLog,
     HealthWatchdog,
+    RespawnGuard,
+    RespawnOutcome,
     WatchState,
     next_watch_state,
+    process_identity,
     retry_with_backoff,
+    stop_process_tree,
 )
 
 # --------------------------------------------------------------- retry helper
@@ -424,3 +430,197 @@ def test_breadcrumb_rotation_can_be_disabled(tmp_path: Path) -> None:
         log.write(f"event {i} with enough text to push past any cap")
 
     assert not (tmp_path / "watchdog.log.1").exists()
+
+
+# ------------------------------------------------------------- respawn guard
+
+
+class _SlowBootWorld:
+    """A fake clock and process table: each child binds ``bind_after_s`` after it spawns.
+
+    Nothing reaps a child except an explicit stop, so a respawn that forgets
+    the previous copy shows up as two live pids.
+    """
+
+    def __init__(self, bind_after_s: float, survives_stop: bool = False) -> None:
+        self.now = 0.0
+        self.bind_after_s = bind_after_s
+        self.survives_stop = survives_stop
+        self.alive: dict[int, int] = {}  # pid -> identity token
+        self.spawned_at: dict[int, float] = {}
+        self.stopped: list[int] = []
+        self._next = 1000
+
+    def clock(self) -> float:
+        return self.now
+
+    def identity(self, pid: int) -> int | None:
+        return self.alive.get(pid)
+
+    def stop_tree(self, pid: int) -> None:
+        self.stopped.append(pid)
+        if not self.survives_stop:
+            self.alive.pop(pid, None)
+
+    def spawn(self) -> int:
+        self._next += 1
+        self.alive[self._next] = self._next * 7
+        self.spawned_at[self._next] = self.now
+        return self._next
+
+    def answering(self) -> bool:
+        return any(self.now - self.spawned_at[p] >= self.bind_after_s for p in self.alive)
+
+
+def _guard(world: _SlowBootWorld, log: list[str], window: float = 300.0) -> RespawnGuard:
+    return RespawnGuard(
+        log.append, window, identity=world.identity, stop_tree=world.stop_tree, clock=world.clock
+    )
+
+
+def test_a_slow_boot_never_leaves_more_than_one_webapp_alive() -> None:
+    """The documented handler, routed through the guard, on a boot slower than the window."""
+    world = _SlowBootWorld(bind_after_s=10_000.0)  # never answers inside the run
+    log: list[str] = []
+    guard = _guard(world, log)
+
+    def on_wedge(count: int) -> None:
+        if guard.is_starting():
+            watchdog.rearm()
+            return
+        try:
+            guard.respawn(world.spawn)
+        finally:
+            watchdog.rearm()
+
+    watchdog = HealthWatchdog(world.answering, on_wedge, lambda: None)
+    guard.respawn(world.spawn)  # the boot spawn
+    peak = 1
+    for _ in range(30):  # 30 minutes of failing probes at the default cadence
+        world.now += 60.0
+        watchdog.tick()
+        peak = max(peak, len(world.alive))
+
+    assert peak == 1
+    assert world.stopped  # past the window the stale copy was reaped, not left behind
+
+
+def test_a_second_spawn_is_refused_while_the_first_child_is_starting() -> None:
+    world = _SlowBootWorld(bind_after_s=120.0)
+    log: list[str] = []
+    guard = _guard(world, log)
+    first = guard.respawn(world.spawn)
+    world.now += 299.0
+
+    assert first is RespawnOutcome.SPAWNED
+    assert guard.is_starting()
+    assert guard.respawn(world.spawn) is RespawnOutcome.STARTING
+    assert list(world.alive) == [guard.pid]
+    assert world.stopped == []
+    assert "still starting" in log[-1] and str(guard.pid) in log[-1]
+
+
+def test_the_breadcrumb_names_the_pid_stopped_before_each_respawn() -> None:
+    world = _SlowBootWorld(bind_after_s=10_000.0)
+    log: list[str] = []
+    guard = _guard(world, log, window=60.0)
+    guard.respawn(world.spawn)
+    old = guard.pid
+    world.now += 61.0
+
+    assert guard.respawn(world.spawn) is RespawnOutcome.SPAWNED
+    stop_line = next(i for i, line in enumerate(log) if line.startswith("stopping"))
+    assert f"pid {old}" in log[stop_line]
+    assert f"pid {guard.pid}" in log[stop_line + 1]  # named before the new spawn is tracked
+    assert world.stopped == [old] and list(world.alive) == [guard.pid]
+
+
+def test_a_child_that_already_exited_is_named_and_replaced_at_once() -> None:
+    world = _SlowBootWorld(bind_after_s=10_000.0)
+    log: list[str] = []
+    guard = _guard(world, log)
+    guard.respawn(world.spawn)
+    old = guard.pid
+    world.alive.clear()  # crashed during import, well inside the window
+
+    assert not guard.is_starting()
+    assert guard.respawn(world.spawn) is RespawnOutcome.SPAWNED
+    assert f"previous webapp pid {old} already exited" in log
+    assert world.stopped == []
+
+
+def test_a_child_that_survives_its_stop_blocks_the_spawn() -> None:
+    world = _SlowBootWorld(bind_after_s=10_000.0, survives_stop=True)
+    log: list[str] = []
+    guard = _guard(world, log, window=60.0)
+    guard.respawn(world.spawn)
+    world.now += 61.0
+
+    with pytest.raises(RuntimeError, match="survived its stop"):
+        guard.respawn(world.spawn)
+    assert len(world.alive) == 1
+
+
+def test_a_reused_pid_reads_as_exited_and_is_never_stopped() -> None:
+    world = _SlowBootWorld(bind_after_s=10_000.0)
+    log: list[str] = []
+    guard = _guard(world, log, window=60.0)
+    guard.respawn(world.spawn)
+    old = guard.pid
+    assert old is not None
+    world.alive[old] = -1  # the OS handed the pid to an unrelated process
+    world.now += 61.0
+
+    guard.respawn(world.spawn)
+    assert world.stopped == []
+    assert f"previous webapp pid {old} already exited" in log
+
+
+def test_track_adopts_a_spawn_made_outside_the_guard() -> None:
+    world = _SlowBootWorld(bind_after_s=10_000.0)
+    log: list[str] = []
+    guard = _guard(world, log)
+    pid = world.spawn()  # e.g. a tray-menu restart
+
+    guard.track(pid)
+    assert guard.pid == pid and guard.is_starting()
+    assert guard.respawn(world.spawn) is RespawnOutcome.STARTING
+
+
+def test_process_identity_and_stop_process_tree_on_a_real_child() -> None:
+    """A throwaway sleeping child: live identity, stopped, then gone."""
+    child = subprocess.Popen(
+        [sys.executable, "-c", "import time; time.sleep(60)"],
+        creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0,
+    )
+    try:
+        assert process_identity(child.pid) is not None
+        stop_process_tree(child.pid)
+        child.wait(timeout=30)
+        assert process_identity(child.pid) is None
+    finally:
+        if child.poll() is None:
+            child.kill()
+            child.wait(timeout=30)
+
+
+def test_a_boot_slower_than_the_window_is_backed_off_until_it_answers() -> None:
+    world = _SlowBootWorld(bind_after_s=500.0)  # slower than the 300 s base window
+    log: list[str] = []
+    guard = _guard(world, log)
+
+    def on_wedge(count: int) -> None:
+        if not guard.is_starting():
+            guard.respawn(world.spawn)
+        watchdog.rearm()
+
+    watchdog = HealthWatchdog(world.answering, on_wedge, guard.mark_healthy)
+    guard.respawn(world.spawn)
+    for _ in range(30):
+        world.now += 60.0
+        watchdog.tick()
+        assert len(world.alive) == 1
+
+    assert world.answering()
+    assert len(world.stopped) == 1  # cut once at 300 s, the 600 s window let it finish
+    assert watchdog.state is WatchState.HEALTHY
