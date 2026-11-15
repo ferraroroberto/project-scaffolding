@@ -26,6 +26,7 @@ from app.tray.watchdog import (
     retry_with_backoff,
     stop_process_tree,
 )
+from src.no_window import NO_WINDOW
 
 # --------------------------------------------------------------- retry helper
 
@@ -591,7 +592,7 @@ def test_process_identity_and_stop_process_tree_on_a_real_child() -> None:
     """A throwaway sleeping child: live identity, stopped, then gone."""
     child = subprocess.Popen(
         [sys.executable, "-c", "import time; time.sleep(60)"],
-        creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0,
+        creationflags=NO_WINDOW,
     )
     try:
         assert process_identity(child.pid) is not None
