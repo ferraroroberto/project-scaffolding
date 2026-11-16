@@ -770,3 +770,5 @@ site_routes     = { src = "scripts/site_routes.py" }
 site_serve      = { src = "scripts/site_serve.py" }
 site_check      = { src = "scripts/site_check.py" }
 resource_probe  = { src = "src/resource_probe.py" }
+# The one reply/forward subject-prefix pattern (colon required) and clean_subject; stdlib-only.
+subject_text    = { src = "src/subject_text.py" }
