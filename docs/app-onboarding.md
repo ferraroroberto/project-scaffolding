@@ -170,9 +170,9 @@ The webapp installs to the phone home screen as a full-screen app. **If you prov
 
 ---
 
-## 4. App internals worth getting right — cache-busting + the DB connection
+## 4. App internals worth getting right — cache-busting, the DB connection, native UI theme
 
-Once the app boots over HTTPS (§1–§3), two webapp-shape conventions decide whether it behaves under load. Both have been re-derived (or forgotten) per app and are now canonical — the scaffold `CLAUDE.md` records the rule; this section carries the reference snippets so a new app copies one thing.
+Once the app boots over HTTPS (§1–§3), two webapp-shape conventions decide whether it behaves under load, and a third whether its native controls match its theme. Both have been re-derived (or forgotten) per app and are now canonical — the scaffold `CLAUDE.md` records the rule; this section carries the reference snippets so a new app copies one thing.
 
 ### 4a. Cache-bust the static module graph (`CachingStaticFiles` + fleet hash)
 
@@ -270,6 +270,15 @@ Two gotchas when first adopting this (both surfaced shipping it into `whatsapp-r
 
 - **ruff B008.** `Depends(get_db)` as a default argument is FastAPI's documented idiom, but `flake8-bugbear`'s B008 ("do not perform function calls in argument defaults") flags every injection. Add `fastapi.Depends` to ruff's `flake8-bugbear.extend-immutable-calls` allowlist in `pyproject.toml` so the convention doesn't fight the linter.
 - **async handlers → `async def` dependency.** If your handlers are `async def`, make `get_db` an **`async def` generator**. A plain `def` generator runs in Starlette's threadpool while the handler runs on the event-loop thread, so the connection is created in one thread and used in another — `sqlite3`'s same-thread guard trips unless you pass `check_same_thread=False` (the snippet above does). The `async def` form keeps creation and use on the same thread and is the cleaner fix.
+
+### 4c. Native UI follows the chosen theme (`color-scheme`)
+
+Native controls (a `<select>`'s option list, date and time pickers, scrollbars) are drawn from the page's `color-scheme`, not from the app's tokens. `:root { color-scheme: light dark }` follows the OS, so a dark app theme on a light OS opens light popups. The fix is three rules keyed to `:root[data-theme]`, and it ships vendored: don't hand-copy it into the app's stylesheet.
+
+- **The app vendors `base/`** (`app/webapp/static/_vendored/base/`): nothing to add, `base.css` carries the rules.
+- **It does not**: vendor `app/webapp/static/_vendored/color-scheme/` verbatim, link `color-scheme/color-scheme.css` in `<head>`, and record `color-scheme` in the app's `[vendored]` table.
+
+Either way, stamp `data-theme` on `<html>` before first paint with the `text-size/` boot script; until the stamp lands the page falls back to the OS scheme. `design_lint`'s `color-scheme-theme` contract flags an app that declares `color-scheme` without following the theme. Contract and proof: `app/webapp/static/_vendored/color-scheme/README.md`.
 
 ---
 

@@ -14,6 +14,7 @@ A cloned web app inherits both: design **tokens** (wire your CSS custom properti
 | Folder | What | Status |
 | --- | --- | --- |
 | [`base/`](base/) | Element-level rules under every component: bare `button`/`input`/`select`/`textarea` inherit the app's font and text color (UA default is Arial on Windows Chrome). Link it first. | ✅ |
+| [`color-scheme/`](color-scheme/) | The page's `color-scheme` follows the chosen `data-theme`, so native popups, pickers and scrollbars match the app theme rather than the OS. The one source of the three rules; `base.css` repeats them byte for byte, so only an app without `base/` links it. | ✅ |
 | [`nav/`](nav/) | Floating bottom-tab navigation (desktop segmented control → mobile pill), with an optional count badge via `setBadge`. The fleet navigation contract. | ✅ |
 | [`icons/`](icons/) | Inline Lucide icon sprite + `icon()` helper. The fleet's one icon set (24×24, 2px stroke, currentColor). | ✅ |
 | [`card/`](card/) | The base elevated content group: `rounded.lg` surface + hairline border + the one-row header (glyph + bold title + muted meta + right-pinned meta). | ✅ |
