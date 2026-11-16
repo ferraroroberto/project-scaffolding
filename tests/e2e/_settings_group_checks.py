@@ -135,8 +135,37 @@ def check_settings_group_number_fields_are_one_shape(gallery: Page) -> None:
         assert _style(gallery, sel, "fontSize") == "16px", sel
         assert _style(gallery, sel, "textAlign") == "right", sel
         assert _style(gallery, sel, "fontVariantNumeric") == "tabular-nums", sel
-        assert _style(gallery, sel, "borderTopColor") == "rgb(129, 139, 152)", sel  # --control-border
+        # --control-border is drawn as an inset ring, not a border (the border is the transparent band).
+        assert _style(gallery, sel, "boxShadow") == "rgb(129, 139, 152) 0px 0px 0px 1px inset", sel
     assert _style(gallery, "#demoSettingsNumberRow .settings-row-unit", "color") == "rgb(101, 109, 118)"
+
+
+def _assert_number_field_box(page: Page, sel: str) -> None:
+    """One number field: a 44px box whose visible control (the padding box) is 36px."""
+    box, visible = page.evaluate(
+        "(s) => { const e = document.querySelector(s), c = getComputedStyle(e), h = e.getBoundingClientRect().height;"
+        " return [h, h - parseFloat(c.borderTopWidth) - parseFloat(c.borderBottomWidth)]; }",
+        sel,
+    )
+    assert box >= 44, (sel, box)
+    assert visible == 36, (sel, visible)
+
+
+def check_settings_group_number_field_meets_the_hit_floor(gallery: Page) -> None:
+    """settings-group: the number field's box is 44px at a fine and a coarse pointer, its visible control 36px."""
+    assert gallery.evaluate("matchMedia('(pointer: fine)').matches"), "fine-pointer run expected"
+    for sel in ("#demoSettingsNumber", "#demoSettingsNumber2"):
+        _assert_number_field_box(gallery, sel)
+    context = gallery.context.browser.new_context(viewport=_PHONE, has_touch=True, is_mobile=True)
+    try:
+        phone = context.new_page()
+        phone.goto(gallery.url)
+        phone.wait_for_selector("body[data-demo-ready='1']")
+        assert phone.evaluate("matchMedia('(pointer: coarse)').matches"), "coarse-pointer emulation is not active"
+        for sel in ("#demoSettingsNumber", "#demoSettingsNumber2"):
+            _assert_number_field_box(phone, sel)
+    finally:
+        context.close()
 
 
 def check_settings_group_dark(gallery: Page) -> None:
@@ -156,6 +185,7 @@ _CHECKS = (
     check_settings_group_select_is_the_muted_value,
     check_settings_group_switch_row_toggles_from_the_row,
     check_settings_group_number_fields_are_one_shape,
+    check_settings_group_number_field_meets_the_hit_floor,
     check_settings_group_dark,
 )
 
