@@ -804,10 +804,10 @@ def _check_dark_theme_values(gallery: Page) -> None:
     assert _style(gallery, "#demoHomeToggle", "backgroundColor") == _TRANSPARENT
     assert _style(gallery, "#demoHomeSettings", "backgroundColor") == _TRANSPARENT
     # select-native fill re-skins to the dark --input-bg (the control fill #21262d);
-    # the 36px control height is theme-independent.
-    assert _style(gallery, "#demoSelectNative", "height") == "36px"
+    # the 44px box is theme-independent.
+    assert _style(gallery, "#demoSelectNative", "height") == "44px"
     assert _style(gallery, "#demoSelectNative", "backgroundColor") == _DARK_CONTROL_FILL
-    assert _style(gallery, "#demoSelectNative", "borderTopColor") == "rgb(110, 118, 129)"
+    assert _style(gallery, "#demoSelectNative", "boxShadow") == "rgb(110, 118, 129) 0px 0px 0px 1px inset"
     # action-row re-skins from the dark tokens; its rows-scale heights hold.
     assert _style(gallery, "#demoActionTwoLine", "minHeight") == "60px"
     assert_action_row_colors(
