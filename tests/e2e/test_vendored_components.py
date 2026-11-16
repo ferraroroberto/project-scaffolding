@@ -29,7 +29,7 @@ import re
 from collections.abc import Callable
 from contextlib import AbstractContextManager
 
-from playwright.sync_api import Browser, Page, expect
+from playwright.sync_api import Browser, Page, Playwright, expect
 
 from tests.e2e import _action_row_avatar_checks, _code_listing_checks, _day_checks, _review_rule_checks
 from tests.e2e._action_row_assertions import (
@@ -51,7 +51,11 @@ from tests.e2e._geometry import (
     assert_unpainted,
     effective_rect,
 )
-from tests.e2e._settings_group_checks import check_select_native_contract, run_settings_group_cases
+from tests.e2e._settings_group_checks import (
+    check_select_native_boundary_renders_in_webkit,
+    check_select_native_contract,
+    run_settings_group_cases,
+)
 from tests.e2e.conftest import STATIC_DIR
 
 _RANGE_ROWS = ("#demoRange2", "#demoRangeTabs", "#demoRange5")
@@ -823,7 +827,7 @@ def _check_dark_theme_values(gallery: Page) -> None:
     assert_action_row_split_meta(gallery)
 
 
-def test_gallery_component_contracts(new_gallery: Callable[[], AbstractContextManager[Page]], static_server: str, browser: Browser) -> None:
+def test_gallery_component_contracts(new_gallery: Callable[[], AbstractContextManager[Page]], static_server: str, browser: Browser, playwright: Playwright) -> None:
     """Every gallery component's contract, one case per component, each on a freshly loaded gallery."""
     with cases() as c:
         with c.case("card_contract"), new_gallery() as gallery:
@@ -885,3 +889,5 @@ def test_gallery_component_contracts(new_gallery: Callable[[], AbstractContextMa
         with c.case("day_row_and_day_marks_contract"), new_gallery() as gallery:
             _day_checks.check_day_row_and_day_marks_contract(gallery=gallery)
         run_settings_group_cases(c, new_gallery)
+        with c.case("select_native_boundary_renders_in_webkit"):
+            check_select_native_boundary_renders_in_webkit(playwright, static_server)
