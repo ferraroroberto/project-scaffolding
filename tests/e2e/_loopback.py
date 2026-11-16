@@ -25,7 +25,7 @@ from __future__ import annotations
 
 import mimetypes
 import posixpath
-from collections.abc import Iterator
+from collections.abc import Generator, Iterator
 from contextlib import contextmanager
 from http.server import SimpleHTTPRequestHandler
 from pathlib import Path
@@ -101,9 +101,11 @@ def is_port_pool_failure(text: str) -> bool:
 
 
 @pytest.hookimpl(wrapper=True)
-def pytest_runtest_makereport(item: pytest.Item, call: pytest.CallInfo[None]) -> Iterator[None]:
+def pytest_runtest_makereport(
+    item: pytest.Item, call: pytest.CallInfo[None]
+) -> Generator[None, pytest.TestReport, pytest.TestReport]:
     """Relabel a report that failed on `ERR_ADDRESS_IN_USE` so its first line names the host."""
-    report: Any = yield
+    report = yield
     if report.failed and is_port_pool_failure(report.longreprtext):
         report.longrepr = f"{PORT_POOL_HEADLINE}\n\n{report.longreprtext}"
         _PORT_POOL_FAILURES.append(report.nodeid)
