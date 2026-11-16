@@ -59,6 +59,11 @@ build_login_alert(app, get_notifier) -> on_alert
 vendor-verbatim; one alert text in every app,
 send on a thread, outcome sent / failed / unconfigured"]
     PASSWORD["password.py\ncheck_password / is_configured / set_password\nvendor-verbatim, stdlib; PBKDF2-SHA256 hash in\nconfig/app_password.json (APP_PASSWORD_FILE overrides)\nold plaintext value checked until the setter runs\npython -m src.password set | status"]
+    SUBJECTTEXT["subject_text.py
+clean_subject / RE_REPLY_PREFIX
+vendor-verbatim, stdlib; strips Re:/Rv:/Fw:/Fwd: chains,
+ASCII or full-width colon, colon required so
+Recibo / Revisión / Report keep their first letters"]
   end
   VIEWS -->|orchestrates, business logic stays here| PIPELINES
   VIEWS --> LOGGER
