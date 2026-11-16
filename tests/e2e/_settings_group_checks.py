@@ -46,16 +46,54 @@ def _lines(gallery: Page, selector: str) -> int:
 
 
 def check_select_native_contract(gallery: Page) -> None:
-    """select-native: control-height (36px via explicit height, not min-height), control-border border, input-bg fill."""
+    """select-native: a 44px box (explicit height, not min-height) around a 36px visible control, control-border ring, input-bg fill."""
     # THE iOS decision: height is an explicit `height` (respected), never
     # `min-height` (ignored on a bare <select>, rendering it stubby).
-    assert _style(gallery, "#demoSelectNative", "height") == "36px"
-    assert _style(gallery, "#demoSelectNative", "borderRadius") == "12px"
-    assert _style(gallery, "#demoSelectNative", "borderTopWidth") == "1px"
-    assert _style(gallery, "#demoSelectNative", "borderTopColor") == "rgb(129, 139, 152)"  # control-border
+    assert _style(gallery, "#demoSelectNative", "height") == "44px"
+    assert _style(gallery, "#demoSelectNative", "borderTopLeftRadius").startswith("12px")
+    # --control-border is drawn as an inset ring, not a border (the border is the transparent band).
+    assert _style(gallery, "#demoSelectNative", "boxShadow") == "rgb(129, 139, 152) 0px 0px 0px 1px inset"
     # input-bg is card-off in light (var(--card-off) = #f6f8fa).
     assert _style(gallery, "#demoSelectNative", "backgroundColor") == "rgb(246, 248, 250)"
     assert _style(gallery, "#demoSelectNative", "color") == "rgb(31, 35, 40)"
+
+
+def _assert_native_box(page: Page, sel: str) -> None:
+    """One native control: a 44px box whose visible control (the padding box) is 36px."""
+    box, visible = page.evaluate(
+        "(s) => { const e = document.querySelector(s), c = getComputedStyle(e), h = e.getBoundingClientRect().height;"
+        " return [h, h - parseFloat(c.borderTopWidth) - parseFloat(c.borderBottomWidth)]; }",
+        sel,
+    )
+    assert box >= 44, (sel, box)
+    assert visible == 36, (sel, visible)
+
+
+def _add_demo_input(page: Page) -> None:
+    """The gallery's only `.input-native` sits in a closed dialog, so a probe input goes beside the select."""
+    page.evaluate(
+        "() => { const i = document.createElement('input'); i.className = 'input-native'; i.id = 'probeInputNative';"
+        " i.type = 'text'; document.querySelector('#demoSelectNative').after(i); }"
+    )
+
+
+def check_select_native_meets_the_hit_floor(gallery: Page) -> None:
+    """select-native: the select and the shared `.input-native` are 44px at a fine and a coarse pointer, visible control 36px."""
+    assert gallery.evaluate("matchMedia('(pointer: fine)').matches"), "fine-pointer run expected"
+    _add_demo_input(gallery)
+    for sel in ("#demoSelectNative", "#probeInputNative"):
+        _assert_native_box(gallery, sel)
+    context = gallery.context.browser.new_context(viewport=_PHONE, has_touch=True, is_mobile=True)
+    try:
+        phone = context.new_page()
+        phone.goto(gallery.url)
+        phone.wait_for_selector("body[data-demo-ready='1']")
+        assert phone.evaluate("matchMedia('(pointer: coarse)').matches"), "coarse-pointer emulation is not active"
+        _add_demo_input(phone)
+        for sel in ("#demoSelectNative", "#probeInputNative"):
+            _assert_native_box(phone, sel)
+    finally:
+        context.close()
 
 
 def check_settings_group_header_sits_above_its_card(gallery: Page) -> None:
@@ -186,6 +224,7 @@ _CHECKS = (
     check_settings_group_switch_row_toggles_from_the_row,
     check_settings_group_number_fields_are_one_shape,
     check_settings_group_number_field_meets_the_hit_floor,
+    check_select_native_meets_the_hit_floor,
     check_settings_group_dark,
 )
 
