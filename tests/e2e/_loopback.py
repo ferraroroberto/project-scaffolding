@@ -10,9 +10,9 @@ cache, so one gallery load alone cost ~43 connections to the harness server.
 
 Two halves, both importable from a conftest:
 
-* `serving(port, directory)` + `route_served_files(context)` — answer GETs for
-  files the harness server would serve straight from disk, inside the browser
-  context, so they open no socket at all. Anything else (a POST, a redirect, a
+* `serving(port, directory)` + `routing_every_context()` — answer GETs for
+  files the harness server would serve straight from disk, inside every browser
+  context the session creates, so they open no socket at all. Anything else (a POST, a redirect, a
   404, a file that is not there) falls through to the real server, so its
   behaviour is unchanged.
 * `pytest_runtest_makereport` + `pytest_terminal_summary` — a failure whose
@@ -33,7 +33,7 @@ from typing import Any
 from urllib.parse import unquote, urlsplit
 
 import pytest
-from playwright.sync_api import BrowserContext, Request, Route
+from playwright.sync_api import Browser, BrowserContext, Request, Route
 
 PORT_POOL_MARKER = "ERR_ADDRESS_IN_USE"
 PORT_POOL_HEADLINE = (
@@ -94,6 +94,29 @@ def _handle(route: Route, request: Request) -> None:
 def route_served_files(context: BrowserContext) -> None:
     """Answer declared harness servers' static GETs inside *context* without a socket."""
     context.route(lambda url: urlsplit(url).port in _SERVED, _handle)
+
+
+@contextmanager
+def routing_every_context() -> Iterator[None]:
+    """Route every context `Browser.new_context` creates for the enclosed block.
+
+    One wrap of the one method every context comes from — pytest-playwright's
+    `page` and `new_context` fixtures, a case helper, a module that builds its
+    own phone context — so a context made by code written later is covered
+    without it remembering to call `route_served_files`.
+    """
+    original = Browser.new_context
+
+    def new_context(self: Browser, *args: Any, **kwargs: Any) -> BrowserContext:
+        context = original(self, *args, **kwargs)
+        route_served_files(context)
+        return context
+
+    Browser.new_context = new_context  # type: ignore[method-assign]
+    try:
+        yield
+    finally:
+        Browser.new_context = original  # type: ignore[method-assign]
 
 
 def is_port_pool_failure(text: str) -> bool:

@@ -701,7 +701,7 @@ A browser that loads a local page opens loopback TCP connections to the harness 
 The pattern, in the order that pays:
 
 1. **Measure before changing anything.** Sample `netstat -ano -p tcp` every 200 ms on a thread while the suite runs and count the *distinct new* loopback pairs seen in TIME_WAIT, excluding the pairs present at the start. Idle the same probe for the same duration to get the host's background rate (other local apps), and subtract it. Group the new pairs by port: a number concentrated on one port is the harness server.
-2. **Answer static GETs inside the context, not over a socket.** The server hands the harness directory out unchanged, so a context route can answer an existing file's GET from disk with the Content-Type the server would send, and open nothing. Anything else (a POST, a redirect, a missing file, a directory) falls through to the real server, so its behaviour is untouched. The vendored `tests/e2e/_loopback.py` (manifest key `e2e_loopback`) does it: `serving(port, directory)` declares what a harness server serves, `route_served_files(context)` installs the route, and `STATS` counts how many routed requests were answered from disk and how many went to the socket. Install it in every place the harness creates a context: an override of the `context` fixture (which the `page` fixture builds on) and the `new_page` helper that gives each case its own context.
+2. **Answer static GETs inside the context, not over a socket.** The server hands the harness directory out unchanged, so a context route can answer an existing file's GET from disk with the Content-Type the server would send, and open nothing. Anything else (a POST, a redirect, a missing file, a directory) falls through to the real server, so its behaviour is untouched. The vendored `tests/e2e/_loopback.py` (manifest key `e2e_loopback`) does it: `serving(port, directory)` declares what a harness server serves, `routing_every_context()` wraps `Browser.new_context` for the session so every context (the `page` fixture, a per-case helper, a module's own phone context) gets the route, and `STATS` counts how many routed requests were answered from disk and how many went to the socket. Run it from one session-scoped autouse fixture rather than at each place a context is made: a context created by code written later is covered without remembering to ask.
 3. **Serve the rest over HTTP/1.1.** The stdlib `SimpleHTTPRequestHandler` defaults to HTTP/1.0 and closes the connection after every response, one socket per request. Set `protocol_version = "HTTP/1.1"` on the harness handler so what still reaches the server reuses its connections.
 4. **Name the failure.** `_loopback.py` also carries two pytest hooks (`pytest_runtest_makereport`, `pytest_terminal_summary`) that re-export from `conftest.py`. A failure whose text contains `ERR_ADDRESS_IN_USE` leads with `PORT POOL EXHAUSTED`, and the run ends with a section of that name listing the affected tests, so a gate reader sees a host-capacity problem, not a page defect.
 
@@ -711,12 +711,12 @@ Measured on this scaffold's full e2e run, the same probe on the same host before
 
 | | Before | After |
 | --- | --- | --- |
-| New loopback TIME_WAIT pairs for the run | 7,150 | 1,122 |
+| New loopback TIME_WAIT pairs for the run | 7,150 | 576 |
 | of those, to the harness static server | 5,971 | 0 |
-| Run time | 347 s | 179 s |
+| Run time | 347 s | 157 s |
 | Result | 5 failed with `ERR_ADDRESS_IN_USE` or the page timeouts it causes | 16 passed |
 
-The 1,122 still includes about 675 per 180 s of other apps' traffic on the host; the rest is mostly the tray-lifecycle test polling its dummy app.
+The 576 is the host's background traffic: the same probe over an idle 180 s counted 675 new pairs, on the same three ports of other local apps. Two such runs at once, and a third straight after, finished with no `ERR_ADDRESS_IN_USE`.
 
 ### Running it
 

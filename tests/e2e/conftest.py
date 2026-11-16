@@ -16,7 +16,7 @@ launcher`'s `LAUNCHER_E2E_LIVE` / `tests/e2e/conftest.py`.
 vendored-component harnesses (their ESM imports don't run from `file://`).
 `pytest-playwright` supplies the `page` fixture.
 
-`context` and `new_page` answer the static servers' GETs from disk
+`_static_gets_from_disk` makes every browser context answer the static servers' GETs from disk
 (`_loopback.py`) so a run opens almost no sockets to them: every closed one
 parks a loopback port in TIME_WAIT, and a drained pool surfaces as
 `net::ERR_ADDRESS_IN_USE`, which the same module reports as "PORT POOL
@@ -48,7 +48,7 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 import pytest
-from playwright.sync_api import Browser, BrowserContext, Page, Playwright, sync_playwright
+from playwright.sync_api import Browser, Page, Playwright, sync_playwright
 
 from tests._streamlit_lifecycle import (
     STREAMLIT_E2E_PORT,
@@ -60,7 +60,7 @@ from tests.e2e._e2e_live_guard import require_disposable_instance
 from tests.e2e._loopback import (  # noqa: F401 — port-pool report hooks
     pytest_runtest_makereport,
     pytest_terminal_summary,
-    route_served_files,
+    routing_every_context,
     serving,
 )
 from tests.e2e._shot import CHROMIUM_CAPTURE_ARGS
@@ -200,11 +200,11 @@ def load_gallery(page: Page, base_url: str) -> Page:
     return page
 
 
-@pytest.fixture()
-def context(context: BrowserContext, static_server: str) -> BrowserContext:
-    """pytest-playwright's context, with declared harness servers' static GETs answered from disk."""
-    route_served_files(context)
-    return context
+@pytest.fixture(scope="session", autouse=True)
+def _static_gets_from_disk() -> Iterator[None]:
+    """Every browser context this session creates answers declared servers' static GETs from disk."""
+    with routing_every_context():
+        yield
 
 
 @pytest.fixture()
@@ -227,7 +227,6 @@ def new_page(browser: Browser, browser_context_args: dict) -> Callable[..., Abst
     def _open(**overrides: object) -> Iterator[Page]:
         context = browser.new_context(**{**browser_context_args, **overrides})
         try:
-            route_served_files(context)
             fresh = context.new_page()
             fresh.set_default_timeout(_DEFAULT_TIMEOUT_MS)
             fresh.set_default_navigation_timeout(_DEFAULT_TIMEOUT_MS)
