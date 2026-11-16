@@ -277,6 +277,7 @@ prefixes = [
     "app/webapp/static/_vendored/button/",
     "app/webapp/static/_vendored/card/",
     "app/webapp/static/_vendored/code-listing/",
+    "app/webapp/static/_vendored/color-scheme/",
     "app/webapp/static/_vendored/day-marks/",
     "app/webapp/static/_vendored/day-row/",
     "app/webapp/static/_vendored/disclosure/",
@@ -640,6 +641,8 @@ capture   = ["-m", "pytest", "tests/e2e/test_shot_capture.py::test_gallery_shots
 [components]
 # Web-app UI components (app/webapp/static/_vendored/) -- see that dir's README.
 base            = { src = "app/webapp/static/_vendored/base" }
+# The color-scheme trio alone, for an app without base (base.css repeats it).
+color-scheme    = { src = "app/webapp/static/_vendored/color-scheme" }
 nav             = { src = "app/webapp/static/_vendored/nav" }
 icons           = { src = "app/webapp/static/_vendored/icons" }
 card            = { src = "app/webapp/static/_vendored/card" }

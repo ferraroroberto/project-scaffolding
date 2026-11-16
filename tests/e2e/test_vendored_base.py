@@ -20,8 +20,9 @@ supposed to fall back to the UA font here.
 Native UI (a `<select>` list, date and time pickers, scrollbars) is drawn from
 `color-scheme`. An app that sets `light dark` on `:root` follows the OS, so a
 dark app theme on a light OS opened native popups on a light background. The
-vendored `base.css` pins `color-scheme` to `data-theme`, and an app's own bare
-`:root { color-scheme: light dark }` must not undo that.
+vendored `color-scheme/color-scheme.css` pins `color-scheme` to `data-theme`,
+`base.css` carries the same rules, and an app's own bare
+`:root { color-scheme: light dark }` must not undo either.
 
 Playwright cannot screenshot a native popup, so the proof is the palette the
 engine hands native UI: the `Canvas` system colour resolves to the scheme's
@@ -34,7 +35,7 @@ from collections.abc import Callable
 from contextlib import AbstractContextManager
 from pathlib import Path
 
-from playwright.sync_api import Page, Playwright, Route
+from playwright.sync_api import Browser, Page, Playwright, Route
 
 from tests.e2e._cases import cases
 from tests.e2e._color_assertions import style as _style
@@ -105,9 +106,14 @@ def _check_nav_tabs_inherit_without_base(static_server: str, page: Page) -> None
     mount_nav(page, static_server)
     assert _assert_inherit(page, ".tabs") >= 2
 
-_BASE_CSS = (
-    Path(__file__).resolve().parents[2] / "app/webapp/static/_vendored/base/base.css"
-).read_text(encoding="utf-8")
+_VENDORED = Path(__file__).resolve().parents[2] / "app/webapp/static/_vendored"
+
+# Both stylesheets an app may take the rules from: the standalone source, and
+# base.css, which carries the same rules.
+_SCHEME_SOURCES = {
+    "color_scheme": (_VENDORED / "color-scheme/color-scheme.css").read_text(encoding="utf-8"),
+    "base": (_VENDORED / "base/base.css").read_text(encoding="utf-8"),
+}
 
 # An app's own stylesheet, loaded AFTER base, restating the old fallback.
 _APP_CSS = ":root { color-scheme: light dark; } body { background: Canvas; }"
@@ -121,12 +127,11 @@ def _is_dark(rgb: str) -> bool:
     return sum(int(c) for c in rgb[rgb.index("(") + 1 : -1].split(",")[:3]) < 255
 
 
-def _read(playwright: Playwright, engine: str, os_scheme: str, theme: str | None) -> dict[str, str]:
+def _read(browser: Browser, css: str, os_scheme: str, theme: str | None) -> dict[str, str]:
     attr = f' data-theme="{theme}"' if theme else ""
-    browser = getattr(playwright, engine).launch()
+    page = browser.new_page(color_scheme=os_scheme)
     try:
-        page = browser.new_page(color_scheme=os_scheme)
-        page.set_content(_PAGE.format(attr=attr, base=_BASE_CSS, app=_APP_CSS))
+        page.set_content(_PAGE.format(attr=attr, base=css, app=_APP_CSS))
         return page.evaluate(
             """() => ({
               scheme: getComputedStyle(document.documentElement).colorScheme,
@@ -134,10 +139,10 @@ def _read(playwright: Playwright, engine: str, os_scheme: str, theme: str | None
             })"""
         )
     finally:
-        browser.close()
+        page.close()
 
 
-# OS scheme, data-theme, the color-scheme base.css must compute, whether it reads dark.
+# OS scheme, data-theme, the color-scheme the stylesheet must compute, whether it reads dark.
 _SCHEMES = [
     ("light", "dark", "dark", True),  # the reported case
     ("dark", "light", "light", False),
@@ -147,22 +152,27 @@ _SCHEMES = [
 
 
 def _check_color_scheme_follows_theme(
-    playwright: Playwright, engine: str, os_scheme: str, theme: str | None, scheme: str, dark: bool
+    browser: Browser, css: str, os_scheme: str, theme: str | None, scheme: str, dark: bool
 ) -> None:
-    got = _read(playwright, engine, os_scheme, theme)
+    got = _read(browser, css, os_scheme, theme)
     assert got["scheme"] == scheme, got
     # The scheme alone decides Canvas, so this is the colour native popups get.
     assert _is_dark(got["canvas"]) is dark, got
 
 
 def test_base_contract(new_page: Callable[..., AbstractContextManager[Page]], static_server: str, playwright: Playwright) -> None:
-    """Gallery controls and nav tabs take the body font with no `base.css` loaded, and `color-scheme` follows the theme on both engines."""
+    """Gallery controls and nav tabs take the body font with no `base.css` loaded, and `color-scheme` follows the theme from both sources on both engines."""
     with cases() as c:
         with c.case("gallery_controls_inherit_without_base"), new_page() as page:
             _check_gallery_controls_inherit_without_base(static_server=static_server, page=page)
         with c.case("nav_tabs_inherit_without_base"), new_page() as page:
             _check_nav_tabs_inherit_without_base(static_server=static_server, page=page)
         for engine in ["webkit", "chromium"]:
-            for os_scheme, theme, scheme, dark in _SCHEMES:
-                with c.case(f"color_scheme_follows_theme[{engine}-os_{os_scheme}-theme_{theme}]"):
-                    _check_color_scheme_follows_theme(playwright=playwright, engine=engine, os_scheme=os_scheme, theme=theme, scheme=scheme, dark=dark)
+            browser = getattr(playwright, engine).launch()
+            try:
+                for source, css in _SCHEME_SOURCES.items():
+                    for os_scheme, theme, scheme, dark in _SCHEMES:
+                        with c.case(f"color_scheme_follows_theme[{source}-{engine}-os_{os_scheme}-theme_{theme}]"):
+                            _check_color_scheme_follows_theme(browser=browser, css=css, os_scheme=os_scheme, theme=theme, scheme=scheme, dark=dark)
+            finally:
+                browser.close()

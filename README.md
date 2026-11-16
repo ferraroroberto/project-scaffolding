@@ -123,7 +123,7 @@ app/
   tray/watchdog.py          vendor-verbatim tray self-heal primitives (spawn retry/backoff, health watchdog, breadcrumb log)
   site/static/_vendored/    vendor-verbatim web-page (static site) components (site-tokens/, site-base/, site-header/, site-section/, site-image/, site-video/, site-button/, site-card/, site-testimonial/, site-carousel/, site-product/, site-pen/, site-footer/, site-consent/, site-theme/)
   webapp/serve.py           vendor-verbatim HTTP/2 launch module (hypercorn + uvicorn fallback, selector loop pinned)
-  webapp/static/_vendored/  vendor-verbatim web-app UI components (base/, nav/, icons/, card/, disclosure/, modal/, empty-state/, switch/, icon-tile/, button/, range-tab/, page-foot/, home-head/, select-native/, settings-group/, action-row/, text-size/, toast/, rec-wave/, mic-notice/, row-menu/, icon-button/, code-listing/, day-row/, day-marks/, segmented/, usage-log/ + demo.html gallery)
+  webapp/static/_vendored/  vendor-verbatim web-app UI components (base/, color-scheme/, nav/, icons/, card/, disclosure/, modal/, empty-state/, switch/, icon-tile/, button/, range-tab/, page-foot/, home-head/, select-native/, settings-group/, action-row/, text-size/, toast/, rec-wave/, mic-notice/, row-menu/, icon-button/, code-listing/, day-row/, day-marks/, segmented/, usage-log/ + demo.html gallery)
 src/
   config.py                 paths + env-driven settings
   logger.py                 the elegant logger
