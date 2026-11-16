@@ -707,6 +707,8 @@ tray_watchdog   = { src = "app/tray/watchdog.py" }
 geometry        = { src = "tests/e2e/_geometry.py" }
 e2e_live_guard  = { src = "tests/e2e/_e2e_live_guard.py" }
 browser_sweep   = { src = "tests/e2e/_browser_sweep.py" }
+# Answers the harness server's static GETs in-context and names ERR_ADDRESS_IN_USE; conftest imports its hooks.
+e2e_loopback    = { src = "tests/e2e/_loopback.py" }
 # The design-surface capture hook; conftest imports its collection hook (#408).
 surface_capture = { src = "tests/e2e/_surface.py" }
 # The screenshot baseline's capture half; its comparison is `shot_baseline` below.
