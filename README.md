@@ -34,6 +34,7 @@ Clone this directory, rename it, and start building.
 - `src/usage_log_starlette.py` — vendor-verbatim Starlette route for the usage log, with `GET` limited to the owner (manifest key `usage_log_starlette`). See the usage-log [README](app/webapp/static/_vendored/usage-log/README.md) ("Starlette apps").
 - `app/webapp/serve.py` — vendor-verbatim HTTP/2 launch module (manifest key `webapp_serve`): `python -m app.webapp.serve` serves the app with hypercorn (`h2` + `http/1.1` by ALPN over the TLS cert) and keeps `--server uvicorn` as the HTTP/1.1 fallback. See [`docs/webapp-pwa-conventions.md`](docs/webapp-pwa-conventions.md) ("Webapp PWA HTTP/2 launch").
 - `src/compression.py` — vendor-verbatim stream-safe gzip middleware (manifest key `compression`). See [`docs/webapp-pwa-conventions.md`](docs/webapp-pwa-conventions.md).
+- `src/shell_etag.py` — vendor-verbatim shell revalidation (manifest key `shell_etag`): `shell_response(request, stamped_html)` returns the `200` or a bodiless `304` for a matching `If-None-Match` (list, `*`, weak comparison), both with `Cache-Control: no-cache, must-revalidate` and a weak `ETag` over the stamped HTML. See [`docs/webapp-pwa-conventions.md`](docs/webapp-pwa-conventions.md).
 - `src/login_lockout.py` — vendor-verbatim per-client login lock-out: `429` + `Retry-After` after repeated wrong passwords, one owner alert per guessing streak (manifest key `login_lockout`). See the sign-in sheet's [README](app/webapp/static/_vendored/sign-in/README.md) ("Server side").
 - `src/password.py` — vendor-verbatim app sign-in password (manifest key `password`): one salted PBKDF2 hash in the git-ignored `config/app_password.json`, `check_password()` for the login route (the app's old value still works until the setter runs), and `python -m src.password set` to set it. See the sign-in sheet's [README](app/webapp/static/_vendored/sign-in/README.md) ("The password").
 - `src/subject_text.py` — vendor-verbatim reply/forward subject-prefix helper (manifest key `subject_text`): `clean_subject()` and `RE_REPLY_PREFIX` strip `Re:`/`Rv:`/`Fw:`/`Fwd:` chains (ASCII or full-width colon, any case) and leave "Recibo", "Revisión" and "Report" intact because the colon is required.
@@ -134,6 +135,7 @@ src/
   usage_log.py              vendor-verbatim local-only usage-log router (views, taps, device class -> usage.sqlite3)
   usage_log_starlette.py    vendor-verbatim Starlette route + owner-only reads for the usage log
   compression.py            vendor-verbatim stream-safe gzip middleware
+  shell_etag.py             vendor-verbatim shell ETag + bodiless 304 (`shell_response`, weak tag)
   login_lockout.py          vendor-verbatim per-client login lock-out (429 + Retry-After) + guessing alert
   password.py               vendor-verbatim app password: PBKDF2 hash store, check, `python -m src.password set`
   subject_text.py           vendor-verbatim reply/forward subject-prefix stripper (`clean_subject`, colon required)

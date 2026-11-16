@@ -226,12 +226,17 @@ class CachingStaticFiles(StaticFiles):
             response.headers["Cache-Control"] = _DAY_CACHE
         return response
 
-# The shell (index.html root route) — stamp asset URLs, force revalidation:
+# The shell (index.html root route) — stamp asset URLs, force revalidation,
+# answer a matching If-None-Match with a bodiless 304 (vendored src/shell_etag.py):
+from src.shell_etag import shell_response
+
 @router.get("/")
-async def index() -> HTMLResponse:
+async def index(request: Request) -> Response:
     html = BUILD_INFO.stamp_html((STATIC_DIR / "index.html").read_text(encoding="utf-8"))
-    return HTMLResponse(html, headers={"Cache-Control": "no-cache, must-revalidate"})
+    return shell_response(request, html)
 ```
+
+`shell_response` sets `Cache-Control: no-cache, must-revalidate` and a **weak** `ETag` over the stamped HTML on both the `200` and the `304`. It is weak because the gzip middleware (`src/compression.py`) re-encodes the body, so a strong tag would misdescribe the bytes on the wire; the build change that rotates the fleet hash also rotates the tag, so a stale shell is never pinned. Copy `src/shell_etag.py` byte-for-byte; never write a private tag or `If-None-Match` comparison.
 
 `BuildInfo` (computed once at startup) also surfaces `{git_sha, built_at, asset_hash}` at `/api/version` and the glanceable `Build:` footer (§the required-surfaces convention in `CLAUDE.md`); its git-SHA capture is console-less-tray-safe (`CREATE_NO_WINDOW` + `stdin=DEVNULL`). Verify with `curl -I` — `.js`/`.css` carry the long-immutable header, `/` carries `no-cache` — and confirm a real mobile PWA picks up new JS on a **normal reload** after a deploy, no delete/re-add. Service workers / offline caching are deliberately not used in the fleet.
 

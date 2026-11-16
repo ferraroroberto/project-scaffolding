@@ -772,3 +772,5 @@ site_check      = { src = "scripts/site_check.py" }
 resource_probe  = { src = "src/resource_probe.py" }
 # The one reply/forward subject-prefix pattern (colon required) and clean_subject; stdlib-only.
 subject_text    = { src = "src/subject_text.py" }
+# The one ETag + bodiless-304 answer for the shell document (weak tag over the stamped HTML); needs starlette.
+shell_etag      = { src = "src/shell_etag.py" }

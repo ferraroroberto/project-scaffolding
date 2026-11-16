@@ -53,6 +53,10 @@ routing_audit, gen_verify_skill, ios_sim_smoke)"]
     BUILDINFO["build_info.py (#199/#246/#247)\nbuild_identity(): git_sha + built_at\ncaptured once at import, bounded retry inside\nthe capture, never re-resolved later\nvendor-verbatim, self-contained (no local imports)"]
     RESOURCEPROBE["resource_probe.py\nsample_process(pid): threads, handles, RSS\nstart_breadcrumb(logger) logs them on an interval\nvendor-verbatim; unreadable = SampleUnavailable, never 0"]
     COMPRESSION["compression.py\nStreamSafeGZipMiddleware, registered last\nvendor-verbatim; never compresses SSE,\nMJPEG, websockets or already-compressed media"]
+    SHELLETAG["shell_etag.py
+shell_response(request, stamped_html): 200 or bodiless 304
+vendor-verbatim; weak ETag over the stamped HTML, If-None-Match
+list / * / weak comparison, Cache-Control kept on both"]
     LOGINLOCKOUT["login_lockout.py\nLoginLockout: retry_after / record_failure / reset\nvendor-verbatim, stdlib; 5 free, 2 s doubling to 300 s,\nforgotten after 1 h, bounded table, in memory\non_alert once per 3-failure streak, global cooldown\n(server half of _vendored/sign-in/)"]
     LOGINALERT["login_alert.py
 build_login_alert(app, get_notifier) -> on_alert
