@@ -13,12 +13,13 @@ from __future__ import annotations
 from collections.abc import Callable
 from contextlib import AbstractContextManager
 
-from playwright.sync_api import Page, expect
+from playwright.sync_api import Page, Playwright, expect
 
 from tests.e2e._cases import Cases
 from tests.e2e._color_assertions import set_theme as _set_theme
 from tests.e2e._color_assertions import style as _style
 from tests.e2e._geometry import assert_no_horizontal_overflow
+from tests.e2e.conftest import load_gallery
 
 _PHONE = {"width": 390, "height": 844}
 
@@ -94,6 +95,21 @@ def check_select_native_meets_the_hit_floor(gallery: Page) -> None:
             _assert_native_box(phone, sel)
     finally:
         context.close()
+
+
+def check_select_native_boundary_renders_in_webkit(playwright: Playwright, base_url: str) -> None:
+    """select-native: in WebKit the ring is the control-border inset shadow, not the native menulist, with the chevron drawn."""
+    browser = playwright.webkit.launch()
+    try:
+        context = browser.new_context(viewport=_PHONE, has_touch=True, is_mobile=True)
+        page = load_gallery(context.new_page(), base_url)
+        _assert_native_box(page, "#demoSelectNative")
+        # --control-border is drawn as an inset ring; a WebKit native menulist computes it as `none`.
+        assert _style(page, "#demoSelectNative", "boxShadow") == "rgb(129, 139, 152) 0px 0px 0px 1px inset"
+        assert _style(page, "#demoSelectNative", "appearance") == "none"
+        assert "linear-gradient" in _style(page, "#demoSelectNative", "backgroundImage"), "the chevron is missing"
+    finally:
+        browser.close()
 
 
 def check_settings_group_header_sits_above_its_card(gallery: Page) -> None:
