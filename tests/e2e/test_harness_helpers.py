@@ -15,7 +15,10 @@ The surface hook (`_surface.py`) is driven against the hermetic static page in
 `fixtures/surface/` with a stub in-page script, so nothing here depends on
 fleet-config; the checks are in `_surface_hook_checks.py`. The cwd isolation
 case (`_cwd_isolation_checks.py`) pins that neither the Playwright driver nor
-any browser helper holds this checkout as its working directory.
+any browser helper holds this checkout as its working directory. The loopback
+case (`_loopback.py`) pins that an existing static file is answered inside the
+browser context with no socket, while a missing one still reaches the real
+server's 404.
 """
 
 from __future__ import annotations
@@ -27,7 +30,7 @@ from pathlib import Path
 import pytest
 from playwright.sync_api import Browser, Page, Playwright
 
-from tests.e2e import _cwd_isolation_checks, _surface_hook_checks
+from tests.e2e import _cwd_isolation_checks, _loopback, _surface_hook_checks
 from tests.e2e._cases import cases
 from tests.e2e._layout_lint import Finding, capture_states
 from tests.e2e.conftest import serve_directory
@@ -56,6 +59,18 @@ def out_dir(tmp_path_factory: pytest.TempPathFactory) -> Path:
 
 def _named(findings: tuple[Finding, ...]) -> dict[str, str]:
     return {f.kind: f.element for f in findings if f.fails}
+
+
+def _check_static_gets_are_served_from_disk_and_the_rest_fall_through(page: Page, surface_server: str) -> None:
+    before = dict(_loopback.STATS)
+    response = page.goto(f"{surface_server}/page.html")
+    assert response is not None and response.status == 200
+    assert "text/html" in response.headers["content-type"]
+    assert _loopback.STATS["from_disk"] == before["from_disk"] + 1, "an existing file was not answered from disk"
+    assert _loopback.STATS["to_socket"] == before["to_socket"], "an existing file opened a socket"
+    missing = page.goto(f"{surface_server}/no-such-file.html")
+    assert missing is not None and missing.status == 404, "a missing file must reach the real server's 404"
+    assert _loopback.STATS["to_socket"] == before["to_socket"] + 1
 
 
 def _check_broken_sheet_fails_with_three_named_findings(layout_server: str, browser: Browser, out_dir: Path) -> None:
@@ -140,8 +155,10 @@ def test_harness_helpers(
     static_server: str,
     streamlit_app: str,
 ) -> None:
-    """The layout lint fails the broken sheet by name and passes the fixed twin, the gallery and Streamlit; the surface hook captures both themes; no Playwright process is rooted in this checkout."""
+    """The layout lint fails the broken sheet by name and passes the fixed twin, the gallery and Streamlit; the surface hook captures both themes; no Playwright process is rooted in this checkout; static GETs open no socket."""
     with cases() as c:
+        with c.case("static_gets_are_served_from_disk_and_the_rest_fall_through"), new_page() as page:
+            _check_static_gets_are_served_from_disk_and_the_rest_fall_through(page=page, surface_server=surface_server)
         with c.case("broken_sheet_fails_with_three_named_findings"), nullcontext(tmp_path_factory.mktemp("ui-proof")) as out_dir:
             _check_broken_sheet_fails_with_three_named_findings(layout_server=layout_server, browser=browser, out_dir=out_dir)
         with c.case("fixed_sheet_passes_and_allow_needs_a_reason"), nullcontext(tmp_path_factory.mktemp("ui-proof")) as out_dir:

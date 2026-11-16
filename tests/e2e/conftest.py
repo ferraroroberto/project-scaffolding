@@ -16,6 +16,12 @@ launcher`'s `LAUNCHER_E2E_LIVE` / `tests/e2e/conftest.py`.
 vendored-component harnesses (their ESM imports don't run from `file://`).
 `pytest-playwright` supplies the `page` fixture.
 
+`context` and `new_page` answer the static servers' GETs from disk
+(`_loopback.py`) so a run opens almost no sockets to them: every closed one
+parks a loopback port in TIME_WAIT, and a drained pool surfaces as
+`net::ERR_ADDRESS_IN_USE`, which the same module reports as "PORT POOL
+EXHAUSTED" instead of a page failure.
+
 `playwright` overrides pytest-playwright's own session fixture for one reason:
 to start the Node driver from a neutral working directory, so nothing it
 spawns can pin this checkout (`_neutral_driver_cwd`, #236).
@@ -42,7 +48,7 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 import pytest
-from playwright.sync_api import Browser, Page, Playwright, sync_playwright
+from playwright.sync_api import Browser, BrowserContext, Page, Playwright, sync_playwright
 
 from tests._streamlit_lifecycle import (
     STREAMLIT_E2E_PORT,
@@ -51,6 +57,12 @@ from tests._streamlit_lifecycle import (
 )
 from tests.e2e._browser_sweep import sweep_browser_helpers
 from tests.e2e._e2e_live_guard import require_disposable_instance
+from tests.e2e._loopback import (  # noqa: F401 — port-pool report hooks
+    pytest_runtest_makereport,
+    pytest_terminal_summary,
+    route_served_files,
+    serving,
+)
 from tests.e2e._shot import CHROMIUM_CAPTURE_ARGS
 from tests.e2e._surface import pytest_collection_modifyitems  # noqa: F401 — capture-mode deselect (#408)
 
@@ -70,6 +82,12 @@ _E2E_LIVE_ENV = "STREAMLIT_E2E_LIVE"
 
 
 class _QuietHandler(SimpleHTTPRequestHandler):
+    # HTTP/1.1 keeps the connection open between requests. The stdlib default
+    # (HTTP/1.0) closes it after every response, so one gallery load opened ~43
+    # sockets; each closed one parks a loopback ephemeral port in TIME_WAIT for
+    # minutes, and a full run drained the pool (`net::ERR_ADDRESS_IN_USE`).
+    protocol_version = "HTTP/1.1"
+
     def log_message(self, *args: object) -> None:  # noqa: D102 — silence per-request stderr noise
         pass
 
@@ -159,7 +177,10 @@ def serve_directory(directory: Path) -> Iterator[str]:
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
     try:
-        yield f"http://127.0.0.1:{server.server_address[1]}"
+        # Declared so every browser context answers this server's static GETs
+        # from disk instead of opening sockets to it (`_loopback.py`).
+        with serving(server.server_address[1], directory):
+            yield f"http://127.0.0.1:{server.server_address[1]}"
     finally:
         server.shutdown()
         thread.join(timeout=5)
@@ -177,6 +198,13 @@ def load_gallery(page: Page, base_url: str) -> Page:
     page.goto(f"{base_url}/_vendored/demo.html")
     page.wait_for_selector("body[data-demo-ready='1']")
     return page
+
+
+@pytest.fixture()
+def context(context: BrowserContext, static_server: str) -> BrowserContext:
+    """pytest-playwright's context, with declared harness servers' static GETs answered from disk."""
+    route_served_files(context)
+    return context
 
 
 @pytest.fixture()
@@ -199,6 +227,7 @@ def new_page(browser: Browser, browser_context_args: dict) -> Callable[..., Abst
     def _open(**overrides: object) -> Iterator[Page]:
         context = browser.new_context(**{**browser_context_args, **overrides})
         try:
+            route_served_files(context)
             fresh = context.new_page()
             fresh.set_default_timeout(_DEFAULT_TIMEOUT_MS)
             fresh.set_default_navigation_timeout(_DEFAULT_TIMEOUT_MS)
