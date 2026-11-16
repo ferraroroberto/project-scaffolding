@@ -14,6 +14,7 @@ from pathlib import Path
 
 import pytest
 
+from src.no_window import NO_WINDOW
 from tests.e2e import _loopback
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -96,7 +97,7 @@ def test_a_port_error_failure_is_reported_as_port_pool_exhaustion(tmp_path: Path
     env = {"PYTHONPATH": str(REPO_ROOT), "PYTHONUTF8": "1", "SYSTEMROOT": os.environ.get("SYSTEMROOT", "")}
     result = subprocess.run(
         [sys.executable, "-m", "pytest", "-p", "no:cacheprovider", "-q", "--rootdir", str(tmp_path), str(tmp_path)],
-        capture_output=True, text=True, cwd=tmp_path, env=env, timeout=120, check=False,
+        capture_output=True, text=True, cwd=tmp_path, env=env, timeout=120, check=False, creationflags=NO_WINDOW,
     )
     out = result.stdout
     assert result.returncode == 1, out
