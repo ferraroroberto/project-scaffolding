@@ -667,7 +667,7 @@ disclosure      = { src = "app/webapp/static/_vendored/disclosure" }
 empty-state     = { src = "app/webapp/static/_vendored/empty-state" }
 select-native   = { src = "app/webapp/static/_vendored/select-native" }
 switch          = { src = "app/webapp/static/_vendored/switch" }
-# The Settings pane's inset groups: overline header, card, four row variants.
+# The full Settings page: page shell, inset groups, sentence-case labels, four row variants, sheet fit.
 settings-group  = { src = "app/webapp/static/_vendored/settings-group" }
 icon-tile       = { src = "app/webapp/static/_vendored/icon-tile" }
 range-tab       = { src = "app/webapp/static/_vendored/range-tab" }
