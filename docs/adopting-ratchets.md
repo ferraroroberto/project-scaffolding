@@ -31,6 +31,7 @@ Listed in gate stage order, the order `scripts/run_ratchets.py` runs them. **Sib
 | conventions | `conventions_ratchet.py`, `conventions_readers.py`, `conventions_state.py` | choose `rules` | fast | | [conventions-ratchet.md](conventions-ratchet.md) |
 | runtime write | `runtime_write_ratchet.py`, `runtime_write_resolve.py` | a test command, for the probe | fast | yes | [runtime-write-ratchet.md](runtime-write-ratchet.md) |
 | usage track | `usage_track_ratchet.py`, `usage_track_scan.py` | a web UI; choose `rules` | fast | | [usage-track-ratchet.md](usage-track-ratchet.md) |
+| ux surface | `ux_surface_ratchet.py`, `usage_track_scan.py` | a web UI and its `docs/ux-surface-map.md` | fast | | [ux-surface-ratchet.md](ux-surface-ratchet.md) |
 
 [ratchet-catalog.md](ratchet-catalog.md) lists every rule of every ratchet by category, with a bad and a fixed snippet for each; read it to learn what a ratchet will flag before you adopt it.
 

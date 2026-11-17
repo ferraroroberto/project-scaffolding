@@ -597,6 +597,19 @@ exclude = [
 ]
 
 # ---------------------------------------------------------------------------
+# UX surface ratchet. scripts/verify-before-ship.ps1 runs
+# scripts/ux_surface_ratchet.py, which fails when a web app's HTML or JS gains a
+# surface root (a <dialog>, a dialog/menu/tabpanel role, a popover) with no
+# `data-surface` id, an id with no entry in its docs/ux-surface-map.md, a map
+# entry no element carries, or a duplicated or non-constant id, beyond the
+# committed baseline. Opt-in per repo through this table, like
+# [usage_track_ratchet]. Off here: the scaffold serves no web app, so it has no
+# surface map; its docs/ux-surface-map.md is the convention, not a map.
+# Mechanism + limits: docs/ux-surface-ratchet.md.
+[ux_surface_ratchet]
+enabled = false
+
+# ---------------------------------------------------------------------------
 # Screenshot baseline. scripts/verify-before-ship.ps1 runs
 # scripts/shot_baseline.py after the e2e stage: it compares the screenshots the
 # run recaptured (tests/e2e/_shot.py: phone + desktop, light + dark) with the
@@ -742,6 +755,8 @@ conventions_state = { src = "scripts/conventions_state.py" }
 usage_track_ratchet = { src = "scripts/usage_track_ratchet.py", requires = ["usage_track_scan"] }
 # usage_track_ratchet loads this sibling (the HTML and JS readers); `requires` makes /propagate-vendored carry both.
 usage_track_scan = { src = "scripts/usage_track_scan.py" }
+# ux_surface_ratchet reads JS through usage_track_scan's tokenizer; `requires` makes /propagate-vendored carry both.
+ux_surface_ratchet = { src = "scripts/ux_surface_ratchet.py", requires = ["usage_track_scan"] }
 runtime_write_ratchet = { src = "scripts/runtime_write_ratchet.py", requires = ["runtime_write_resolve"] }
 # runtime_write_ratchet loads this sibling (the static path resolver); `requires` makes /propagate-vendored carry both.
 runtime_write_resolve = { src = "scripts/runtime_write_resolve.py" }

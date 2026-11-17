@@ -12,6 +12,7 @@ The ratchets are the baseline-and-ratchet stages of the pre-ship gate: stdlib-on
 - [Runtime safety: conventions, runtime write](#runtime-safety)
 - [Agent instructions: instruction](#agent-instructions)
 - [Usage tracking: usage track](#usage-tracking)
+- [UX surfaces: ux surface](#ux-surfaces)
 - [Exceptions and burn-down](#exceptions-and-burn-down)
 - [Adoption order](#adoption-order)
 
@@ -74,7 +75,7 @@ comment ratchet: .comment-ratchet-baseline.json now has 0 entr(ies), 0 finding(s
 | 2 | Bad configuration, baseline or arguments | fails |
 | 3 | **Not confirmed**: the check could not run (a tool, sibling module or file missing, `git` unusable). Its own state, never folded into a pass | fails |
 
-A check that is switched off (`duplicates = false`, a runtime probe with no test command) prints **OFF**, never "clean". `scripts/run_ratchets.py` runs every enabled ratchet in stage order: static, comment, docs, structure, instruction, doc references, dead code, conventions, runtime write, usage track.
+A check that is switched off (`duplicates = false`, a runtime probe with no test command) prints **OFF**, never "clean". `scripts/run_ratchets.py` runs every enabled ratchet in stage order: static, comment, docs, structure, instruction, doc references, dead code, conventions, runtime write, usage track, ux surface.
 
 ## How to read an entry
 
@@ -1006,6 +1007,79 @@ usage track ratchet: [usage-log-wired] the app does not reach its usage log:
   no file in `paths` calls `initUsageLog(`
 ```
 
+## UX surfaces
+
+[ux-surface-ratchet.md](ux-surface-ratchet.md). A web app's [UX surface map](ux-surface-map.md) lists every surface under a stable id, and the code marks each surface root with the same id as `data-surface`. This ratchet reads the app's HTML and JavaScript and the map, and counts, per file and rule, where the two disagree: a code rule against the HTML or JS file, a map rule against the map. **Every rule is on by default**; `rules` narrows them. A missing map is not baselined: the check fails until the template is copied. **Except** one hit with `<rule>-exempt: <reason>` in a `//` comment in JavaScript or a `<!-- -->` comment in HTML and in the map, on its own line or in the comment block right above it. Or by `exclude`.
+
+```toml
+[ux_surface_ratchet]
+enabled = true
+map     = "docs/ux-surface-map.md"                              # the default
+paths   = ["app/webapp/static/**", "app/webapp/templates/**"]   # the default
+```
+
+#### `unmarked-surface`
+
+An element that is a surface by its markup (a `<dialog>`, a `role` of dialog, alertdialog, menu or tabpanel, a `popover` attribute) with no `data-surface`. In JavaScript it also reads a surface inside a string or template literal, and a `createElement` root (tag `dialog`, or a role or `popover` set in the same block) that never gets `dataset.surface` or `setAttribute('data-surface', ...)` in that block.
+
+```html
+<!-- bad -->
+<dialog id="add"><p>New task</p></dialog>
+
+<!-- fixed -->
+<dialog id="add" data-surface="strip.quick-add"><p>New task</p></dialog>
+```
+
+#### `invalid-surface-id`
+
+A `data-surface` value (also a `dataset.surface` assignment or a `setAttribute('data-surface', ...)` value), or a map entry's id, that is not a string literal of lowercase letters and digits in segments joined by `.` or `-` (the e2e `surface()` name form). A name bound to a module-level `const` string literal is resolved and accepted.
+
+```js
+// bad
+menu.dataset.surface = `menu-${kind}`;
+
+// fixed
+menu.dataset.surface = 'today.row-menu';
+```
+
+#### `unmapped-surface`
+
+An id the code declares that no map entry lists.
+
+```markdown
+<!-- bad: the code has data-surface="strip.quick-add", the map has no entry -->
+
+<!-- fixed -->
+**`strip.quick-add` Quick-add dialog** — *Root:* `data-surface`. *Reach:* the + button.
+```
+
+#### `stale-entry`
+
+A map entry no element in the code carries, unless its *Root* says `none — <reason>` (a gesture, a key, a state drawn inside another surface).
+
+```markdown
+<!-- bad: no element carries data-surface="row.swipe" -->
+**`row.swipe` Swipe** — *Reach:* a row, on touch.
+
+<!-- fixed -->
+**`row.swipe` Swipe** — *Root:* none — a gesture on the row. *Reach:* a row, on touch.
+```
+
+#### `duplicate-surface`
+
+An id declared on more than one element in the code, or listed by more than one map entry. Every site is a hit.
+
+```html
+<!-- bad -->
+<div popover data-surface="row.date"></div>
+<dialog data-surface="row.date"></dialog>
+
+<!-- fixed: one root, or the second excepted with its reason -->
+<div popover data-surface="row.date"></div>
+<!-- duplicate-surface-exempt: the phone renders the same date picker as a sheet -->
+<dialog data-surface="row.date"></dialog>
+```
+
 ## Exceptions and burn-down
 
 A hit has five possible fates. Pick the narrowest.
@@ -1032,6 +1106,7 @@ Which ratchets take which:
 | conventions | `# <rule>-exempt: <reason>` | `exclude`, `print_paths` |
 | runtime write | `# runtime-write-exempt: <reason>` | `exclude`, `safe_calls`, `code_folders` |
 | usage track | `<rule>-exempt: <reason>` | `exclude`, `paths`, `builders` |
+| ux surface | `<rule>-exempt: <reason>` | `exclude`, `paths`, `rules` |
 
 **A baseline is a ledger to burn to zero, never a permanent allowance.** It records debt, not approval:
 
@@ -1042,4 +1117,4 @@ Which ratchets take which:
 
 ## Adoption order
 
-[adopting-ratchets.md](adopting-ratchets.md) has the steps and the prerequisites table, and `scripts/tools/adopt_ratchets.py` does them. A sensible order: start with the set that is Python only and needs no choices (comment, docs, structure, instruction, doc references, dead code, runtime write), then add static once `ruff` is installed, then conventions and usage track by choosing the rules that match the repository. Run `--init` on each, review the baseline, and burn it down in later changes.
+[adopting-ratchets.md](adopting-ratchets.md) has the steps and the prerequisites table, and `scripts/tools/adopt_ratchets.py` does them. A sensible order: start with the set that is Python only and needs no choices (comment, docs, structure, instruction, doc references, dead code, runtime write), then add static once `ruff` is installed, then conventions and usage track by choosing the rules that match the repository, and ux surface once the web app has its surface map. Run `--init` on each, review the baseline, and burn it down in later changes.
