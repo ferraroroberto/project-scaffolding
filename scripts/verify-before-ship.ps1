@@ -79,6 +79,14 @@
                          reach its usage log; opt-in per rule via .fleet.toml
                          [usage_track_ratchet]; exit 3 = "not confirmed", a
                          failure, never a pass (docs/usage-track-ratchet.md)
+     12b. ux surface ratchet — scripts/ux_surface_ratchet.py: fails when a web
+                         app's HTML or JS gains a surface root with no
+                         data-surface id, an id with no entry in
+                         docs/ux-surface-map.md, a map entry no element
+                         carries, a duplicated or non-constant id, beyond the
+                         committed baseline; opt-in via .fleet.toml
+                         [ux_surface_ratchet]; exit 3 = "not confirmed", a
+                         failure, never a pass (docs/ux-surface-ratchet.md)
      13. mypy --strict — the vendor-verbatim primitives only; the list is
                          derived from .fleet.toml's [components] catalog via
                          scripts/vendored_catalog.py, never hand-maintained here
@@ -201,6 +209,7 @@ Invoke-Stage "dead code ratchet"                  { & $py "scripts/dead_code_rat
 Invoke-Stage "conventions ratchet"                { & $py "scripts/conventions_ratchet.py" }
 Invoke-Stage "runtime write ratchet"              { & $py "scripts/runtime_write_ratchet.py" }
 Invoke-Stage "usage track ratchet"                { & $py "scripts/usage_track_ratchet.py" }
+Invoke-Stage "ux surface ratchet"                 { & $py "scripts/ux_surface_ratchet.py" }
 Invoke-Stage "mypy --strict (vendored)"           { & $py -m mypy @VendoredModules }
 # Runtime write probe, first half: what already sits untracked or ignored under
 # the code folders, so the probe after the tests names only what they wrote.

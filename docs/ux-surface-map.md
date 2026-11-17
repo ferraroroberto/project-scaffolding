@@ -43,8 +43,8 @@ Add *Phone* and *Desktop* where the two renderings differ; a field without eithe
 
 ## Ids
 
-- An id matches `[A-Za-z0-9][A-Za-z0-9._:-]{0,63}`: no spaces, no `/`, at most 64 characters.
-- Prefer `<area>.<surface>`, such as `today.row-menu` or `settings.theme`. Short area-number ids (`RW-4`) work too, but an id is never renumbered when entries are reordered.
+- An id is lowercase letters and digits in segments joined by `.` or `-` (`^[a-z0-9]+(?:[.-][a-z0-9]+)*$`), the same form the e2e capture hook takes, so one id names the surface in the map, in the markup and in a test's `surface(page, "<id>")` call.
+- Prefer `<area>.<surface>`, such as `today.row-menu` or `settings.theme`. Short area-number ids (`rw-4`) work too, but an id is never renumbered when entries are reordered.
 - An id is stable for the life of the surface. Renaming a surface's title keeps its id; removing the surface removes its entry and every `data-surface` that carried it, in the same change.
 - One id names one surface. A surface drawn two ways (a popover with a mouse, a sheet on a phone) keeps one id and one entry, with *Phone* and *Desktop* lines.
 
@@ -76,6 +76,8 @@ menu.dataset.surface = 'today.row-menu';
 ## Keeping it true
 
 A change that adds, removes, renames or reshapes a user-visible surface updates the map in the same PR, including the entry's *Why* when the choice was deliberate, and adds or removes the matching `data-surface`. A surface's entry and its attribute appear and disappear together.
+
+The gate holds this deterministically: the [UX surface ratchet](ux-surface-ratchet.md) fails a change that adds a surface root with no `data-surface`, an id with no entry, an entry no element carries, or one id on two surfaces, beyond the app's committed baseline. It sees what the markup and the JS declare; a screen or state built with no id at all is caught by the design-review and e2e walk, which reports every surface it opened that carries no `data-surface`.
 
 ## Starting a map
 
