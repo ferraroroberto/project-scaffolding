@@ -42,7 +42,7 @@ A config template (`*.example.*`, `*.sample.*`, `*.json.example`) is the committ
 
 ### Folder types
 
-*Enforced, shrink-only.* A typed folder takes files of its type only, so a script cannot sit in `docs/`, a notebook in `src/` or a binary in `tests/`. The longest typed folder holding a file sets its type, so `tests/fixtures/` and `tests/e2e/fixtures/` (the pages an e2e suite serves) take any type over `tests/` (code), and `tests/e2e/shots/` (the screenshot baselines the vendored `shot_baseline` writes) takes images. A folder no row names is untyped: `data/`, `assets/`, `brand/`, `content/` and `site/` take anything. Everywhere, a file named `README.md`, and any path with a hidden segment (`.gitkeep`, `app/.streamlit/`), is allowed. Extensions compare lowercased.
+*Enforced, shrink-only.* A typed folder takes files of its type only, so a script cannot sit in `docs/`, a notebook in `src/` or a binary in `tests/`. The longest typed folder holding a file sets its type, so `tests/fixtures/` and `tests/e2e/fixtures/` (the pages an e2e suite serves) take any type over `tests/` (code), and `tests/e2e/shots/` (the screenshot baselines the vendored `shot_baseline` writes) takes images. A folder no row names is untyped: `data/`, `assets/`, `brand/`, `content/` and `site/` take anything. Everywhere, a file named `README.md` or `ux-surfaces.yaml` (the [UX surface map](ux-surface-map.md), a structured document kept in `docs/` beside the page generated from it), and any path with a hidden segment (`.gitkeep`, `app/.streamlit/`), is allowed. Extensions compare lowercased.
 
 | Type | Extensions |
 |---|---|

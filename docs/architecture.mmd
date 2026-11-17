@@ -97,9 +97,11 @@ Recibo / Revisión / Report keep their first letters"]
     WRATCHET["runtime_write_ratchet.py (vendor-verbatim, stdlib ast)\nwrite targets resolving under code folders may not rise\nvs .runtime-write-ratchet-baseline.json; unresolved = exit 3\n--snapshot/--probe: no new runtime file under code folders after the tests\nloads sibling runtime_write_resolve.py: the path resolver\nopt-in via .fleet.toml [runtime_write_ratchet]"]
     UTRATCHET["usage_track_ratchet.py (vendor-verbatim, stdlib html.parser + JS tokenizer)\ncontrols with no constant data-track, dialogs with no data-track-view,\ntracking ids built at run time may not rise per file and rule\nvs .usage-track-ratchet-baseline.json; usage-log-wired never baselined\nloads sibling usage_track_scan.py: the HTML + JS readers\nopt-in via .fleet.toml [usage_track_ratchet]; exit 3 = not confirmed"]
     USRATCHET["ux_surface_ratchet.py (vendor-verbatim, stdlib html.parser + shared JS tokenizer)
-surface roots with no constant data-surface, ids with no docs/ux-surface-map.md entry,
-entries no element carries, duplicated ids may not rise per file and rule
-vs .ux-surface-ratchet-baseline.json; reads JS through usage_track_scan.py
+surface roots with no constant data-surface, ids with no docs/ux-surfaces.yaml entry,
+entries no element carries, duplicated ids, dangling links, a page not regenerated
+may not rise per file and rule vs .ux-surface-ratchet-baseline.json;
+reads JS through usage_track_scan.py, the YAML map through ux_surface_map.py
+(which also generates docs/ux-surface-map.md: one Mermaid diagram per area)
 opt-in via .fleet.toml [ux_surface_ratchet]; exit 3 = not confirmed"]
     ADOPTKIT["adopt_ratchets.py + run_ratchets.py (not vendored, stdlib)
 adopt: copy chosen ratchets + siblings into any repo,

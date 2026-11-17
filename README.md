@@ -55,7 +55,7 @@ Clone this directory, rename it, and start building.
 - `.fleet.toml`'s `[components]` table + `scripts/vendored_catalog.py` — the canonical catalog of every vendor-verbatim component this scaffold publishes. See [`docs/components.md`](docs/components.md).
 - `docs/agents/` — the master AGENTS/CLAUDE templates, the adapt prompt and the rollout runbook.
 - [`docs/architecture-decisions.md`](docs/architecture-decisions.md) — the register of standing architecture decisions, one `adr` issue each.
-- [`docs/ux-surface-map.md`](docs/ux-surface-map.md) — the per-app map of every user-facing surface (entry shape, stable ids, the `data-surface` attribute in code, the surface graph), with the copy-to-start [`docs/templates/ux-surface-map.md`](docs/templates/ux-surface-map.md).
+- [`docs/ux-surface-map.md`](docs/ux-surface-map.md) — the per-app map of every user-facing surface (the `docs/ux-surfaces.yaml` schema, stable ids, the `data-surface` attribute in code, the generated page with one diagram per area), with the copy-to-start [`docs/templates/ux-surfaces.yaml`](docs/templates/ux-surfaces.yaml).
 - [`docs/implicit-state-machines.md`](docs/implicit-state-machines.md) — what an implicit state machine is, how to spot one (signs, a deterministic scan then an agent deep-dive), and the declared-state shape that replaces it.
 - [`docs/repo-layout.md`](docs/repo-layout.md) — where code goes: canonical tree, placement rules, extra roots per repo shape.
 - [`docs/layout.md`](docs/layout.md) — this repo's own layout: its folders and where new code goes.
@@ -159,7 +159,8 @@ scripts/
   runtime_write_resolve.py    runtime_write_ratchet's sibling: resolves where each write target points
   usage_track_ratchet.py      gate stage: untracked controls and sheets, and built tracking ids, may not rise above a committed baseline
   usage_track_scan.py         usage_track_ratchet's sibling: the HTML and JS readers (its JS tokenizer is shared with ux_surface_ratchet)
-  ux_surface_ratchet.py       gate stage: data-surface ids and the docs/ux-surface-map.md entries may not drift apart beyond a committed baseline
+  ux_surface_ratchet.py       gate stage: data-surface ids and the docs/ux-surfaces.yaml entries may not drift apart beyond a committed baseline
+  ux_surface_map.py           ux_surface_ratchet's sibling: reads docs/ux-surfaces.yaml (strict YAML subset) and generates docs/ux-surface-map.md
   dead_code_ratchet.py        gate stage: unreferenced functions, classes and methods may not rise above a committed baseline
   doc_refs_ratchet.py         gate stage: doc references to missing paths, modules or ports, and uses of a declared retired name, may not rise above a committed baseline
   docs_ratchet.py              gate stage: README byte budget + docs history markers may not rise above a committed baseline

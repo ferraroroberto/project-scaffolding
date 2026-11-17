@@ -1025,12 +1025,13 @@ usage track ratchet: [usage-log-wired] the app does not reach its usage log:
 
 ## UX surfaces
 
-[ux-surface-ratchet.md](ux-surface-ratchet.md). A web app's [UX surface map](ux-surface-map.md) lists every surface under a stable id, and the code marks each surface root with the same id as `data-surface`. This ratchet reads the app's HTML and JavaScript and the map, and counts, per file and rule, where the two disagree: a code rule against the HTML or JS file, a map rule against the map. **Every rule is on by default**; `rules` narrows them. A missing map is not baselined: the check fails until the template is copied. **Except** one hit with `<rule>-exempt: <reason>` in a `//` comment in JavaScript or a `<!-- -->` comment in HTML and in the map, on its own line or in the comment block right above it. Or by `exclude`.
+[ux-surface-ratchet.md](ux-surface-ratchet.md). A web app's [UX surface map](ux-surface-map.md) lists every surface under a stable id, and the code marks each surface root with the same id as `data-surface`. The map is `docs/ux-surfaces.yaml`, and `scripts/ux_surface_map.py` generates the readable `docs/ux-surface-map.md` from it. This ratchet reads the app's HTML and JavaScript, the map and the page, and counts, per file and rule, where they disagree: a code rule against the HTML or JS file, a map rule against the map, `stale-generated` against the page. **Every rule is on by default**; `rules` narrows them. A missing or invalid map is not baselined: the check fails until the template is copied or the map is fixed. **Except** one hit with `<rule>-exempt: <reason>` in a `//` comment in JavaScript, a `<!-- -->` comment in HTML or a `#` comment in the map, on its own line or in the comment block right above it. Or by `exclude`.
 
 ```toml
 [ux_surface_ratchet]
 enabled = true
-map     = "docs/ux-surface-map.md"                              # the default
+map     = "docs/ux-surfaces.yaml"                               # the default
+page    = "docs/ux-surface-map.md"                              # the default, generated from the map
 paths   = ["app/webapp/static/**", "app/webapp/templates/**"]   # the default
 ```
 
@@ -1062,23 +1063,35 @@ menu.dataset.surface = 'today.row-menu';
 
 An id the code declares that no map entry lists.
 
-```markdown
-<!-- bad: the code has data-surface="strip.quick-add", the map has no entry -->
+```yaml
+# bad: the code has data-surface="strip.quick-add", the map has no entry
 
-<!-- fixed -->
-**`strip.quick-add` Quick-add dialog** — *Root:* `data-surface`. *Reach:* the + button.
+# fixed
+  - id: strip.quick-add
+    area: strip
+    title: Quick-add dialog
+    root: data-surface
+    reach:
+      - the + button
 ```
 
 #### `stale-entry`
 
-A map entry no element in the code carries, unless its *Root* says `none — <reason>` (a gesture, a key, a state drawn inside another surface).
+A map entry no element in the code carries, unless its `root` is `none: <reason>` (a gesture, a key, a state drawn inside another surface).
 
-```markdown
-<!-- bad: no element carries data-surface="row.swipe" -->
-**`row.swipe` Swipe** — *Reach:* a row, on touch.
+```yaml
+# bad: no element carries data-surface="row.swipe"
+  - id: row.swipe
+    area: today
+    title: Swipe
+    root: data-surface
 
-<!-- fixed -->
-**`row.swipe` Swipe** — *Root:* none — a gesture on the row. *Reach:* a row, on touch.
+# fixed
+  - id: row.swipe
+    area: today
+    title: Swipe
+    root:
+      none: a gesture on the row
 ```
 
 #### `duplicate-surface`
@@ -1094,6 +1107,31 @@ An id declared on more than one element in the code, or listed by more than one 
 <div popover data-surface="row.date"></div>
 <!-- duplicate-surface-exempt: the phone renders the same date picker as a sheet -->
 <dialog data-surface="row.date"></dialog>
+```
+
+#### `dangling-link`
+
+A map entry's `links` item whose `to:` id no entry lists. The page draws it to a stub saying the entry is missing.
+
+```yaml
+# bad: no entry has id today.row-menus
+    links:
+      - to: today.row-menus
+        via: the kebab
+
+# fixed
+    links:
+      - to: today.row-menu
+        via: the kebab
+```
+
+#### `stale-generated`
+
+The committed `docs/ux-surface-map.md` is not what `scripts/ux_surface_map.py` generates from the map (line endings aside), or it is missing. The hit is on the first differing line. Never edit the page; change the map and regenerate.
+
+```text
+bad:   the map gained an entry, the page was not regenerated
+fixed: python scripts/ux_surface_map.py, and commit the map and the page together
 ```
 
 ## Exceptions and burn-down
