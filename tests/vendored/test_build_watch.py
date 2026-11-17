@@ -74,6 +74,7 @@ def test_a_newer_live_build_shows_the_prompt_on_the_toast_glass(probe: dict[str,
     assert (stale["role"], stale["live"]) == ("status", "polite")
     assert stale["texts"][:2] == ["New version available", "Reload"]
     assert stale["tracks"] == [None, "build.reload", "build.dismiss"]
+    assert stale["surface"] == "app.update-banner"
     assert stale["read"]["url"] == "/api/version"
     assert stale["read"]["init"]["cache"] == "no-store"
 

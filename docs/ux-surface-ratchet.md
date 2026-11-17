@@ -44,7 +44,7 @@ An id declared on more than one element in the code, or listed by more than one 
 
 ## What it reads
 
-- **Code:** every tracked or untracked-but-not-ignored file under `paths` with an HTML suffix (`.html`, `.htm`, `.jinja`, `.jinja2`, `.j2`) or a JS one (`.js`, `.mjs`), outside `exclude`, test folders, `node_modules`, `.venv`, `*.min.js` and every `[vendored]` destination. A surface a vendored component builds is stamped by the app's call site, which is scanned.
+- **Code:** every tracked or untracked-but-not-ignored file under `paths` with an HTML suffix (`.html`, `.htm`, `.jinja`, `.jinja2`, `.j2`) or a JS one (`.js`, `.mjs`), outside `exclude`, test folders, `node_modules`, `.venv`, `*.min.js` and every `[vendored]` destination. A surface a vendored component builds is stamped by the app's call site, which is scanned. A vendored file is read only for the ids it stamps itself (`build-watch`'s `app.update-banner`): they keep a map entry from being stale, and no rule is applied to the vendored copy, since the app cannot edit it. An app still lists such an id in its map; nothing fails if it does not.
 - **The map:** the file named by `map`. An entry is a line that opens with a bold backticked id (`**\`today.row-menu\` Row menu**`, optionally as a list item), outside fenced code blocks, and runs until the next entry or heading. Prose between entries is ignored.
 
 ## Exceptions
