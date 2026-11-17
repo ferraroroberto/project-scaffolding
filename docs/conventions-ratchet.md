@@ -10,7 +10,7 @@ It reuses the shape of the [dead code ratchet](dead-code-ratchet.md): an opt-in 
 
 Each rule is opted into by name in `rules`. A rule that needs the repo's own helper refuses to run until the helper is declared, so a repo without one is never flagged for not using it.
 
-**Test modules** (any file under a `tests/` or `test/` folder, `test_*.py`, `*_test.py`, `conftest.py`) are held to `no-window` only. Fixtures legitimately spell drive paths, raw compares and raw git calls.
+**Test modules** (any file under a `tests/` or `test/` folder, `test_*.py`, `*_test.py`, `conftest.py`) are held to `no-window` and `browser-per-iteration` only. Fixtures legitimately spell drive paths, raw compares and raw git calls; a capture walk is as likely to live in a test as in a script.
 
 ### `no-window`
 
@@ -189,6 +189,24 @@ A call that is meant to block for the child's whole life (a foreground dev runne
 A fix passes a named constant (`timeout=GIT_TIMEOUT_S`) and handles `subprocess.TimeoutExpired` as its own failure, distinct from the child's non-zero exit: a hung child and a failed child are different conditions.
 
 **Enabling it in a repo that has hits today.** Add `"subprocess-timeout"` to `rules` and record today's hits with `--update-baseline --allow-additions` (or `--init` when there is no baseline yet). Fix them in a follow-up, so the baseline reaches zero and is not kept as a standing ledger. A copy of a scaffold script that predates its timeout (`scripts/gen_tailscale_cert.py`, `scripts/classify_e2e.py`) is cleared by re-vendoring it, not by editing the copy.
+
+### `browser-per-iteration`
+
+> **Windows ephemeral port exhaustion takes down the whole fleet at once** — all local web apps dead 1–4 min at once, then self-healing, is a drained dynamic port range, not one app's diff … then fix the leaking burst and pool connections first.
+
+A browser context starts with an empty HTTP cache, so a capture walk that opens one per screenshot re-fetches every module and stylesheet each time, and every closed connection leaves a TIME_WAIT entry on the target port for minutes. One such walk left a few hundred sockets on one port and took the host's whole ephemeral pool with it. The convention is one browser and one reused context per walk, paced by the TIME_WAIT count: the vendored `tests/e2e/_paced_browser.py` (manifest key `paced_browser`), described under "One paced, reused browser for every walk" in [playwright-ui-testing.md](playwright-ui-testing.md).
+
+A hit is, inside a `for`, `async for`, `while` or comprehension body:
+
+- `<x>.new_context(...)`, any receiver;
+- `browser.new_page(...)`, which makes a context of its own (on a `context` receiver the same call adds a tab to the one context, which is what the rule asks for, so it is not a hit);
+- `<chromium|firefox|webkit|browser_type>.launch(...)` or `.launch_persistent_context(...)`.
+
+The loop's iterable and its `else` run once and are not the body. A function defined inside a loop is not run once per pass, so its body starts outside the loop again. The rule reads names, not types, and a context opened by a helper the loop calls is not seen: the helper's own loop is what it checks. Test modules are held to it, because a walk lives in a test as often as in a script.
+
+Two loops are legitimate and take `# browser-per-iteration-exempt: <reason>`: a retry that waits out a locked profile (at most one launch ever succeeds), and a case whose point is a clean cache or a fresh storage state per pass (a payload table where each row must start unauthenticated). A comment marker with no reason exempts nothing.
+
+**Enabling it in a repo that has hits today.** Add `"browser-per-iteration"` to `rules` and record today's hits with `--update-baseline --allow-additions` (or `--init` when there is no baseline yet). Fix the walks first: move the context above the loop and call `walk.visit(url)` between captures.
 
 ### `must-use`
 
@@ -454,6 +472,7 @@ A read-only dry run with **every rule on** over every fleet checkout (42 repos),
 | `must-use` `sqlite3.connect` outside the repo's `get_db` home, no `paths`, every `[vendored]` copy and test module skipped | 45 (1 to 7 per repo, 7 each in two repos) | 21 (of 30 active) | none: the home differs per repo, so each hit counts until the repo names it | not established: the counts are an upper bound until each repo's `helper` is declared, which removes the home's own calls |
 | `no-pwsh-stub` | 28 | 5 (of 44) | all | 24 of 28 are the stub run as a command in a gate or restart line: the gate command in `CLAUDE.md` and the README, `docs/` pages, and `scripts/*.ps1` usage banners. 4 are a kind a marker covers: 3 `run: pwsh -File` steps in CI workflows, where a hosted runner has a real `pwsh`, and 1 `Get-Command pwsh` lookup. 8 more sit under `tests/` folders, which the rule skips. |
 | `subprocess-timeout` | 128 (24 are in scaffold scripts: 18 in adopters' copies of `gen_tailscale_cert.py`, 5 in `classify_e2e.py` (the scaffold's own 2 since fixed) and 1 in a `gen_ssl_cert.py`) | 21 (of 44) | 14 of the 104 hits outside the scaffold-script copies, every 7th, source read | 12 of 14: a `git`, `ffmpeg`, `ffprobe`, `clip`, `systemctl`, `launchctl` or Ghostscript call that waits on a child with no bound. 2 are a kind a marker covers: foreground runners that block for the child's life. The issue's own hand sample found 8 of 10 real, 2 deliberate. Vendored destinations and test modules are not read. |
+| `browser-per-iteration` | 6 | 5 (of 45) | all | 6 of 6 are a browser or context opened inside a loop. 2 are a retry that waits out a busy profile (one launch ever succeeds): a marker covers them. 4 are a context per pass: a screenshot walk of every page at every device size, a table of nine payloads, two colour schemes, two recording roles. Run over each repo's tracked Python files with the rule forced on, read-only, vendored copies not excluded. |
 | `state-literal` | app-launcher 55, home-automation 9, local-llm-hub 15, whatsapp-radar 21 (100) | 4 of 4 | 42 sampled at random (10 to 12 per repo), source read | 38 of 42 are a lifecycle status compared or stored outside any declared machine (a job record's `"running"`, a run's `"failed"`, a container's `"running"`, a transcription's `"done"`). 4 are a remote API's vocabulary translated at the boundary (a GitHub run's `in_progress`, a vehicle's `online`), the spot a derive function belongs: declare it or mark it. A wider probe that did not require a state-named holder counted 74 / 44 / 30 in the first three repos |
 | `state-set-repeat` | app-launcher 4, others 0 | 1 of 4 | all | 4 of 4: one job record's active set (`running`, `pending`) spelled in three modules |
 | `state-write` | local-llm-hub 2, others 0 | 1 of 4 | all | 2 of 2: the serving state's `load.ready` written both in its declared module and in the backend process module. Keyed by attribute name alone (no receiver) it reported 4, 2 of them two unrelated classes sharing a `ready` field |

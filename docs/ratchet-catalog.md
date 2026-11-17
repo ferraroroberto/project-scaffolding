@@ -596,7 +596,7 @@ A curated set of ruff `B` (bugbear) and `S` (bandit) codes, plus `I001`, run in 
 
 ### Conventions ratchet
 
-[conventions-ratchet.md](conventions-ratchet.md). Fleet conventions that one syntax-tree or markup rule can check, each opted into per repository. **No rule is on by default:** `rules` is required and names the ones the repository enforces, and an unknown name is a configuration error, so a typo never runs with less than asked for. Test modules (and any file under `tests/` or `test/`) are held to `no-window` only. Counts are per file and rule.
+[conventions-ratchet.md](conventions-ratchet.md). Fleet conventions that one syntax-tree or markup rule can check, each opted into per repository. **No rule is on by default:** `rules` is required and names the ones the repository enforces, and an unknown name is a configuration error, so a typo never runs with less than asked for. Test modules (and any file under `tests/` or `test/`) are held to `no-window` and `browser-per-iteration` only. Counts are per file and rule.
 
 ```toml
 [conventions_ratchet]
@@ -746,6 +746,22 @@ subprocess.run(["tool"], creationflags=NO_WINDOW)
 
 # fixed
 subprocess.run(["tool"], creationflags=NO_WINDOW, timeout=30)
+```
+
+#### `browser-per-iteration`
+
+A Playwright `<x>.new_context(...)`, `browser.new_page(...)` or `<chromium|firefox|webkit|browser_type>.launch(...)` / `.launch_persistent_context(...)` inside a `for`, `while` or comprehension body, test modules included. Every fresh context re-fetches its assets, and each closed connection holds the target port in TIME_WAIT for minutes; a walk that opens one per screenshot can drain the host's whole ephemeral port pool. A context opened by a helper the loop calls is not seen.
+
+```python
+# bad
+for url in urls:
+    context = browser.new_context()
+    context.new_page().goto(url)
+
+# fixed
+with paced_walk(browser, port) as walk:
+    for url in urls:
+        walk.visit(url)
 ```
 
 #### `must-use`

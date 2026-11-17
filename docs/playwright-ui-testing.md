@@ -176,6 +176,10 @@ Typical session:
 - **Throwaway means throwaway.** Do NOT create `tests/e2e/` files
   during verification. If the verification deserves to live forever,
   that's a deliberate, separate decision (Loop 2).
+- **One browser, one context, for the whole walk.** A screenshot walk
+  that opens a context per capture can drain the host's ephemeral port
+  pool and take every local app down; use the paced, reused browser in
+  "One paced, reused browser for every walk" below.
 
 ---
 
@@ -717,6 +721,32 @@ Measured on this scaffold's full e2e run, the same probe on the same host before
 | Result | 5 failed with `ERR_ADDRESS_IN_USE` or the page timeouts it causes | 16 passed |
 
 The 576 is the host's background traffic: the same probe over an idle 180 s counted 675 new pairs, on the same three ports of other local apps. Two such runs at once, and a third straight after, finished with no `ERR_ADDRESS_IN_USE`.
+
+### One paced, reused browser for every walk
+
+The loopback section keeps the *suite* off the port pool. A capture or design walk is code outside the suite: a script an agent writes to screenshot every view of a disposable instance, a design-review pass, a docs capture. It has the same cost and none of the protection. A walk that opens a fresh browser or context per screenshot starts each one with an empty HTTP cache, so every module and stylesheet is fetched again; one such script left a few hundred sockets in TIME_WAIT on one port, and because every local web app on the host draws from the same ephemeral pool, the whole fleet's ports went down for minutes (Windows logs it as event Tcpip 4231).
+
+The rule, for every walk, in either loop:
+
+- **Never a new browser or context per capture.** One browser, one context, one page, reused for every capture. State is cleared with `page.goto`, `context.clear_cookies()` or `storage_state`, not with a new context. A case that genuinely needs a clean cache or a fresh storage state per pass says so in an exempt marker (see below).
+- **Parallelism is bounded and stated.** More than one page open at once is an explicit `max_parallel` (default 1, hard cap 4) in the walk's own call, never a thread pool or a `gather` over `new_context()`.
+- **Any walk uses the helper.** The vendored `tests/e2e/_paced_browser.py` (manifest key `paced_browser`) is the one shape: it opens one context from a browser you launched once, waits for network idle between captures, pauses while TIME_WAIT on the target port is above a budget (default 40) and reports the peak at the end.
+
+```python
+from tests.e2e._paced_browser import launch_paced_walk
+
+with launch_paced_walk(8501, context_kwargs={"viewport": {"width": 390, "height": 844}}) as walk:
+    for name, url in views:
+        walk.visit(url)                     # pause if the pool is hot, load, wait for idle
+        walk.page.screenshot(path=f"{name}.png")
+# INFO paced walk: peak TIME_WAIT on port 8501: 12 (budget 40); 0 pause(s) totalling 0s; 1 page(s) ...
+```
+
+Inside a pytest suite the `browser` fixture is the browser, so `with paced_walk(browser, port) as walk:` gives the same context and pacing. `walk.extra_page()` returns a further page in that context and raises `ParallelCapExceeded` past `max_parallel`; `walk.settle()` is the idle-and-budget check for a page you drove yourself; `walk.report()` is the cost line. The TIME_WAIT count is the number of `netstat` lines in that state with the port at either end. A count that cannot be read is reported as NOT CONFIRMED, never as zero, and `strict=True` refuses to walk unmeasured. A port that stays above the budget for the whole `pause_timeout_s` raises `PortPoolBusy`, a failure that names the host, not the page.
+
+Never change the machine's dynamic port range or `TcpTimedWaitDelay` to make a walk pass: those are host-level settings and the owner's call.
+
+The conventions ratchet backs the rule: its `browser-per-iteration` rule fails a `new_context(`, `browser.new_page(` or `launch(` inside a loop body, in a script or a test, against a committed baseline (see [conventions-ratchet.md](conventions-ratchet.md)). A pass that legitimately needs its own clean context, a table of payloads that must each start unauthenticated, takes `# browser-per-iteration-exempt: <reason>`; a retry that waits out a locked profile does too.
 
 ### Running it
 
