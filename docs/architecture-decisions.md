@@ -57,6 +57,20 @@ Enforcement: the [UX surface ratchet](ux-surface-ratchet.md) fails the ship on a
 
 Issue: https://github.com/ferraroroberto/project-scaffolding/issues/838
 
+### Fleet web apps use inset list sections, swipe on inset rows and one Filters & sort sheet
+
+Fleet web apps lay lists out as **inset** sections (rounded cards inside the page gutter) on phone and desktop; a full-bleed list section is not used.
+
+- **Swipe stays.** Left and right swipe actions on list rows are allowed inside inset cards; the reveal clips to the card's rounded corners, and swipe never requires full-bleed.
+- **One filter sheet.** A view with two or more filters, sorts or view toggles shows one filter field that opens a single **Filters & sort** sheet holding all of them. The field shows a badge with the number of active filters, so filtered-out content never disappears silently.
+- **Settings group labels are sentence case** at the section-header size (16px, weight 700, muted), never all caps; the `overline` wording is retired for them.
+
+Why: the real problem was inconsistency, with some apps and screens full-bleed and others inset. A full-bleed trial on a disposable instance, checked on a phone after every round, did not converge on something clearly better, and inset is what most apps already use, so it is the smaller change. The trial also showed that swipe does not depend on full-bleed and that one filter sheet makes a busy view cleaner.
+
+Enforcement: prose in the design spec (`design.md` / `design.dark.md`, owned by `fleet-config`), applied app by app; no ratchet yet, because the rules are visual and need a rendered check.
+
+Issue: https://github.com/ferraroroberto/project-scaffolding/issues/847
+
 ### LLM access goes through the local-llm-hub
 
 Downstream apps reach Claude, Gemini and open-weight models through the hub's Anthropic-shape and OpenAI-shape endpoints on `127.0.0.1:8000`, and audio through its transcription and translation endpoints, using standard SDKs. No app wraps `claude -p`, `codex exec` or `gemini -p` itself or hard-codes a whisper port; when the hub lacks a feature, the answer is a plan for the hub to add it.
