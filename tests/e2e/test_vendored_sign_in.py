@@ -74,6 +74,7 @@ def _check_the_sheet_renders_one_field_one_primary_and_no_close(gallery: Page) -
     _open(gallery)
     dialog = gallery.locator(_DIALOG)
     assert dialog.get_attribute("data-track-view") == "sign-in"
+    assert dialog.get_attribute("data-surface") == "shared.login"
     assert gallery.evaluate("document.querySelector('dialog.sign-in').parentElement === document.body")
     expect(dialog.locator(".sign-in-title")).to_have_text("Sign in")
     expect(dialog.locator(".sign-in-hint")).to_have_text("Enter the password to use the app.")
