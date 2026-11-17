@@ -352,69 +352,115 @@
     </select>
   </div>
 
-  <h2>settings-group (header outside the card; value + chevron, select, switch, number field)</h2>
-  <div id="demoSettings">
-    <h3 class="settings-overline" id="demoSettingsHead">Dictation</h3>
-    <section class="card settings-group" id="demoSettingsGroup" aria-labelledby="demoSettingsHead">
-      <button type="button" class="settings-row" id="demoSettingsLink" aria-haspopup="dialog">
-        <svg class="icon settings-row-icon" aria-hidden="true"><use href="#i-globe"></use></svg>
-        <span class="settings-row-label">Language</span>
-        <span class="settings-row-value" id="demoSettingsValue">English</span>
-        <svg class="icon settings-row-chevron" aria-hidden="true"><use href="#i-chevron-right"></use></svg>
-      </button>
-      <button type="button" class="settings-row" id="demoSettingsLong" aria-haspopup="dialog">
-        <svg class="icon settings-row-icon" aria-hidden="true"><use href="#i-folder"></use></svg>
-        <span class="settings-row-label" id="demoSettingsLongLabel">Archive folder</span>
-        <span class="settings-row-value" id="demoSettingsLongValue" title="D:\archive\mail\2026\a-folder-name-long-enough-to-ellipsize">D:\archive\mail\2026\a-folder-name-long-enough-to-ellipsize</span>
-        <svg class="icon settings-row-chevron" aria-hidden="true"><use href="#i-chevron-right"></use></svg>
-      </button>
-      <label class="settings-row" id="demoSettingsPick">
-        <svg class="icon settings-row-icon" aria-hidden="true"><use href="#i-mic"></use></svg>
-        <span class="settings-row-label">Microphone</span>
-        <select class="settings-row-select" id="demoSettingsSelect">
-          <option>System default</option>
-          <option>USB microphone</option>
-        </select>
-        <svg class="icon settings-row-chevron" aria-hidden="true"><use href="#i-chevron-down"></use></svg>
-      </label>
-      <label class="settings-row" id="demoSettingsSwitchRow">
-        <svg class="icon settings-row-icon" aria-hidden="true"><use href="#i-globe"></use></svg>
-        <span class="settings-row-text">
-          <span class="settings-row-label">Translate to English</span>
-          <span class="settings-row-hint" id="demoSettingsHint">Any language in, English out</span>
-        </span>
-        <button type="button" class="toggle" id="demoSettingsSwitch" role="switch" aria-checked="false">
-          <span class="knob"></span><span class="toggle-label">OFF</span>
-        </button>
-      </label>
-      <label class="settings-row" id="demoSettingsNumberRow">
-        <svg class="icon settings-row-icon" aria-hidden="true"><use href="#i-timer"></use></svg>
-        <span class="settings-row-label">Silence length</span>
-        <span class="settings-row-number">
-          <input class="settings-row-input" id="demoSettingsNumber" type="number" inputmode="numeric" min="1" max="60" value="3">
-          <span class="settings-row-unit">s</span>
-        </span>
-      </label>
-      <button type="button" class="settings-row" id="demoSettingsTone" aria-haspopup="dialog">
-        <svg class="icon settings-row-icon" aria-hidden="true"><use href="#i-bell"></use></svg>
-        <span class="settings-row-label">Email sign-in</span>
-        <span class="settings-row-value" id="demoSettingsToneValue" data-tone="attention">Needs setup</span>
-        <svg class="icon settings-row-chevron" aria-hidden="true"><use href="#i-chevron-right"></use></svg>
-      </button>
-    </section>
-    <p class="settings-footnote">Changes save as you make them.</p>
-    <h3 class="settings-overline" id="demoSettingsHead2">Sound</h3>
-    <section class="card settings-group" id="demoSettingsGroup2" aria-labelledby="demoSettingsHead2">
-      <label class="settings-row">
-        <svg class="icon settings-row-icon" aria-hidden="true"><use href="#i-volume-2"></use></svg>
-        <span class="settings-row-label">Boost amount</span>
-        <span class="settings-row-number">
-          <input class="settings-row-input" id="demoSettingsNumber2" type="number" inputmode="numeric" value="12">
-          <span class="settings-row-unit">dB</span>
-        </span>
-      </label>
-    </section>
+  <h2>settings-group (the full Settings page: inset groups, sentence-case labels, a detail sheet)</h2>
+  <div class="card">
+    <button type="button" id="openSettingsPage" class="empty-state-action">Open the Settings page</button>
   </div>
+  <dialog class="settings-page" id="demoSettingsPage" aria-labelledby="demoSettingsTitle">
+    <header class="settings-page-head">
+      <h2 class="settings-page-title" id="demoSettingsTitle">Settings</h2>
+      <button type="button" class="icon-button settings-page-close" id="demoSettingsClose" aria-label="Close settings">
+        <svg class="icon" aria-hidden="true"><use href="#i-x"></use></svg>
+      </button>
+    </header>
+    <div class="settings-page-body" id="demoSettings">
+      <h3 class="settings-group-label" id="demoSettingsHead">Dictation</h3>
+      <section class="card settings-group" id="demoSettingsGroup" aria-labelledby="demoSettingsHead">
+        <button type="button" class="settings-row" id="demoSettingsLink" aria-haspopup="dialog">
+          <svg class="icon settings-row-icon" aria-hidden="true"><use href="#i-globe"></use></svg>
+          <span class="settings-row-label">Language</span>
+          <span class="settings-row-value" id="demoSettingsValue">English</span>
+          <svg class="icon settings-row-chevron" aria-hidden="true"><use href="#i-chevron-right"></use></svg>
+        </button>
+        <button type="button" class="settings-row" id="demoSettingsLong" aria-haspopup="dialog">
+          <svg class="icon settings-row-icon" aria-hidden="true"><use href="#i-folder"></use></svg>
+          <span class="settings-row-label" id="demoSettingsLongLabel">Archive folder</span>
+          <span class="settings-row-value" id="demoSettingsLongValue" title="D:\archive\mail\2026\a-folder-name-long-enough-to-ellipsize">D:\archive\mail\2026\a-folder-name-long-enough-to-ellipsize</span>
+          <svg class="icon settings-row-chevron" aria-hidden="true"><use href="#i-chevron-right"></use></svg>
+        </button>
+        <label class="settings-row" id="demoSettingsPick">
+          <svg class="icon settings-row-icon" aria-hidden="true"><use href="#i-mic"></use></svg>
+          <span class="settings-row-label">Microphone</span>
+          <select class="settings-row-select" id="demoSettingsSelect">
+            <option>System default</option>
+            <option>USB microphone</option>
+          </select>
+          <svg class="icon settings-row-chevron" aria-hidden="true"><use href="#i-chevron-down"></use></svg>
+        </label>
+        <label class="settings-row" id="demoSettingsSwitchRow">
+          <svg class="icon settings-row-icon" aria-hidden="true"><use href="#i-globe"></use></svg>
+          <span class="settings-row-text">
+            <span class="settings-row-label">Translate to English</span>
+            <span class="settings-row-hint" id="demoSettingsHint">Any language in, English out</span>
+          </span>
+          <button type="button" class="toggle" id="demoSettingsSwitch" role="switch" aria-checked="false">
+            <span class="knob"></span><span class="toggle-label">OFF</span>
+          </button>
+        </label>
+        <label class="settings-row" id="demoSettingsNumberRow">
+          <svg class="icon settings-row-icon" aria-hidden="true"><use href="#i-timer"></use></svg>
+          <span class="settings-row-label">Silence length</span>
+          <span class="settings-row-number">
+            <input class="settings-row-input" id="demoSettingsNumber" type="number" inputmode="numeric" min="1" max="60" value="3">
+            <span class="settings-row-unit">s</span>
+          </span>
+        </label>
+        <button type="button" class="settings-row" id="demoSettingsTone" aria-haspopup="dialog">
+          <svg class="icon settings-row-icon" aria-hidden="true"><use href="#i-bell"></use></svg>
+          <span class="settings-row-label">Email sign-in</span>
+          <span class="settings-row-value" id="demoSettingsToneValue" data-tone="attention">Needs setup</span>
+          <svg class="icon settings-row-chevron" aria-hidden="true"><use href="#i-chevron-right"></use></svg>
+        </button>
+      </section>
+      <p class="settings-footnote" id="demoSettingsFootnote">Changes save as you make them.</p>
+      <h3 class="settings-group-label" id="demoSettingsHead2">Sound</h3>
+      <section class="card settings-group" id="demoSettingsGroup2" aria-labelledby="demoSettingsHead2">
+        <label class="settings-row" id="demoSettingsBoostRow">
+          <svg class="icon settings-row-icon" aria-hidden="true"><use href="#i-volume-2"></use></svg>
+          <span class="settings-row-label">Boost amount</span>
+          <span class="settings-row-number">
+            <input class="settings-row-input" id="demoSettingsNumber2" type="number" inputmode="numeric" value="12">
+            <span class="settings-row-unit">dB</span>
+          </span>
+        </label>
+        <label class="settings-row" id="demoSettingsPlainRow">
+          <span class="settings-row-label">Play a chime</span>
+          <button type="button" class="toggle" id="demoSettingsSwitch2" role="switch" aria-checked="true">
+            <span class="knob"></span><span class="toggle-label">ON</span>
+          </button>
+        </label>
+      </section>
+      <h3 class="settings-group-label" id="demoSettingsHead3">About</h3>
+      <section class="card settings-group" aria-labelledby="demoSettingsHead3">
+        <button type="button" class="settings-row" aria-haspopup="dialog">
+          <svg class="icon settings-row-icon" aria-hidden="true"><use href="#i-info"></use></svg>
+          <span class="settings-row-label">Version</span>
+          <span class="settings-row-value">1.4.2</span>
+          <svg class="icon settings-row-chevron" aria-hidden="true"><use href="#i-chevron-right"></use></svg>
+        </button>
+        <button type="button" class="settings-row" aria-haspopup="dialog">
+          <svg class="icon settings-row-icon" aria-hidden="true"><use href="#i-shield-check"></use></svg>
+          <span class="settings-row-label">Access</span>
+          <span class="settings-row-value">Signed in</span>
+          <svg class="icon settings-row-chevron" aria-hidden="true"><use href="#i-chevron-right"></use></svg>
+        </button>
+      </section>
+    </div>
+  </dialog>
+  <dialog class="detail-dialog settings-sheet" id="demoSettingsSheet" aria-labelledby="demoSettingsSheetTitle">
+    <div class="detail-card">
+      <div class="detail-header">
+        <h2 id="demoSettingsSheetTitle" tabindex="-1" autofocus>Language</h2>
+        <button type="button" class="icon-button detail-close" id="demoSettingsSheetClose" aria-label="Close">
+          <svg class="icon" aria-hidden="true"><use href="#i-x"></use></svg>
+        </button>
+      </div>
+      <div class="settings-sheet-body" id="demoSettingsSheetBody"></div>
+      <div class="detail-actions">
+        <button type="button" class="button-primary detail-save-btn" id="demoSettingsSheetDone">Done</button>
+      </div>
+    </div>
+  </dialog>
 
   <h2>action-row (filter, one line, two line, favorite, dominant verb, outlined stop verb)</h2>
   <div class="card action-list" id="demoActionList">
@@ -724,6 +770,7 @@
   </footer>
 </div>
 
+<script type="module" src="demo-settings.js"></script>
 <script type="module">
   import { emptyStateEl } from './empty-state/empty-state.js';
   import { switchEl, setSwitch } from './switch/switch.js';

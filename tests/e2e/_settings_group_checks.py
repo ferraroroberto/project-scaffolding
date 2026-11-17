@@ -3,9 +3,12 @@
 Each check takes a freshly loaded `demo.html` gallery; `test_vendored_components.py`
 runs them as cases. A select has two shapes: the bordered `select-native` form
 control, and inside a Settings row the borderless muted value. The settings-group
-checks pin what the fleet's hand-built Settings panes got wrong at 390px: an
-overline that rode into its card's border, labels that wrapped, values drawn as
-bordered pills and number fields of different widths and sizes.
+checks pin the full Settings page: the page shell (full screen on a phone, a
+centred column on desktop), the inset groups and their sentence-case labels at
+the trial's measured edges, the separators and trailing edge, the detail sheet
+fitting both phone heights, and what the hand-built Settings panes got wrong at
+390px (labels that wrapped, values drawn as bordered pills, number fields of
+different widths and sizes).
 """
 
 from __future__ import annotations
@@ -112,15 +115,73 @@ def check_select_native_boundary_renders_in_webkit(playwright: Playwright, base_
         browser.close()
 
 
-def check_settings_group_header_sits_above_its_card(gallery: Page) -> None:
-    """settings-group: the overline is outside the card with a positive gap, at every text size."""
-    gallery.set_viewport_size(_PHONE)
+def _open_page(gallery: Page, viewport: dict[str, int] = _PHONE) -> None:
+    """Size the window, then open the Settings page the way the gear does."""
+    gallery.set_viewport_size(viewport)
+    gallery.locator("#openSettingsPage").click()
+    expect(gallery.locator("#demoSettingsPage")).to_be_visible()
+
+
+def _box(page: Page, selector: str) -> tuple[float, float, float, float]:
+    """An element's (left, top, right, bottom) in viewport pixels."""
+    b = page.evaluate(
+        "(s) => { const r = document.querySelector(s).getBoundingClientRect(); return [r.left, r.top, r.right, r.bottom]; }",
+        selector,
+    )
+    return float(b[0]), float(b[1]), float(b[2]), float(b[3])
+
+
+def _separator(page: Page, selector: str) -> tuple[float, float, float]:
+    """A row's separator (its ::before) as (left, right, height) in viewport pixels."""
+    s = page.evaluate(
+        "(s) => { const e = document.querySelector(s), b = e.getBoundingClientRect(), c = getComputedStyle(e, '::before');"
+        " return [b.left + parseFloat(c.left), b.right - parseFloat(c.right), parseFloat(c.height)]; }",
+        selector,
+    )
+    return float(s[0]), float(s[1]), float(s[2])
+
+
+def check_settings_group_page_fills_the_phone(gallery: Page) -> None:
+    """settings-group: the page is a full-screen dialog on a phone, its header the app header's colour, close on the content edge."""
+    _open_page(gallery)
+    left, top, right, bottom = _box(gallery, "#demoSettingsPage")
+    assert (left, top, right, bottom) == (0, 0, 390, 844), (left, top, right, bottom)
+    assert _style(gallery, ".settings-page-head", "backgroundColor") == _style(gallery, "body", "backgroundColor")
+    # Title and close glyph on the content edges (inset 20 + padding 16).
+    assert _box(gallery, "#demoSettingsTitle")[0] == 36
+    assert _box(gallery, "#demoSettingsClose .icon")[2] == 354
+    assert gallery.evaluate(
+        "() => { const d = document.querySelector('#demoSettingsPage'); return d.scrollWidth <= d.clientWidth; }"
+    ), "the page scrolls sideways"
+    gallery.locator("#demoSettingsClose").click()
+    expect(gallery.locator("#demoSettingsPage")).to_be_hidden()
+
+
+def check_settings_group_page_is_a_centred_column_on_desktop(gallery: Page) -> None:
+    """settings-group: at 1440 the groups sit in a centred column at the layout measure."""
+    _open_page(gallery, {"width": 1440, "height": 900})
+    left, _, right, _ = _box(gallery, "#demoSettingsGroup")
+    assert (left, right) == (354, 1086), (left, right)  # 772 measure, 20px inset each side
+    assert _box(gallery, "#demoSettingsHead")[0] == 370
+    assert _box(gallery, "#demoSettingsClose .icon")[2] == 1070
+    # Every trailing item ends on the card's inner edge, a select included.
+    for sel in ("#demoSettingsLink .settings-row-chevron", "#demoSettingsPick .settings-row-chevron", "#demoSettingsSwitch"):
+        assert _box(gallery, sel)[2] == 1070, sel
+
+
+def check_settings_group_label_sits_above_its_card(gallery: Page) -> None:
+    """settings-group: the label is sentence case 16px/700 muted, outside its card with a positive gap, at every text size."""
+    _open_page(gallery)
     head = "#demoSettingsHead"
-    assert _style(gallery, head, "textTransform") == "uppercase"
-    assert _style(gallery, head, "fontSize") == "12px"
+    assert _style(gallery, head, "textTransform") == "none"
+    assert _style(gallery, head, "letterSpacing") in ("normal", "0px")
+    assert _style(gallery, head, "fontSize") == "16px"
+    assert _style(gallery, head, "fontWeight") == "700"
     assert _style(gallery, head, "color") == "rgb(101, 109, 118)"  # --muted
-    # The header is not inside the card it names.
+    assert _box(gallery, head)[0] == 36
+    # The label is not inside the card it names; groups are about 30px apart.
     assert gallery.locator("#demoSettingsGroup #demoSettingsHead").count() == 0
+    assert _box(gallery, "#demoSettingsHead2")[1] - _box(gallery, "#demoSettingsFootnote")[3] == 30
     for root_px in ("16px", "18px", "20px"):
         gallery.evaluate("(px) => { document.documentElement.style.fontSize = px; }", root_px)
         for h, c in (("#demoSettingsHead", "#demoSettingsGroup"), ("#demoSettingsHead2", "#demoSettingsGroup2")):
@@ -131,16 +192,38 @@ def check_settings_group_header_sits_above_its_card(gallery: Page) -> None:
 
 
 def check_settings_group_rows_and_value(gallery: Page) -> None:
-    """settings-group: inset card, 52px rows on a hairline, a muted unboxed value, a chevron."""
-    gallery.set_viewport_size(_PHONE)
-    assert _style(gallery, "#demoSettingsGroup", "paddingTop") == "0px"
-    assert _style(gallery, "#demoSettingsGroup", "overflow") == "hidden"
+    """settings-group: a borderless 20px-radius card inset 20px, 52px rows, separators title-to-edge, a muted unboxed value."""
+    _open_page(gallery)
+    group = "#demoSettingsGroup"
+    left, _, right, _ = _box(gallery, group)
+    assert (left, right) == (20, 370), (left, right)
+    assert _style(gallery, group, "borderTopLeftRadius") == "20px"
+    assert _style(gallery, group, "borderTopWidth") == "0px"
+    assert _style(gallery, group, "paddingTop") == "0px"
+    assert _style(gallery, group, "overflow") == "hidden"
     box = gallery.locator("#demoSettingsLink").bounding_box()
     assert box is not None and box["height"] >= 52, box
-    # The first row draws no divider; the next one does, in line-muted.
-    assert _style(gallery, "#demoSettingsLink", "borderTopWidth") == "0px"
-    assert _style(gallery, "#demoSettingsLong", "borderTopWidth") == "1px"
-    assert _style(gallery, "#demoSettingsLong", "borderTopColor") == "rgb(216, 222, 228)"
+    assert _box(gallery, "#demoSettingsLink .settings-row-icon")[0] == 36
+    # Separators: none above the first row; the next one runs from its title
+    # (past the glyph) to the inner edge, a glyph-less row's from its label.
+    assert gallery.evaluate(
+        "() => getComputedStyle(document.querySelector('#demoSettingsLink'), '::before').content"
+    ) == "none"
+    sep_left, sep_right, sep_h = _separator(gallery, "#demoSettingsLong")
+    assert (sep_left, sep_right, sep_h) == (_box(gallery, "#demoSettingsLongLabel")[0], 354, 1), (sep_left, sep_right)
+    assert _separator(gallery, "#demoSettingsPlainRow")[:2] == (36, 354)
+    assert gallery.evaluate(
+        "() => getComputedStyle(document.querySelector('#demoSettingsLong'), '::before').backgroundColor"
+    ) == "rgb(216, 222, 228)"
+    # Every trailing item ends on the inner edge, symmetric with the left.
+    for sel in (
+        "#demoSettingsLink .settings-row-chevron",
+        "#demoSettingsPick .settings-row-chevron",
+        "#demoSettingsSwitch",
+        "#demoSettingsNumberRow .settings-row-unit",
+        "#demoSettingsSwitch2",
+    ):
+        assert _box(gallery, sel)[2] == 354, sel
     assert _style(gallery, "#demoSettingsLink .settings-row-icon", "width") == "18px"
     assert _style(gallery, "#demoSettingsLink .settings-row-chevron", "width") == "16px"
     # The value is muted text, never a bordered pill.
@@ -162,6 +245,7 @@ def check_settings_group_rows_and_value(gallery: Page) -> None:
 
 def check_settings_group_select_is_the_muted_value(gallery: Page) -> None:
     """settings-group: a select in a row is drawn as the value (borderless, muted, full-height target)."""
+    _open_page(gallery)
     sel = "#demoSettingsSelect"
     assert _style(gallery, sel, "borderTopWidth") == "0px"
     assert _style(gallery, sel, "backgroundColor") == "rgba(0, 0, 0, 0)"
@@ -173,6 +257,7 @@ def check_settings_group_select_is_the_muted_value(gallery: Page) -> None:
 
 def check_settings_group_switch_row_toggles_from_the_row(gallery: Page) -> None:
     """settings-group: the switch row is a label, so a tap on its text toggles the switch."""
+    _open_page(gallery)
     switch = gallery.locator("#demoSettingsSwitch")
     expect(switch).to_have_attribute("aria-checked", "false")
     expect(switch).to_have_accessible_name("Translate to English Any language in, English out")
@@ -208,6 +293,7 @@ def _assert_number_field_box(page: Page, sel: str) -> None:
 def check_settings_group_number_field_meets_the_hit_floor(gallery: Page) -> None:
     """settings-group: the number field's box is 44px at a fine and a coarse pointer, its visible control 36px."""
     assert gallery.evaluate("matchMedia('(pointer: fine)').matches"), "fine-pointer run expected"
+    _open_page(gallery)
     for sel in ("#demoSettingsNumber", "#demoSettingsNumber2"):
         _assert_number_field_box(gallery, sel)
     context = gallery.context.browser.new_context(viewport=_PHONE, has_touch=True, is_mobile=True)
@@ -216,30 +302,62 @@ def check_settings_group_number_field_meets_the_hit_floor(gallery: Page) -> None
         phone.goto(gallery.url)
         phone.wait_for_selector("body[data-demo-ready='1']")
         assert phone.evaluate("matchMedia('(pointer: coarse)').matches"), "coarse-pointer emulation is not active"
+        _open_page(phone)
         for sel in ("#demoSettingsNumber", "#demoSettingsNumber2"):
             _assert_number_field_box(phone, sel)
     finally:
         context.close()
 
 
+def check_settings_group_sheet_fits_both_phone_heights(gallery: Page) -> None:
+    """settings-group: a detail sheet fits the viewport at 844 and 664, title and Done pinned, the body scrolling."""
+    for height in (844, 664):
+        _open_page(gallery, {"width": 390, "height": height})
+        gallery.locator("#demoSettingsLink").click()
+        expect(gallery.locator("#demoSettingsSheet")).to_be_visible()
+        top, bottom = _box(gallery, "#demoSettingsSheet")[1::2]
+        assert top >= 0 and bottom <= height, (height, top, bottom)
+        assert gallery.evaluate(
+            "() => { const b = document.querySelector('#demoSettingsSheetBody'); return b.scrollHeight > b.clientHeight; }"
+        ), f"the sheet body does not scroll at {height}"
+        gallery.evaluate("() => { document.querySelector('#demoSettingsSheetBody').scrollTop = 1e6; }")
+        for sel in ("#demoSettingsSheetClose", "#demoSettingsSheetDone"):
+            s_top, s_bottom = _box(gallery, sel)[1::2]
+            assert s_top >= top and s_bottom <= bottom, (height, sel, s_top, s_bottom)
+        expect(gallery.locator("#demoSettingsSheetDone")).to_be_in_viewport(ratio=1)
+        expect(gallery.locator("#demoSettingsSheetClose")).to_be_in_viewport(ratio=1)
+        gallery.locator("#demoSettingsSheetDone").click()
+        expect(gallery.locator("#demoSettingsSheet")).to_be_hidden()
+        gallery.locator("#demoSettingsClose").click()
+
+
 def check_settings_group_dark(gallery: Page) -> None:
-    """settings-group: the dark theme re-skins header, value, divider and field from the tokens."""
+    """settings-group: the dark theme re-skins label, value, separator, canvas and field from the tokens."""
     _set_theme(gallery, "dark")
+    _open_page(gallery)
     assert _style(gallery, "#demoSettingsHead", "color") == "rgb(125, 133, 144)"
     assert _style(gallery, "#demoSettingsValue", "color") == "rgb(125, 133, 144)"
-    assert _style(gallery, "#demoSettingsLong", "borderTopColor") == "rgb(33, 38, 45)"
+    assert gallery.evaluate(
+        "() => getComputedStyle(document.querySelector('#demoSettingsLong'), '::before').backgroundColor"
+    ) == "rgb(33, 38, 45)"
     assert _style(gallery, "#demoSettingsGroup", "backgroundColor") == "rgb(22, 27, 34)"
+    # The canvas sits a step under the cards: the app canvas in dark.
+    assert _style(gallery, "#demoSettingsPage", "backgroundColor") == "rgb(13, 17, 23)"
+    assert _style(gallery, ".settings-page-head", "backgroundColor") == "rgb(13, 17, 23)"
     assert _style(gallery, "#demoSettingsNumber", "backgroundColor") == "rgb(33, 38, 45)"
     assert _style(gallery, "#demoSettingsToneValue", "color") == "rgb(227, 179, 65)"
 
 
 _CHECKS = (
-    check_settings_group_header_sits_above_its_card,
+    check_settings_group_page_fills_the_phone,
+    check_settings_group_page_is_a_centred_column_on_desktop,
+    check_settings_group_label_sits_above_its_card,
     check_settings_group_rows_and_value,
     check_settings_group_select_is_the_muted_value,
     check_settings_group_switch_row_toggles_from_the_row,
     check_settings_group_number_fields_are_one_shape,
     check_settings_group_number_field_meets_the_hit_floor,
+    check_settings_group_sheet_fits_both_phone_heights,
     check_select_native_meets_the_hit_floor,
     check_settings_group_dark,
 )
