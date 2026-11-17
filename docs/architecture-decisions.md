@@ -47,6 +47,16 @@ Enforcement: the [usage track ratchet](usage-track-ratchet.md) fails the ship on
 
 Issue: https://github.com/ferraroroberto/project-scaffolding/issues/561
 
+### Every web app keeps a UX surface map held to its `data-surface` ids
+
+Every fleet web app keeps one [UX surface map](ux-surface-map.md), `docs/ux-surface-map.md`: one entry per surface (screen, drill-in, menu, sheet, dialog, popover, Settings row, state, gesture, key) under a stable id, plus a graph of how surfaces connect. Each surface root carries the same id as a constant `data-surface="<id>"`, in the e2e capture hook's name form, and the entry and the attribute change in the same PR as the surface.
+
+Why: a layout change or a design review can only check every surface when there is a complete list of them, and a list kept by memory drifts; tying it to the code makes it stay true.
+
+Enforcement: the [UX surface ratchet](ux-surface-ratchet.md) fails the ship on a surface root with no id, an id with no entry, an entry no element carries, or a duplicated id; existing gaps sit in each app's baseline and only shrink. The design-review and e2e walk reports a surface it opened that carries no id.
+
+Issue: https://github.com/ferraroroberto/project-scaffolding/issues/838
+
 ### LLM access goes through the local-llm-hub
 
 Downstream apps reach Claude, Gemini and open-weight models through the hub's Anthropic-shape and OpenAI-shape endpoints on `127.0.0.1:8000`, and audio through its transcription and translation endpoints, using standard SDKs. No app wraps `claude -p`, `codex exec` or `gemini -p` itself or hard-codes a whisper port; when the hub lacks a feature, the answer is a plan for the hub to add it.
