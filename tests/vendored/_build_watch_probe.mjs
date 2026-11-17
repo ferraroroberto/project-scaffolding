@@ -119,6 +119,7 @@ out.stale = {
   live: p && p.attributes['aria-live'],
   texts: p && p.children.map((c) => c.textContent),
   tracks: p && p.children.map((c) => c.dataset.track || null),
+  surface: p && p.dataset.surface,
   read: reads[reads.length - 1],
 };
 

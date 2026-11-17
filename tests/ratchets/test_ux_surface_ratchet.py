@@ -300,6 +300,18 @@ def test_out_of_scope_excluded_vendored_and_test_files_are_not_scanned(repo: Pat
     assert run_mode(repo) == us.EXIT_PASS
 
 
+def test_an_id_a_vendored_component_stamps_keeps_its_map_entry_from_being_stale(repo: Path) -> None:
+    (repo / ".fleet.toml").write_text(TABLE + '\n[vendored]\nbw = { dest = "app/webapp/static/_v/bw" }\n',
+                                      encoding="utf-8")
+    run_mode(repo, init=True)
+    write(repo, MAP, GOOD_MAP + "**`app.banner` Banner** — *Root:* `data-surface`.\n")
+    assert run_mode(repo) == us.EXIT_RISE, "no element carries the id yet"
+    write(repo, "app/webapp/static/_v/bw/bw.js",
+          "const el = document.createElement('div');\nel.dataset.surface = 'app.banner';\n"
+          "const d = document.createElement('dialog');\n")
+    assert run_mode(repo) == us.EXIT_PASS, "the vendored stamp counts; its unmarked dialog is not the app's hit"
+
+
 @pytest.mark.parametrize(
     ("rel", "body", "says"),
     [

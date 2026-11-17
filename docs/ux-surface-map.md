@@ -70,7 +70,11 @@ menu.dataset.surface = 'today.row-menu';
 
 - The value is always a string literal, never built from content or state.
 - The root is the element that appears and disappears with the surface: the `<dialog>`, the sheet's container, the tab panel, the drill-in's pane. Elements that are surfaces by their markup (a `<dialog>`, an element with `role` `dialog`, `alertdialog`, `menu` or `tabpanel`, an element with a `popover` attribute) always carry one; screens, drill-ins and states carry one where they have a root of their own.
-- A surface a vendored component builds is stamped by the app's call site, since the component's code is shared by every app.
+- A surface a vendored component builds is stamped by the app's call site, since the component's code is shared by every app. The exception is a surface that has no call site, because the component builds it internally; that component stamps a fixed id itself, and every adopting app lists that id in its map. The ratchet reads the id from the vendored copy, so the entry needs no `Root: none`.
+
+| Id | Component | Surface |
+| --- | --- | --- |
+| `app.update-banner` | `build-watch` | The "New version available · Reload" banner. |
 - `data-surface` names a surface for the map, the tests and the design walk; it is independent of `data-track-view`, which names a view for the usage log, though the two often hold the same value.
 
 ## Keeping it true
