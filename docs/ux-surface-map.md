@@ -117,6 +117,7 @@ menu.dataset.surface = 'today.row-menu';
 | Id | Component | Surface |
 | --- | --- | --- |
 | `app.update-banner` | `build-watch` | The "New version available · Reload" banner. |
+| `shared.login` | `sign-in` | The password sign-in sheet. |
 - `data-surface` names a surface for the map, the tests and the design walk; it is independent of `data-track-view`, which names a view for the usage log, though the two often hold the same value.
 
 ## Keeping it true
