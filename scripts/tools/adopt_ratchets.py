@@ -71,8 +71,8 @@ RATCHETS: tuple[Ratchet, ...] = (
     Ratchet("runtime_write", ("runtime_write_resolve",), "-"),
     Ratchet("usage_track", ("usage_track_scan",), "a web UI (HTML/JS) to scan",
             'rules = ["untracked-control", "untracked-sheet", "dynamic-id"]  # docs/usage-track-ratchet.md\n'),
-    Ratchet("ux_surface", ("usage_track_scan",),
-            "a web UI (HTML/JS) to scan and its docs/ux-surface-map.md (docs/ux-surface-map.md)"),
+    Ratchet("ux_surface", ("usage_track_scan", "ux_surface_map"),
+            "a web UI (HTML/JS) to scan and its docs/ux-surfaces.yaml (docs/ux-surface-map.md)"),
 )
 BY_NAME = {r.name: r for r in RATCHETS}
 #: Python-only, no choices to make: what `--ratchets` defaults to.

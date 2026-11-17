@@ -4,12 +4,14 @@ Three layers, mirroring `test_usage_track_ratchet.py`:
 
 1. **Readers** on in-memory sources: the code reader finds `data-surface` ids and
    unmarked surface roots in HTML, inline scripts, JS strings and templates and
-   `createElement` blocks; the map reader finds entries and root-less ones; the
-   cross-check names a missing entry, a stale entry and a duplicate id.
-2. **Ratchet behaviour** on throwaway git repos: each of the three named
-   failures is red first and green once fixed, every mode, and the "not
-   confirmed" exit for anything that cannot be read through. A missing
-   prerequisite is a hard failure, never `pytest.skip`.
+   `createElement` blocks; the YAML map reader finds entries, root-less ones,
+   invalid ids and dangling links; the cross-check names a missing entry, a
+   stale entry and a duplicate id. (The YAML subset and the generator have
+   their own tests, `test_ux_surface_map.py`.)
+2. **Ratchet behaviour** on throwaway git repos: each named failure is red
+   first and green once fixed, every mode, and the "not confirmed" exit for
+   anything that cannot be read through. A missing prerequisite is a hard
+   failure, never `pytest.skip`.
 3. **Self-declaration** -- this repo's table, gate wiring, catalog row and docs.
 """
 
@@ -23,6 +25,7 @@ from pathlib import Path
 
 import pytest
 
+from scripts import ux_surface_map as um
 from scripts import ux_surface_ratchet as us
 from src.no_window import NO_WINDOW
 from tests._git_repo import git, write
@@ -43,10 +46,27 @@ def code(src: str, path: str = HTML) -> tuple[list[str], list[str]]:
     return [f"{h.rule}:{h.line}" for h in hits], [f"{s.id}:{s.line}" for s in sites]
 
 
+MAP_HEAD = ("app: test\nwalk:\n  date: 2026-01-01\n  build: abc\n  widths: [390]\n  themes: [light]\n"
+            "areas:\n  - id: home\n    title: Home\nsurfaces:\n")
+
+
+def entry(ident: str, *, root: str = "data-surface", links: tuple[str, ...] = (), before: str = "") -> str:
+    """One surface in the YAML map, in area `home`; `before` is a comment block above it."""
+    text = f"{before}  - id: {ident}\n    area: home\n    title: {ident}\n"
+    text += f"    root: {root}\n" if root == "data-surface" else f"    root:\n      none: {root}\n"
+    if links:
+        text += "    links:\n" + "".join(f"      - to: {to}\n" for to in links)
+    return text
+
+
+def yaml_map(*surfaces: str) -> str:
+    return MAP_HEAD + "".join(surfaces)
+
+
 def entries(text: str) -> list[str]:
-    sites, bad = us.parse_map(text, "docs/ux-surface-map.md")
+    sites, hits = us.read_map(um.load(text, "docs/ux-surfaces.yaml"), "docs/ux-surfaces.yaml")
     return [f"{s.id}:{s.line}{' rootless' if s.rootless else ''}" for s in sites] + [
-        f"{h.rule}:{h.line}" for h in bad]
+        f"{h.rule}:{h.line}" for h in hits]
 
 
 # ------------------------------------------------------------------- config
@@ -59,12 +79,13 @@ def test_absent_or_disabled_table_is_not_enabled() -> None:
 
 def test_enabled_table_defaults_to_every_rule_and_honours_every_key() -> None:
     assert us.parse_config("[ux_surface_ratchet]\nenabled = true\n") == us.Config()
+    assert us.Config().map == "docs/ux-surfaces.yaml" and us.Config().page == "docs/ux-surface-map.md"
     cfg = us.parse_config(
-        '[ux_surface_ratchet]\nenabled = true\nbaseline = "b.json"\nmap = "docs/map.md"\n'
+        '[ux_surface_ratchet]\nenabled = true\nbaseline = "b.json"\nmap = "docs/map.yaml"\npage = "docs/m.md"\n'
         'rules = ["stale-entry", "unmapped-surface"]\npaths = ["web/**"]\nexclude = ["web/vendor/**"]\n'
     )
-    assert cfg == us.Config("b.json", ("unmapped-surface", "stale-entry"), "docs/map.md", ("web/**",),
-                            ("web/vendor/**",))
+    assert cfg == us.Config("b.json", ("unmapped-surface", "stale-entry"), "docs/map.yaml", ("web/**",),
+                            ("web/vendor/**",), "docs/m.md")
 
 
 @pytest.mark.parametrize(
@@ -76,6 +97,8 @@ def test_enabled_table_defaults_to_every_rule_and_honours_every_key() -> None:
         pytest.param("enabled = true\nrules = ['missing-entry']\n", id="unknown-rule"),
         pytest.param("enabled = true\nmap = ''\n", id="empty-map"),
         pytest.param("enabled = true\npaths = []\n", id="no-paths"),
+        pytest.param("enabled = true\nmap = 'docs/ux-surface-map.md'\n", id="markdown-map"),
+        pytest.param("enabled = true\nmap = 'a.yaml'\npage = 'a.yaml'\n", id="page-is-map"),
     ],
 )
 def test_a_malformed_table_is_a_config_error(body: str) -> None:
@@ -151,19 +174,23 @@ def test_js_that_does_not_close_is_not_confirmed(body: str, says: str) -> None:
 
 # --------------------------------------------------------------- map reader
 
-def test_map_entries_open_with_a_bold_backticked_id() -> None:
-    text = ("# Map\n\n**Not an entry.** prose\n\n## Chrome\n\n**`chrome.nav` Nav** — *Root:* `data-surface`.\n"
-            "- **`chrome.toast` Toast** — *Root:* `data-surface`.\n\n```markdown\n**`fenced.example` X**\n```\n"
-            "**`keys.global` Keys** — *Reach:* any page.\n*Root:* none — keys act on the page.\n"
-            "**`state.bare` Bare** — *Root:* none.\n**`bad id` Bad**\n")
-    assert entries(text) == ["chrome.nav:7", "chrome.toast:8", "keys.global:13 rootless", "state.bare:15",
-                             "invalid-surface-id:16"]
+def test_map_entries_carry_their_item_line_and_rootless_needs_a_reason() -> None:
+    text = yaml_map(entry("home.list"), entry("keys.global", root="keys act on the page"),
+                    "  - id: state.bare\n    area: home\n    title: Bare\n    root:\n      none:\n",
+                    entry("Bad Id"))
+    assert entries(text) == ["home.list:11", "keys.global:15 rootless", "state.bare:20", "Bad Id:25",
+                             "invalid-surface-id:25"]
 
 
-def test_the_shipped_template_parses_and_has_a_rootless_entry() -> None:
-    text = (REPO_ROOT / "docs" / "templates" / "ux-surface-map.md").read_text(encoding="utf-8")
-    sites, bad = us.parse_map(text, "docs/ux-surface-map.md")
-    assert not bad
+def test_a_link_to_an_id_no_entry_lists_is_a_dangling_link_on_the_link_line() -> None:
+    text = yaml_map(entry("home.list", links=("home.list", "home.gone")))
+    assert entries(text) == ["home.list:11", "dangling-link:17"]
+
+
+def test_the_shipped_template_loads_and_has_a_rootless_entry() -> None:
+    text = (REPO_ROOT / "docs" / "templates" / "ux-surfaces.yaml").read_text(encoding="utf-8")
+    sites, hits = us.read_map(um.load(text, "docs/ux-surfaces.yaml"), "docs/ux-surfaces.yaml")
+    assert not hits
     assert {s.id for s in sites} == {"chrome.nav", "home.list", "settings.sheet", "keys.global"}
     assert [s.id for s in sites if s.rootless] == ["keys.global"]
 
@@ -192,18 +219,27 @@ def test_an_id_listed_twice_in_the_map_is_a_duplicate() -> None:
 # ---------------------------------------------------------- ratchet on repos
 
 TABLE = "[ux_surface_ratchet]\nenabled = true\n"
-MAP = "docs/ux-surface-map.md"
-GOOD_MAP = "# Map\n\n**`home.list` Home** — *Root:* `data-surface`.\n"
+MAP = "docs/ux-surfaces.yaml"
+PAGE = "docs/ux-surface-map.md"
+GOOD_MAP = yaml_map(entry("home.list"))
 GOOD_HTML = '<main data-surface="home.list">\n<p>hi</p>\n</main>\n'
+#: The line of the next entry appended to GOOD_MAP.
+NEXT_ENTRY = GOOD_MAP.count("\n") + 1
+
+
+def write_map(root: Path, text: str) -> None:
+    """The map and the page it generates, both tracked."""
+    write(root, MAP, text)
+    write(root, PAGE, um.render(um.load(text, MAP), MAP))
 
 
 @pytest.fixture
 def repo(tmp_path: Path) -> Path:
-    """A throwaway git repo whose one surface matches its one map entry."""
+    """A throwaway git repo whose one surface matches its one map entry, with the page generated."""
     git(tmp_path, "init", "-q")
     (tmp_path / ".fleet.toml").write_text(TABLE, encoding="utf-8")
     write(tmp_path, HTML, GOOD_HTML)
-    write(tmp_path, MAP, GOOD_MAP)
+    write_map(tmp_path, GOOD_MAP)
     return tmp_path
 
 
@@ -222,13 +258,15 @@ def test_a_matching_app_inits_empty_and_passes(repo: Path, capsys: pytest.Captur
     ("rel", "text", "rule", "where", "fix"),
     [
         pytest.param(HTML, GOOD_HTML + '<dialog data-surface="home.add"></dialog>\n', "unmapped-surface",
-                     f"{HTML}:4", (MAP, GOOD_MAP + "**`home.add` Add** — *Root:* `data-surface`.\n"),
-                     id="missing-entry"),
-        pytest.param(MAP, GOOD_MAP + "**`home.gone` Gone** — *Root:* `data-surface`.\n", "stale-entry",
-                     f"{MAP}:4", (MAP, GOOD_MAP), id="stale-entry"),
+                     f"{HTML}:4", (MAP, GOOD_MAP + entry("home.add")), id="missing-entry"),
+        pytest.param(MAP, GOOD_MAP + entry("home.gone"), "stale-entry", f"{MAP}:{NEXT_ENTRY}", (MAP, GOOD_MAP),
+                     id="stale-entry"),
         pytest.param(JS, "const s = document.createElement('section');\ns.dataset.surface = 'home.list';\n",
                      "duplicate-surface", f"{JS}:2", (JS, "const s = document.createElement('section');\n"),
                      id="duplicate-id"),
+        pytest.param(MAP, yaml_map(entry("home.list", links=("home.gone",))), "dangling-link",
+                     f"{MAP}:16", (MAP, yaml_map(entry("home.list", links=("home.list",)))),  # the `- to:` line
+                     id="dangling-link"),
     ],
 )
 def test_each_named_failure_is_red_then_green_once_fixed(
@@ -236,12 +274,52 @@ def test_each_named_failure_is_red_then_green_once_fixed(
     fix: tuple[str, str],
 ) -> None:
     assert run_mode(repo, init=True) == us.EXIT_PASS
-    write(repo, rel, text)
+    (write_map if rel == MAP else lambda r, t: write(r, rel, t))(repo, text)
     assert run_mode(repo) == us.EXIT_RISE
     out = capsys.readouterr().out
     assert f"{where}: [{rule}]" in out
-    write(repo, *fix)
+    (write_map if fix[0] == MAP else lambda r, t: write(r, fix[0], t))(repo, fix[1])
     assert run_mode(repo) == us.EXIT_PASS
+
+
+def test_a_hand_edited_or_missing_page_is_stale_generated_until_regenerated(
+    repo: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    assert run_mode(repo, init=True) == us.EXIT_PASS
+    page = (repo / PAGE).read_text(encoding="utf-8")
+    write(repo, PAGE, page.replace("# UX surface map: test", "# UX surface map: hand-edited"))
+    assert run_mode(repo) == us.EXIT_RISE
+    assert f"{PAGE}:3: [stale-generated]" in capsys.readouterr().out
+    write(repo, MAP, GOOD_MAP + entry("home.more", root="drawn inside the list"))
+    write(repo, PAGE, page)
+    assert run_mode(repo) == us.EXIT_RISE, "a map edited without regenerating the page"
+    (repo / PAGE).unlink()
+    assert run_mode(repo) == us.EXIT_RISE
+    assert f"{PAGE}:1: [stale-generated] the page is missing" in capsys.readouterr().out
+    assert um.main(["--root", str(repo)]) == um.EXIT_OK
+    assert run_mode(repo) == us.EXIT_PASS
+
+
+def test_a_page_checked_out_with_crlf_line_endings_is_not_stale(repo: Path) -> None:
+    assert run_mode(repo, init=True) == us.EXIT_PASS
+    page = (repo / PAGE).read_text(encoding="utf-8")
+    (repo / PAGE).write_bytes(page.replace("\n", "\r\n").encode("utf-8"))
+    assert run_mode(repo) == us.EXIT_PASS
+
+
+def test_a_reasoned_yaml_comment_above_an_entry_exempts_its_hit(repo: Path) -> None:
+    assert run_mode(repo, init=True) == us.EXIT_PASS
+    write_map(repo, GOOD_MAP + entry("home.gone", before="  # stale-entry-exempt\n"))
+    assert run_mode(repo) == us.EXIT_RISE, "a bare marker exempts nothing"
+    write_map(repo, GOOD_MAP + entry("home.gone", before="  # note\n  # stale-entry-exempt: built by a plugin\n"))
+    assert run_mode(repo) == us.EXIT_PASS
+
+
+def test_a_map_outside_the_subset_fails_and_names_its_line(repo: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    assert run_mode(repo, init=True) == us.EXIT_PASS
+    write(repo, MAP, GOOD_MAP + "    why: &anchor no\n")
+    assert run_mode(repo) == us.EXIT_RISE
+    assert f"the surface map is invalid: {MAP}:{NEXT_ENTRY}:" in capsys.readouterr().out
 
 
 def test_baselined_debt_passes_and_a_second_hit_fails(repo: Path, capsys: pytest.CaptureFixture[str]) -> None:
@@ -279,7 +357,7 @@ def test_a_missing_map_fails_and_names_the_template(repo: Path, capsys: pytest.C
     (repo / MAP).unlink()
     git(repo, "add", "-A")
     assert run_mode(repo) == us.EXIT_RISE
-    assert "docs/templates/ux-surface-map.md" in capsys.readouterr().out
+    assert "docs/templates/ux-surfaces.yaml" in capsys.readouterr().out
 
 
 def test_disabled_or_absent_stage_exits_zero_and_says_so(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
@@ -304,7 +382,7 @@ def test_an_id_a_vendored_component_stamps_keeps_its_map_entry_from_being_stale(
     (repo / ".fleet.toml").write_text(TABLE + '\n[vendored]\nbw = { dest = "app/webapp/static/_v/bw" }\n',
                                       encoding="utf-8")
     run_mode(repo, init=True)
-    write(repo, MAP, GOOD_MAP + "**`app.banner` Banner** — *Root:* `data-surface`.\n")
+    write_map(repo, GOOD_MAP + entry("app.banner"))
     assert run_mode(repo) == us.EXIT_RISE, "no element carries the id yet"
     write(repo, "app/webapp/static/_v/bw/bw.js",
           "const el = document.createElement('div');\nel.dataset.surface = 'app.banner';\n"
@@ -365,11 +443,14 @@ def test_gate_runs_the_stage_after_the_usage_track_ratchet_and_before_mypy() -> 
     assert before < stage < mypy
 
 
-def test_the_script_is_catalogued_with_its_tokenizer() -> None:
+def test_the_script_is_catalogued_with_its_siblings() -> None:
     from scripts.vendored_catalog import load_catalog
 
-    row = load_catalog(REPO_ROOT)["ux_surface_ratchet"]
-    assert row["src"] == "scripts/ux_surface_ratchet.py"
+    catalog = load_catalog(REPO_ROOT)
+    assert catalog["ux_surface_ratchet"]["src"] == "scripts/ux_surface_ratchet.py"
+    assert catalog["ux_surface_map"]["src"] == "scripts/ux_surface_map.py"
+    toml = (REPO_ROOT / ".fleet.toml").read_text(encoding="utf-8")
+    assert 'requires = ["usage_track_scan", "ux_surface_map"]' in toml
 
 
 def test_every_rule_is_documented() -> None:

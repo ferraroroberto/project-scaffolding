@@ -133,6 +133,7 @@ def test_a_malformed_extra_root_files_is_a_config_error(tmp_path: Path, value: s
         ("webapp-tray", "app/webapp/static/icons/a.png"), ("webapp-tray", "app/webapp/player/index.html"),
         ("service", "launchers/start.sh"), ("static-site", "css/site.css"), ("skills-governance", "skills/a/SKILL.md"),
         ("streamlit", "config/app.json.example"), ("node", "patches/left-pad+1.0.0.patch"),
+        ("webapp-tray", "docs/ux-surfaces.yaml"), ("streamlit", "docs/templates/ux-surfaces.yaml"),
     ],
 )
 def test_a_file_its_folder_type_takes_is_not_mistyped(shape: str, path: str) -> None:
@@ -147,7 +148,7 @@ def test_a_file_its_folder_type_takes_is_not_mistyped(shape: str, path: str) -> 
         ("streamlit", "app/index.html", "app", ".html"), ("webapp-tray", "app/cli/logo.png", "app/cli", ".png"),
         ("service", "launchers/start.py", "launchers", ".py"), ("static-site", "js/app.css", "js", ".css"),
         ("node", "test/snap", "test", "(none)"), ("node", "patches/fix.js", "patches", ".js"),
-        ("node", "scripts/fix.patch", "scripts", ".patch"),
+        ("node", "scripts/fix.patch", "scripts", ".patch"), ("webapp-tray", "docs/other.yaml", "docs", ".yaml"),
     ],
 )
 def test_a_file_its_folder_type_does_not_take_is_counted_per_folder(

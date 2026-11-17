@@ -82,9 +82,11 @@
      12b. ux surface ratchet — scripts/ux_surface_ratchet.py: fails when a web
                          app's HTML or JS gains a surface root with no
                          data-surface id, an id with no entry in
-                         docs/ux-surface-map.md, a map entry no element
-                         carries, a duplicated or non-constant id, beyond the
-                         committed baseline; opt-in via .fleet.toml
+                         docs/ux-surfaces.yaml, a map entry no element
+                         carries, a duplicated or non-constant id, a link to
+                         no entry, or a docs/ux-surface-map.md page not
+                         regenerated from the map, beyond the committed
+                         baseline; opt-in via .fleet.toml
                          [ux_surface_ratchet]; exit 3 = "not confirmed", a
                          failure, never a pass (docs/ux-surface-ratchet.md)
      13. mypy --strict — the vendor-verbatim primitives only; the list is

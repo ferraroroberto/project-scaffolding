@@ -1,6 +1,6 @@
 # UX surface ratchet
 
-`scripts/ux_surface_ratchet.py` is a baseline-and-ratchet stage for the pre-ship gate. It reads a web app's HTML and JS and its [UX surface map](ux-surface-map.md), counts each rule's hits per file, and **fails when a file's count for a rule rises** above the committed baseline. Existing debt never blocks work; it cannot grow either.
+`scripts/ux_surface_ratchet.py` is a baseline-and-ratchet stage for the pre-ship gate. It reads a web app's HTML and JS, its [UX surface map](ux-surface-map.md) (`docs/ux-surfaces.yaml`) and the page generated from it (`docs/ux-surface-map.md`), counts each rule's hits per file, and **fails when a file's count for a rule rises** above the committed baseline. Existing debt never blocks work; it cannot grow either.
 
 It holds the convention that the map and the code name the same surfaces:
 
@@ -8,11 +8,11 @@ It holds the convention that the map and the code name the same surfaces:
 
 The map is only useful while it is complete. A surface added without an entry, an entry left behind when its surface goes, or one id on two surfaces each make the map wrong without anyone noticing; this stage makes each of them a gate failure in the PR that causes it.
 
-It has the shape of the [usage track ratchet](usage-track-ratchet.md): an opt-in `.fleet.toml` table, named rules, a committed baseline, the same flags, and exit 3 for "not confirmed". It reads JS through that ratchet's tokenizer, `scripts/usage_track_scan.py`, so the two read strings, templates, comments and blocks the same way; it is stdlib-only and imports nothing it scans.
+It has the shape of the [usage track ratchet](usage-track-ratchet.md): an opt-in `.fleet.toml` table, named rules, a committed baseline, the same flags, and exit 3 for "not confirmed". It reads JS through that ratchet's tokenizer, `scripts/usage_track_scan.py`, so the two read strings, templates, comments and blocks the same way; it reads the map through `scripts/ux_surface_map.py`, the generator, so the ratchet and the page read the same file the same way. It is stdlib-only and imports nothing it scans.
 
 ## The rules
 
-Every rule is on unless `rules` lists a subset, and every rule is counted per file against the baseline: a code rule against the HTML or JS file, a map rule against the map.
+Every rule is on unless `rules` lists a subset, and every rule is counted per file against the baseline: a code rule against the HTML or JS file, a map rule against the map, `stale-generated` against the page.
 
 ### `unmarked-surface`
 
@@ -36,20 +36,29 @@ An id the code declares that no map entry lists. The hit is on the code line: ad
 
 ### `stale-entry`
 
-A map entry whose id no element in the code carries. The hit is on the map line: remove the entry with its surface, or, for a surface that has no element of its own (a gesture, a key, a state drawn inside another surface), say so with `*Root:* none — <reason>`. A bare `none` with no reason still counts.
+A map entry whose id no element in the code carries. The hit is on the entry's `- id:` line: remove the entry with its surface, or, for a surface that has no element of its own (a gesture, a key, a state drawn inside another surface), say so with `root:` and `none: <reason>`. A bare `none:` with no reason still counts.
 
 ### `duplicate-surface`
 
 An id declared on more than one element in the code, or listed by more than one map entry. Every site counts, so both copies are named. A surface drawn twice on purpose (one root for the mouse popover, another for the phone sheet) keeps one id and excepts the second root with `duplicate-surface-exempt: <reason>`.
 
+### `dangling-link`
+
+A `links` item whose `to:` id no map entry lists. The hit is on the link's `- to:` line: fix the id, add the entry, or drop the link with the surface it pointed at. The page draws such a link to a stub saying the entry is missing, so it is visible there too.
+
+### `stale-generated`
+
+The committed page is not what `scripts/ux_surface_map.py` generates from the map, or it is missing. The hit is on the first line that differs. The page is never edited by hand: change the map and run `python scripts/ux_surface_map.py`. Line endings are ignored, so a Windows checkout's CRLF page is not stale.
+
 ## What it reads
 
 - **Code:** every tracked or untracked-but-not-ignored file under `paths` with an HTML suffix (`.html`, `.htm`, `.jinja`, `.jinja2`, `.j2`) or a JS one (`.js`, `.mjs`), outside `exclude`, test folders, `node_modules`, `.venv`, `*.min.js` and every `[vendored]` destination. A surface a vendored component builds is stamped by the app's call site, which is scanned. A vendored file is read only for the ids it stamps itself (`build-watch`'s `app.update-banner`): they keep a map entry from being stale, and no rule is applied to the vendored copy, since the app cannot edit it. An app still lists such an id in its map; nothing fails if it does not.
-- **The map:** the file named by `map`. An entry is a line that opens with a bold backticked id (`**\`today.row-menu\` Row menu**`, optionally as a list item), outside fenced code blocks, and runs until the next entry or heading. Prose between entries is ignored.
+- **The map:** the YAML file named by `map`, through the generator's strict subset reader and schema ([The map file](ux-surface-map.md#the-map-file)). Each `surfaces` item is an entry, counted on its `- id:` line. A map outside the subset or the schema (a tab, an anchor, an unknown key, an `area` not listed) fails the stage with its line, exit 1, and is never baselined: it has to be fixed before anything else can be counted.
+- **The page:** the file named by `page`, compared with what the generator renders from the map.
 
 ## Exceptions
 
-A single hit keeps its exception with a `<rule>-exempt: <reason>` comment (`//` in JS, `<!-- -->` in HTML and in the map) on the hit's own line or in the comment block right above it. A marker with no reason exempts nothing.
+A single hit keeps its exception with a `<rule>-exempt: <reason>` comment (`//` in JS, `<!-- -->` in HTML, `#` in the map) on the hit's own line or in the comment block right above it; in the map that is the block of `#` lines above the entry's `- id:` line or the link's `- to:` line. A marker with no reason exempts nothing. The page has no exceptions: it is regenerated, never edited.
 
 ## Configuration
 
@@ -57,8 +66,10 @@ A single hit keeps its exception with a `<rule>-exempt: <reason>` comment (`//` 
 [ux_surface_ratchet]
 enabled  = true
 baseline = ".ux-surface-ratchet-baseline.json"            # the default
-map      = "docs/ux-surface-map.md"                        # the default
-rules    = ["unmarked-surface", "invalid-surface-id", "unmapped-surface", "stale-entry", "duplicate-surface"]  # the default: all
+map      = "docs/ux-surfaces.yaml"                         # the default: the source
+page     = "docs/ux-surface-map.md"                        # the default: generated from the map
+rules    = ["unmarked-surface", "invalid-surface-id", "unmapped-surface", "stale-entry", "duplicate-surface",
+            "dangling-link", "stale-generated"]             # the default: all
 paths    = ["app/webapp/static/**", "app/webapp/templates/**"]  # the default
 exclude  = ["app/webapp/static/vendor/**"]
 ```
@@ -71,20 +82,21 @@ exclude  = ["app/webapp/static/vendor/**"]
 | `--init` | Write the first baseline. Never overwrites an existing one. |
 | `--update-baseline` | Lower or drop entries. Refuses, and writes nothing, while anything rose. |
 | `--update-baseline --allow-additions` | Raise or add entries; shows in review. |
+| `python scripts/ux_surface_map.py` | Regenerate the page from the map (`--check` only reports). |
 
 | Exit | Meaning |
 |---|---|
 | 0 | Pass, or the stage is not enabled |
-| 1 | A count rose, the map is missing, or the baseline is missing |
-| 2 | Bad configuration, baseline or arguments |
+| 1 | A count rose, the map is missing or invalid, or the baseline is missing |
+| 2 | Bad configuration, baseline or arguments; a `map` that names a Markdown file |
 | 3 | **Not confirmed**: `git` could not list the tree, a file could not be read or is not UTF-8, or a JS source's strings, comments or braces do not close. Fails the gate; never a pass |
 
-A missing map is not baselined: an app that enables the stage copies `docs/templates/ux-surface-map.md` first.
+A missing map is not baselined: an app that enables the stage copies `docs/templates/ux-surfaces.yaml` first. A Markdown map from before the YAML source moves as [Moving a Markdown map](ux-surface-map.md#moving-a-markdown-map) says.
 
 ## Adopting it
 
-1. Vendor `scripts/ux_surface_ratchet.py` and `scripts/usage_track_scan.py` (manifest keys `ux_surface_ratchet` and `usage_track_scan`) and add the stage to the gate after the usage track ratchet.
-2. Copy the template to `docs/ux-surface-map.md` and walk the app ([Starting a map](ux-surface-map.md#starting-a-map)).
+1. Vendor `scripts/ux_surface_ratchet.py`, `scripts/usage_track_scan.py` and `scripts/ux_surface_map.py` (manifest keys `ux_surface_ratchet`, `usage_track_scan` and `ux_surface_map`) and add the stage to the gate after the usage track ratchet.
+2. Copy the template to `docs/ux-surfaces.yaml`, walk the app ([Starting a map](ux-surface-map.md#starting-a-map)) and generate the page.
 3. Add the table, run `--init`, and commit the baseline: today's unmarked roots, unmapped ids and stale entries go in as debt.
 4. Burn it down: each `data-surface` added with its entry lowers a count; `--update-baseline` records it.
 
@@ -92,4 +104,4 @@ A missing map is not baselined: an app that enables the stage copies `docs/templ
 
 - It sees surfaces that are surfaces by their markup, and every surface that already carries an id. A screen, drill-in or state built without `data-surface` and without an entry is invisible to it; the design-review and e2e walk is the cross-check that reports a surface it opened with no id.
 - A `createElement` root marked in another function, after it was returned, is not seen: mark it where it is built, or except it with a reason.
-- It holds ids, not contents: it does not check that an entry's *Holds* or *Does* still matches the controls on the surface.
+- It holds ids and links, not contents: it does not check that an entry's `holds` or `does` still matches the controls on the surface.

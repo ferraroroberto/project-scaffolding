@@ -1,0 +1,98 @@
+# UX surface map: the single source for docs/ux-surface-map.md.
+#
+# Every screen, drill-in, menu, sheet, dialog, popover, Settings row, state,
+# gesture and key a person can reach in this app, one entry per surface. The
+# convention is project-scaffolding's docs/ux-surface-map.md. Edit this file,
+# never the generated page; then run `python scripts/ux_surface_map.py`.
+#
+# A change that adds, removes, renames or reshapes a user-visible surface
+# updates its entry here in the same change, adds or removes the matching
+# `data-surface` attribute in the code, and regenerates the page.
+#
+# The file is a strict YAML subset (scripts/ux_surface_map.py lists it): keys
+# are plain identifiers, indentation is spaces, a value stays on one line or
+# goes in a `>` block, and a value that starts with a backtick, quote or
+# bracket, or holds ": ", is quoted.
+
+app: replace-with-the-app-name
+
+# Optional prose for the top of the page: input modes, layout bands, where
+# state lives, what gates features.
+notes: >
+  Replace with the app's ground rules.
+
+# The walk the map was checked against.
+walk:
+  date: 2026-01-01
+  build: replace-with-the-build-sha
+  widths: [390, 1280]
+  themes: [light, dark]
+
+# Areas, in page order; each gets its own section and its own diagram.
+areas:
+  - id: chrome
+    title: Chrome
+  - id: home
+    title: Home
+  - id: settings
+    title: Settings
+  - id: keys
+    title: Keys and gestures
+
+# Surfaces. `root` is `data-surface` when an element carries the id, or
+# `none:` with the reason the surface has no element of its own. `reach`,
+# `holds`, `does` and `states` are lists; `why`, `phone` and `desktop` are
+# text; `links` are the ways out of this surface and draw the diagrams.
+surfaces:
+  - id: chrome.nav
+    area: chrome
+    title: Nav
+    root: data-surface
+    reach:
+      - always on screen
+    holds:
+      - one tab per destination
+    does:
+      - switches the view
+    why: the fleet navigation contract
+    links:
+      - to: home.list
+        via: Home tab
+      - to: settings.sheet
+        via: Settings tab
+
+  - id: home.list
+    area: home
+    title: Home list
+    root: data-surface
+    reach:
+      - the Home tab
+      - the first visit lands here
+    holds:
+      - replace
+    does:
+      - replace
+    states:
+      - "empty: replace"
+
+  - id: settings.sheet
+    area: settings
+    title: Settings
+    root: data-surface
+    reach:
+      - the Settings tab
+    holds:
+      - one group per area
+    does:
+      - replace
+    links:
+      - to: home.list
+        via: Back
+
+  - id: keys.global
+    area: keys
+    title: Keyboard shortcuts
+    root:
+      none: keys act on the page, not on an element of their own
+    holds:
+      - replace with each key and what it does
