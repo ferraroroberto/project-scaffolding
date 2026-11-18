@@ -115,6 +115,44 @@ def check_select_native_boundary_renders_in_webkit(playwright: Playwright, base_
         browser.close()
 
 
+# A select row in a detail sheet (narrower than the page): the value is the longest that
+# WebKit drew past the select's own box once the flex row shrank it.
+_SHEET_SELECT_ROW = (
+    '<label class="settings-row" id="probeSelectRow">'
+    '<svg class="icon settings-row-icon" aria-hidden="true"><use href="#i-folder"></use></svg>'
+    '<span class="settings-row-label">Download limit</span>'
+    '<select class="settings-row-select"><option>No limit (recommended)</option></select>'
+    '<svg class="icon settings-row-chevron" aria-hidden="true"><use href="#i-chevron-down"></use></svg>'
+    "</label>"
+)
+
+
+def check_settings_group_long_select_value_keeps_its_row_in_webkit(playwright: Playwright, base_url: str) -> None:
+    """settings-group: in WebKit a long select value in a sheet row stays inside its box and never widens the row, both phone heights, both themes."""
+    browser = playwright.webkit.launch()
+    try:
+        context = browser.new_context(viewport=_PHONE, has_touch=True, is_mobile=True)
+        page = load_gallery(context.new_page(), base_url)
+        for height in (844, 664):
+            for theme in ("light", "dark"):
+                _set_theme(page, theme)
+                _open_page(page, {"width": 390, "height": height})
+                page.locator("#demoSettingsLink").click()
+                page.evaluate(
+                    "(h) => { document.querySelector('#probeSelectRow')?.remove();"
+                    " document.querySelector('#demoSettingsSheetBody').insertAdjacentHTML('afterbegin', h); }",
+                    _SHEET_SELECT_ROW,
+                )
+                client, scroll = page.evaluate(
+                    "() => { const r = document.querySelector('#probeSelectRow'); return [r.clientWidth, r.scrollWidth]; }"
+                )
+                assert scroll <= client, (height, theme, client, scroll)
+                page.locator("#demoSettingsSheetDone").click()
+                page.locator("#demoSettingsClose").click()
+    finally:
+        browser.close()
+
+
 def _open_page(gallery: Page, viewport: dict[str, int] = _PHONE) -> None:
     """Size the window, then open the Settings page the way the gear does."""
     gallery.set_viewport_size(viewport)

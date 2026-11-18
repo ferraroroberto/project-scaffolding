@@ -54,6 +54,7 @@ from tests.e2e._geometry import (
 from tests.e2e._settings_group_checks import (
     check_select_native_boundary_renders_in_webkit,
     check_select_native_contract,
+    check_settings_group_long_select_value_keeps_its_row_in_webkit,
     run_settings_group_cases,
 )
 from tests.e2e.conftest import STATIC_DIR
@@ -891,3 +892,5 @@ def test_gallery_component_contracts(new_gallery: Callable[[], AbstractContextMa
         run_settings_group_cases(c, new_gallery)
         with c.case("select_native_boundary_renders_in_webkit"):
             check_select_native_boundary_renders_in_webkit(playwright, static_server)
+        with c.case("settings_group_long_select_value_keeps_its_row_in_webkit"):
+            check_settings_group_long_select_value_keeps_its_row_in_webkit(playwright, static_server)
