@@ -33,6 +33,8 @@ Listed in gate stage order, the order `scripts/run_ratchets.py` runs them. **Sib
 | usage track | `usage_track_ratchet.py`, `usage_track_scan.py` | a web UI; choose `rules` | fast | | [usage-track-ratchet.md](usage-track-ratchet.md) |
 | ux surface | `ux_surface_ratchet.py`, `usage_track_scan.py`, `ux_surface_map.py` | a web UI and its `docs/ux-surfaces.yaml` | fast | | [ux-surface-ratchet.md](ux-surface-ratchet.md) |
 
+The test value ratchet is not in this table: it reads a test run's recorded results, so it runs after the tests and `run_ratchets.py` and `adopt_ratchets.py` leave it out. Its siblings (`unit_ledger.py`, `spawn_probe/`, `unit_ledger_pytest.py`, `weekly_burst.py`), the gate wiring and the weekly job: [test-value-ratchet.md](test-value-ratchet.md).
+
 [ratchet-catalog.md](ratchet-catalog.md) lists every rule of every ratchet by category, with a bad and a fixed snippet for each; read it to learn what a ratchet will flag before you adopt it.
 
 Two of the reference docs' terms belong to the owner's fleet and can be ignored here: `/propagate-vendored` (a private re-vendoring skill) and the e2e routing step (only for repos that use this scaffold's e2e router). `[vendored]` is **not** fleet-only: the ratchets read its `dest` entries to skip their own copies, so keep it.

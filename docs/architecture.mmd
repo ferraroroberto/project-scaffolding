@@ -118,7 +118,16 @@ docs/adopting-ratchets.md"]
     BRANDGEN["brand_gen.py\nrender_set(): Lucide master SVG -> dark-tile\nPWA/tray/Stream Deck icon set (resvg-py)"]
     SITESCRIPTS["site_images.py · site_routes.py · site_serve.py · site_check.py\n(vendor-verbatim, a built static site's scripts/)\nWebP variants per role + social JPEG (Pillow) ·\nCloudflare Pages URL rules · preview server ·\noffline check: sitemap routes, forbidden hosts, local refs"]
     BOXLOCK["box_lock_gate.ps1 (vendor-verbatim)\ndot-sources verify-before-ship.ps1 under\nfleet-config's box_lock.py run --mode shared\nexit 3 = lock held past timeout, prints GATE-RESULT: FAIL;\nno helper -> runs unlocked with [WARN]"]
+    TESTVALUE["test value family (vendor-verbatim, stdlib, off by default)
+unit_ledger.py: run wrapper + per-unit JSONL ledger (machine-local state)
+spawn_probe/ (sitecustomize.py): per-unit spawn count + covered lines
+unit_ledger_pytest.py: one pytest module = one unit, honours FLEET_GATE_ONLY
+test_value_ratchet.py: new-test-value, spawn-budget, flake-ledger, hermetic
+vs .test-value-ratchet-baseline.json; exit 3 = not confirmed
+weekly_burst.py: weekly units, fresh-clone gate, coverage map, medians
+docs/test-value-ratchet.md"]
   end
+  TESTVALUE -.->|reads [test_value_ratchet] + [test_value_burst] from| FLEETTOML
   BOXLOCK -->|dot-sources, holds the shared box lock for the run| VERIFY
   SITESCRIPTS -->|sizes and classes the images of| SITEVEND
   VERIFY --> srcdir

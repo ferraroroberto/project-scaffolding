@@ -37,6 +37,16 @@ Enforcement: a convention that is one pattern joins the [conventions ratchet](co
 
 Issue: https://github.com/ferraroroberto/project-scaffolding/issues/560
 
+### A new test earns its place, and the suite's cost only shrinks
+
+The unit of a test suite's value is the whole unit: a check function or a test file (a pytest module), never one assertion. Every gate run appends one row per unit (outcome, seconds, process spawns, tree hash) to a run ledger kept as machine-local state beside the repo's runtime logs, never committed. One ratchet, `test_value_ratchet`, reads it with several deterministic rules, each its own failure mode: a unit new in the diff shows red-before-fix, a covered line no other unit covers, or a `test-value-exempt: <reason>` marker (`new-test-value`); no unit's spawn count rises (`spawn-budget`); open flakes only shrink in number and age (`flake-ledger`); a unit green in the checkout is green in a fresh clone (`hermetic`, weekly). Burn and load proofs, the full coverage map, the fresh-clone re-run and wall-clock medians never run per change: they run once a week as their own scheduled burst on the main machine. Wall-clock time is measured there and never fails a change. Existing units are baselined and are never failed or deleted for low value; merge candidates go to a person.
+
+Why: suites only grow and their cost lands on every change of every lane; the process spawn count is a cost proxy that does not flake under box load, and a capped flake ledger stops red-then-green reruns from becoming normal, while deleting tests on coverage alone would lose fault detection.
+
+Enforcement: the [test value ratchet](test-value-ratchet.md) and its siblings (`unit_ledger`, `spawn_probe`, `unit_ledger_pytest`, `weekly_burst`), each a vendored component that is off until a repo enables `[test_value_ratchet]` and `[test_value_burst]`; a stale coverage map or a run with no report is exit 3, never a pass.
+
+Issue: https://github.com/ferraroroberto/project-scaffolding/issues/858
+
 ### Every UX control is tracked in usage-log
 
 Every feature that touches the UX is tracked in the app's `usage-log` and ingested by its `/api/usage` routes: each interactive control carries a constant tracking id, each sheet, dialog and drawer records its view on open and returns to the previous view on close, and every fleet web app initialises `usage-log` and mounts its routes. Ids are constants, never built from content.

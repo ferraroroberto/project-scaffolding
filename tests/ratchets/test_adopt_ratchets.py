@@ -45,7 +45,8 @@ def test_every_ratchet_script_is_in_the_scaffold_catalog() -> None:
     for r in ar.RATCHETS:
         assert {f"scripts/{f}" for f in r.files} <= sources, r.name
     on_disk = {p.stem.removesuffix("_ratchet") for p in (REPO_ROOT / "scripts").glob("*_ratchet.py")}
-    assert on_disk == set(ar.BY_NAME)
+    assert on_disk == set(ar.BY_NAME) | set(ar.POST_RUN)
+    assert not set(ar.BY_NAME) & set(ar.POST_RUN), "a post-run ratchet is never a pre-test stage"
 
 
 def test_stage_order_matches_the_runner_and_the_scaffold_gate() -> None:

@@ -17,6 +17,7 @@ from scripts import (
     runtime_write_ratchet,
     static_ratchet,
     structure_ratchet,
+    test_value_ratchet,
     usage_track_ratchet,
 )
 
@@ -51,6 +52,7 @@ def expected_rules() -> list[str]:
         *static_ratchet.DEFAULT_RULES,
         *structure_ratchet.KINDS,
         *runtime_write_ratchet.KINDS,
+        *test_value_ratchet.ALL_RULES,
         *NAMED_IN_CODE,
     ]
 
