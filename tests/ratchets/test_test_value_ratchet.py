@@ -144,6 +144,25 @@ def test_flake_ledger(repo: Path, tmp_path: Path) -> None:
     assert code == 3 and "the unit ledger is missing" in out
 
 
+def test_flake_ledger_skips_its_own_host_unit(repo: Path, tmp_path: Path) -> None:
+    ledger = tmp_path / "ledger.jsonl"
+    flags = ["--rules", "flake-ledger", "--ledger", str(ledger)]
+    write(repo, ".fleet.toml", CONFIG + 'host_unit = "_host_check"\n')
+    host = [unit_row("_host_check", "fail", "t1", stamp(2)), unit_row("_host_check", "pass", "t1", stamp(2, 5))]
+    write_jsonl(ledger, host)
+    code, out = run(repo, *flags)
+    assert code == 0 and "_host_check: host unit, not counted" in out, "the host unit's own flake cannot hold it red"
+    other = [unit_row("u", "fail", "t1", stamp(2)), unit_row("u", "pass", "t1", stamp(2, 5))]
+    write_jsonl(ledger, host + other)
+    code, out = run(repo, *flags)
+    assert code == 1 and "u: open flake since" in out and "1 open flakes, above the baseline of 0" in out
+    cfg = tvr.load_config(repo)
+    assert cfg is not None
+    ledger_rows = host + [{"kind": "run", "run_id": "r", "label": "gate"}]
+    new, _ = tvr.update_baseline(None, ledger_rows, cfg, allow_additions=True)
+    assert new["flake_count"] == 0, "the baseline does not record the host unit's flake"
+
+
 def test_new_test_value(repo: Path, tmp_path: Path) -> None:
     ledger, units, cov = tmp_path / "ledger.jsonl", tmp_path / "units.jsonl", tmp_path / "map.json"
     write_jsonl(ledger, [unit_row("_new_unit_check", "fail", "older-tree", stamp(1))])
