@@ -24,7 +24,7 @@ A **unit** is a whole check function or a whole test file, never one assertion. 
 |---|---|---|
 | `new-test-value` | A unit missing from the baseline at the merge base with `base_ref` (new in the diff) shows none of: a `test-value-exempt: <reason>` marker; a ledger record of it failing on a tree other than this one (red before the fix); a covered source line that the weekly coverage map lacks. A missing or stale map is exit 3. | per change, new units only |
 | `spawn-budget` | A unit's process spawns in this run rise above its baseline entry, or a unit has no entry. Spawns stand in for cost because they do not flake under box load. | per change |
-| `flake-ledger` | Open flakes (a unit that passed and failed on one tree hash under the gate label, until `flake_clear_runs` passes in a row) rise above the baseline's `flake_count`, or one stays open past `flake_max_age_days`. | per change |
+| `flake-ledger` | Open flakes (a unit that passed and failed on one tree hash under the gate label, until `flake_clear_runs` passes in a row) rise above the baseline's `flake_count`, or one stays open past `flake_max_age_days`. The `host_unit` (the unit that runs this verdict) is not counted: it would fail itself on every run and never collect the passes that close its flake; its rows stay on the ledger and `new-test-value` and `spawn-budget` still judge it. | per change |
 | `hermetic` | A unit red in the latest fresh-clone gate run is green in the latest checkout run, and is not in the baseline's `hermetic` list. No fresh-clone run in `hermetic_max_age_days` is exit 3. | weekly |
 
 Wall-clock time is never a rule. The weekly burst records the medians; nothing fails on them.
@@ -45,6 +45,7 @@ base_ref    = "origin/main"
 label       = "gate"                               # the ledger label of per-change runs
 capture_runs = 3                                   # --update-baseline takes each unit's max over these
 flake_clear_runs = 10
+host_unit   = ""                                   # the unit that evaluates this ratchet; its own flake is not counted
 coverage_map_max_age_days = 8
 hermetic_label = "weekly-hermetic-gate"
 hermetic_max_age_days = 8
