@@ -13,6 +13,7 @@ The ratchets are the baseline-and-ratchet stages of the pre-ship gate: stdlib-on
 - [Agent instructions: instruction](#agent-instructions)
 - [Usage tracking: usage track](#usage-tracking)
 - [UX surfaces: ux surface](#ux-surfaces)
+- [Test value: test value](#test-value)
 - [Exceptions and burn-down](#exceptions-and-burn-down)
 - [Adoption order](#adoption-order)
 
@@ -1134,6 +1135,54 @@ bad:   the map gained an entry, the page was not regenerated
 fixed: python scripts/ux_surface_map.py, and commit the map and the page together
 ```
 
+## Test value
+
+### Test value ratchet
+
+`scripts/test_value_ratchet.py`, off by default. Unlike every ratchet above it reads the results of a test run, so it runs after the tests, on the run the `unit_ledger.py` wrapper recorded; `run_ratchets.py` does not run it. A unit is a check function or a test file (a pytest module). Its siblings, the run ledger, the probe, the pytest reporter and the weekly burst, and the gate wiring: [test-value-ratchet.md](test-value-ratchet.md).
+
+#### `new-test-value`
+
+A unit new in the diff (missing from the baseline at the merge base) with no red-before-fix record, no covered source line the weekly coverage map lacks, and no marker. A missing or stale map is exit 3, never a pass.
+
+```python
+# bad: re-runs lines other tests already cover, never seen failing
+def test_total_again():
+    assert total([1, 2]) == 3
+
+# fixed: seen red on the pre-fix tree (a ledger row), or excepted with its reason
+# test-value-exempt: pins the rounding the invoice footer prints
+def test_total_rounds_half_up():
+    assert total([0.125]) == 0.13
+```
+
+#### `spawn-budget`
+
+A unit whose process spawns in this run rise above its baseline entry, or a unit with no entry. Spawns stand in for cost because they do not flake under load.
+
+```text
+bad:   tests/test_cli.py: 14 spawns, above its baseline of 9
+fixed: call the CLI's main() in-process and keep one real spawn for the wiring
+```
+
+#### `flake-ledger`
+
+More open flakes than the baseline's `flake_count`, or one open past `flake_max_age_days`. A flake is a unit that passed and failed on one tree hash; it closes after `flake_clear_runs` passes in a row.
+
+```text
+bad:   tests/test_poll.py: open flake since 2026-01-02 (20 days), past the 14-day cap
+fixed: remove the timing dependence (a fake clock), so the unit stops flaking and the ledger closes it
+```
+
+#### `hermetic`
+
+Weekly only. A unit red in the fresh-clone gate leg of the burst but green in the checkout, not listed in the baseline's `hermetic` list.
+
+```text
+bad:   tests/test_paths.py: red in a fresh clone, green in the primary checkout (it reads a gitignored file)
+fixed: build the file the test needs in a temporary folder
+```
+
 ## Exceptions and burn-down
 
 A hit has five possible fates. Pick the narrowest.
@@ -1161,6 +1210,7 @@ Which ratchets take which:
 | runtime write | `# runtime-write-exempt: <reason>` | `exclude`, `safe_calls`, `code_folders` |
 | usage track | `<rule>-exempt: <reason>` | `exclude`, `paths`, `builders` |
 | ux surface | `<rule>-exempt: <reason>` | `exclude`, `paths`, `rules` |
+| test value | `test-value-exempt: <reason>` (new units only) | `unit_roots` |
 
 **A baseline is a ledger to burn to zero, never a permanent allowance.** It records debt, not approval:
 

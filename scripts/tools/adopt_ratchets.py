@@ -75,6 +75,9 @@ RATCHETS: tuple[Ratchet, ...] = (
             "a web UI (HTML/JS) to scan and its docs/ux-surfaces.yaml (docs/ux-surface-map.md)"),
 )
 BY_NAME = {r.name: r for r in RATCHETS}
+#: Ratchets that read a recorded test run, so they run after the tests and are wired by hand
+#: (docs/test-value-ratchet.md); this kit copies pre-test stages only.
+POST_RUN = ("test_value",)
 #: Python-only, no choices to make: what `--ratchets` defaults to.
 RECOMMENDED = ("comment", "docs", "structure", "instruction", "doc_refs", "dead_code", "runtime_write")
 
