@@ -92,6 +92,11 @@
      13. mypy --strict — the vendor-verbatim primitives only; the list is
                          derived from .fleet.toml's [components] catalog via
                          scripts/vendored_catalog.py, never hand-maintained here
+     13b. py39 (vendored) — scripts/tools/vendored_py39_check.py: the same list
+                         read as Python 3.9 source (`ast`, no 3.9 interpreter):
+                         fails on 3.10+ syntax or an `X | Y` 3.9 evaluates;
+                         an unestablished result is "not confirmed", a failure,
+                         never a pass (docs/components.md "Python 3.9 floor")
      14. pytest (non-e2e) — unit suite, tests/e2e excluded
      15. pytest (e2e)  — diff-proportionate: the browser slice is routed by
                          scripts/classify_e2e.py against the .fleet.toml [e2e]
@@ -213,6 +218,7 @@ Invoke-Stage "runtime write ratchet"              { & $py "scripts/runtime_write
 Invoke-Stage "usage track ratchet"                { & $py "scripts/usage_track_ratchet.py" }
 Invoke-Stage "ux surface ratchet"                 { & $py "scripts/ux_surface_ratchet.py" }
 Invoke-Stage "mypy --strict (vendored)"           { & $py -m mypy @VendoredModules }
+Invoke-Stage "py39 (vendored)"                    { & $py "scripts/tools/vendored_py39_check.py" }
 # Runtime write probe, first half: what already sits untracked or ignored under
 # the code folders, so the probe after the tests names only what they wrote.
 $runtimeSnapshot = Join-Path ([IO.Path]::GetTempPath()) "runtime-write-snapshot-$PID.json"
