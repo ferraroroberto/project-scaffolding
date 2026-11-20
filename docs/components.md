@@ -10,12 +10,23 @@ It is load-bearing in two more places:
 
 - `fleet-config`'s `vendored_drift.py` hashes every fleet repo's copy of a catalogued path to name repos carrying an undeclared component.
 - `scripts/verify-before-ship.ps1` derives its `mypy --strict` gate list from the same declaration, rather than keeping a second hand-maintained list, so a new Python component is type-gated the day it lands.
+- `scripts/tools/vendored_py39_check.py` reads the same Python list as Python 3.9 source, so a new Python component is held to the 3.9 floor the day it lands (below).
 
 ## Keeping it current
 
 Add a component to the table in the same PR that adds it to the tree. `tests/test_vendored_catalog.py` is the anti-drift guard that fails otherwise.
 
 A component that loads a sibling at run time declares it with `requires = ["<key>", ...]` on its entry (`conventions_ratchet` requires `conventions_readers` and `conventions_state`; `tests/test_vendored_catalog.py` fails a script that loads a sibling through `_load_sibling` without listing it). `/propagate-vendored` expands a named component with its `requires`, so a wave never re-vendors one without the other. Every `requires` name must be a declared key.
+
+## Python 3.9 floor
+
+Some adopters run Python 3.9, and the gate runs a newer interpreter that would never notice a construct 3.9 rejects. `scripts/tools/vendored_py39_check.py` (the `py39 (vendored)` gate stage, proven by `tests/vendored/test_vendored_py39.py`) reads every Python component with the stdlib `ast` module, so no 3.9 interpreter is needed, and fails on three things:
+
+- **`syntax`** — source that does not parse with the 3.9 grammar (`match`, `except*`).
+- **`annotation-union`** — an `X | Y` annotation in a module without `from __future__ import annotations`; 3.9 evaluates it when the definition runs.
+- **`runtime-union`** — an `X | Y` evaluated at import, such as a module-level type alias (`Alias = int | None`, `Callable[[], Foo | None]`) or `isinstance(x, A | B)`. Write it with `Optional`/`Union` and a `# noqa: UP007, UP045` that says why, since the repo's own ruff target is 3.12 and would rewrite it back.
+
+It ends on `PY39=clean`, `PY39=violations N` (exit 1) or `PY39=unknown` (exit 3, a failure, never a pass). It does not cover standard-library names missing on 3.9 (`tomllib`, `typing.Self`) or a union of two names it cannot tell from a bitwise or; the ratchet scripts that read `.fleet.toml` already require Python 3.11 ([adopting-ratchets.md](adopting-ratchets.md)).
 
 ## Declaring a deliberate fork
 
