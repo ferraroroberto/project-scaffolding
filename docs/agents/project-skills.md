@@ -77,6 +77,14 @@ The issue's disposable fixture probes observed the following on 2026-09-05. **Ve
 | Pi 0.84.4 | Installed `DefaultResourceLoader`, trusted project, no extensions: same scoped inventory using native `.agents/skills`; no `.pi` mirror needed. | Untrusted-project loading is excluded by its documented trust contract. Interactive trust UI and skill execution are unknown. |
 | Grok 0.2.118 | `inspect --json`: `.claude/skills` compatibility discovers root without a Grok link; with `.agents` links, root/package/sibling inventories contain one matching entry per visible sentinel. | In-session descendant refresh and skill execution are unknown. No unsupported native-root claim follows from this probe. |
 
+## A skill that commits to the default branch
+
+A scheduled skill that commits its own generated output straight to `main` first grants a short-lived marker through the fleet's commit guard (`skills/_lib/commit_guard/marker.py grant <repo> --reason <skill> --path <dir>/`, owned by `fleet-config`), then commits, then revokes it.
+
+**Run the `grant` as its own command, and confirm it succeeded, before the `git add` / `git commit` command starts.** The guard is a `PreToolUse` hook that judges a whole command line before any part of it runs, so `grant && git commit` (or `;`, or one script block) finds no marker yet, refuses the commit, and the run loses it.
+
+Grant exactly the directory the skill writes, never wider; the marker lapses after 15 minutes, and the skill revokes it whether or not the commit happened. On a feature branch the guard does not apply and no grant is needed.
+
 ## Repeatable verification
 
 Use disposable local repositories containing public synthetic sentinels only; never send real private context to a model for a discovery test. Prefer local inventory interfaces without a model turn. Keep normal client configuration untouched and record any per-probe settings/trust differences.
