@@ -241,6 +241,8 @@ views          = ["/"]                                      # optional: key view
 exclude_marker = "not windows_only"                         # optional: the unit leg's -m expression (this is the default)
 ```
 
+The e2e leg runs pytest with the pytest-playwright options (`--browser webkit --tracing ... --screenshot ... --output ...`) after the adopter's own `e2e` arguments, so **the adopter's requirements must install `pytest-playwright`**; plain `playwright` driven from the adopter's own fixtures is not enough. Before it runs, the leg asks `pytest --help` in the adopter checkout for `--browser`. Without it the leg ends `no-plugin` (the night is `unknown`) and no test runs, instead of pytest exiting on `unrecognized arguments`. There is no opt-out key: an adopter whose fixtures own the browser either adds the plugin or leaves `e2e` out of its table.
+
 At least one of `unit` and `e2e` is required. A repo that is listed but cannot run here declares only `skip_reason = "<why>"`, and the selection summary shows the reason every night. Unknown keys are refused, so a typo is an error, not a silently ignored setting.
 
 Tests that need the tray, toasts, PowerShell, real audio devices or other Windows-desktop state carry `@pytest.mark.windows_only` (the marker is registered in the adopter's `pytest.ini`) and are excluded from the unit leg. They are not ported: the local gate keeps covering them, and the PR that marks them lists them.
@@ -266,10 +268,11 @@ The platform job checks out the exact commit the selection read. Only a green ni
 | `pass` | the first run passed |
 | `flaky` | the first run failed and the retry passed; the test ids are in `unit-flaky.txt` or `e2e-flaky.txt` in the run folder |
 | `fail` | the retry failed too, or the first run passed the one-hour cap (no second hour is spent) |
-| `unknown` | pytest collected nothing |
+| `unknown` | pytest collected nothing, or the plugin probe could not run |
+| `no-plugin` | the e2e leg needs `pytest-playwright` and the adopter checkout does not have it; no test ran |
 | `not-run` | the adopter does not declare the leg, or an earlier step (install, config seeding) failed |
 
-The night is `green` when no leg is `fail`, no declared leg is `not-run` and no declared leg is `unknown`. A flaky leg is green: the flake is recorded, never hidden. Each leg runs even when the one before it failed, so one red leg does not hide another. The routing audit reads the e2e leg's first-attempt `junit.xml`.
+The night is `green` when no leg is `fail`, no declared leg is `not-run` and no declared leg is `unknown` or `no-plugin`. A flaky leg is green: the flake is recorded, never hidden. Each leg runs even when the one before it failed, so one red leg does not hide another. The routing audit reads the e2e leg's first-attempt `junit.xml`.
 
 ### The `READY` marker
 
@@ -281,7 +284,7 @@ One `key=value` per line, every value a single token:
 | `repo` | the adopter |
 | `sha` | the commit tested, or `unknown` |
 | `result` | `green`, `red` or `unknown` |
-| `unit`, `e2e`, `smoke` | `pass`, `flaky`, `fail`, `not-run` or `unknown` |
+| `unit`, `e2e`, `smoke` | `pass`, `flaky`, `fail`, `not-run`, `unknown` or `no-plugin` |
 | `flaky` | how many tests passed only on the retry |
 | `audit` | the routing audit's `clean`, `miss` or `unknown`, or `not-run` |
 

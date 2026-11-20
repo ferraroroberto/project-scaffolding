@@ -58,7 +58,10 @@ _MARKER = re.compile(r"^[A-Za-z0-9_ ()]{1,200}$")
 
 KEYS = {"python", "requirements", "samples", "unit", "e2e", "views", "exclude_marker", "skip_reason"}
 DEFAULT_EXCLUDE = "not windows_only"
-LEG_RESULTS = ("pass", "flaky", "fail", "not-run", "unknown")
+LEG_RESULTS = ("pass", "flaky", "fail", "not-run", "unknown", "no-plugin")
+# The e2e leg appends pytest-playwright options; pytest rejects them at once when the plugin is absent.
+PLUGIN_OPTION = "--browser"
+PROBE_TIMEOUT_S = 120
 
 
 # ------------------------------------------------------------------ git
@@ -306,6 +309,24 @@ def _pytest(python: str, cwd: Path, args: list[str]) -> int | None:
         return None
 
 
+def plugin_missing(python: str, cwd: Path) -> bool | None:
+    """True when pytest in *cwd* does not know the pytest-playwright options; None when that cannot be told.
+
+    `pytest --help` runs in the adopter checkout so options its own conftest
+    registers count as known.
+    """
+    try:
+        done = subprocess.run(
+            [python, "-m", "pytest", "--help"], cwd=cwd, stdin=subprocess.DEVNULL, capture_output=True,
+            text=True, errors="replace", creationflags=NO_WINDOW, timeout=PROBE_TIMEOUT_S, check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    if done.returncode != 0:
+        return None
+    return PLUGIN_OPTION not in done.stdout
+
+
 def run_leg(
     python: str, cwd: Path, args: list[str], retry_args: list[str], junit: Path, retry_junit: Path, flaky_out: Path,
     runner: Callable[[str, Path, list[str]], int | None] = _pytest,
@@ -343,6 +364,14 @@ def cmd_leg(args: argparse.Namespace) -> int:
         return 3
     if args.marker:
         tokens += ["-m", args.marker]
+    if PLUGIN_OPTION in tokens:
+        missing = plugin_missing(args.python, Path(args.cwd))
+        if missing is None:
+            print(f"LEG={args.name} result=unknown flaky=0 reason=could not tell whether pytest-playwright is installed")
+            return 3
+        if missing:
+            print(f"LEG={args.name} result=no-plugin flaky=0 reason=pytest-playwright is not installed, no test ran")
+            return 3
     result, count, reason = run_leg(
         args.python, Path(args.cwd), tokens, retry_tokens, Path(args.junit), Path(args.retry_junit), Path(args.flaky_out),
     )
@@ -365,7 +394,8 @@ def night_result(status: str, legs: dict[str, str], declared: set[str]) -> str:
     """green, red or unknown for one repo's night.
 
     Any failed leg, or a declared leg that never ran (its install or setup
-    failed), is red. Otherwise any unknown leg makes the night unknown. A flaky
+    failed), is red. Otherwise any unknown or no-plugin leg makes the night
+    unknown: no test ran, so nothing is established. A flaky
     leg is green: the flake is recorded, not hidden.
     """
     if status != "run":
@@ -373,7 +403,7 @@ def night_result(status: str, legs: dict[str, str], declared: set[str]) -> str:
     for name, value in legs.items():
         if value == "fail" or (name in declared and value == "not-run"):
             return "red"
-    if any(legs[name] == "unknown" for name in declared):
+    if any(legs[name] in ("unknown", "no-plugin") for name in declared):
         return "unknown"
     return "green"
 
