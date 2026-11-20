@@ -5,7 +5,8 @@ and fake reports:
 
   spawn-budget    a unit above its entry fails, a unit at or below passes, a unit with no entry fails;
   flake-ledger    a pass and a fail on one tree is an open flake; more open flakes than the baseline fail;
-                  `flake_clear_runs` passes in a row close it; one open past the age cap fails;
+                  `flake_clear_runs` passes in a row close it, or one pass after a commit with a
+                  `Flake-Fixed: <unit>` trailer; a fail after that fix reopens it; one open past the age cap fails;
   new-test-value  a unit missing from the merge base's baseline is new; an exempt marker (on a function,
                   or in a test file's header), or a red record on another tree, passes it; a red record on
                   this very tree does not; with neither, a missing or stale coverage map is exit 3 with its
@@ -142,6 +143,39 @@ def test_flake_ledger(repo: Path, tmp_path: Path) -> None:
     assert code == 1 and "past the 14-day cap" in out
     code, out = run(repo, "--rules", "flake-ledger", "--ledger", str(tmp_path / "absent.jsonl"))
     assert code == 3 and "the unit ledger is missing" in out
+
+
+def test_flake_ledger_fix_route(repo: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    ledger = tmp_path / "ledger.jsonl"
+    flags = ["--rules", "flake-ledger", "--ledger", str(ledger)]
+    flaky = [unit_row("u", "fail", "t1", stamp(2)), unit_row("u", "pass", "t1", stamp(2, 5))]
+
+    def fix_commit(unit: str, days_ago: float) -> None:
+        monkeypatch.setenv("GIT_COMMITTER_DATE", stamp(days_ago))
+        git(repo, "commit", "-q", "--allow-empty", "-m", f"fix: {unit}", "-m", f"Flake-Fixed: {unit}")
+
+    write_jsonl(ledger, flaky + [unit_row("u", "pass", "t2", stamp(1))])
+    assert run(repo, *flags)[0] == 1, "no fix marker: one pass does not close it, flake_clear_runs is 2"
+    fix_commit("other_unit", 1.5)
+    assert run(repo, *flags)[0] == 1, "a marker naming another unit does not close it"
+    fix_commit("u", 1.5)
+    code, out = run(repo, *flags)
+    assert code == 0 and "no open flake" in out, "a marked fix and one pass after it close the flake"
+    write_jsonl(ledger, flaky + [unit_row("u", "pass", "t2", stamp(1.8))])
+    assert run(repo, *flags)[0] == 1, "a pass from before the fix commit proves nothing about the fix"
+    write_jsonl(ledger, flaky)
+    assert run(repo, *flags)[0] == 1, "the marker alone, with no pass after it, leaves it open"
+    closed = flaky + [unit_row("u", "pass", "t2", stamp(1))]
+    write_jsonl(ledger, closed + [unit_row("u", "fail", "t3", stamp(0.5))])
+    code, out = run(repo, *flags)
+    assert code == 1 and "u: open flake since" in out, "a fail after the fix reopens the flake"
+    write_jsonl(ledger, closed + [unit_row("u", "fail", "t3", stamp(0.5)), unit_row("u", "pass", "t4", stamp(0.4))])
+    assert run(repo, *flags)[0] == 1, "one pass does not re-close it: the fix was voided, not renewed"
+    fix_commit("u", 0.3)
+    write_jsonl(ledger, closed + [unit_row("u", "fail", "t3", stamp(0.5)), unit_row("u", "pass", "t4", stamp(0.2))])
+    assert run(repo, *flags)[0] == 0, "naming the fix again and passing once closes it"
+    write_jsonl(ledger, flaky + [unit_row("u", "fail", "t2", stamp(1.7)), unit_row("u", "pass", "t3", stamp(1.6))])
+    assert run(repo, *flags)[0] == 1, "a fail after the marker's commit time but before the pass voids it"
 
 
 def test_flake_ledger_skips_its_own_host_unit(repo: Path, tmp_path: Path) -> None:

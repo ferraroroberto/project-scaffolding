@@ -1167,11 +1167,11 @@ fixed: call the CLI's main() in-process and keep one real spawn for the wiring
 
 #### `flake-ledger`
 
-More open flakes than the baseline's `flake_count`, or one open past `flake_max_age_days`. A flake is a unit that passed and failed on one tree hash; it closes after `flake_clear_runs` passes in a row.
+More open flakes than the baseline's `flake_count`, or one open past `flake_max_age_days`. A flake is a unit that passed and failed on one tree hash; it closes after `flake_clear_runs` passes in a row, or, once its cause is fixed, on one pass after a commit carrying a `Flake-Fixed: <unit>` trailer.
 
 ```text
 bad:   tests/test_poll.py: open flake since 2026-01-02 (20 days), past the 14-day cap
-fixed: remove the timing dependence (a fake clock), so the unit stops flaking and the ledger closes it
+fixed: remove the timing dependence (a fake clock) in a commit with the trailer `Flake-Fixed: tests/test_poll.py`; the next gate pass closes it
 ```
 
 #### `hermetic`
