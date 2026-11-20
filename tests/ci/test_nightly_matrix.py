@@ -248,6 +248,53 @@ def test_the_leg_cli_refuses_unsafe_arguments_and_adds_the_marker(tmp_path: Path
     assert "result=unknown" in capsys.readouterr().out
 
 
+E2E_BASE = ["leg", "--name", "e2e", "--python", sys.executable, "--junit", "j", "--retry-junit", "r", "--flaky-out", "f"]
+PLAYWRIGHT_ARGS = "tests/e2e --browser webkit --tracing retain-on-failure --output out"
+
+
+def test_an_adopter_without_the_plugin_gets_its_own_state_and_no_test_runs(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Real pytest with plugin autoload off: the options are unknown, so the leg must not run pytest with them."""
+    monkeypatch.setenv("PYTEST_DISABLE_PLUGIN_AUTOLOAD", "1")
+    assert nm.main([*E2E_BASE, "--cwd", str(tmp_path), "--args", PLAYWRIGHT_ARGS]) == 3
+    out = capsys.readouterr().out
+    assert "result=no-plugin" in out
+    assert "result=fail" not in out
+    assert not (tmp_path / "j").exists()  # pytest never ran, so it wrote no junit
+
+
+def test_an_adopter_that_registers_the_option_itself_is_not_flagged(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("PYTEST_DISABLE_PLUGIN_AUTOLOAD", "1")
+    (tmp_path / "conftest.py").write_text(
+        "def pytest_addoption(parser):\n    parser.addoption('--browser', action='store')\n", encoding="utf-8"
+    )
+    assert nm.plugin_missing(sys.executable, tmp_path) is False
+
+
+def test_an_unprobeable_python_is_unknown_not_no_plugin(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    base = [*E2E_BASE]
+    base[base.index(sys.executable)] = str(tmp_path / "no-such-python")
+    assert nm.main([*base, "--cwd", str(tmp_path), "--args", PLAYWRIGHT_ARGS]) == 3
+    assert "result=unknown" in capsys.readouterr().out
+
+
+def test_a_leg_without_playwright_options_skips_the_probe(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def boom(python: str, cwd: Path) -> bool | None:
+        raise AssertionError("the unit leg must not probe for the plugin")
+
+    monkeypatch.setattr(nm, "plugin_missing", boom)
+    monkeypatch.setattr(nm, "run_leg", lambda *a, **k: ("pass", 0, ""))
+    base = ["leg", "--name", "unit", "--python", "py", "--junit", "j", "--retry-junit", "r", "--flaky-out", "f"]
+    assert nm.main([*base, "--cwd", str(tmp_path), "--args", "tests"]) == 0
+
+
 def test_a_real_flaky_test_is_caught_by_the_retry(tmp_path: Path) -> None:
     """Drives real pytest: --last-failed re-runs only the failure, which passes the second time."""
     project = tmp_path / "proj"
@@ -285,6 +332,7 @@ def test_a_real_flaky_test_is_caught_by_the_retry(tmp_path: Path) -> None:
         ("run", {"unit": "pass", "e2e": "fail", "smoke": "pass"}, {"unit", "e2e", "smoke"}, "red"),
         ("run", {"unit": "not-run", "e2e": "not-run", "smoke": "not-run"}, {"unit", "e2e"}, "red"),
         ("run", {"unit": "pass", "e2e": "pass", "smoke": "unknown"}, {"unit", "e2e", "smoke"}, "unknown"),
+        ("run", {"unit": "pass", "e2e": "no-plugin", "smoke": "pass"}, {"unit", "e2e", "smoke"}, "unknown"),
         ("unknown", {"unit": "not-run", "e2e": "not-run", "smoke": "not-run"}, set(), "unknown"),
     ],
 )
@@ -297,6 +345,7 @@ def test_leg_from_prefers_the_legs_own_result() -> None:
     assert nm.leg_from("", "failure") == "fail"
     assert nm.leg_from("", "skipped") == "not-run"
     assert nm.leg_from("unknown", "failure") == "unknown"
+    assert nm.leg_from("no-plugin", "failure") == "no-plugin"
     assert nm.leg_from("", "weird") == "unknown"
 
 
