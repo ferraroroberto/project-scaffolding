@@ -15,7 +15,7 @@ Conventions:
 - **`AGENTS.md` is a committed short pointer to `CLAUDE.md`, never a copy.** Keep the instruction chain; machine-scope policy owned by `fleet-config`.
 - **One source per project skill.** Keep existing sources; discover native compatibility before adding a per-skill junction/symlink at the same repo/package scope. Never broaden a nested skill into a root or user-global catalog. Preserve real `.agents` directories; report name/target collisions without overwriting.
 - **Agent directories are ignored by default, not disposable noise.** `.claude/`, `.agents/`, `.codex/`, `.pi/`, `.grok/` may hold private context or owned discovery artifacts. Only deliberately shared skill sources get narrow ignore exceptions; generated links, local settings, conversations stay ignored. Fresh clones/worktrees recreate own links to own sources.
-- **Adoption/proof:** follow [portable project skills](https://github.com/ferraroroberto/project-scaffolding/blob/main/docs/agents/project-skills.md) contract — scope, helper exclusions, collisions, ignore allowlists, native discovery checks. Installer mechanics belong to `fleet-config`, not a per-project fork. (`#28`, `#250`.)
+- **Adoption/proof:** follow [portable project skills](https://github.com/ferraroroberto/project-scaffolding/blob/main/docs/agents/project-skills.md) contract — scope, helper exclusions, collisions, ignore allowlists, native discovery checks. Installer mechanics belong to `fleet-config`, not a per-project fork. A skill that commits generated output to `main` runs the commit-guard `grant` as its **own confirmed command before** the commit command, never chained (`grant && git commit` is refused: the guard judges the whole line before any part runs). (`#28`, `#250`.)
 
 ## Where code goes
 
