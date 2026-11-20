@@ -24,12 +24,19 @@ A **unit** is a whole check function or a whole test file, never one assertion. 
 |---|---|---|
 | `new-test-value` | A unit missing from the baseline at the merge base with `base_ref` (new in the diff) shows none of: a `test-value-exempt: <reason>` marker; a ledger record of it failing on a tree other than this one (red before the fix); a covered source line that the weekly coverage map lacks. A missing or stale map is exit 3. | per change, new units only |
 | `spawn-budget` | A unit's process spawns in this run rise above its baseline entry, or a unit has no entry. Spawns stand in for cost because they do not flake under box load. | per change |
-| `flake-ledger` | Open flakes (a unit that passed and failed on one tree hash under the gate label, until `flake_clear_runs` passes in a row) rise above the baseline's `flake_count`, or one stays open past `flake_max_age_days`. The `host_unit` (the unit that runs this verdict) is not counted: it would fail itself on every run and never collect the passes that close its flake; its rows stay on the ledger and `new-test-value` and `spawn-budget` still judge it. | per change |
+| `flake-ledger` | Open flakes (a unit that passed and failed on one tree hash under the gate label, until one of the two closing routes below) rise above the baseline's `flake_count`, or one stays open past `flake_max_age_days`. The `host_unit` (the unit that runs this verdict) is not counted: it would fail itself on every run and never collect the passes that close its flake; its rows stay on the ledger and `new-test-value` and `spawn-budget` still judge it. | per change |
 | `hermetic` | A unit red in the latest fresh-clone gate run is green in the latest checkout run, and is not in the baseline's `hermetic` list. No fresh-clone run in `hermetic_max_age_days` is exit 3. | weekly |
 
 Wall-clock time is never a rule. The weekly burst records the medians; nothing fails on them.
 
 **Exempt marker.** On a function unit: on its `def` line or in the comment block right above it. On a file unit: anywhere in the file's header, before its first `import`, `from`, `def` or `class` (the module docstring or the leading comments). Give a reason a reviewer can check: `test-value-exempt: renders a doc page, covers no source`.
+
+**Closing a flake.** Two routes, and a flake closes by whichever comes first:
+
+- *No known cause:* `flake_clear_runs` gate passes of the unit in a row after the flake. A fail in between restarts the count.
+- *Named fix:* a commit in the history of `HEAD`, dated after the flake, carries the trailer `Flake-Fixed: <unit>` (the unit's name exactly as the ledger holds it; one trailer per unit), and the unit then passes once under the gate label. The trailer is read from the commit message, so the fix is reviewable in the same change as the code. A fail of the unit after the trailer's commit voids that fix: it reopens a flake the fix had closed, and the fix must be named again in a later commit (or the 10 passes collected). A trailer dated before the flake, or on another unit, closes nothing.
+
+The pass is matched to the fix by time (a ledger pass after the fix commit's date), not by tree hash, so run the gate on the branch that carries the fix before relying on it. A commit history git cannot read yields no named fixes: the flake stays open, never closed.
 
 **Red before the fix.** Run the new test on the pre-fix tree through the wrapper with `FLEET_GATE_ONLY=<unit>`; its failing row, on a tree the fix then changes, is the evidence.
 
