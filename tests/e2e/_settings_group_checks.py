@@ -73,6 +73,27 @@ def _assert_native_box(page: Page, sel: str) -> None:
     assert visible == 36, (sel, visible)
 
 
+def _assert_hit_floor_at_both_pointers(
+    gallery: Page, selectors: tuple[str, ...], prepare: Callable[[Page], None]
+) -> None:
+    """Every selector is a 44px box (visible control 36px) at a fine pointer and again under coarse-pointer emulation."""
+    assert gallery.evaluate("matchMedia('(pointer: fine)').matches"), "fine-pointer run expected"
+    prepare(gallery)
+    for sel in selectors:
+        _assert_native_box(gallery, sel)
+    context = gallery.context.browser.new_context(viewport=_PHONE, has_touch=True, is_mobile=True)
+    try:
+        phone = context.new_page()
+        phone.goto(gallery.url)
+        phone.wait_for_selector("body[data-demo-ready='1']")
+        assert phone.evaluate("matchMedia('(pointer: coarse)').matches"), "coarse-pointer emulation is not active"
+        prepare(phone)
+        for sel in selectors:
+            _assert_native_box(phone, sel)
+    finally:
+        context.close()
+
+
 def _add_demo_input(page: Page) -> None:
     """The gallery's only `.input-native` sits in a closed dialog, so a probe input goes beside the select."""
     page.evaluate(
@@ -83,21 +104,7 @@ def _add_demo_input(page: Page) -> None:
 
 def check_select_native_meets_the_hit_floor(gallery: Page) -> None:
     """select-native: the select and the shared `.input-native` are 44px at a fine and a coarse pointer, visible control 36px."""
-    assert gallery.evaluate("matchMedia('(pointer: fine)').matches"), "fine-pointer run expected"
-    _add_demo_input(gallery)
-    for sel in ("#demoSelectNative", "#probeInputNative"):
-        _assert_native_box(gallery, sel)
-    context = gallery.context.browser.new_context(viewport=_PHONE, has_touch=True, is_mobile=True)
-    try:
-        phone = context.new_page()
-        phone.goto(gallery.url)
-        phone.wait_for_selector("body[data-demo-ready='1']")
-        assert phone.evaluate("matchMedia('(pointer: coarse)').matches"), "coarse-pointer emulation is not active"
-        _add_demo_input(phone)
-        for sel in ("#demoSelectNative", "#probeInputNative"):
-            _assert_native_box(phone, sel)
-    finally:
-        context.close()
+    _assert_hit_floor_at_both_pointers(gallery, ("#demoSelectNative", "#probeInputNative"), _add_demo_input)
 
 
 def check_select_native_boundary_renders_in_webkit(playwright: Playwright, base_url: str) -> None:
@@ -317,34 +324,9 @@ def check_settings_group_number_fields_are_one_shape(gallery: Page) -> None:
     assert _style(gallery, "#demoSettingsNumberRow .settings-row-unit", "color") == "rgb(101, 109, 118)"
 
 
-def _assert_number_field_box(page: Page, sel: str) -> None:
-    """One number field: a 44px box whose visible control (the padding box) is 36px."""
-    box, visible = page.evaluate(
-        "(s) => { const e = document.querySelector(s), c = getComputedStyle(e), h = e.getBoundingClientRect().height;"
-        " return [h, h - parseFloat(c.borderTopWidth) - parseFloat(c.borderBottomWidth)]; }",
-        sel,
-    )
-    assert box >= 44, (sel, box)
-    assert visible == 36, (sel, visible)
-
-
 def check_settings_group_number_field_meets_the_hit_floor(gallery: Page) -> None:
     """settings-group: the number field's box is 44px at a fine and a coarse pointer, its visible control 36px."""
-    assert gallery.evaluate("matchMedia('(pointer: fine)').matches"), "fine-pointer run expected"
-    _open_page(gallery)
-    for sel in ("#demoSettingsNumber", "#demoSettingsNumber2"):
-        _assert_number_field_box(gallery, sel)
-    context = gallery.context.browser.new_context(viewport=_PHONE, has_touch=True, is_mobile=True)
-    try:
-        phone = context.new_page()
-        phone.goto(gallery.url)
-        phone.wait_for_selector("body[data-demo-ready='1']")
-        assert phone.evaluate("matchMedia('(pointer: coarse)').matches"), "coarse-pointer emulation is not active"
-        _open_page(phone)
-        for sel in ("#demoSettingsNumber", "#demoSettingsNumber2"):
-            _assert_number_field_box(phone, sel)
-    finally:
-        context.close()
+    _assert_hit_floor_at_both_pointers(gallery, ("#demoSettingsNumber", "#demoSettingsNumber2"), _open_page)
 
 
 def check_settings_group_sheet_fits_both_phone_heights(gallery: Page) -> None:
