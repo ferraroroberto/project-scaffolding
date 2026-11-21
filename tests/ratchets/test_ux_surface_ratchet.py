@@ -211,6 +211,17 @@ def test_cross_check_names_a_missing_entry_a_stale_entry_and_a_duplicate_id() ->
     ]
 
 
+def test_the_stale_entry_hint_and_docstring_name_the_yaml_rootless_form() -> None:
+    """The hint is printed on every failure; it must spell the form the YAML map schema accepts."""
+    (hit,) = us.cross_check([], _sites(("a.gone", "m.yaml")), ("stale-entry",))
+    source = (REPO_ROOT / "scripts" / "ux_surface_ratchet.py").read_text(encoding="utf-8")
+    for text in (hit.message, source):
+        assert "none: <reason>" in text
+        assert "*Root" not in text
+    sites, hits = us.read_map(um.load(yaml_map(entry("a.gone", root="<reason>")), "m.yaml"), "m.yaml")
+    assert not hits and [s.rootless for s in sites] == [True]
+
+
 def test_an_id_listed_twice_in_the_map_is_a_duplicate() -> None:
     hits = us.cross_check(_sites(("a", HTML)), _sites(("a", "m.md"), ("a", "m.md")), ("duplicate-surface",))
     assert [f"{h.rule}:{h.line}" for h in hits] == ["duplicate-surface:1", "duplicate-surface:2"]

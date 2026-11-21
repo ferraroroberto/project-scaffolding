@@ -18,8 +18,8 @@ The rules (docs/ux-surface-ratchet.md quotes the convention each one holds):
     matching the id pattern (or a module-level `const` bound to one), or a map
     entry whose id does not match it;
   * `unmapped-surface` -- an id the code declares that no map entry lists;
-  * `stale-entry` -- a map entry no code declares, unless its *Root* says
-    `none — <reason>`;
+  * `stale-entry` -- a map entry no code declares, unless its `root:` is
+    `none: <reason>`;
   * `duplicate-surface` -- an id declared on more than one element in the
     code, or listed by more than one map entry (every site is a hit);
   * `dangling-link` -- a map entry's `links` `to:` id that no entry lists;
@@ -521,7 +521,7 @@ def cross_check(code: list[Site], entries: list[Site], rules: tuple[str, ...],
     if "stale-entry" in rules:
         hits += [Hit(s.path, s.line, "stale-entry",
                      f"`{s.id}` is in the map but no element carries {ATTR}=\"{s.id}\" "
-                     "(a surface with no element of its own says `*Root:* none — <reason>`)")
+                     "(a surface with no element of its own sets `root:` to `none: <reason>`, nested under it)")
                  for s in entries if s.id not in declared and not s.rootless]
     if "duplicate-surface" in rules:
         for sites, where in ((code, "declared on"), (entries, "listed by")):
