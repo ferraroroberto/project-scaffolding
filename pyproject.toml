@@ -36,6 +36,7 @@ known-first-party = ["views"]
 # `datetime.UTC` fail at import (tests/usage_log/test_usage_log_py39.py); UP007/UP045/UP017
 # would rewrite them back for this repo's 3.12 target.
 "src/usage_log.py" = ["UP007", "UP045", "UP017"]
+"src/self_restart.py" = ["UP007", "UP045"]
 
 [tool.mypy]
 # `mypy --strict` is what consumers run on vendored modules; the scaffold gates

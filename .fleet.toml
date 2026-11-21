@@ -544,6 +544,12 @@ module = "app/tray/watchdog.py"
 type   = "WatchState"
 derive = "next_watch_state"
 
+[[state_machines]]
+name   = "self-restart run"
+module = "src/self_restart.py"
+type   = "RestartState"
+derive = "derive_restart_state"
+
 # ---------------------------------------------------------------------------
 # Runtime write ratchet. scripts/verify-before-ship.ps1 runs
 # scripts/runtime_write_ratchet.py, which fails when a tracked Python file gains a
@@ -803,6 +809,8 @@ fleet_root      = { src = "src/fleet_root.py" }
 notify          = { src = "src/notify" }
 doc_capture     = { src = "src/doc_capture" }
 build_info      = { src = "src/build_info.py" }
+# The page-foot restart sheet's server half: declared targets, detached runner, recorded endings.
+self_restart    = { src = "src/self_restart.py" }
 usage_log       = { src = "src/usage_log.py" }
 # The usage log behind a Starlette app (route adapter + owner-only reads); imports usage_log.
 usage_log_starlette = { src = "src/usage_log_starlette.py" }
