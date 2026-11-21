@@ -51,9 +51,27 @@ from playwright.sync_api import Error as PlaywrightError
 
 logger = logging.getLogger(__name__)
 
+# TIME_WAIT sockets tolerated on the target port before a walk pauses. Far below the ~250 one
+# unpaced walk left behind (enough to take the host's ephemeral pool down) yet loose enough
+# that an ordinary capture does not pause. A conservative ceiling, not a
+# measured optimum: adopters inherit it unchanged, so tune per walk through `budget=`.
 DEFAULT_BUDGET = 40
+# Most pages open at once. The sync Playwright API drives every page from one thread, so more
+# pages add sockets without adding throughput; the cap bounds the burst, not the speed.
 HARD_MAX_PARALLEL = 4
+# `netstat` normally answers in well under a second; this only bounds a hung call on a
+# loaded host. Past it the count is unknown (never a pass) and `strict` walks refuse to run.
 NETSTAT_TIMEOUT_S = 30
+# Re-check cadence while paused: TIME_WAIT entries age out over minutes, so polling faster
+# adds `netstat` spawns without freeing the pool sooner.
+DEFAULT_POLL_INTERVAL_S = 2.0
+# Longest a walk waits for the pool to drain before raising `PortPoolBusy`. Covers a few
+# minutes of TIME_WAIT ageing after a recent run; longer means another lane holds the pool,
+# which waiting inside this walk will not fix.
+DEFAULT_PAUSE_TIMEOUT_S = 300.0
+# Network-idle wait per page. A page that polls forever never idles; the timeout lets the
+# budget check still pace it (counted in `idle_timeouts`) instead of hanging the walk.
+DEFAULT_IDLE_TIMEOUT_MS = 10_000
 # Vendor-verbatim module: derives the flag locally (the shared `src/no_window.py` would not
 # resolve in a consumer tree), the documented exception.
 _NO_WINDOW = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
@@ -115,9 +133,9 @@ class PacedWalk:
         budget: int = DEFAULT_BUDGET,
         counter: Counter = count_time_wait,
         strict: bool = False,
-        poll_interval_s: float = 2.0,
-        pause_timeout_s: float = 300.0,
-        idle_timeout_ms: int = 10_000,
+        poll_interval_s: float = DEFAULT_POLL_INTERVAL_S,
+        pause_timeout_s: float = DEFAULT_PAUSE_TIMEOUT_S,
+        idle_timeout_ms: int = DEFAULT_IDLE_TIMEOUT_MS,
         sleep: Callable[[float], None] = time.sleep,
         clock: Callable[[], float] = time.monotonic,
     ) -> None:
