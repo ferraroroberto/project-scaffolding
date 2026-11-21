@@ -186,7 +186,7 @@ Examples — adapt to the project's actual tooling. Windows / PowerShell: syntax
 ---
 
 ## This repository
-Starter scaffold for a Streamlit app + Python pipelines project — clone, rename, and build. See `README.md` for setup, layout, and usage.
+A starter to clone for a **Streamlit app + Python pipelines** project, and the fleet's canonical source of vendored web-app and site components, `src/` primitives, gate ratchets and conventions. See `README.md` for setup, layout, and usage.
 
 ### CI expectations
 - No per-change workflow runs here: `.github/workflows/` holds the `*.yml.template` files adopters copy plus `nightly-mac.yml`, which fires only on `schedule`/`workflow_dispatch` on the self-hosted Mac runner (`docs/mac-runner.md`), never on a PR or push. So `/issue-finish` has no CI run to wait on. **Advisory, not required** — the local gate (`scripts/verify-before-ship.ps1`) is the contract.
