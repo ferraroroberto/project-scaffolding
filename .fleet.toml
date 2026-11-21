@@ -36,6 +36,14 @@ extra_root_files = []
 # [design]
 # wide_views = ["board", "table"]
 
+# The scaffold ships a component gallery, not an app shell. demo.html is a
+# deliberate 480px phone-width probe: the e2e suite measures overflow and ellipsis
+# against that width, so widening it to the 772px measure would break those assertions.
+[[design.accepted]]
+check  = "desktop-measure"
+detail = "no desktop content cap found — spec: centered max-width 772px"
+reason = "component gallery harness, no app shell; demo.html is deliberately a 480px phone-width probe that the e2e overflow and ellipsis assertions depend on"
+
 # Nightly CI on the Mac Mini (docs/mac-runner.md, "The [ci.nightly] table"). A
 # public repo opts in with this table plus one line in project-scaffolding's
 # .github/nightly-adopters.txt; scripts/ci/nightly_matrix.py reads it from `main`
