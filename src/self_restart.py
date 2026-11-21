@@ -72,7 +72,7 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Literal, Optional
 from urllib.parse import urlsplit
 
 logger = logging.getLogger(__name__)
@@ -98,7 +98,12 @@ _START_DELAY_S = 1.0
 #: Enough of the recipe's output to say why it failed, no more.
 _LOG_TAIL_LINES = 20
 
-FINAL_STATES = ("ok", "failed", "timeout", "error")
+#: A run's state: ``running`` until the runner records one of the final
+#: states; ``unknown`` is never written, only derived (see
+#: :func:`derive_restart_state`). Declared in ``.fleet.toml``
+#: ``[[state_machines]]`` as this module's one state machine.
+RestartState = Literal["running", "ok", "failed", "timeout", "error", "unknown"]
+FINAL_STATES: tuple[RestartState, ...] = ("ok", "failed", "timeout", "error")
 _ID_PATTERN = re.compile(r"^[a-z][a-z0-9-]{0,31}$")
 
 
@@ -121,6 +126,17 @@ def launch_root() -> Path:
     return Path(os.path.abspath(__file__)).parent.parent
 
 
+def derive_restart_state(record: dict[str, Any], now: float) -> RestartState:
+    """The record's state as of ``now``: a ``running`` one past its timeout is ``unknown``."""
+    state = record.get("state")
+    if state in FINAL_STATES:
+        return state  # type: ignore[no-any-return]
+    if state != "running":
+        return "unknown"
+    deadline = float(record.get("started_ts", 0)) + float(record.get("timeout_s", 0)) + _STALE_GRACE_S
+    return "unknown" if now > deadline else "running"
+
+
 def _now_iso() -> str:
     return datetime.now().replace(microsecond=0).isoformat()
 
@@ -135,8 +151,10 @@ class RestartStore:
         self.log_path = self.status_dir / "last.log"
 
     def _write_json(self, path: Path, data: dict[str, Any]) -> None:
+        # runtime-write-exempt: status_dir comes from the app's runtime_data_dir
         self.status_dir.mkdir(parents=True, exist_ok=True)
         tmp = path.with_name(path.name + ".tmp")
+        # runtime-write-exempt: under status_dir, from the app's runtime_data_dir
         tmp.write_text(json.dumps(data), encoding="utf-8")
         os.replace(tmp, path)
 
@@ -156,13 +174,9 @@ class RestartStore:
     def current(self, now: Optional[float] = None) -> Optional[dict[str, Any]]:
         """The record, with a ``running`` one past its timeout read as ``unknown``."""
         record = self.read()
-        if record is None or record.get("state") != "running":
-            return record
-        moment = time.time() if now is None else now
-        deadline = float(record.get("started_ts", 0)) + float(record.get("timeout_s", 0)) + _STALE_GRACE_S
-        if moment > deadline:
-            return dict(record, state="unknown")
-        return record
+        if record is None:
+            return None
+        return dict(record, state=derive_restart_state(record, time.time() if now is None else now))
 
     def finish(self, restart_id: str, state: str, exit_code: Optional[int]) -> None:
         record = self.read() or {}
@@ -195,7 +209,7 @@ def spawn_detached(spec_path: Path, root: Path, python: Optional[str] = None) ->
     else:
         subprocess.Popen(
             argv, cwd=str(root), stdin=devnull, stdout=devnull, stderr=devnull,
-            close_fds=True, start_new_session=True,
+            close_fds=True, start_new_session=True, creationflags=_NO_WINDOW,
         )
 
 
@@ -206,6 +220,7 @@ def run_spec(spec_path: Path) -> str:
     restart_id = str(spec["id"])
     time.sleep(float(spec.get("delay_s", _START_DELAY_S)))
     exit_code: Optional[int] = None
+    # runtime-write-exempt: under status_dir, from the app's runtime_data_dir
     with open(store.log_path, "w", encoding="utf-8") as out:
         try:
             done = subprocess.run(
@@ -330,6 +345,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     # The runner is console-less and detached: its own breadcrumbs go to a
     # file beside the record, or a crash before ``finish`` would leave only an
     # ``unknown`` state with nothing to explain it.
+    # runtime-write-exempt: beside the spec, under the app's runtime_data_dir
     logging.basicConfig(
         filename=str(spec_path.parent / "runner.log"), level=logging.INFO,
         format="%(asctime)s %(levelname)s %(message)s", encoding="utf-8",
