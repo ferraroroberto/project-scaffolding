@@ -228,6 +228,21 @@ def test_count_time_wait_counts_lines_with_the_port_at_either_end(monkeypatch: p
     assert count_time_wait(8501) == 3
 
 
+@pytest.mark.parametrize("platform", ["linux", "darwin"])
+def test_count_time_wait_reads_the_unix_netstat_columns(monkeypatch: pytest.MonkeyPatch, platform: str) -> None:
+    # Recv-Q/Send-Q precede the endpoints on Linux and macOS; macOS separates the port with a dot.
+    sep = ":" if platform == "linux" else "."
+    proto = "tcp" if platform == "linux" else "tcp4"
+    monkeypatch.setattr(_paced_browser.sys, "platform", platform)
+    _netstat(monkeypatch, [
+        f"{proto}        0      0 127.0.0.1{sep}50001      127.0.0.1{sep}8501       TIME_WAIT",
+        f"{proto}        0      0 127.0.0.1{sep}8501       127.0.0.1{sep}50002      TIME_WAIT",
+        f"{proto}        0      0 127.0.0.1{sep}50003      127.0.0.1{sep}8501       ESTABLISHED",
+        f"{proto}        0      0 127.0.0.1{sep}50004      127.0.0.1{sep}9999       TIME_WAIT",
+    ])
+    assert count_time_wait(8501) == 2
+
+
 def test_count_time_wait_is_none_when_netstat_fails(monkeypatch: pytest.MonkeyPatch) -> None:
     _netstat(monkeypatch, [], returncode=1)
     assert count_time_wait(8501) is None

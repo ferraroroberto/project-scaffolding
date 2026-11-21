@@ -31,6 +31,9 @@ Opt-in, per adopter, in `.fleet.toml` (machine-local paths are arguments, never 
 
     python scripts/weekly_burst.py --ledger L --coverage-map M --results-dir D [--median-runs 5] [--skip-hermetic]
 
+`gate` defaults to the ratchet's `unit_runner`; the ledger labels come from `[test_value_ratchet]`
+`label` and `hermetic_label`, so the medians and the `hermetic` rule read the runs this burst wrote.
+
 A command's first item, when it is not an interpreter flag, is a repo-relative script, resolved inside
 the tree the leg runs in. A repo with its own gate wrapper builds a `Burst` and calls `main(argv, burst)`.
 
@@ -289,8 +292,18 @@ def _from_config(root: Path, args: argparse.Namespace) -> Burst | None:
     unknown = set(table) - {"enabled", "gate", "weekly"}
     if unknown:
         raise ValueError(f"[test_value_burst] has unknown key(s): {', '.join(sorted(unknown))}")
+    ratchet_table = tomllib.loads((root / ".fleet.toml").read_text(encoding="utf-8")).get("test_value_ratchet")
+    ratchet_table = ratchet_table if isinstance(ratchet_table, dict) else {}
+    labels: dict[str, str] = {}
+    for key, fallback in (("label", Burst.gate_label), ("hermetic_label", Burst.hermetic_label)):
+        label = ratchet_table.get(key, fallback)
+        if not isinstance(label, str) or not label:
+            raise ValueError(f"[test_value_ratchet] {key} must be a non-empty string")
+        labels[key] = label
+    # The ratchet's own `unit_runner` is the gate command unless `gate` here names another.
+    gate_default = ratchet_table.get("unit_runner", ["-m", "pytest", "-q", "-p", "scripts.unit_ledger_pytest"])
     specs: dict[str, list[str] | None] = {}
-    for key, default in (("gate", ["-m", "pytest", "-q", "-p", "scripts.unit_ledger_pytest"]), ("weekly", None)):
+    for key, default in (("gate", gate_default), ("weekly", None)):
         value = table.get(key, default)
         if value is not None and not (isinstance(value, list) and value and all(isinstance(v, str) for v in value)):
             raise ValueError(f"[test_value_burst] {key} must be a non-empty list of strings")
@@ -301,7 +314,8 @@ def _from_config(root: Path, args: argparse.Namespace) -> Burst | None:
         raise ValueError(f"give {', '.join(missing)}: machine-local paths are arguments, never config")
     return Burst(repo=root, ledger=args.ledger, coverage_map=args.coverage_map, results_dir=args.results_dir,
                  ratchet=args.ratchet or root / "scripts" / "test_value_ratchet.py",
-                 gate=specs["gate"] or [], weekly=specs["weekly"])
+                 gate=specs["gate"] or [], weekly=specs["weekly"],
+                 gate_label=labels["label"], hermetic_label=labels["hermetic_label"])
 
 
 def main(argv: list[str] | None = None, burst: Burst | None = None) -> int:

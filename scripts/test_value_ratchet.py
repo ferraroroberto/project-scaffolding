@@ -579,13 +579,16 @@ def update_baseline(baseline: Row | None, ledger: list[Row], cfg: Config, allow_
             observed[str(r["unit"])] = max(observed[str(r["unit"])], int(r.get("spawns") or 0))
     out = baseline or empty_baseline()
     notes: list[str] = []
-    units = dict(out["units"])
+    units: dict[str, int] = {}
     for unit, spawns in observed.items():
-        if unit in units:
-            units[unit] = min(units[unit], spawns)
+        if unit in out["units"]:
+            units[unit] = min(out["units"][unit], spawns)
         elif allow_additions:
             units[unit] = spawns
             notes.append(f"added {unit}: {spawns} spawns")
+    # A unit the captured runs no longer report is gone: keeping it would let a module re-created
+    # at that path skip `new-test-value`.
+    notes.extend(f"dropped {unit}: not in the last {len(runs)} run(s)" for unit in sorted(set(out["units"]) - set(units)))
     flakes = len(countable_flakes(ledger, cfg, fixes))
     flake_count = flakes if allow_additions and baseline is None else min(out["flake_count"], flakes)
     hermetic = [u for u in out["hermetic"] if u in observed]

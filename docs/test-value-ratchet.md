@@ -64,7 +64,7 @@ gate    = ["-m", "pytest", "-q", "-p", "scripts.unit_ledger_pytest", "--ignore=t
 weekly  = ["-m", "pytest", "-q", "-p", "scripts.unit_ledger_pytest", "tests/weekly"]   # optional
 ```
 
-Every key but `enabled` is optional. The `[test_value_ratchet]` values above are its defaults; the burst's `gate` defaults to the `unit_runner` value without the `--ignore`, and `weekly` has no default (without it the burst runs no weekly-units legs). An unknown key is exit 2. `unit_runner` and `gate` are the argv after the interpreter; a first item that is not a flag is a repo-relative script.
+Every key but `enabled` is optional. The `[test_value_ratchet]` values above are its defaults; the burst's `gate` defaults to the `unit_runner` value without the `--ignore`, and `weekly` has no default (without it the burst runs no weekly-units legs). The burst's ledger labels are the ratchet's `label` and `hermetic_label`, so the medians and the `hermetic` rule read the runs the burst wrote. An unknown key is exit 2. `unit_runner` and `gate` are the argv after the interpreter; a first item that is not a flag is a repo-relative script.
 
 Machine-local paths are arguments, never config: the ledger, the coverage map, the burst's results folder. Keep all three in the repo's runtime state location (for a scaffold app, beside its runtime data, `runtime_db_path(<app>, ...)`'s folder; never a tracked path). The ledger is history for this machine; it is never committed.
 
@@ -103,4 +103,4 @@ The burst exits 0 when every leg is green, 1 when a unit is red, 3 when a leg co
 
 ## Baselines burn down
 
-`--update-baseline` lowers a unit's spawn entry to the highest count over the last `capture_runs` gate runs and never raises one; `--allow-additions` records new units and shows in review. `flake_count` only falls. The `hermetic` list keeps only units the runs still see. Existing units are never failed for low value: merge candidates go to a person through a report, never through the gate.
+`--update-baseline` lowers a unit's spawn entry to the highest count over the last `capture_runs` gate runs and never raises one; `--allow-additions` records new units and shows in review. `flake_count` only falls. The `units` and `hermetic` lists keep only units the runs still see: a deleted unit is dropped (and named in the output), so a module re-created at its path is a new unit again. Existing units are never failed for low value: merge candidates go to a person through a report, never through the gate.
