@@ -27,7 +27,7 @@ from src.self_restart import RestartStore, RestartTarget, restart_router, run_sp
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 ORIGIN = {"origin": "http://testserver"}
-APP_TARGET = RestartTarget("app", "Restart app", ("cmd.exe", "/c", "tray.bat", "--restart"))
+APP_TARGET = RestartTarget("app", "Restart app", self_restart.TRAY_RESTART)
 
 
 def _guard(request: Request) -> None:
@@ -86,7 +86,7 @@ def test_post_records_the_run_and_spawns_the_declared_command(tmp_path: Path) ->
     assert answer.status_code == 202
     restart_id = answer.json()["restart_id"]
     spec = json.loads((tmp_path / "spec.json").read_text(encoding="utf-8"))
-    assert spec["command"] == ["cmd.exe", "/c", "tray.bat", "--restart"]
+    assert spec["command"] == list(self_restart.TRAY_RESTART)
     assert spec["root"] == str(Path("E:/fleet/my-app"))
     assert spawned == [(tmp_path / "spec.json", Path("E:/fleet/my-app"))]
     last = client.get("/api/restart").json()["last"]
@@ -158,6 +158,34 @@ def test_a_failed_run_shows_its_log_tail(tmp_path: Path) -> None:
     run_spec(_spec(tmp_path, [sys.executable, "-c", "print('ERROR: reclaim failed'); raise SystemExit(3)"]))
     last = _client(tmp_path, []).get("/api/restart").json()["last"]
     assert last["log_tail"] == ["ERROR: reclaim failed"]
+
+
+def _stub_checkout(tmp_path: Path) -> Path:
+    checkout = tmp_path / "checkout"
+    checkout.mkdir()
+    (checkout / "tray.bat").write_text("@echo off\r\necho restarted %1\r\nexit /b 0\r\n", encoding="ascii")
+    return checkout
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="cmd.exe's executable search is Windows-only")
+@pytest.mark.parametrize(("command", "state"), [
+    (self_restart.TRAY_RESTART, "ok"),
+    # The control: a bare name is what ``cmd`` cannot find once the working
+    # directory is off the executable search path, so it must read ``failed``.
+    (("cmd.exe", "/c", "tray.bat", "--restart"), "failed"),
+])
+def test_the_tray_recipe_starts_when_the_cwd_is_off_the_exe_search_path(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, command: tuple[str, ...], state: str,
+) -> None:
+    checkout = _stub_checkout(tmp_path)
+    status = tmp_path / "status"
+    spec = _spec(status, list(command))
+    RestartStore(status).write_spec({
+        "id": "r1", "target": "app", "command": list(command), "root": str(checkout),
+        "timeout_s": 30, "delay_s": 0,
+    })
+    monkeypatch.setenv("NoDefaultCurrentDirectoryInExePath", "1")
+    assert run_spec(spec) == state
 
 
 def test_launch_root_keeps_the_launch_spelling(monkeypatch: pytest.MonkeyPatch) -> None:
