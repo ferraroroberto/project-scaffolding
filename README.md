@@ -45,6 +45,7 @@ Clone this directory, rename it, and start building.
 - `src/fleet_root.py` — vendor-verbatim fleet-root resolver (manifest key `fleet_root`): `fleet_root()` from `FLEET_ROOT`, a machine-local config, or the checkout's parent, never a drive letter. See [`docs/conventions-ratchet.md`](docs/conventions-ratchet.md) (`no-drive-path`).
 - `src/resource_probe.py` + `tests/soak/_resource_soak.py` — vendor-verbatim thread/handle/RSS sampler with a runtime breadcrumb, and the gate soak that fails a webapp leaking threads or handles (manifest keys `resource_probe`, `resource_soak`). See [`docs/long-lived-process-conventions.md`](docs/long-lived-process-conventions.md) ("Resource soak").
 - `src/build_info.py` — vendor-verbatim process build-identity capture (manifest key `build_info`). See `CLAUDE.md` ("Restart/deploy coverage — merged is not shipped").
+- `src/self_restart.py` — vendor-verbatim server half of the page-foot restart (manifest key `self_restart`): `GET`/`POST /api/restart` behind the app's own auth, runs only targets declared in code, through a runner detached from the tray's process tree, and records each ending. See the page-foot [README](app/webapp/static/_vendored/page-foot/README.md) ("Restart from the readout").
 - `src/doc_capture/` — vendor-verbatim doc-capture screenshot engine + README "tour" regen. See [`src/doc_capture/README.md`](src/doc_capture/README.md).
 - `brand/` + `scripts/tools/brand_gen.py` — the fleet icon/brand generator (favicon, PWA icons, tray `.ico`, Stream Deck button). See [`docs/brand-icons.md`](docs/brand-icons.md).
 - `CLAUDE.md` so AI coding agents can extend the project safely; `AGENTS.md` is a one-line pointer to it for non-Claude tools.
@@ -145,6 +146,7 @@ src/
   subject_text.py           vendor-verbatim reply/forward subject-prefix stripper (`clean_subject`, colon required)
   resource_probe.py         vendor-verbatim thread/handle/RSS sampler + runtime breadcrumb
   build_info.py             vendor-verbatim process build-identity capture (git_sha + built_at, captured once at import)
+  self_restart.py           vendor-verbatim page-foot restart: /api/restart, detached runner, recorded endings
   notify/                   vendor-verbatim Telegram notifier (send_text + factory/config)
   doc_capture/              vendor-verbatim doc-capture screenshot engine (manifest-driven, fail-safe-masked, input-hash-idempotent + README tour regen)
   pipelines/                one run() per file
