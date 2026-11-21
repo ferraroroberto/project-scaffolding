@@ -269,6 +269,17 @@ def test_update_baseline(repo: Path, tmp_path: Path) -> None:
     assert got == {"a": 4, "b": 2, "c": 3}
 
 
+def test_update_baseline_drops_a_unit_no_run_reports(repo: Path, tmp_path: Path) -> None:
+    ledger = tmp_path / "ledger.jsonl"
+    set_baseline(repo, units={"a": 9, "gone": 2})
+    write_jsonl(ledger, [unit_row("a", "pass", "t1", stamp(1), spawns=4),
+                         {"kind": "run", "run_id": "t1-" + stamp(1), "label": "gate", "utc": stamp(1)}])
+    code, out = run(repo, "--update-baseline", "--ledger", str(ledger))
+    got = json.loads((repo / ".test-value-ratchet-baseline.json").read_text(encoding="utf-8"))["units"]
+    assert got == {"a": 4}, "a deleted unit leaves the baseline, so re-creating it is a new unit again"
+    assert code == 0 and "dropped gone" in out
+
+
 def test_off_by_default_and_bad_config(tmp_path: Path) -> None:
     assert run(tmp_path, "--ledger", str(tmp_path / "l.jsonl"))[0] == 0, "no .fleet.toml: not enabled, exit 0"
     (tmp_path / ".fleet.toml").write_text("[test_value_ratchet]\nenabled = true\nbogus = 1\n", encoding="utf-8")

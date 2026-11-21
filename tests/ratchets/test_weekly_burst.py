@@ -174,3 +174,28 @@ def test_the_config_table(tmp_path: Path) -> None:
     (tmp_path / ".fleet.toml").write_text("[test_value_burst]\nenabled = true\nnightly = true\n", encoding="utf-8")
     code, out = cli()
     assert code == 2 and "unknown key(s): nightly" in out
+
+
+def test_the_ratchets_labels_and_unit_runner_reach_the_burst(tmp_path: Path) -> None:
+    paths = {"ledger": tmp_path / "l", "coverage_map": tmp_path / "m", "results_dir": tmp_path / "d", "ratchet": None}
+    args = type("Args", (), paths)()
+    toml = tmp_path / ".fleet.toml"
+    toml.write_text("[test_value_burst]\nenabled = true\n", encoding="utf-8")
+    burst = wb._from_config(tmp_path, args)  # type: ignore[arg-type]
+    assert burst is not None and (burst.gate_label, burst.hermetic_label) == ("gate", "weekly-hermetic-gate")
+    toml.write_text(
+        '[test_value_ratchet]\nenabled = true\nlabel = "ci"\nhermetic_label = "nightly-hermetic"\n'
+        'unit_runner = ["-m", "pytest", "-q", "-p", "mine"]\n[test_value_burst]\nenabled = true\n',
+        encoding="utf-8",
+    )
+    burst = wb._from_config(tmp_path, args)  # type: ignore[arg-type]
+    assert burst is not None
+    assert (burst.gate_label, burst.hermetic_label) == ("ci", "nightly-hermetic")
+    assert burst.gate == ["-m", "pytest", "-q", "-p", "mine"]
+    # An explicit `gate` in the burst table still wins over the ratchet's runner.
+    toml.write_text(toml.read_text(encoding="utf-8") + 'gate = ["-m", "pytest"]\n', encoding="utf-8")
+    burst = wb._from_config(tmp_path, args)  # type: ignore[arg-type]
+    assert burst is not None and burst.gate == ["-m", "pytest"]
+    toml.write_text("[test_value_ratchet]\nenabled = true\nlabel = 3\n[test_value_burst]\nenabled = true\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="label must be a non-empty string"):
+        wb._from_config(tmp_path, args)  # type: ignore[arg-type]

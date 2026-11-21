@@ -39,6 +39,7 @@ docs/playwright-ui-testing.md ("One paced, reused browser for every walk").
 from __future__ import annotations
 
 import logging
+import re
 import subprocess
 import sys
 import time
@@ -93,7 +94,8 @@ class ParallelCapExceeded(RuntimeError):
 
 
 def _port_of(endpoint: str) -> str:
-    return endpoint.rsplit(":", 1)[-1] if ":" in endpoint else ""
+    # Windows and Linux write `host:port`; macOS writes `host.port` (and `::1.port`).
+    return re.split(r"[:.]", endpoint)[-1] if re.search(r"[:.]", endpoint) else ""
 
 
 def count_time_wait(port: int) -> int | None:
@@ -116,8 +118,12 @@ def count_time_wait(port: int) -> int | None:
     total = 0
     for line in text.splitlines():
         fields = line.split()
-        if "TIME_WAIT" in fields and len(fields) >= 3:
-            total += wanted in (_port_of(fields[1]), _port_of(fields[2]))
+        # The local and foreign endpoints are the two fields just before the state: Linux
+        # and macOS put the Recv-Q/Send-Q columns ahead of them, Windows does not.
+        if "TIME_WAIT" in fields:
+            at = fields.index("TIME_WAIT")
+            if at >= 2:
+                total += wanted in (_port_of(fields[at - 2]), _port_of(fields[at - 1]))
     return total
 
 
