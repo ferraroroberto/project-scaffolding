@@ -25,7 +25,7 @@ from src import self_restart
 from src.no_window import NO_WINDOW
 from src.self_restart import RestartStore, RestartTarget, restart_router, run_spec
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
+REPO_ROOT = Path(__file__).resolve().parents[2]
 ORIGIN = {"origin": "http://testserver"}
 APP_TARGET = RestartTarget("app", "Restart app", ("cmd.exe", "/c", "tray.bat", "--restart"))
 

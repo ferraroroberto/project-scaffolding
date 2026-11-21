@@ -195,37 +195,10 @@ function makeTappable(readout, open) {
   });
 }
 
-// Wires the restart onto the build readout. Resolves to true when the app
-// offers a restart, false when it does not (no route, no targets, a refused
-// read), in which case the readout is left untouched.
-export async function initRestartSheet(opts) {
-  const o = opts || {};
-  const readout = o.readout || document.getElementById('buildReadout');
-  const deps = {
-    fetchJson: o.fetchJson || defaultFetchJson,
-    postJson: o.postJson || defaultPostJson,
-    endpoint: o.endpoint || '/api/restart',
-    versionEndpoint: o.versionEndpoint || '/api/version',
-    sleep: o.sleep || ((ms) => new Promise((resolve) => setTimeout(resolve, ms))),
-    now: o.now || (() => Date.now()),
-    timeoutMs: o.timeoutMs || RESTART_TIMEOUT_MS,
-  };
-  const reload = o.reload || (() => location.reload());
-
-  if (!readout) return false;
-  let targets;
-  try {
-    targets = (await deps.fetchJson(deps.endpoint)).targets || [];
-  } catch (_) {
-    return false;
-  }
-  if (!targets.length) return false;
-
-  const sheet = buildSheet(targets);
-  document.body.appendChild(sheet.dialog);
+// The sheet's state and handlers; returns the function that opens it.
+function wireSheet(sheet, targets, deps, reload) {
   let armed = false;
   let busy = false;
-
   const chosen = () => {
     const id = sheet.picker ? sheet.picker.value : targets[0].id;
     return targets.find((t) => t.id === id) || targets[0];
@@ -282,9 +255,40 @@ export async function initRestartSheet(opts) {
   });
   if (sheet.picker) sheet.picker.addEventListener('change', () => { if (!busy) reset(); });
   sheet.close.addEventListener('click', () => sheet.dialog.close());
-  makeTappable(readout, () => {
+  return () => {
     if (!busy) reset();
     sheet.dialog.showModal();
-  });
+  };
+}
+
+// Wires the restart onto the build readout. Resolves to true when the app
+// offers a restart, false when it does not (no route, no targets, a refused
+// read), in which case the readout is left untouched.
+export async function initRestartSheet(opts) {
+  const o = opts || {};
+  const readout = o.readout || document.getElementById('buildReadout');
+  const deps = {
+    fetchJson: o.fetchJson || defaultFetchJson,
+    postJson: o.postJson || defaultPostJson,
+    endpoint: o.endpoint || '/api/restart',
+    versionEndpoint: o.versionEndpoint || '/api/version',
+    sleep: o.sleep || ((ms) => new Promise((resolve) => setTimeout(resolve, ms))),
+    now: o.now || (() => Date.now()),
+    timeoutMs: o.timeoutMs || RESTART_TIMEOUT_MS,
+  };
+  const reload = o.reload || (() => location.reload());
+
+  if (!readout) return false;
+  let targets;
+  try {
+    targets = (await deps.fetchJson(deps.endpoint)).targets || [];
+  } catch (_) {
+    return false;
+  }
+  if (!targets.length) return false;
+
+  const sheet = buildSheet(targets);
+  document.body.appendChild(sheet.dialog);
+  makeTappable(readout, wireSheet(sheet, targets, deps, reload));
   return true;
 }

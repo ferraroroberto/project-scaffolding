@@ -117,7 +117,7 @@ After the `202`, the page polls `/api/version` and `/api/restart` every 1.5 s fo
 | timed out | at 90 s: no new process and no `ok` | "The app did not come back in 90 s", with the PC command |
 | refused | `401`/`403` or `409` on the `POST` | "Not allowed from here" / "A restart is already running" |
 
-An unknown result is never shown as success. Pinned by `tests/vendored/test_restart_sheet.py` (the real module under Node) and `tests/test_self_restart.py` (the routes, every runner ending, and a runner that outlives a `taskkill /T` of its parent).
+An unknown result is never shown as success. Pinned by `tests/vendored/test_restart_sheet.py` (the real module under Node) and `tests/vendored/test_self_restart.py` (the routes, every runner ending, and a runner that outlives a `taskkill /T` of its parent).
 
 ## Required design tokens
 
