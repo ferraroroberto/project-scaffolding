@@ -28,6 +28,8 @@ import subprocess
 import sys
 import time
 import urllib.request
+from collections.abc import Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -387,6 +389,45 @@ def poll_version(port: int, *, https: bool, timeout: float = 30.0) -> dict[str, 
             last_err = exc
             time.sleep(0.5)
     raise TimeoutError(f"{url} did not respond within {timeout}s: {last_err}")
+
+
+# ---------------------------------------------------------------------------
+# two spellings of one checkout
+# ---------------------------------------------------------------------------
+
+def _free_drive_letters(count: int) -> list[str]:
+    """*count* unused drive letters, taken from `Z` downward so a real drive is never picked."""
+    free = [c for c in "ZYXWVUTSRQPONMLKJIHGFED" if not Path(f"{c}:/").exists()]
+    if len(free) < count:
+        raise RuntimeError(f"need {count} free drive letters, found {free}")
+    return free[:count]
+
+
+@contextmanager
+def two_drive_spellings(root: Path) -> Iterator[tuple[Path, Path]]:
+    """Map *root* to two otherwise-unused drive letters and yield `(a:/, b:/)`.
+
+    A path under `a:/` and the same path under `b:/` are one folder with two
+    spellings that differ only by drive letter -- exactly how a fleet root
+    reached as `C:/automation` and as `E:/automation` (a junction) looks to a
+    process command line. `subst` writes nothing to disk, so the mapping is
+    undone on exit and a crashed run leaves no file behind.
+    """
+    letters = _free_drive_letters(2)
+    mapped: list[str] = []
+    try:
+        for letter in letters:
+            subprocess.run(
+                ["subst", f"{letter}:", str(root)],
+                capture_output=True, text=True, check=True, creationflags=NO_WINDOW,
+            )
+            mapped.append(letter)
+        yield Path(f"{letters[0]}:/"), Path(f"{letters[1]}:/")
+    finally:
+        for letter in mapped:
+            subprocess.run(
+                ["subst", f"{letter}:", "/D"], capture_output=True, creationflags=NO_WINDOW,
+            )
 
 
 # ---------------------------------------------------------------------------

@@ -47,7 +47,7 @@ The obvious scope guard — "only match the process if its *image path* is under
 
 This applies to **both** uses of the per-app match: the `--restart` **port-reclaim** (which holder to kill) **and** the single-instance **detection** (is a tray already running?). The original 2026-06-04 correction fixed only the reclaim block; the detection block kept an `ExecutablePath.StartsWith(...)` guard and so never recognised a live tray on a pythoncore venv — every `tray.bat` invocation then stacked another tray and the webapp port deadlocked. Both blocks now match on CommandLine.
 
-Match on `CommandLine` containing the repo's `.venv` path (ordinal, case-insensitive). That uniquely identifies *this* app's processes while leaving sibling apps' processes (and unrelated processes that merely happen to hold the port) untouched.
+Match on `CommandLine` containing the repo's `.venv` path (ordinal, case-insensitive). That uniquely identifies *this* app's processes while leaving sibling apps' processes (and unrelated processes that merely happen to hold the port) untouched. The match ignores the drive letter and the slash style, because a junctioned fleet root (`C:/automation` and `E:/automation`) is one checkout with two spellings and a live process keeps the one it started from: `--restart` from either spelling reclaims a tray started from the other, and the behavioral e2e harness proves it in both directions over two `subst` drive letters.
 
 ### Only reclaim ports the tray definitively owns
 

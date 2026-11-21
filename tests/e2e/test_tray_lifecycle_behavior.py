@@ -5,8 +5,9 @@ materialized from the real `tray.bat.template`, against a dummy stdlib
 HTTP(S) app (`_dummy_tray_app.py`) -- cold start, idempotent relaunch,
 `--restart` after a new commit (asserting the NEW git_sha is actually
 served, not a stale adopt), the non-interactive nested-shell invocation
-path that historically failed silently (#54/#144), and an HTTPS loopback
-variant with a self-signed cert (#147/#148).
+path that historically failed silently (#54/#144), an HTTPS loopback
+variant with a self-signed cert (#147/#148), and a restart run from the other
+spelling of a junctioned repo path than the one the old tray started from.
 
 project-scaffolding#153 moved `tray_lifecycle.ps1` out of this repo to ONE
 shared, machine-local copy owned by fleet-config -- see
@@ -198,6 +199,45 @@ def _check_restart_without_shared_helper_is_still_a_hard_error(env: harness.Tray
     assert not listening_pids(env.port), "--restart must not start a tray"
 
 
+def _check_restart_reclaims_a_tray_started_from_the_other_spelling(
+    root: Path, *, start_on: int,
+) -> None:
+    """`--restart` from one spelling of the repo path replaces a tray started from the other.
+
+    A fleet root reached as `C:/automation` and `E:/automation` is one checkout
+    with two spellings, and a live process keeps the one it started from. Two
+    drive letters mapped over *root* reproduce that. The old tray must be gone
+    and one new tray serve the new build -- not two trays with the stale one
+    still serving.
+    """
+    with harness.two_drive_spellings(root) as drives:
+        name = f"spelling-{harness.find_free_port()}"
+        started_under, restarted_under = drives[start_on], drives[1 - start_on]
+        with _env(started_under / name) as env:
+            first = harness.run_tray_bat(env.tray_bat, [])
+            assert first.returncode == 0, first.stdout + first.stderr
+            old_pids = harness.wait_for_tray_pids(env.venv_dir, env.tray_match)
+            assert old_pids, "no tray process detected after a plain launch"
+            old_sha = harness.poll_version(env.port, https=False)["git_sha"]
+
+            new_sha = harness.git_commit_allow_empty(env.script_dir, "bump build (other spelling)")
+            restarted = harness.run_tray_bat(restarted_under / name / "tray.bat", ["--restart"])
+            assert restarted.returncode == 0, restarted.stdout + restarted.stderr
+
+            served = harness.poll_version(env.port, https=False, timeout=30)["git_sha"]
+            assert served == new_sha != old_sha, (
+                f"--restart from {restarted_under} left the tray started from "
+                f"{started_under} serving {served!r}, expected {new_sha!r}"
+            )
+            new_pids = harness.wait_for_tray_pids(env.venv_dir, env.tray_match)
+            assert new_pids
+            assert set(new_pids).isdisjoint(old_pids), (
+                f"the old tray must be reclaimed, not kept beside a new one: "
+                f"before={old_pids} after={new_pids}"
+            )
+            assert len(listening_pids(env.port)) == 1, "the owned port must have a single owner"
+
+
 def test_tray_lifecycle(tmp_path_factory: pytest.TempPathFactory) -> None:
     """The tray launcher's start, restart and duplicate-launch contract, each case in a fresh tray environment."""
     with cases() as c:
@@ -215,3 +255,8 @@ def test_tray_lifecycle(tmp_path_factory: pytest.TempPathFactory) -> None:
             _check_plain_start_without_shared_helper_serves_and_does_not_duplicate(env=env)
         with c.case("restart_without_shared_helper_is_still_a_hard_error"), _env(tmp_path_factory.mktemp("tray")) as env:
             _check_restart_without_shared_helper_is_still_a_hard_error(env=env)
+        for start_on, label in ((0, "first_to_second"), (1, "second_to_first")):
+            with c.case(f"restart_reclaims_tray_started_from_other_drive_spelling_{label}"):
+                _check_restart_reclaims_a_tray_started_from_the_other_spelling(
+                    tmp_path_factory.mktemp("spelled"), start_on=start_on,
+                )
