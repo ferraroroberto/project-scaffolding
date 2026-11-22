@@ -284,6 +284,7 @@ prefixes = [
     "app/webapp/static/_vendored/base/",
     "app/webapp/static/_vendored/button/",
     "app/webapp/static/_vendored/card/",
+    "app/webapp/static/_vendored/chip/",
     "app/webapp/static/_vendored/code-listing/",
     "app/webapp/static/_vendored/color-scheme/",
     "app/webapp/static/_vendored/day-marks/",
@@ -308,6 +309,7 @@ prefixes = [
 ]
 paths          = [
     "tests/e2e/_action_row_avatar_checks.py",
+    "tests/e2e/_chip_checks.py",
     "tests/e2e/_code_listing_checks.py",
     "tests/e2e/_day_checks.py",
     "tests/e2e/_mic_notice_checks.py",
@@ -593,6 +595,7 @@ rules   = ["untracked-control", "untracked-sheet", "dynamic-id"]
 exclude = [
   "app/webapp/static/_vendored/action-row/action-row.html",
   "app/webapp/static/_vendored/button/button.html",
+  "app/webapp/static/_vendored/chip/chip.html",
   "app/webapp/static/_vendored/code-listing/code-listing.html",
   "app/webapp/static/_vendored/day-marks/day-marks.html",
   "app/webapp/static/_vendored/day-row/day-row.html",
@@ -704,6 +707,8 @@ settings-group  = { src = "app/webapp/static/_vendored/settings-group" }
 icon-tile       = { src = "app/webapp/static/_vendored/icon-tile" }
 range-tab       = { src = "app/webapp/static/_vendored/range-tab" }
 segmented       = { src = "app/webapp/static/_vendored/segmented" }
+# The toggle pill that joins or leaves a filter or a day set (aria-pressed, optional count).
+chip            = { src = "app/webapp/static/_vendored/chip" }
 home-head       = { src = "app/webapp/static/_vendored/home-head" }
 page-foot       = { src = "app/webapp/static/_vendored/page-foot" }
 action-row      = { src = "app/webapp/static/_vendored/action-row" }

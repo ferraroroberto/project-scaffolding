@@ -13,9 +13,9 @@ Assertions are the contracts from `~/.claude/design.md` v2 ("Component
 contracts" + the component token blocks); expected colors are the sRGB spec
 values (the demo page omits the P3 twins on purpose).
 
-The action-row avatar, code-listing, day-row/day-marks and select/settings-group
-checks live in `_action_row_avatar_checks.py`, `_code_listing_checks.py`,
-`_day_checks.py` and `_settings_group_checks.py`, run as cases of the test below.
+The action-row avatar, code-listing, day-row/day-marks, select/settings-group and
+chip checks live in `_action_row_avatar_checks.py`, `_code_listing_checks.py`,
+`_day_checks.py`, `_settings_group_checks.py` and `_chip_checks.py`, run as cases of the test below.
 
 The `nav/` component has its own harness — `test_vendored_nav.py` — because a
 fixed, body-level nav can't share the gallery's scrolling page. The
@@ -41,6 +41,7 @@ from tests.e2e._action_row_assertions import (
     assert_action_row_split_meta,
 )
 from tests.e2e._cases import cases
+from tests.e2e._chip_checks import run_chip_cases
 from tests.e2e._color_assertions import contrast as _contrast
 from tests.e2e._color_assertions import rgba as _rgba
 from tests.e2e._color_assertions import set_theme as _set_theme
@@ -890,6 +891,7 @@ def test_gallery_component_contracts(new_gallery: Callable[[], AbstractContextMa
         with c.case("day_row_and_day_marks_contract"), new_gallery() as gallery:
             _day_checks.check_day_row_and_day_marks_contract(gallery=gallery)
         run_settings_group_cases(c, new_gallery)
+        run_chip_cases(c, new_gallery, static_server)
         with c.case("select_native_boundary_renders_in_webkit"):
             check_select_native_boundary_renders_in_webkit(playwright, static_server)
         with c.case("settings_group_long_select_value_keeps_its_row_in_webkit"):
