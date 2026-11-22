@@ -32,6 +32,7 @@ Listed in gate stage order, the order `scripts/run_ratchets.py` runs them. **Sib
 | runtime write | `runtime_write_ratchet.py`, `runtime_write_resolve.py` | a test command, for the probe | fast | yes | [runtime-write-ratchet.md](runtime-write-ratchet.md) |
 | usage track | `usage_track_ratchet.py`, `usage_track_scan.py` | a web UI; choose `rules` | fast | | [usage-track-ratchet.md](usage-track-ratchet.md) |
 | ux surface | `ux_surface_ratchet.py`, `usage_track_scan.py`, `ux_surface_map.py` | a web UI and its `docs/ux-surfaces.yaml` | fast | | [ux-surface-ratchet.md](ux-surface-ratchet.md) |
+| request budget | `request_budget_ratchet.py`, `request_budget_scan.py` | - | fast | | [request-budget-ratchet.md](request-budget-ratchet.md) |
 
 The test value ratchet is not in this table: it reads a test run's recorded results, so it runs after the tests and `run_ratchets.py` and `adopt_ratchets.py` leave it out. Its siblings (`unit_ledger.py`, `spawn_probe/`, `unit_ledger_pytest.py`, `weekly_burst.py`), the gate wiring and the weekly job: [test-value-ratchet.md](test-value-ratchet.md).
 

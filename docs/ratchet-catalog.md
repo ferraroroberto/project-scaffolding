@@ -13,6 +13,7 @@ The ratchets are the baseline-and-ratchet stages of the pre-ship gate: stdlib-on
 - [Agent instructions: instruction](#agent-instructions)
 - [Usage tracking: usage track](#usage-tracking)
 - [UX surfaces: ux surface](#ux-surfaces)
+- [Request budget: request budget](#request-budget)
 - [Test value: test value](#test-value)
 - [Exceptions and burn-down](#exceptions-and-burn-down)
 - [Adoption order](#adoption-order)
@@ -1149,6 +1150,121 @@ bad:   the map gained an entry, the page was not regenerated
 fixed: python scripts/ux_surface_map.py, and commit the map and the page together
 ```
 
+## Request budget
+
+[request-budget-ratchet.md](request-budget-ratchet.md); the rules and why: [polling-budget.md](polling-budget.md). A web app built and tested on a fast machine hides its waste. This ratchet reads browser JavaScript (and inline `<script>` blocks) and server Python, and counts, per file and rule, the polls, loops, scans and pool submits that cost work nobody is looking at. **Every rule is on by default**; `rules` narrows them. **Except** one hit with `request-budget-exempt: <reason>` in a comment on its line or in the comment block right above it; a marker with no reason exempts nothing and is itself a hit. Exemptions are counted and printed on every run.
+
+```toml
+[request_budget_ratchet]
+enabled      = true
+handler_dirs = ["app/webapp/routers"]   # turns scan-per-request on
+stat_cache   = ["src.stat_cache"]       # a handler module importing one passes scan-per-request
+
+[[request_budget.loops]]                # a background loop that must run while nobody views
+path       = "src/watcher.py"
+function   = "Watcher.run"
+interval_s = 1
+why        = "reads the hardware's state while nobody is viewing"
+```
+
+#### `fixed-rate-poll`
+
+RB1. A `setInterval` (or a declared `poll_wrappers` name built on one) whose callback reaches a server call: `fetch`, `XMLHttpRequest`, `EventSource`, `sendBeacon`, `axios`, a jQuery read or a declared `fetch_wrappers` name, directly or through a function the same file defines. A callback that calls something the file does not define cannot be ruled out and counts.
+
+```js
+// bad
+setInterval(() => fetch('/api/board').then(render), 5000);
+
+// fixed
+import { startPoll, singleFlight } from './_vendored/poll/poll.js';
+startPoll(singleFlight(() => fetch('/api/board').then(render)), 5000);
+```
+
+#### `poll-floor`
+
+RB2. A poll interval under 2000 ms: a `startPoll` call, or a `fixed-rate-poll` hit, whose interval is a numeric literal, a product of literals or a `const` bound to one. A `startPoll` call that declares `activeWhile` runs only while a job is in progress and passes.
+
+```js
+// bad
+startPoll(loadProgress, 1000);
+
+// fixed
+startPoll(loadProgress, 1000, { activeWhile: () => state.jobRunning });
+```
+
+#### `unwatched-loop`
+
+RB3. A server `while` loop paced by a `sleep(...)` or a `wait(timeout)`, or a `Timer`/`call_later` that re-arms the function it is created in, that sleeps under 5 s, sleeps for an interval the source does not fix, or starts an outside program on each pass. A `[[request_budget.loops]]` entry naming the file and the enclosing function declares it.
+
+```python
+# bad
+while True:
+    refresh_status()
+    time.sleep(1)
+
+# fixed: run the work when a viewer asks, behind a cache; or declare the loop
+POLL_S = 30
+while True:
+    refresh_status()
+    time.sleep(POLL_S)
+```
+
+#### `scan-per-request`
+
+RB4. `os.walk`, `glob`/`iglob`/`rglob`/`Path.glob`, `iterdir`, `scandir` or `listdir` in a module under `handler_dirs` that does not import a `stat_cache` module. Off (printed as OFF) until `handler_dirs` is declared.
+
+```python
+# bad (app/webapp/routers/logs.py)
+def list_logs():
+    return sorted(p.name for p in LOG_DIR.iterdir())
+
+# fixed
+from src import stat_cache
+def list_logs():
+    return stat_cache.listing(LOG_DIR)
+```
+
+#### `default-pool`
+
+RB5. `asyncio.to_thread(...)` or `run_in_executor(None, ...)`: work on the one shared default pool, where a slow fan-out starves the hot polls.
+
+```python
+# bad
+rows = await asyncio.to_thread(read_rows)
+
+# fixed
+HEAVY_READS = TimedExecutor("heavy-reads", 4)
+rows = await loop.run_in_executor(HEAVY_READS, read_rows)
+```
+
+#### `timing-middleware`
+
+RB6. A web app (a `FastAPI(` or `Starlette(` call) whose tracked Python never imports the vendored `RequestTimingMiddleware`; one hit, on the file that builds the app.
+
+```python
+# bad
+app = FastAPI()
+
+# fixed
+from src.request_timing import RequestTimingMiddleware
+app = FastAPI()
+app.add_middleware(RequestTimingMiddleware, classes=BUDGETS)
+```
+
+#### `bare-exempt`
+
+A `request-budget-exempt` marker with no reason after a colon. It exempts nothing.
+
+```js
+// bad
+// request-budget-exempt
+setInterval(paintClock, 1000);
+
+// fixed
+// request-budget-exempt: an on-screen clock whose paint function is passed in
+setInterval(paintClock, 1000);
+```
+
 ## Test value
 
 ### Test value ratchet
@@ -1235,4 +1351,4 @@ Which ratchets take which:
 
 ## Adoption order
 
-[adopting-ratchets.md](adopting-ratchets.md) has the steps and the prerequisites table, and `scripts/tools/adopt_ratchets.py` does them. A sensible order: start with the set that is Python only and needs no choices (comment, docs, structure, instruction, doc references, dead code, runtime write), then add static once `ruff` is installed, then conventions and usage track by choosing the rules that match the repository, and ux surface once the web app has its surface map. Run `--init` on each, review the baseline, and burn it down in later changes.
+[adopting-ratchets.md](adopting-ratchets.md) has the steps and the prerequisites table, and `scripts/tools/adopt_ratchets.py` does them. A sensible order: start with the set that is Python only and needs no choices (comment, docs, structure, instruction, doc references, dead code, runtime write), then add static once `ruff` is installed, then conventions and usage track by choosing the rules that match the repository, ux surface once the web app has its surface map, and request budget (every rule on, no choices) in any repo, web code or not. Run `--init` on each, review the baseline, and burn it down in later changes.

@@ -35,7 +35,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent
 #: Gate stage order: the cheap whole-tree checks first, the runtime write ratchet last.
 STAGES = ("static", "comment", "docs", "structure", "instruction", "doc_refs",
-          "dead_code", "conventions", "runtime_write", "usage_track", "ux_surface")
+          "dead_code", "conventions", "runtime_write", "usage_track", "ux_surface", "request_budget")
 STAGE_TIMEOUT_S = 1800
 EXIT_PASS, EXIT_FAIL, EXIT_CONFIG, EXIT_NOT_CONFIRMED = 0, 1, 2, 3
 STATE = {EXIT_PASS: "PASS", EXIT_FAIL: "FAIL", EXIT_CONFIG: "CONFIG ERROR", EXIT_NOT_CONFIRMED: "NOT CONFIRMED"}

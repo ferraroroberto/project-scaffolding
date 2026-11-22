@@ -434,7 +434,7 @@ def test_real_surfaces_route_representative_paths() -> None:
     cfg = load_config(REAL_FLEET_TOML)
     assert cfg.surfaces_note == "", cfg.surfaces_note
     assert {s.name for s in cfg.surfaces} == {
-        "nav", "components", "geometry", "layout-lint", "usage-log", "sign-in", "shot-baseline",
+        "nav", "components", "geometry", "layout-lint", "usage-log", "sign-in", "poll", "shot-baseline",
     }
 
     def route(*paths: str) -> tuple[str, str]:
@@ -485,7 +485,7 @@ def test_real_surfaces_route_representative_paths() -> None:
                  "app/webapp/static/_vendored/sign-in/sign-in.css") == (
         "surface", "tests/e2e/test_vendored_sign_in.py")
     assert route("tests/e2e/test_vendored_sign_in.py") == ("surface", "tests/e2e/test_vendored_sign_in.py")
-    assert route("src/usage_log.py") == ("surface", "tests/e2e/test_vendored_usage_log.py")
+    assert route("src/usage_log.py") ==("surface", "tests/e2e/test_vendored_usage_log.py")
     assert route("src/usage_log.py", "tests/usage_log/test_usage_log.py") == (
         "surface", "tests/e2e/test_vendored_usage_log.py")
 
@@ -518,6 +518,13 @@ def test_real_surfaces_route_representative_paths() -> None:
     # Two surfaces in one diff -> whole suite.
     assert route("app/webapp/static/_vendored/nav/nav-tabs.css",
                  "app/webapp/static/_vendored/card/card.css") == ("full", "tests/e2e")
+
+
+def test_the_poll_surface_runs_only_the_poll_harness() -> None:
+    """The poll helper and its request-budget probe are proven by one harness."""
+    cfg = load_config(REAL_FLEET_TOML)
+    result = classify(["app/webapp/static/_vendored/poll/poll.js", "tests/e2e/budget/_request_budget.py"], cfg)
+    assert (result.tier, result.pytest_target) == ("surface", "tests/e2e/budget/test_vendored_poll.py")
 
 
 def test_real_surface_helpers_are_only_imported_by_their_own_targets() -> None:

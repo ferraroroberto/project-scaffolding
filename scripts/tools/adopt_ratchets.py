@@ -73,6 +73,7 @@ RATCHETS: tuple[Ratchet, ...] = (
             'rules = ["untracked-control", "untracked-sheet", "dynamic-id"]  # docs/usage-track-ratchet.md\n'),
     Ratchet("ux_surface", ("usage_track_scan", "ux_surface_map"),
             "a web UI (HTML/JS) to scan and its docs/ux-surfaces.yaml (docs/ux-surface-map.md)"),
+    Ratchet("request_budget", ("request_budget_scan",), "-"),
 )
 BY_NAME = {r.name: r for r in RATCHETS}
 #: Ratchets that read a recorded test run, so they run after the tests and are wired by hand

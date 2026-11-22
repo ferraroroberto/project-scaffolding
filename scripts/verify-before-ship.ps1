@@ -89,6 +89,14 @@
                          baseline; opt-in via .fleet.toml
                          [ux_surface_ratchet]; exit 3 = "not confirmed", a
                          failure, never a pass (docs/ux-surface-ratchet.md)
+     12c. request budget ratchet — scripts/request_budget_ratchet.py: fails when
+                         a fixed-rate fetch poll, a poll under the 2 s floor,
+                         an undeclared fast server loop, a directory walk in a
+                         request handler, a shared-default-pool submit, or a
+                         web app without the timing middleware is new beyond
+                         the committed baseline; opt-in via .fleet.toml
+                         [request_budget_ratchet]; exit 3 = "not confirmed", a
+                         failure, never a pass (docs/request-budget-ratchet.md)
      13. mypy --strict — the vendor-verbatim primitives only; the list is
                          derived from .fleet.toml's [components] catalog via
                          scripts/vendored_catalog.py, never hand-maintained here
@@ -217,6 +225,7 @@ Invoke-Stage "conventions ratchet"                { & $py "scripts/conventions_r
 Invoke-Stage "runtime write ratchet"              { & $py "scripts/runtime_write_ratchet.py" }
 Invoke-Stage "usage track ratchet"                { & $py "scripts/usage_track_ratchet.py" }
 Invoke-Stage "ux surface ratchet"                 { & $py "scripts/ux_surface_ratchet.py" }
+Invoke-Stage "request budget ratchet"             { & $py "scripts/request_budget_ratchet.py" }
 Invoke-Stage "mypy --strict (vendored)"           { & $py -m mypy @VendoredModules }
 Invoke-Stage "py39 (vendored)"                    { & $py "scripts/tools/vendored_py39_check.py" }
 # Runtime write probe, first half: what already sits untracked or ignored under
