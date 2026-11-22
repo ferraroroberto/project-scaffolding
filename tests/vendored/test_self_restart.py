@@ -63,6 +63,28 @@ def test_get_lists_the_declared_targets(tmp_path: Path) -> None:
     assert body == {"targets": [{"id": "app", "label": "Restart app", "warning": ""}], "last": None}
 
 
+def test_a_callable_warning_is_computed_on_every_get(tmp_path: Path) -> None:
+    sessions = [2]
+    target = RestartTarget(
+        "hub", "Restart hub", self_restart.TRAY_RESTART,
+        warning=lambda: f"This ends {sessions[0]} live sessions.",
+    )
+    client = _client(tmp_path, [], targets=(target,))
+    first = client.get("/api/restart").json()["targets"][0]["warning"]
+    sessions[0] = 5
+    second = client.get("/api/restart").json()["targets"][0]["warning"]
+    assert (first, second) == ("This ends 2 live sessions.", "This ends 5 live sessions.")
+
+
+def test_a_failing_warning_check_still_asks_for_the_second_confirmation(tmp_path: Path) -> None:
+    def broken() -> str:
+        raise RuntimeError("hub unreachable")
+
+    target = RestartTarget("hub", "Restart hub", self_restart.TRAY_RESTART, warning=broken)
+    shown = _client(tmp_path, [], targets=(target,)).get("/api/restart").json()["targets"][0]
+    assert shown["warning"]
+
+
 @pytest.mark.parametrize("headers", [{}, {"origin": "https://evil.example"}])
 def test_post_refuses_a_missing_or_foreign_origin(tmp_path: Path, headers: dict[str, str]) -> None:
     spawned: list[Any] = []
