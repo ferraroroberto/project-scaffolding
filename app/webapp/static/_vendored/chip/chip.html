@@ -1,0 +1,17 @@
+<!-- Markup skeleton — copy and adapt. One `.chip-group` (role="group", with an
+     accessible name) holding `<button class="chip">`s. Each carries
+     aria-pressed="true" or "false"; any number may be pressed. Flipping it is
+     the caller's job (see README). `.chip-count` is optional and trails the label.
+     Add `chip-group--scroll` for one swipeable line instead of wrapping.
+     One choice among 2-5 peers is NOT chips: use `segmented`. -->
+<div class="chip-group" role="group" aria-label="Stores">
+  <button type="button" class="chip" aria-pressed="true" data-value="all">All <span class="chip-count">24</span></button>
+  <button type="button" class="chip" aria-pressed="false" data-value="north">North <span class="chip-count">9</span></button>
+  <button type="button" class="chip" aria-pressed="false" data-value="market">Market <span class="chip-count">15</span></button>
+</div>
+
+<div class="chip-group chip-group--scroll" role="group" aria-label="Zones">
+  <button type="button" class="chip" aria-pressed="false" data-value="pantry">Pantry</button>
+  <button type="button" class="chip" aria-pressed="true" data-value="fridge">Fridge</button>
+  <button type="button" class="chip" aria-pressed="false" data-value="freezer">Freezer</button>
+</div>

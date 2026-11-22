@@ -17,50 +17,7 @@
   defining tokens is the app's job, and this page plays the app.
 -->
 <link rel="stylesheet" href="demo-tokens.css">
-<style>
-  /* Gallery chrome only — not part of any component. */
-  * { box-sizing: border-box; }
-  body {
-    margin: 0;
-    background: var(--bg);
-    color: var(--ink);
-    font-family: var(--font);
-    font-size: var(--font-body);
-    line-height: 1.5;
-  }
-  .gallery {
-    max-width: 480px;
-    margin: 0 auto;
-    padding: var(--gap);
-    display: flex;
-    flex-direction: column;
-    gap: var(--gap);
-  }
-  .gallery > h2 {
-    margin: var(--space-md) 0 0;
-    font-size: var(--font-label);
-    font-weight: 600;
-    color: var(--muted);
-    text-transform: none;
-  }
-  .icon { display: inline-block; width: 1em; height: 1em; flex: none;
-          stroke: currentColor; stroke-width: 2; stroke-linecap: round;
-          stroke-linejoin: round; vertical-align: -0.15em; }
-  .tile-row { display: flex; gap: var(--gap); }
-  /* An app's own muted class, placed inside a modal row (#363). */
-  .demo-row-note { color: var(--muted); font-weight: 400; }
-  #themeToggle { align-self: flex-end; }
-  /* The day cell of the day-marks demo: the app's own, as in a real strip. */
-  .demo-week { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 2px; }
-  .demo-day-cell {
-    display: grid; grid-template-rows: auto 10px; justify-items: center; align-content: center;
-    gap: 3px; min-height: var(--row-md); padding: 4px 0; border: 0; border-radius: var(--radius-md);
-    background: transparent; color: var(--ink); font: inherit;
-  }
-  .demo-day-cell.today { background: var(--accent-soft); color: var(--accent-text); }
-  .demo-day-num { font-size: var(--font-body-sm); font-weight: 600; font-variant-numeric: tabular-nums; }
-  .demo-rec { display: inline-flex; align-items: center; gap: var(--space-sm); }
-</style>
+<link rel="stylesheet" href="demo-chrome.css">
 <!-- base.css loads FIRST: element-level rules every component builds on. -->
 <link rel="stylesheet" href="base/base.css">
 <link rel="stylesheet" href="card/card.css">
@@ -73,6 +30,7 @@
 <link rel="stylesheet" href="icon-button/icon-button.css">
 <link rel="stylesheet" href="range-tab/range-tab.css">
 <link rel="stylesheet" href="segmented/segmented.css">
+<link rel="stylesheet" href="chip/chip.css">
 <link rel="stylesheet" href="page-foot/page-foot.css">
 <link rel="stylesheet" href="home-head/home-head.css">
 <link rel="stylesheet" href="select-native/select-native.css">
@@ -308,6 +266,22 @@
       <button type="button" class="segmented-item" id="demoSegPartial" aria-pressed="true">Partial</button>
       <button type="button" class="segmented-item" id="demoSegFull" aria-pressed="false"
               disabled title="A door is open">Full</button>
+    </div>
+  </div>
+
+  <h2>chip (toggle pills: a wrapping group with counts, one swipeable line, an unavailable chip)</h2>
+  <div class="card" style="display: flex; flex-direction: column; gap: var(--gap);">
+    <div class="chip-group" id="demoChipGroup" role="group" aria-label="Stores">
+      <button type="button" class="chip" id="demoChipAll" aria-pressed="true">All <span class="chip-count">24</span></button>
+      <button type="button" class="chip" id="demoChipNorth" aria-pressed="false">North <span class="chip-count">9</span></button>
+      <button type="button" class="chip" aria-pressed="false">Market <span class="chip-count">15</span></button>
+      <button type="button" class="chip" aria-pressed="true">Corner shop <span class="chip-count">3</span></button>
+      <button type="button" class="chip" id="demoChipOff" aria-pressed="false" disabled title="No items">Online <span class="chip-count">0</span></button>
+    </div>
+    <div class="chip-group chip-group--scroll" id="demoChipScroll" role="group" aria-label="Zones">
+      <button type="button" class="chip" aria-pressed="false">Pantry</button><button type="button" class="chip" aria-pressed="true">Fridge</button>
+      <button type="button" class="chip" aria-pressed="false">Freezer</button><button type="button" class="chip" aria-pressed="false">Bathroom</button>
+      <button type="button" class="chip" aria-pressed="false">Garage</button><button type="button" class="chip" aria-pressed="false">Balcony</button>
     </div>
   </div>
 

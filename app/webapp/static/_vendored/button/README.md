@@ -91,14 +91,14 @@ The design-review rule `INV-03` (button) lists every `<button>` that no vendored
 | A whole-row tap target with a title and one context line (a session row, a type row, a search hit) | [`action-row`](../action-row/) |
 | A single-choice filter of 2–5 peers drawn as pills (`All`, `Needs checking`, `Checked`) | [`segmented`](../segmented/) |
 | A native choice of 6+ options | [`select-native`](../select-native/) |
+| A toggle chip: a pill with `aria-pressed` that joins or leaves a filter or a day set, count or label inside (store pills, weekday pills, a zone strip) | [`chip`](../chip/) |
 
 A row that carries a trailing chevron keeps it as it is: the chevron is not part of this mapping.
 
-**Bucket 3: no component covers it.** A shape that recurs in two or more apps gets a scaffold component; a shape that lives in one app stays app-owned.
+**Bucket 3: no component covers it.** A shape that recurs in two or more apps gets a scaffold component (the toggle chip did, and is now `chip` in bucket 2); a shape that lives in one app stays app-owned.
 
 | Shape | Decision |
 | --- | --- |
-| A toggle chip: a pill with `aria-pressed` that joins or leaves a filter or a day set, count or label inside (store pills, weekday pills, a zone strip) | Recurs in two apps: the scaffold gains a `chip` component. Until it ships, those controls stay as they are. |
 | A stat tile that is a button (a summary tile that navigates, a metric tile that selects a trend) | Two apps but two jobs (navigate vs select): app-owned. A third app with the same job reopens this. |
 | A data row with a share bar, a snippet or a selected state (a folder tree node, a contents row, a search result `role="option"`) | One app: app-owned |
 | A readout that opens a sheet (a CPU reading, a usage meter), a combobox trigger with per-option notes, a floating "jump to latest" pill, a hero record toggle, a date quick-pick tile | One app each: app-owned |

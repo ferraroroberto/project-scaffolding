@@ -1,0 +1,42 @@
+/* Gallery chrome only — not part of any component. */
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font);
+  font-size: var(--font-body);
+  line-height: 1.5;
+}
+.gallery {
+  max-width: 480px;
+  margin: 0 auto;
+  padding: var(--gap);
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap);
+}
+.gallery > h2 {
+  margin: var(--space-md) 0 0;
+  font-size: var(--font-label);
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: none;
+}
+.icon { display: inline-block; width: 1em; height: 1em; flex: none;
+        stroke: currentColor; stroke-width: 2; stroke-linecap: round;
+        stroke-linejoin: round; vertical-align: -0.15em; }
+.tile-row { display: flex; gap: var(--gap); }
+/* An app's own muted class, placed inside a modal row (#363). */
+.demo-row-note { color: var(--muted); font-weight: 400; }
+#themeToggle { align-self: flex-end; }
+/* The day cell of the day-marks demo: the app's own, as in a real strip. */
+.demo-week { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 2px; }
+.demo-day-cell {
+  display: grid; grid-template-rows: auto 10px; justify-items: center; align-content: center;
+  gap: 3px; min-height: var(--row-md); padding: 4px 0; border: 0; border-radius: var(--radius-md);
+  background: transparent; color: var(--ink); font: inherit;
+}
+.demo-day-cell.today { background: var(--accent-soft); color: var(--accent-text); }
+.demo-day-num { font-size: var(--font-body-sm); font-weight: 600; font-variant-numeric: tabular-nums; }
+.demo-rec { display: inline-flex; align-items: center; gap: var(--space-sm); }

@@ -456,6 +456,7 @@ def test_real_surfaces_route_representative_paths() -> None:
     assert route("app/webapp/static/_vendored/code-listing/code-listing.css") == (
         "surface", _COMPONENTS_TARGETS)
     assert route("app/webapp/static/_vendored/settings-group/settings-group.css") == ("surface", _COMPONENTS_TARGETS)
+    assert route("app/webapp/static/_vendored/chip/chip.css") == ("surface", _COMPONENTS_TARGETS)
     # A row-menu-only diff reaches the placement harness (#393).
     assert route("app/webapp/static/_vendored/row-menu/row-menu.js") == (
         "surface", _COMPONENTS_TARGETS)
