@@ -27,7 +27,7 @@ body {
         stroke: currentColor; stroke-width: 2; stroke-linecap: round;
         stroke-linejoin: round; vertical-align: -0.15em; }
 .tile-row { display: flex; gap: var(--gap); }
-/* An app's own muted class, placed inside a modal row (#363). */
+/* An app's own muted class, placed inside a modal row. */
 .demo-row-note { color: var(--muted); font-weight: 400; }
 #themeToggle { align-self: flex-end; }
 /* The day cell of the day-marks demo: the app's own, as in a real strip. */
