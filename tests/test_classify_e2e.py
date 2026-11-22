@@ -430,6 +430,13 @@ _COMPONENTS_TARGETS = (
     "tests/e2e/test_vendored_rec_wave.py tests/e2e/test_vendored_row_menu.py")
 
 
+_GEOMETRY_TARGETS = (
+    "tests/e2e/test_geometry_helper.py tests/e2e/components/test_page_foot.py "
+    "tests/e2e/test_harness_helpers.py tests/e2e/test_vendored_components.py "
+    "tests/e2e/test_vendored_home_head.py tests/e2e/test_vendored_nav.py "
+    "tests/e2e/test_vendored_row_menu.py")
+
+
 def test_real_surfaces_route_representative_paths() -> None:
     """This repo's declared surfaces narrow what they own and nothing shared (#258)."""
     cfg = load_config(REAL_FLEET_TOML)
@@ -469,12 +476,7 @@ def test_real_surfaces_route_representative_paths() -> None:
         "surface",
         _COMPONENTS_TARGETS)
     # The nav harness imports the helper too (#348), so it runs on a helper edit.
-    assert route("tests/e2e/_geometry.py") == (
-        "surface",
-        "tests/e2e/test_geometry_helper.py tests/e2e/components/test_page_foot.py "
-        "tests/e2e/test_harness_helpers.py "
-        "tests/e2e/test_vendored_components.py tests/e2e/test_vendored_home_head.py "
-        "tests/e2e/test_vendored_nav.py tests/e2e/test_vendored_row_menu.py")
+    assert route("tests/e2e/_geometry.py") == ("surface", _GEOMETRY_TARGETS)
     # The layout lint: the helper, its proof and its fixture page run only that proof.
     assert route("tests/e2e/_layout_lint.py") == ("surface", "tests/e2e/test_harness_helpers.py")
     assert route("tests/e2e/fixtures/layout/sheet.html") == ("surface", "tests/e2e/test_harness_helpers.py")
