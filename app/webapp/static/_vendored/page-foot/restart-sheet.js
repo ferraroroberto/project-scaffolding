@@ -195,6 +195,27 @@ function makeTappable(readout, open) {
   });
 }
 
+// Re-reads the target list into `targets` (and the picker's option text) so a
+// warning that depends on live state is the one true now. A failed read keeps
+// the list the page already has.
+async function refreshTargets(deps, targets, picker) {
+  let fresh = null;
+  try { fresh = (await deps.fetchJson(deps.endpoint)).targets; } catch (_) { fresh = null; }
+  if (!Array.isArray(fresh)) return;
+  for (const next of fresh) {
+    const known = targets.find((t) => t.id === next.id);
+    if (known) {
+      known.label = next.label;
+      known.warning = next.warning;
+    }
+  }
+  if (!picker) return;
+  for (const option of picker.children) {
+    const known = targets.find((t) => t.id === option.value);
+    if (known) option.textContent = known.label;
+  }
+}
+
 // The sheet's state and handlers; returns the function that opens it.
 function wireSheet(sheet, targets, deps, reload) {
   let armed = false;
@@ -256,26 +277,6 @@ function wireSheet(sheet, targets, deps, reload) {
   });
   if (sheet.picker) sheet.picker.addEventListener('change', () => { if (!busy && !refreshing) reset(); });
   sheet.close.addEventListener('click', () => sheet.dialog.close());
-  // Re-reads the target list so a warning that depends on live state is the
-  // one true now. A failed read keeps the list the page already has.
-  const refresh = async () => {
-    let fresh = null;
-    try { fresh = (await deps.fetchJson(deps.endpoint)).targets; } catch (_) { fresh = null; }
-    if (!Array.isArray(fresh)) return;
-    for (const next of fresh) {
-      const known = targets.find((t) => t.id === next.id);
-      if (known) {
-        known.label = next.label;
-        known.warning = next.warning;
-      }
-    }
-    if (sheet.picker) {
-      for (const option of sheet.picker.children) {
-        const known = targets.find((t) => t.id === option.value);
-        if (known) option.textContent = known.label;
-      }
-    }
-  };
   // The confirm button is held until the read lands, so a tap can never act on
   // the warning the page loaded with. Resolves once the sheet is ready.
   return async () => {
@@ -289,7 +290,7 @@ function wireSheet(sheet, targets, deps, reload) {
     refreshing = true;
     setLocked(true, chosen().label);
     try {
-      await refresh();
+      await refreshTargets(deps, targets, sheet.picker);
     } finally {
       refreshing = false;
     }
