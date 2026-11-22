@@ -46,7 +46,7 @@ from tests.e2e._color_assertions import contrast as _contrast
 from tests.e2e._color_assertions import rgba as _rgba
 from tests.e2e._color_assertions import set_theme as _set_theme
 from tests.e2e._color_assertions import style as _style
-from tests.e2e._fullscreen_checks import run_fullscreen_cases
+from tests.e2e.components._fullscreen_checks import run_fullscreen_cases
 from tests.e2e._geometry import (
     assert_min_target,
     assert_no_overlap,
@@ -64,7 +64,6 @@ from tests.e2e.conftest import STATIC_DIR
 _RANGE_ROWS = ("#demoRange2", "#demoRangeTabs", "#demoRange5")
 _TRANSPARENT = "rgba(0, 0, 0, 0)"
 _BOOT_SNIPPET = STATIC_DIR / "_vendored" / "text-size" / "text-size-boot.html"
-
 
 # The dark control fill: border-muted, the closed-palette value the spec fills
 # controls and disabled buttons with (fleet-config#1368). Never #010409 / #0d1117.

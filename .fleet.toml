@@ -314,7 +314,7 @@ paths          = [
     "tests/e2e/_chip_checks.py",
     "tests/e2e/_code_listing_checks.py",
     "tests/e2e/_day_checks.py",
-    "tests/e2e/_fullscreen_checks.py",
+    "tests/e2e/components/_fullscreen_checks.py",
     "tests/e2e/_mic_notice_checks.py",
     "tests/e2e/_settings_group_checks.py",
     "tests/e2e/test_vendored_base.py",
