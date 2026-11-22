@@ -2,6 +2,8 @@
 // open it, its close shuts it, and the Language row opens a detail sheet long
 // enough that its body scrolls between the pinned title and Done. Loaded as a
 // module before the gallery's own script, so it is wired before demo-ready.
+import { bindFullscreen } from './fullscreen/fullscreen.js';
+
 const page = document.getElementById('demoSettingsPage');
 const sheet = document.getElementById('demoSettingsSheet');
 const body = document.getElementById('demoSettingsSheetBody');
@@ -17,6 +19,9 @@ const body = document.getElementById('demoSettingsSheetBody');
   row.append(name, state);
   body.append(row);
 });
+
+// The Full screen row shows in Edge only; every other browser keeps it hidden.
+bindFullscreen(document.getElementById('demoFullscreenRow'), 'demo');
 
 const openPage = () => page.showModal();
 document.getElementById('openSettingsPage').addEventListener('click', openPage);
