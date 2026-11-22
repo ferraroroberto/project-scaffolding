@@ -3,10 +3,13 @@
 The readout's touch target is a `::after` that must reach the fleet minimum
 without ever extending the document: an app whose footer sits flush at the
 window bottom (`margin-block-end: 0`, no scroll) must not gain page scroll.
-`test_vendored_components.py` runs the case in a fresh browser context.
+The test opens it in a fresh browser context.
 """
 
 from __future__ import annotations
+
+from collections.abc import Callable
+from contextlib import AbstractContextManager
 
 from playwright.sync_api import Page
 
@@ -44,3 +47,10 @@ def check_flush_footer_hit_area_adds_no_page_scroll(page: Page, static_server: s
     rect = effective_rect(page.locator("#readout")).effective
     assert rect.height >= 44, f"the readout's tap target shrank to {rect.height}px"
     assert rect.bottom <= scroll["view"], "the hit area extends below the window"
+
+
+def test_restart_readout_hit_area_adds_no_page_scroll(
+    new_page: Callable[..., AbstractContextManager[Page]], static_server: str
+) -> None:
+    with new_page() as page:
+        check_flush_footer_hit_area_adds_no_page_scroll(page, static_server)
