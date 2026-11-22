@@ -1,5 +1,11 @@
 [
     {
+        "number": 912,
+        "state": "OPEN",
+        "stateReason": "",
+        "title": "ADR: tests read host identity only through a synthetic fixture"
+    },
+    {
         "number": 858,
         "state": "OPEN",
         "stateReason": "",

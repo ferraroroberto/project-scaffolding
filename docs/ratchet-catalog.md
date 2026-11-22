@@ -765,6 +765,20 @@ with paced_walk(browser, port) as walk:
         walk.visit(url)
 ```
 
+#### `host-identity`
+
+A test reading the real account name or home folder: `getpass.getuser()`, `os.getlogin()`, `pwd.getpw*`, `Path.home()`, `os.path.expanduser("~...")` or `Path("~...").expanduser()`, or `USERNAME`/`USER`/`LOGNAME`/`LNAME`/`HOME`/`USERPROFILE`/`HOMEDRIVE`/`HOMEPATH` read through `os.environ[...]`, `os.environ.get` or `os.getenv`. Test modules only: on the developer's machine the real value is the expected one, so the test fails first on another host. Writes (`monkeypatch.setenv`) and `sys.executable` are not hits. Marker: `# host-identity-exempt: <reason>`, for a privacy check or a live-install guard.
+
+```python
+# bad
+def test_config_path():
+    assert config_path() == Path.home() / ".config" / "app.toml"
+
+# fixed: the synthetic_host fixture (tests/host/_synthetic_host.py)
+def test_config_path(synthetic_host):
+    assert config_path() == synthetic_host.home / ".config" / "app.toml"
+```
+
 #### `must-use`
 
 A call to a dotted name outside the file or files the repository declares as the one home for that job. Listing a `[[conventions_ratchet.must_use]]` entry is what turns the rule on; each entry takes `call` (a dotted name or a list), `helper`, `why` and an optional `paths` scope. The name is resolved through the module's imports (`import x as y`, `from x import f`). A method on an instance is not seen. `secret-compare` and `git-wrapper` are this same check with the call set built in. Marker: `# must-use-exempt: <reason>`.

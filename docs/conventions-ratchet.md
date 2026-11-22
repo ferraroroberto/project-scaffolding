@@ -10,7 +10,7 @@ It reuses the shape of the [dead code ratchet](dead-code-ratchet.md): an opt-in 
 
 Each rule is opted into by name in `rules`. A rule that needs the repo's own helper refuses to run until the helper is declared, so a repo without one is never flagged for not using it.
 
-**Test modules** (any file under a `tests/` or `test/` folder, `test_*.py`, `*_test.py`, `conftest.py`) are held to `no-window` and `browser-per-iteration` only. Fixtures legitimately spell drive paths, raw compares and raw git calls; a capture walk is as likely to live in a test as in a script.
+**Test modules** (any file under a `tests/` or `test/` folder, `test_*.py`, `*_test.py`, `conftest.py`) are held to `no-window` and `browser-per-iteration` only. Fixtures legitimately spell drive paths, raw compares and raw git calls; a capture walk is as likely to live in a test as in a script. `host-identity` is the other way round: it reads test modules only.
 
 ### `no-window`
 
@@ -207,6 +207,36 @@ The loop's iterable and its `else` run once and are not the body. A function def
 Two loops are legitimate and take `# browser-per-iteration-exempt: <reason>`: a retry that waits out a locked profile (at most one launch ever succeeds), and a case whose point is a clean cache or a fresh storage state per pass (a payload table where each row must start unauthenticated). A comment marker with no reason exempts nothing.
 
 **Enabling it in a repo that has hits today.** Add `"browser-per-iteration"` to `rules` and record today's hits with `--update-baseline --allow-additions` (or `--init` when there is no baseline yet). Fix the walks first: move the context above the loop and call `walk.visit(url)` between captures.
+
+### `host-identity`
+
+> **Tests read host identity only through a synthetic fixture**: a fake account name, a fake home folder and a fake interpreter path (`tests/host/_synthetic_host.py`), never the machine's own.
+
+A test that reads the real account name or home folder passes on the developer's machine, because there the real value is the expected one, and fails on every other host: a macOS runner rendered the account name in WebKit, a CI box had a different home. Each such failure surfaced a day late, in a nightly, in one repo. The fix is the vendored `tests/host/_synthetic_host.py` (manifest key `synthetic_host`), whose `synthetic_host` fixture points `HOME`, `USERPROFILE`, `HOMEDRIVE`/`HOMEPATH` and the account variables at a fake home under the test's `tmp_path` and returns `SyntheticHost(account, home, python)`. A repo registers it once, in `tests/conftest.py`:
+
+```python
+from tests.host._synthetic_host import synthetic_host  # noqa: F401 -- registers the fixture
+```
+
+A hit, in a test module only, is:
+
+- `getpass.getuser()`, `os.getlogin()` or any `pwd.getpw*` call;
+- `Path.home()` (any `pathlib` path class), `os.path.expanduser("~...")`, or `.expanduser()` on a `Path("~...")`;
+- `USERNAME`, `USER`, `LOGNAME`, `LNAME`, `HOME`, `USERPROFILE`, `HOMEDRIVE` or `HOMEPATH` read through `os.environ[...]`, `os.environ.get(...)` or `os.getenv(...)`.
+
+Names are followed through import aliases. It is not reported when:
+
+- the test writes the variable (`monkeypatch.setenv`, `monkeypatch.delenv`, `os.environ["HOME"] = ...`, `del os.environ[...]`): that is how a test fakes the host;
+- the value is one the scanner cannot see: a variable passed to `expanduser`, a copied `env` dict (a miss, never a guess);
+- the code is not a test module: app code reads the real host on purpose.
+
+`sys.executable` is not a hit. Nearly every read of it in fleet tests spawns a child or compares the path with itself, which works on any host; the breakage is a test that asserts on the path's shape (a Windows `.venv\Scripts\python.exe`), and such a test asserts on `synthetic_host.python` instead. `os.getlogin()` and `pwd` read the operating system rather than the environment, so the fixture cannot fake them: a test never calls them.
+
+Two kinds of read are legitimate and take `# host-identity-exempt: <reason>`: a privacy check that compares output against the real home or account on purpose (the screenshot helper `tests/e2e/_shot.py` does), and a guard over the live install on this machine (a hook file under the real home). A marker with no reason exempts nothing.
+
+**The e2e half.** The harness starts the app under test with `synthetic_host_env(os.environ, root)`, a copy of the environment pointing at the same synthetic home, and the screenshot privacy check fails a page that shows `SYNTHETIC_ACCOUNT` as well as one that shows the real home. An app that renders the account name in any form therefore fails on the developer's own machine before merge. The synthetic home applies only to fixture users and that app process, never to the whole gate: git, pip and Playwright read their own settings from the real home.
+
+**Enabling it in a repo that has hits today.** Vendor `tests/host/_synthetic_host.py`, register the fixture in `tests/conftest.py`, add `"host-identity"` to `rules` and record today's hits with `--update-baseline --allow-additions` (or `--init` when there is no baseline yet). Then move each test onto the fixture, or mark the deliberate live-host and privacy checks, so the baseline reaches zero.
 
 ### `must-use`
 
@@ -473,6 +503,7 @@ A read-only dry run with **every rule on** over every fleet checkout (42 repos),
 | `no-pwsh-stub` | 28 | 5 (of 44) | all | 24 of 28 are the stub run as a command in a gate or restart line: the gate command in `CLAUDE.md` and the README, `docs/` pages, and `scripts/*.ps1` usage banners. 4 are a kind a marker covers: 3 `run: pwsh -File` steps in CI workflows, where a hosted runner has a real `pwsh`, and 1 `Get-Command pwsh` lookup. 8 more sit under `tests/` folders, which the rule skips. |
 | `subprocess-timeout` | 128 (24 are in scaffold scripts: 18 in adopters' copies of `gen_tailscale_cert.py`, 5 in `classify_e2e.py` (the scaffold's own 2 since fixed) and 1 in a `gen_ssl_cert.py`) | 21 (of 44) | 14 of the 104 hits outside the scaffold-script copies, every 7th, source read | 12 of 14: a `git`, `ffmpeg`, `ffprobe`, `clip`, `systemctl`, `launchctl` or Ghostscript call that waits on a child with no bound. 2 are a kind a marker covers: foreground runners that block for the child's life. The issue's own hand sample found 8 of 10 real, 2 deliberate. Vendored destinations and test modules are not read. |
 | `browser-per-iteration` | 6 | 5 (of 45) | all | 6 of 6 are a browser or context opened inside a loop. 2 are a retry that waits out a busy profile (one launch ever succeeds): a marker covers them. 4 are a context per pass: a screenshot walk of every page at every device size, a table of nine payloads, two colour schemes, two recording roles. Run over each repo's tracked Python files with the rule forced on, read-only, vendored copies not excluded. |
+| `host-identity` | 31 outside the scaffold (the scaffold's own 2 moved to the fixture or marked) | 8 (of 47) | all 31, source read | 12 of 31 belong on the fixture: 8 compare a default path the code builds against `Path.home()`, 2 fixture apps read the real `~/.claude.json`, 1 uses the home as an arbitrary working directory, 1 passes a real home path as a test argument. 19 are a kind a marker covers: 14 guard the live install on this machine (a tray helper, hook files, a design spec under the real home), and 5 are privacy checks comparing output with the real home or account. Run over each repo's tracked Python files with the rule forced on, read-only, `[vendored]` copies excluded. |
 | `state-literal` | app-launcher 55, home-automation 9, local-llm-hub 15, whatsapp-radar 21 (100) | 4 of 4 | 42 sampled at random (10 to 12 per repo), source read | 38 of 42 are a lifecycle status compared or stored outside any declared machine (a job record's `"running"`, a run's `"failed"`, a container's `"running"`, a transcription's `"done"`). 4 are a remote API's vocabulary translated at the boundary (a GitHub run's `in_progress`, a vehicle's `online`), the spot a derive function belongs: declare it or mark it. A wider probe that did not require a state-named holder counted 74 / 44 / 30 in the first three repos |
 | `state-set-repeat` | app-launcher 4, others 0 | 1 of 4 | all | 4 of 4: one job record's active set (`running`, `pending`) spelled in three modules |
 | `state-write` | local-llm-hub 2, others 0 | 1 of 4 | all | 2 of 2: the serving state's `load.ready` written both in its declared module and in the backend process module. Keyed by attribute name alone (no receiver) it reported 4, 2 of them two unrelated classes sharing a `ready` field |
@@ -497,5 +528,7 @@ The false-positive kinds that remain:
 `tests/ratchets/test_conventions_state.py` covers the three state rules on throwaway git repos: a hit, a miss, the exempt marker (a marked site is not reported but still counts as a second home) and the declared module's exemption for each, the `Enum`, `Literal` and `frozenset` spellings, and the `[[state_machines]]` table: every malformed entry exits 2, and a declared module, type or derive function that is not there exits 3.
 
 `tests/ratchets/test_conventions_state_js.py` covers the same rules in JavaScript and TypeScript: each comparison, store, `switch`, `includes` and `Set.has` form; the misses (a union type, comments, plain template text, a regex holding a quote, a JSX apostrophe); code inside a `${...}` interpolation; the `//` and `/* */` markers; test modules and minified bundles skipped; arrays, unions, `enum`s and enum-shaped objects as sets, records not; a JS site counting a Python spelling while the Python site does not; JS flag writes and their misses; a declared JS module's exemption and name resolution; and exit 3 for a file the tokenizer cannot read.
+
+`tests/ratchets/test_conventions_host_identity.py` covers `host-identity`: every call, `~` expansion and environment-read spelling failing by name in a test, the same test written against the fixture passing, writes, unseen values, other variable names, `sys.executable` and app code not reported, the reasoned marker, and a seeded throwaway repo failing the gate on a new direct read. `tests/host/test_synthetic_host.py` proves the fixture: `getpass.getuser()`, `Path.home()` and `expanduser("~")` answer with the fake values, and the child environment keeps everything else.
 
 `tests/ratchets/test_conventions_must_use.py` covers `must-use`: the entry shape and every config error, import aliases and dotted modules, the helper, `paths` and test-module scope, several entries counted under one rule, the two built-in policies reporting beside a declared one, and the gate on a throwaway repo (a new hit failing by rule, file and line, a baseline burned down to zero, a bad entry exiting 2 in every mode).

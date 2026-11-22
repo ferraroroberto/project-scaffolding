@@ -9,13 +9,19 @@ Engine note: this is the *Streamlit instance* of the boot-or-adopt harness
 rule in ``CLAUDE.md`` ("End-to-end UI testing"). A FastAPI / Flask project
 swaps the launch command and the health path; the kill-port / wait-health
 shape is identical.
+
+The app runs under ``synthetic_host_env()`` (``tests/host/_synthetic_host.py``): a fake
+account name and home folder, so the screenshot privacy check can find an account
+name the app renders on the developer's own machine.
 """
 
 from __future__ import annotations
 
+import os
 import socket
 import subprocess
 import sys
+import tempfile
 import time
 import urllib.error
 import urllib.request
@@ -25,6 +31,7 @@ from pathlib import Path
 
 from src.no_window import NO_WINDOW
 from tests._port_probe import listening_pids
+from tests.host._synthetic_host import synthetic_host_env
 
 _ROOT = Path(__file__).resolve().parent.parent
 _APP = _ROOT / "app" / "app.py"
@@ -35,6 +42,8 @@ _MARKER = Path(__file__).resolve().parent / "_streamlit_restart_marker.txt"
 STREAMLIT_E2E_PORT = 8766
 
 _HEALTH_TIMEOUT = 30.0
+# One fixed folder, reused by every boot, so repeated runs do not pile up synthetic homes in the temp dir.
+_SYNTHETIC_ROOT = Path(tempfile.gettempdir()) / "e2e-synthetic-host"
 
 
 def port_is_in_use(port: int) -> bool:
@@ -112,6 +121,7 @@ def ensure_fresh_streamlit(port: int = STREAMLIT_E2E_PORT) -> str:
             "--browser.gatherUsageStats", "false",
         ],
         cwd=str(_ROOT),
+        env=synthetic_host_env(os.environ, _SYNTHETIC_ROOT),
         creationflags=NO_WINDOW,
     )
     base_url = f"http://localhost:{port}"

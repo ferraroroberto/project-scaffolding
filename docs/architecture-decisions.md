@@ -47,6 +47,16 @@ Enforcement: the [test value ratchet](test-value-ratchet.md) and its siblings (`
 
 Issue: https://github.com/ferraroroberto/project-scaffolding/issues/858
 
+### Tests read host identity only through a synthetic fixture
+
+A test never reads the machine's account name, home folder or interpreter path. Unit tests take the vendored `synthetic_host` fixture, which provides a fake account, a fake home under `tmp_path` and a fake interpreter path. The e2e harness boots the app under test with `synthetic_host_env()`, and the screenshot privacy check fails a page that shows the synthetic account name as well as one that shows the real home. The synthetic home covers only fixture users and that app process, never the whole gate. `sys.executable` stays the way tests spawn children.
+
+Why: on the developer's machine the real value is the expected one, so a host-reading test passes there and fails first on another host (the macOS nightly), a day late and one repo at a time.
+
+Enforcement: the [conventions ratchet](conventions-ratchet.md)'s test-only `host-identity` rule flags direct reads (`getpass.getuser()`, `os.getlogin()`, `pwd`, `Path.home()`, `~` expansion, account and home variables read through `os.environ`/`os.getenv`). A deliberate privacy check or live-install guard carries `# host-identity-exempt: <reason>`.
+
+Issue: https://github.com/ferraroroberto/project-scaffolding/issues/912
+
 ### Every UX control is tracked in usage-log
 
 Every feature that touches the UX is tracked in the app's `usage-log` and ingested by its `/api/usage` routes: each interactive control carries a constant tracking id, each sheet, dialog and drawer records its view on open and returns to the previous view on close, and every fleet web app initialises `usage-log` and mounts its routes. Ids are constants, never built from content.

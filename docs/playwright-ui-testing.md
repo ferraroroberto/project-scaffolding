@@ -871,6 +871,17 @@ proc = subprocess.Popen([sys.executable, "-m", "uvicorn", "app.webapp.server:app
 
 **This scaffold's own harness complies by spawning nothing that resolves runtime data.** `tests/e2e/test_vendored_usage_log.py` serves the vendored router in-process over an explicit temp path (`usage_router(tmp_path / "usage.sqlite3")`, never `runtime_db_path`), and the Streamlit example app that `ensure_fresh_streamlit` boots persists nothing through `runtime_data`. The day a scaffold harness boots something that calls `runtime_db_path`, it sets `<APP>_DATA_DIR` as above.
 
+### Synthetic host identity (`synthetic_host`)
+
+A test that reads the machine's account name, home folder or interpreter path passes on the developer's machine, because there the real value is the expected one, and fails on every other host: a macOS nightly rendered the account name in WebKit, another asserted on a Windows interpreter path. **The rule: tests read host identity only through the vendored `tests/host/_synthetic_host.py` (manifest key `synthetic_host`).**
+
+- Unit tests take the `synthetic_host` fixture (registered once in `tests/conftest.py`). It points the account and home variables at a fake home under `tmp_path` and returns `SyntheticHost(account, home, python)`; a test that displays or asserts on an interpreter path uses `synthetic_host.python`, while spawning still goes through `sys.executable`.
+- The harness boots the app under test with `env=synthetic_host_env(os.environ, root)`, so the app sees the same fake account and home. The screenshot privacy check in `tests/e2e/_shot.py` then fails a page that shows `SYNTHETIC_ACCOUNT` in any spelling, as well as one that shows the real home: an app that renders the account name fails on Windows before merge, not first on another host.
+- The synthetic home applies only to fixture users and the booted app, never to the whole gate: git, pip and the Playwright browser install read their settings from the real home.
+- The conventions ratchet's `host-identity` rule flags a test that reads the host directly; a deliberate privacy check or live-install guard takes `# host-identity-exempt: <reason>`. Rule and limits: [conventions-ratchet.md](conventions-ratchet.md).
+
+This scaffold's `ensure_fresh_streamlit` (`tests/_streamlit_lifecycle.py`) boots the example app that way.
+
 ### Mobile projection (phone-first apps only)
 
 If the app's primary surface is a phone, add a second projection:
@@ -1146,7 +1157,8 @@ vendored files do it:
   app whose theme is an explicit toggle sets it in `prepare(page, variant)`.
   `shot()` waits for the network, fonts, images, every finite animation and
   three still frames before it captures, and refuses a page whose clock is
-  not pinned or whose text shows this machine's home folder. A screen that
+  not pinned or whose text shows this machine's home folder or the synthetic
+  account name (see "Synthetic host identity" above). A screen that
   needs driving first opens `variant_page(browser, variant)` and calls
   `shot()` itself. Add `CHROMIUM_CAPTURE_ARGS` to the suite's
   `browser_type_launch_args` (this repo's `tests/e2e/conftest.py` shows
@@ -1471,6 +1483,7 @@ Optional, lives at `tests/e2e/`. Don't create the folder until the first regress
 - What the flag permits differs per repo — don't conflate: `app-launcher`'s `LAUNCHER_E2E_LIVE` = read-only assertions against the live tray, never a kill (`_require_live_tray` guard; `--e2e-autoboot` never adopts the live session-host on `:8446`, always spawns its own on a free port). This scaffold's `STREAMLIT_E2E_LIVE` = kill-and-restart via `ensure_fresh_streamlit`, legitimate only because the target is a stateless, cheap-to-restart dev server *and* goes through this repo's own canonical restart helper, never a by-hand kill. A repo adopting the vendored guard picks its own meaning, documented in the guard's exit message pointing at that repo's CLAUDE.md. **Log** which instance (disposable vs acted-on-live) the suite is driving and why, so a hung run is diagnosable from its own output.
 - Isolate anything stateful — never adopt-and-mutate a host holding the user's live work, even under the live opt-in. The reclaim-on-opt-in rule is safe only for a stateless, cheap-to-restart webapp. A host owning user state or child processes (session-host, worker with in-flight jobs, PTY host) must **always** get the harness's own disposable instance on a free port, injected via env override — never the live fixed port, opt-in or not. Litmus test: is the thing I'd be touching holding work the user would be upset to lose? If yes, isolate unconditionally. Same bar — a destructive test scopes to what it created: snapshot pre-existing ids before acting, kill only the delta, never `.first`/"whatever's in the list".
 - Is a `/propagate-vendored` component: `tests/e2e/_e2e_live_guard.py` (manifest key `e2e_live_guard`). The policy — check target port, refuse (`pytest.exit`, naming the flag) if occupied with no opt-in, else log the decision — is shape-independent; only the port number, flag name, and how the disposable instance boots are call-site parameters. Same vendoring pattern as `app/tray/single_instance.py` and `tests/e2e/_geometry.py`: copy the file byte-identical into an app's `tests/e2e/`, call `require_disposable_instance(port, flag_env_name)` from the fixture, let `/propagate-vendored e2e_live_guard` hash-verify and re-vendor fleet-wide. (`tray_lifecycle.ps1` is NOT a valid precedent — it is one shared machine-local copy, not vendored.) Adopter records the entry in its own `.fleet.toml`'s `[vendored]` table — never here.
+- Boot the app with `synthetic_host_env()` and read host identity in tests only through the `synthetic_host` fixture (vendored `tests/host/_synthetic_host.py`); the conventions ratchet's `host-identity` rule flags direct reads.
 - Boot failure is a hard failure — never `pytest.skip`. A suite that skips when the app isn't up reports green on a build it never tested. Skip is fine for the ad-hoc "use whatever tray I have running" path; the pre-ship path must fail loud.
 - Keep the suite small — target < 15 tests total. Tempted to add a 20th → delete two first.
 - No Page Object Model. Too much ceremony for this size.
