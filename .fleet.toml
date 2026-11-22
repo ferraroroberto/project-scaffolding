@@ -320,6 +320,7 @@ paths          = [
     "tests/e2e/_code_listing_checks.py",
     "tests/e2e/_day_checks.py",
     "tests/e2e/components/_fullscreen_checks.py",
+    "tests/e2e/components/test_page_foot.py",
     "tests/e2e/_mic_notice_checks.py",
     "tests/e2e/_settings_group_checks.py",
     "tests/e2e/test_vendored_base.py",
@@ -329,6 +330,7 @@ paths          = [
     "tests/e2e/test_vendored_row_menu.py",
 ]
 pytest_targets = [
+    "tests/e2e/components/test_page_foot.py",
     "tests/e2e/test_vendored_base.py",
     "tests/e2e/test_vendored_components.py",
     "tests/e2e/test_vendored_home_head.py",
@@ -347,6 +349,7 @@ prefixes       = ["tests/e2e/fixtures/geometry/"]
 paths          = ["tests/e2e/_geometry.py", "tests/e2e/test_geometry_helper.py"]
 pytest_targets = [
     "tests/e2e/test_geometry_helper.py",
+    "tests/e2e/components/test_page_foot.py",
     "tests/e2e/test_harness_helpers.py",
     "tests/e2e/test_vendored_components.py",
     "tests/e2e/test_vendored_home_head.py",
