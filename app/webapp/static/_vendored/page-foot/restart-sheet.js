@@ -199,6 +199,7 @@ function makeTappable(readout, open) {
 function wireSheet(sheet, targets, deps, reload) {
   let armed = false;
   let busy = false;
+  let refreshing = false;
   const chosen = () => {
     const id = sheet.picker ? sheet.picker.value : targets[0].id;
     return targets.find((t) => t.id === id) || targets[0];
@@ -239,7 +240,7 @@ function wireSheet(sheet, targets, deps, reload) {
   };
 
   sheet.confirm.addEventListener('click', () => {
-    if (busy) return;
+    if (busy || refreshing) return;
     const target = chosen();
     if (target.warning && !armed) {
       armed = true;
@@ -253,11 +254,46 @@ function wireSheet(sheet, targets, deps, reload) {
     say('Restarting…');
     runRestart(deps, ui, target);
   });
-  if (sheet.picker) sheet.picker.addEventListener('change', () => { if (!busy) reset(); });
+  if (sheet.picker) sheet.picker.addEventListener('change', () => { if (!busy && !refreshing) reset(); });
   sheet.close.addEventListener('click', () => sheet.dialog.close());
-  return () => {
-    if (!busy) reset();
+  // Re-reads the target list so a warning that depends on live state is the
+  // one true now. A failed read keeps the list the page already has.
+  const refresh = async () => {
+    let fresh = null;
+    try { fresh = (await deps.fetchJson(deps.endpoint)).targets; } catch (_) { fresh = null; }
+    if (!Array.isArray(fresh)) return;
+    for (const next of fresh) {
+      const known = targets.find((t) => t.id === next.id);
+      if (known) {
+        known.label = next.label;
+        known.warning = next.warning;
+      }
+    }
+    if (sheet.picker) {
+      for (const option of sheet.picker.children) {
+        const known = targets.find((t) => t.id === option.value);
+        if (known) option.textContent = known.label;
+      }
+    }
+  };
+  // The confirm button is held until the read lands, so a tap can never act on
+  // the warning the page loaded with. Resolves once the sheet is ready.
+  return async () => {
+    if (busy) {
+      sheet.dialog.showModal();
+      return;
+    }
+    reset();
     sheet.dialog.showModal();
+    if (refreshing) return;
+    refreshing = true;
+    setLocked(true, chosen().label);
+    try {
+      await refresh();
+    } finally {
+      refreshing = false;
+    }
+    if (!busy) reset();
   };
 }
 

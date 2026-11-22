@@ -87,7 +87,7 @@ app.include_router(restart_router(
 ```
 
 - **Auth is the app's.** `guard` is required and has no default: the same dependency that protects the app's other write routes, so any signed-in client may restart and nobody else can. The `POST` also needs an `Origin` matching the request's host, so another site cannot post a restart from a signed-in browser.
-- **Only declared targets run.** Targets are declared in code, each a fixed argv run from the checkout root; the client sends a target id, never a command. `TRAY_RESTART` is the repo's own `tray.bat --restart`, spelled `cmd.exe /c .\tray.bat --restart` because `cmd` does not search the working directory when `NoDefaultCurrentDirectoryInExePath=1`. A target with a `warning` makes the sheet ask twice and show it. More than one target adds a picker (`data-track="build.restart-target"`).
+- **Only declared targets run.** Targets are declared in code, each a fixed argv run from the checkout root; the client sends a target id, never a command. `TRAY_RESTART` is the repo's own `tray.bat --restart`, spelled `cmd.exe /c .\tray.bat --restart` because `cmd` does not search the working directory when `NoDefaultCurrentDirectoryInExePath=1`. A target with a `warning` makes the sheet ask twice and show it. The `warning` is a string or a zero-argument callable: a callable runs on every `GET /api/restart`, so a warning that depends on live state ("this ends 3 live sessions") is current. A callable that raises degrades to a generic non-empty warning, never to none. More than one target adds a picker (`data-track="build.restart-target"`).
 - **The runner leaves the tray's tree.** `tray.bat --restart` kills the tray's whole tree, webapp included, so the runner starts through `cmd /c start` and is no one's child when the kill comes. It runs the recipe with the target's timeout (default 180 s) and writes `last.json` (the record) and `last.log` (the recipe's output) under `status_dir`.
 - **The recipe runs from the launch spelling.** The checkout root comes from the process's own `sys.prefix`, which keeps the path spelling the tray was started from; `Path.resolve()` would replace a junctioned fleet root with its target.
 - **One run at a time.** A `POST` while a run is in flight answers `409`. A record still `running` 30 s past its timeout reads `unknown`, the runner having vanished, and frees the slot.
@@ -102,6 +102,8 @@ app.include_router(restart_router(
 import { initRestartSheet } from '/static/_vendored/page-foot/restart-sheet.js';
 initRestartSheet();   // or initRestartSheet({ fetchJson: jsonApi }) when reads carry a bearer
 ```
+
+Each time the sheet opens it re-reads `GET /api/restart` and takes the targets' labels and warnings from that answer, with the confirm button held until the read lands, so the warning shown is the one true at that moment and an adopter needs no re-read of its own. A failed re-read keeps the list the page loaded with. Targets that appear or disappear after page load are not picked up until the next load.
 
 The sheet needs the `modal`, `button`, `icon-button` and (with a picker) `select-native` stylesheets. Add `app.restart-sheet` to the app's UX surface map.
 

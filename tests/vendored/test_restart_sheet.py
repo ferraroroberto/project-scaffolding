@@ -109,6 +109,23 @@ def test_a_warned_target_asks_twice(probe: dict[str, Any]) -> None:
     assert (run["note"], run["tone"]) == ("Stops the running jobs.", "warning")
 
 
+def test_the_warning_is_the_one_true_when_the_sheet_opens(probe: dict[str, Any]) -> None:
+    run = probe["warning_follows_live_state"]
+    # Read 1 (page load) said 3 sessions; read 2 (the open) said 6.
+    assert (run["note"], run["tone"]) == ("This ends 6 live sessions.", "warning")
+    assert run["labels"] == ["Restart hub", "Restart anyway"]
+    assert run["posted"] is None
+
+
+def test_confirm_is_held_while_the_open_reads_the_targets(probe: dict[str, Any]) -> None:
+    assert probe["warning_follows_live_state"]["lockedWhileReading"] is True
+
+
+def test_a_failed_reread_keeps_the_warning_the_page_loaded_with(probe: dict[str, Any]) -> None:
+    run = probe["warning_kept_when_the_reread_fails"]
+    assert (run["note"], run["tone"]) == ("This ends 3 live sessions.", "warning")
+
+
 def test_the_readouts_hit_area_has_slack_for_webkit_line_box_snapping() -> None:
     css = (MODULE.parent / "restart-sheet.css").read_text(encoding="utf-8")
     assert "/ -2 - 0.5px) 0;" in css

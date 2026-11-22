@@ -69,7 +69,7 @@ const outcomes = {
 
 // One scripted run: `versions` and `records` are served in order (the last
 // repeats); `post` is the POST answer; returns what the page showed.
-async function scenario({ targets, post, versions, records, taps = 1, getFails = false }) {
+async function scenario({ targets, post, versions, records, taps = 1, getFails = false, targetsAt = null, failAfter = null }) {
   readout = element('p');
   body.children = [];
   let clock = 0;
@@ -77,11 +77,15 @@ async function scenario({ targets, post, versions, records, taps = 1, getFails =
   let posted = null;
   let v = 0;
   let r = 0;
+  let gets = 0;
   const fetchJson = async (url) => {
     if (url === '/api/restart') {
-      if (getFails) { const e = new Error('HTTP 404'); e.status = 404; throw e; }
+      gets += 1;
+      if (getFails || (failAfter !== null && gets > failAfter)) {
+        const e = new Error('HTTP 404'); e.status = 404; throw e;
+      }
       const last = records ? records[Math.min(r++, records.length - 1)] : null;
-      return { targets, last };
+      return { targets: targetsAt ? targetsAt(gets) : targets, last };
     }
     const next = versions[Math.min(v++, versions.length - 1)];
     if (next === null) throw new Error('down');
@@ -101,7 +105,9 @@ async function scenario({ targets, post, versions, records, taps = 1, getFails =
   const confirm = card.children[card.children.length - 1].children[0];
   const note = card.children.find((c) => c.className === 'restart-sheet-note');
   const log = card.children.find((c) => c.className === 'restart-sheet-log');
-  readout.listeners.click();
+  const opening = readout.listeners.click();
+  const lockedWhileReading = confirm.disabled;
+  await opening;
   const labels = [confirm.textContent];
   const notes = [];
   for (let i = 0; i < taps; i += 1) {
@@ -119,6 +125,7 @@ async function scenario({ targets, post, versions, records, taps = 1, getFails =
     readoutClasses: readout.classes,
     tracks: card.children.flatMap((c) => [c, ...c.children]).map((c) => c.dataset.track).filter(Boolean),
     labels,
+    lockedWhileReading,
     notes,
     note: note.textContent,
     tone: note.dataset.tone || null,
@@ -150,6 +157,16 @@ const result = {
   refused: await scenario({ targets: app, post: { status: 401, body: null }, versions: [before] }),
   busy: await scenario({ targets: app, post: { status: 409, body: { restart_id: 'r0' } }, versions: [before] }),
   warned_once: await scenario({ targets: [risky[1]], post: accepted, versions: [before], records: [null], taps: 1 }),
+  // The live count moves between the page load (read 1) and the open (read 2).
+  warning_follows_live_state: await scenario({
+    targets: [], post: accepted, versions: [before], records: [null], taps: 1,
+    targetsAt: (read) => [{ id: 'hub', label: 'Restart hub', warning: 'This ends ' + (read * 3) + ' live sessions.' }],
+  }),
+  // A read that fails at open keeps the warning the page loaded with.
+  warning_kept_when_the_reread_fails: await scenario({
+    targets: [], post: accepted, versions: [before], records: [null], taps: 1, failAfter: 1,
+    targetsAt: () => [{ id: 'hub', label: 'Restart hub', warning: 'This ends 3 live sessions.' }],
+  }),
   picker: await scenario({ targets: risky, post: accepted, versions: [before, fresh],
     records: [null, { id: 'r1', state: 'ok', exit_code: 0 }] }),
 };
