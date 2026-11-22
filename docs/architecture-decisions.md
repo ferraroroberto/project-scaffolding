@@ -77,6 +77,16 @@ Enforcement: the [UX surface ratchet](ux-surface-ratchet.md) fails the ship on a
 
 Issue: https://github.com/ferraroroberto/project-scaffolding/issues/838
 
+### Polling web apps keep a request budget
+
+Every fleet web app that polls its own API holds to a [request budget](polling-budget.md), so it stays responsive on a slower computer with several sessions open: polls are self-scheduling and single-flight (the vendored `poll` helper), a hidden tab makes no requests and returns with one catch-up read, unchanged files cost a stat, work runs in bounded pools by class, fleet-wide scans are capped and run only while viewed, and every request reports `queue_ms`/`worker_ms`/`total_ms` through the vendored request-timing middleware. Every limit (poll intervals, pool sizes, scan TTLs, concurrency caps) is an owner setting in the app's Settings with sensible defaults, never a constant only code can change.
+
+Why: on a slower computer one app reached 10–37 s per request with 17+ in flight, from repeated directory walks, re-parses of unchanged files, overlapping browser polls and one shared thread pool. The same shapes exist in other fleet apps; a faster computer hides the waste rather than removing it.
+
+Enforcement: the [request budget ratchet](request-budget-ratchet.md) fails the ship on a new fixed-rate fetch poll, a poll under the 2 s floor, an undeclared fast server loop, a directory walk in a request handler, a submit to the shared default pool, or a web app without the timing middleware; existing gaps sit in each repo's baseline and only shrink. In the browser tests, the vendored request-budget probe counts requests for a minute visible and a minute hidden on a fake clock.
+
+Issue: https://github.com/ferraroroberto/project-scaffolding/issues/914
+
 ### Fleet web apps use inset list sections, swipe on inset rows and one Filters & sort sheet
 
 Fleet web apps lay lists out as **inset** sections (rounded cards inside the page gutter) on phone and desktop; a full-bleed list section is not used.

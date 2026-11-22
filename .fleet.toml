@@ -74,8 +74,9 @@ full_pytest_target    = "tests/e2e"
 # Suite-size ratchet in collected pytest nodes, read by fleet-config's /e2e
 # budget step (not classify_e2e.py); adopters set their own count, or omit it
 # for the scaffold's default of 15 (#260). This repo ratchets at its current
-# 16 nodes (no redundancy found in the audit); lower it as the suite trims.
-test_budget           = 16
+# 16 nodes (no redundancy found in the audit) plus the poll helper's budget probe;
+# lower it as the suite trims.
+test_budget           = 17
 
 # Inert image/font assets under the vendored static tree -> smoke is enough.
 [[e2e.rule]]
@@ -231,6 +232,10 @@ path = ".runtime-write-ratchet-baseline.json"
 [[e2e.rule]]
 tier = "none"
 path = ".usage-track-ratchet-baseline.json"
+# Likewise the request-budget-ratchet baseline.
+[[e2e.rule]]
+tier = "none"
+path = ".request-budget-ratchet-baseline.json"
 [[e2e.rule]]
 tier = "none"
 path = "LICENSE"
@@ -383,6 +388,14 @@ pytest_targets = ["tests/e2e/test_vendored_sign_in.py"]
 # The screenshot baseline: the comparison, its proof and the committed PNGs.
 # The capture helper tests/e2e/_shot.py stays out: conftest imports it, so an
 # edit there runs the whole suite.
+# The poll helper and the request-budget probe that proves it; the probe page is a
+# route of the test itself, so no other harness reads either.
+[[e2e.surface]]
+name           = "poll"
+prefixes       = ["app/webapp/static/_vendored/poll/"]
+paths          = ["tests/e2e/budget/_request_budget.py", "tests/e2e/budget/test_vendored_poll.py"]
+pytest_targets = ["tests/e2e/budget/test_vendored_poll.py"]
+
 [[e2e.surface]]
 name           = "shot-baseline"
 prefixes       = ["tests/e2e/shots/"]
@@ -634,6 +647,26 @@ exclude = [
 enabled = false
 
 # ---------------------------------------------------------------------------
+# Request budget ratchet. scripts/verify-before-ship.ps1 runs
+# scripts/request_budget_ratchet.py, which fails when a fixed-rate browser poll
+# that reaches the server, a poll under the 2 s floor, an undeclared fast server
+# loop, a directory walk in a request handler, a submit to the shared default
+# pool, or a web app without the request-timing middleware is new beyond the
+# committed baseline. Opt-in per repo through this table, like
+# [usage_track_ratchet]; every rule is on unless `rules` narrows it.
+# `[[request_budget.loops]]` declares a background loop that must run while
+# nobody is viewing; `[request_budget] visible_requests_per_minute` is the
+# browser probe's budget (tests/e2e/budget/_request_budget.py). The scaffold has no
+# request handlers, so it declares no handler_dirs (scan-per-request prints OFF),
+# and it baselines its six hits: the build-watch poll, four loops whose interval
+# is a caller's argument (the log panel, the tray watchdog's two, the resource
+# probe's breadcrumb), and the usage-log adapter's sub-app, which the host app's
+# own middleware times. Mechanism + limits:
+# docs/request-budget-ratchet.md; the rules and why: docs/polling-budget.md.
+[request_budget_ratchet]
+enabled = true
+
+# ---------------------------------------------------------------------------
 # Test value ratchet and weekly burst. scripts/test_value_ratchet.py checks a
 # gate run recorded by scripts/unit_ledger.py: a new test unit shows its value
 # (red before the fix, a covered line no other unit covers, or an exempt
@@ -736,6 +769,8 @@ day-marks       = { src = "app/webapp/static/_vendored/day-marks" }
 usage-log       = { src = "app/webapp/static/_vendored/usage-log" }
 # The one password sign-in sheet; conventions_ratchet's password-input-vendored rule holds apps to it.
 sign-in         = { src = "app/webapp/static/_vendored/sign-in" }
+# Self-scheduling, single-flight polls that pause on a hidden tab; the request budget ratchet holds apps to it.
+poll            = { src = "app/webapp/static/_vendored/poll" }
 
 # Web-page (static site) components (app/site/static/_vendored/) -- see that dir's README.
 site-tokens      = { src = "app/site/static/_vendored/site-tokens" }
@@ -778,6 +813,8 @@ shot_capture    = { src = "tests/e2e/_shot.py", requires = ["synthetic_host"] }
 # (conventions_ratchet's host-identity rule); the adopter's tests/conftest.py imports its fixture.
 synthetic_host  = { src = "tests/host/_synthetic_host.py" }
 layout_lint     = { src = "tests/e2e/_layout_lint.py" }
+# A minute visible, a minute hidden on a fake clock, API requests counted by path (docs/polling-budget.md).
+request_budget_probe = { src = "tests/e2e/budget/_request_budget.py" }
 # The resource soak (needs `resource_probe`); not a browser helper, so it lives in its own tests/soak/ folder.
 resource_soak   = { src = "tests/soak/_resource_soak.py" }
 
@@ -810,6 +847,9 @@ usage_track_scan = { src = "scripts/usage_track_scan.py" }
 # the page generator adopters run); `requires` makes /propagate-vendored carry all three.
 ux_surface_ratchet = { src = "scripts/ux_surface_ratchet.py", requires = ["usage_track_scan", "ux_surface_map"] }
 ux_surface_map  = { src = "scripts/ux_surface_map.py" }
+request_budget_ratchet = { src = "scripts/request_budget_ratchet.py", requires = ["request_budget_scan"] }
+# request_budget_ratchet loads this sibling (the JS and Python rule readers); `requires` makes /propagate-vendored carry both.
+request_budget_scan = { src = "scripts/request_budget_scan.py" }
 runtime_write_ratchet = { src = "scripts/runtime_write_ratchet.py", requires = ["runtime_write_resolve"] }
 # runtime_write_ratchet loads this sibling (the static path resolver); `requires` makes /propagate-vendored carry both.
 runtime_write_resolve = { src = "scripts/runtime_write_resolve.py" }
@@ -835,6 +875,8 @@ build_info      = { src = "src/build_info.py" }
 # The page-foot restart sheet's server half: declared targets, detached runner, recorded endings.
 self_restart    = { src = "src/self_restart.py" }
 usage_log       = { src = "src/usage_log.py" }
+# Server-Timing queue/worker split, slow and over-budget lines, timed named pools (docs/polling-budget.md).
+request_timing  = { src = "src/request_timing.py" }
 # The usage log behind a Starlette app (route adapter + owner-only reads); imports usage_log.
 usage_log_starlette = { src = "src/usage_log_starlette.py" }
 # The usage log's Cloudflare server half, for a public site served by a Worker (#540).

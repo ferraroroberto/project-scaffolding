@@ -14,6 +14,7 @@ from scripts import (
     comment_ratchet,
     conventions_ratchet,
     instruction_ratchet,
+    request_budget_ratchet,
     runtime_write_ratchet,
     static_ratchet,
     structure_ratchet,
@@ -47,6 +48,7 @@ def expected_rules() -> list[str]:
     return [
         *conventions_ratchet.RULES,
         *usage_track_ratchet.RULES,
+        *request_budget_ratchet.RULES,
         *instruction_ratchet.RULES,
         *instruction_ratchet.SHAPE_RULES,
         *static_ratchet.DEFAULT_RULES,
