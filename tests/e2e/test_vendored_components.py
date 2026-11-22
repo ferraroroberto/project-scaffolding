@@ -46,7 +46,6 @@ from tests.e2e._color_assertions import contrast as _contrast
 from tests.e2e._color_assertions import rgba as _rgba
 from tests.e2e._color_assertions import set_theme as _set_theme
 from tests.e2e._color_assertions import style as _style
-from tests.e2e.components._fullscreen_checks import run_fullscreen_cases
 from tests.e2e._geometry import (
     assert_min_target,
     assert_no_overlap,
@@ -59,6 +58,7 @@ from tests.e2e._settings_group_checks import (
     check_settings_group_long_select_value_keeps_its_row_in_webkit,
     run_settings_group_cases,
 )
+from tests.e2e.components._fullscreen_checks import run_fullscreen_cases
 from tests.e2e.conftest import STATIC_DIR
 
 _RANGE_ROWS = ("#demoRange2", "#demoRangeTabs", "#demoRange5")
