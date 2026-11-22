@@ -107,3 +107,8 @@ def test_a_warned_target_asks_twice(probe: dict[str, Any]) -> None:
     assert run["posted"] is None
     assert run["labels"] == ["Restart worker", "Restart anyway"]
     assert (run["note"], run["tone"]) == ("Stops the running jobs.", "warning")
+
+
+def test_the_readouts_hit_area_has_slack_for_webkit_line_box_snapping() -> None:
+    css = (MODULE.parent / "restart-sheet.css").read_text(encoding="utf-8")
+    assert "/ -2 - 0.5px) 0;" in css
