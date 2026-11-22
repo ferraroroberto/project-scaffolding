@@ -31,7 +31,13 @@ from contextlib import AbstractContextManager
 
 from playwright.sync_api import Browser, Page, Playwright, expect
 
-from tests.e2e import _action_row_avatar_checks, _code_listing_checks, _day_checks, _page_foot_checks, _review_rule_checks
+from tests.e2e import (
+    _action_row_avatar_checks,
+    _code_listing_checks,
+    _day_checks,
+    _page_foot_checks,
+    _review_rule_checks,
+)
 from tests.e2e._action_row_assertions import (
     assert_action_row,
     assert_action_row_colors,
