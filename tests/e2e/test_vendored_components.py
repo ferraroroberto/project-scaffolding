@@ -46,6 +46,7 @@ from tests.e2e._color_assertions import contrast as _contrast
 from tests.e2e._color_assertions import rgba as _rgba
 from tests.e2e._color_assertions import set_theme as _set_theme
 from tests.e2e._color_assertions import style as _style
+from tests.e2e._fullscreen_checks import run_fullscreen_cases
 from tests.e2e._geometry import (
     assert_min_target,
     assert_no_overlap,
@@ -829,7 +830,7 @@ def _check_dark_theme_values(gallery: Page) -> None:
     assert_action_row_split_meta(gallery)
 
 
-def test_gallery_component_contracts(new_gallery: Callable[[], AbstractContextManager[Page]], static_server: str, browser: Browser, playwright: Playwright) -> None:
+def test_gallery_component_contracts(new_gallery: Callable[[], AbstractContextManager[Page]], new_page: Callable[..., AbstractContextManager[Page]], static_server: str, browser: Browser, playwright: Playwright) -> None:
     """Every gallery component's contract, one case per component, each on a freshly loaded gallery."""
     with cases() as c:
         with c.case("card_contract"), new_gallery() as gallery:
@@ -892,6 +893,7 @@ def test_gallery_component_contracts(new_gallery: Callable[[], AbstractContextMa
             _day_checks.check_day_row_and_day_marks_contract(gallery=gallery)
         run_settings_group_cases(c, new_gallery)
         run_chip_cases(c, new_gallery, static_server)
+        run_fullscreen_cases(c, new_gallery, new_page, static_server)
         with c.case("select_native_boundary_renders_in_webkit"):
             check_select_native_boundary_renders_in_webkit(playwright, static_server)
         with c.case("settings_group_long_select_value_keeps_its_row_in_webkit"):

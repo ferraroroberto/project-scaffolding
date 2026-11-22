@@ -39,6 +39,7 @@
 <link rel="stylesheet" href="day-row/day-row.css">
 <link rel="stylesheet" href="day-marks/day-marks.css">
 <link rel="stylesheet" href="text-size/text-size.css">
+<link rel="stylesheet" href="fullscreen/fullscreen.css">
 <link rel="stylesheet" href="toast/toast.css">
 <link rel="stylesheet" href="rec-wave/rec-wave.css">
 <link rel="stylesheet" href="mic-notice/mic-notice.css">
@@ -368,6 +369,16 @@
             <span class="settings-row-hint" id="demoSettingsHint">Any language in, English out</span>
           </span>
           <button type="button" class="toggle" id="demoSettingsSwitch" role="switch" aria-checked="false">
+            <span class="knob"></span><span class="toggle-label">OFF</span>
+          </button>
+        </label>
+        <label class="settings-row fullscreen-row" id="demoFullscreenRow" hidden>
+          <svg class="icon settings-row-icon" aria-hidden="true"><use href="#i-maximize"></use></svg>
+          <span class="settings-row-text">
+            <span class="settings-row-label">Full screen on Edge</span>
+            <span class="settings-row-hint" aria-live="polite">Hides the address bar and toolbar.<span class="fullscreen-armed"> Tap anywhere to go full screen.</span></span>
+          </span>
+          <button type="button" class="toggle" id="demoFullscreenSwitch" role="switch" aria-checked="false" aria-label="Full screen on Edge" data-fullscreen-toggle>
             <span class="knob"></span><span class="toggle-label">OFF</span>
           </button>
         </label>

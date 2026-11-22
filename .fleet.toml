@@ -292,6 +292,7 @@ prefixes = [
     "app/webapp/static/_vendored/day-row/",
     "app/webapp/static/_vendored/disclosure/",
     "app/webapp/static/_vendored/empty-state/",
+    "app/webapp/static/_vendored/fullscreen/",
     "app/webapp/static/_vendored/home-head/",
     "app/webapp/static/_vendored/icon-button/",
     "app/webapp/static/_vendored/icon-tile/",
@@ -313,6 +314,7 @@ paths          = [
     "tests/e2e/_chip_checks.py",
     "tests/e2e/_code_listing_checks.py",
     "tests/e2e/_day_checks.py",
+    "tests/e2e/_fullscreen_checks.py",
     "tests/e2e/_mic_notice_checks.py",
     "tests/e2e/_settings_group_checks.py",
     "tests/e2e/test_vendored_base.py",
@@ -603,6 +605,7 @@ exclude = [
   "app/webapp/static/_vendored/demo.html",
   "app/webapp/static/_vendored/disclosure/disclosure.html",
   "app/webapp/static/_vendored/empty-state/empty-state.js",
+  "app/webapp/static/_vendored/fullscreen/fullscreen.html",
   "app/webapp/static/_vendored/home-head/home-head.html",
   "app/webapp/static/_vendored/icon-button/icon-button.html",
   "app/webapp/static/_vendored/modal/modal.html",
@@ -714,6 +717,8 @@ home-head       = { src = "app/webapp/static/_vendored/home-head" }
 page-foot       = { src = "app/webapp/static/_vendored/page-foot" }
 action-row      = { src = "app/webapp/static/_vendored/action-row" }
 text-size       = { src = "app/webapp/static/_vendored/text-size" }
+# The Edge-only "Full screen" Settings row: a switch that hides the browser chrome, kept per device.
+fullscreen      = { src = "app/webapp/static/_vendored/fullscreen" }
 toast           = { src = "app/webapp/static/_vendored/toast" }
 # The "New version available · Reload" prompt, on the toast's glass.
 build-watch     = { src = "app/webapp/static/_vendored/build-watch" }
