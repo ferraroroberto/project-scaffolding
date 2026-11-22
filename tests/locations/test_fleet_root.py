@@ -19,6 +19,7 @@ from src.fleet_root import (
     fleet_config_path,
     fleet_root,
 )
+from tests.host._synthetic_host import SyntheticHost
 
 
 @pytest.fixture(autouse=True)
@@ -84,9 +85,9 @@ def test_config_file_used_when_env_unset(tmp_path: Path) -> None:
     assert fleet_root(anchor=_checkout(tmp_path)) == root
 
 
-def test_config_path_defaults_under_home(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_config_path_defaults_under_home(monkeypatch: pytest.MonkeyPatch, synthetic_host: SyntheticHost) -> None:
     monkeypatch.delenv("XDG_CONFIG_HOME")
-    assert fleet_config_path() == Path.home() / ".config" / "fleet" / "fleet.toml"
+    assert fleet_config_path() == synthetic_host.home / ".config" / "fleet" / "fleet.toml"
 
 
 def test_config_without_root_key_falls_through(tmp_path: Path) -> None:
