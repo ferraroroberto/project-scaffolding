@@ -121,6 +121,13 @@ After the `202`, the page polls `/api/version` and `/api/restart` every 1.5 s fo
 
 An unknown result is never shown as success. Pinned by `tests/vendored/test_restart_sheet.py` (the real module under Node) and `tests/vendored/test_self_restart.py` (the routes, every runner ending, and a runner that outlives a `taskkill /T` of its parent).
 
+### Adopter test notes
+
+With the restart on, the readout is a control, and an adopter's tests see it:
+
+- **The hit area grows upward only.** `restart-sheet.css` makes the 44px target with a `::after` that extends above the readout and never below it, so a footer flush at the window bottom (`margin-block-end: 0`) adds no page scroll and needs no `--hit-min` override. The target overlaps about 15px of whatever sits above the footer's own top margin. A tap-target helper that only reads a `::before` expansion does not see this `::after` one: read both (`tests/e2e/_geometry.py` `EFFECTIVE_RECT_JS` does).
+- **The readout is focusable and a button.** It carries `tabindex="0"` and `role="button"`, and the closed restart sheet is a `<dialog>` in the page. A generic locator such as `dialog .detail-save-btn` or `.detail-dialog h2` also matches the closed restart dialog (a strict-mode collision), and a count of all `dialog` elements is no longer zero. Scope such locators to the dialog under test (an id or `[open]`).
+
 ## Required design tokens
 
 | Token | Light value | Used for |

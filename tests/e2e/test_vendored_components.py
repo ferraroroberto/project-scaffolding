@@ -31,7 +31,7 @@ from contextlib import AbstractContextManager
 
 from playwright.sync_api import Browser, Page, Playwright, expect
 
-from tests.e2e import _action_row_avatar_checks, _code_listing_checks, _day_checks, _review_rule_checks
+from tests.e2e import _action_row_avatar_checks, _code_listing_checks, _day_checks, _page_foot_checks, _review_rule_checks
 from tests.e2e._action_row_assertions import (
     assert_action_row,
     assert_action_row_colors,
@@ -890,6 +890,8 @@ def test_gallery_component_contracts(new_gallery: Callable[[], AbstractContextMa
             _code_listing_checks.check_code_listing_copy_failure_is_said_not_swallowed(gallery=gallery)
         with c.case("day_row_and_day_marks_contract"), new_gallery() as gallery:
             _day_checks.check_day_row_and_day_marks_contract(gallery=gallery)
+        with c.case("page_foot_flush_hit_area_adds_no_page_scroll"), new_page() as page:
+            _page_foot_checks.check_flush_footer_hit_area_adds_no_page_scroll(page, static_server)
         run_settings_group_cases(c, new_gallery)
         run_chip_cases(c, new_gallery, static_server)
         run_fullscreen_cases(c, new_gallery, new_page, static_server)

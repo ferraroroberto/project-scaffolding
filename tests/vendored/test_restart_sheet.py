@@ -126,6 +126,7 @@ def test_a_failed_reread_keeps_the_warning_the_page_loaded_with(probe: dict[str,
     assert (run["note"], run["tone"]) == ("This ends 3 live sessions.", "warning")
 
 
-def test_the_readouts_hit_area_has_slack_for_webkit_line_box_snapping() -> None:
+def test_the_readouts_hit_area_grows_upward_only_with_webkit_slack() -> None:
     css = (MODULE.parent / "restart-sheet.css").read_text(encoding="utf-8")
-    assert "/ -2 - 0.5px) 0;" in css
+    # Top inset only (bottom 0) so a flush footer gains no scroll; 1px covers line-box snapping.
+    assert "inset: calc(1.1em - var(--hit-min, 44px) - 1px) 0 0;" in css
