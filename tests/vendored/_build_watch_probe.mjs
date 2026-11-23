@@ -48,8 +48,27 @@ define('document', {
 });
 define('location', { reload() { reloads += 1; } });
 let reloads = 0;
-let intervals = [];
-define('setInterval', (fn, ms) => { intervals.push({ fn, ms }); return intervals.length; });
+// The watch polls through the vendored helper, which schedules with
+// window.setTimeout; a raw setInterval would be a regression, so it is counted.
+let setIntervalCalls = 0;
+define('setInterval', () => { setIntervalCalls += 1; return 0; });
+let timers = [];
+let timerIds = 0;
+define('window', {
+  setTimeout(fn, ms) { timerIds += 1; timers.push({ id: timerIds, fn, ms }); return timerIds; },
+  clearTimeout(id) { timers = timers.filter((t) => t.id !== id); },
+});
+// A fake clock: the throttle reads Date.now(), and the poll's tick is fired by
+// advancing it one poll interval, as the real timer would.
+let clockMs = 1_000_000;
+Date.now = () => clockMs;
+async function fireTick() {
+  clockMs += 5 * 60 * 1000;
+  const armed = timers[timers.length - 1];
+  if (!armed) throw new Error('no poll tick is armed');
+  await armed.fn();
+  await tick(); await tick();
+}
 
 let reads = [];
 let nextResponse = { ok: true, status: 200, body: { asset_hash: 'bbb' } };
@@ -106,7 +125,7 @@ out.noStamp = { started: mod.initBuildWatch(), reads: reads.length };
 stampedAssets = [{ src: '/static/main.js?v=aaa' }, { href: '/static/app.css?v=aaa' }];
 const started = mod.initBuildWatch({ endpoint: '/api/version' });
 out.started = started;
-out.intervalMs = intervals.map((i) => i.ms);
+out.intervalMs = timers.map((t) => t.ms);
 
 // Stale: both known and differ -> the prompt shows.
 nextResponse = { ok: true, status: 200, body: { asset_hash: 'bbb' } };
@@ -131,12 +150,12 @@ out.throttled = reads.length === before;
 // Dismiss: the prompt stays down for the same live build...
 p.children[2].listeners.click();
 out.dismissedHidden = p.hidden;
-await intervals[0].fn(); await tick(); await tick();
+await fireTick();
 out.dismissStaysDown = p.hidden;
 
 // ...and comes back when the server moves to yet another build.
 nextResponse = { ok: true, status: 200, body: { asset_hash: 'ccc' } };
-await intervals[0].fn(); await tick(); await tick();
+await fireTick();
 out.newBuildReshows = p.hidden === false;
 
 // Reload is only ever the user's tap.
@@ -146,7 +165,7 @@ out.reloadsAfterTap = reloads;
 
 // Back on the boot build -> the prompt hides.
 nextResponse = { ok: true, status: 200, body: { asset_hash: 'aaa' } };
-await intervals[0].fn(); await tick(); await tick();
+await fireTick();
 out.currentHides = p.hidden;
 
 // Unknown is never stale: on a fresh page, a 401, an empty hash, a missing
@@ -158,22 +177,22 @@ for (const [name, resp] of [
   ['network', new Error('offline')],
 ]) {
   body.children = [];
-  intervals = [];
+  timers = [];
   nextResponse = resp;
   mod.initBuildWatch();
-  await intervals[0].fn(); await tick(); await tick();
+  await fireTick();
   out[name] = prompt() === null;
 }
 
 // A caller's own reader (an app that adds auth headers) replaces fetch.
 const own = [];
 reads = [];
-intervals = [];
+timers = [];
 const second = mod.initBuildWatch({
   endpoint: '/x/version',
   fetchJson: (url) => { own.push(url); return Promise.resolve({ asset_hash: 'zzz' }); },
 });
-await intervals[0].fn(); await tick(); await tick();
+await fireTick();
 out.ownReader = { started: second, urls: own, fetchCalls: reads.length };
 
 // A per-file-hash app reports its entry module's stamp as asset_hash, so the
@@ -183,12 +202,22 @@ stampedAssets = [{ href: '/static/app.css?v=sss' }, { src: '/static/app.js?v=eee
 out.entry = {};
 for (const live of ['eee', 'sss']) {
   body.children = [];
-  intervals = [];
+  timers = [];
   nextResponse = { ok: true, status: 200, body: { asset_hash: live } };
   mod.initBuildWatch();
-  await intervals[0].fn(); await tick(); await tick();
+  await fireTick();
   const shown = prompt();
   out.entry[live] = !!shown && shown.hidden === false;
 }
+
+// A hidden page arms no tick; the raw setInterval was never used.
+timers = [];
+mod.initBuildWatch();
+const armedWhileVisible = timers.length;
+document.hidden = true;
+docListeners.visibilitychange();
+out.hidden = { armedWhileVisible, armedAfterHide: timers.length };
+document.hidden = false;
+out.setIntervalCalls = setIntervalCalls;
 
 process.stdout.write(JSON.stringify(out));

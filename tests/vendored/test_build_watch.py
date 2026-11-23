@@ -110,3 +110,8 @@ def test_the_entry_module_stamp_is_the_boot_build(probe: dict[str, Any]) -> None
     # Live == the entry script's stamp is current even though a stylesheet
     # carries a different per-file stamp; live == that stylesheet stamp is stale.
     assert probe["entry"] == {"eee": False, "sss": True}
+
+
+def test_it_polls_through_the_helper_and_a_hidden_page_arms_no_tick(probe: dict[str, Any]) -> None:
+    assert probe["setIntervalCalls"] == 0
+    assert probe["hidden"] == {"armedWhileVisible": 1, "armedAfterHide": 0}
