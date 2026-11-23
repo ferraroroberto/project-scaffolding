@@ -316,6 +316,7 @@ function pullText(answer) {
   const body = answer.body || {};
   if (body.state === 'pulled') return null;
   if (body.state === 'refused') return 'Pull refused: ' + body.reason + '.';
+  // state-literal-exempt: the pull ending declared by the server's state machine in src/self_restart.py
   if (body.state === 'failed') return 'Pull failed: ' + body.reason + '.';
   return 'Could not pull: the app gave an answer this page does not know.';
 }
