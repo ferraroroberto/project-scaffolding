@@ -245,7 +245,7 @@ The e2e leg runs pytest with the pytest-playwright options (`--browser webkit --
 
 At least one of `unit` and `e2e` is required. A repo that is listed but cannot run here declares only `skip_reason = "<why>"`, and the selection summary shows the reason every night. Unknown keys are refused, so a typo is an error, not a silently ignored setting.
 
-Tests that need the tray, toasts, PowerShell, real audio devices or other Windows-desktop state carry `@pytest.mark.windows_only` (the marker is registered in the adopter's `pytest.ini`) and are excluded from the unit leg. They are not ported: the local gate keeps covering them, and the PR that marks them lists them.
+Tests that need the tray, toasts, PowerShell, real audio devices or other Windows-desktop state carry `@pytest.mark.windows_only` (the marker is registered in the adopter's `pytest.ini`) and are excluded from the unit leg. They are not ported: the local gate keeps covering them, and the PR that marks them lists them. The [windows-only ratchet](windows-only-ratchet.md) enforces the marker in the adopter's gate: a test that uses a Windows-only API without it fails before the merge instead of on the next night.
 
 A listed repo whose `main` cannot be fetched, or whose table is missing or refused, is not dropped: it gets a matrix row marked unknown, its job fails at once with the reason, and its `READY` says `result=unknown`.
 

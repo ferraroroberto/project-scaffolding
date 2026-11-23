@@ -97,6 +97,12 @@
                          the committed baseline; opt-in via .fleet.toml
                          [request_budget_ratchet]; exit 3 = "not confirmed", a
                          failure, never a pass (docs/request-budget-ratchet.md)
+     12d. windows only ratchet — scripts/windows_only_ratchet.py: fails when a
+                         test that touches a Windows-only API lacks the
+                         windows_only marker the Mac nightly filters on,
+                         beyond the committed baseline; opt-in via .fleet.toml
+                         [windows_only_ratchet]; exit 3 = "not confirmed", a
+                         failure, never a pass (docs/windows-only-ratchet.md)
      13. mypy --strict — the vendor-verbatim primitives only; the list is
                          derived from .fleet.toml's [components] catalog via
                          scripts/vendored_catalog.py, never hand-maintained here
@@ -226,6 +232,7 @@ Invoke-Stage "runtime write ratchet"              { & $py "scripts/runtime_write
 Invoke-Stage "usage track ratchet"                { & $py "scripts/usage_track_ratchet.py" }
 Invoke-Stage "ux surface ratchet"                 { & $py "scripts/ux_surface_ratchet.py" }
 Invoke-Stage "request budget ratchet"             { & $py "scripts/request_budget_ratchet.py" }
+Invoke-Stage "windows only ratchet"               { & $py "scripts/windows_only_ratchet.py" }
 Invoke-Stage "mypy --strict (vendored)"           { & $py -m mypy @VendoredModules }
 Invoke-Stage "py39 (vendored)"                    { & $py "scripts/tools/vendored_py39_check.py" }
 # Runtime write probe, first half: what already sits untracked or ignored under

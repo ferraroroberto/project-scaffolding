@@ -14,6 +14,7 @@ The ratchets are the baseline-and-ratchet stages of the pre-ship gate: stdlib-on
 - [Usage tracking: usage track](#usage-tracking)
 - [UX surfaces: ux surface](#ux-surfaces)
 - [Request budget: request budget](#request-budget)
+- [Windows-only tests: windows only](#windows-only-tests)
 - [Test value: test value](#test-value)
 - [Exceptions and burn-down](#exceptions-and-burn-down)
 - [Adoption order](#adoption-order)
@@ -1265,6 +1266,83 @@ setInterval(paintClock, 1000);
 setInterval(paintClock, 1000);
 ```
 
+## Windows-only tests
+
+[windows-only-ratchet.md](windows-only-ratchet.md). The Mac nightly's unit leg runs `pytest -m "not windows_only"` ([mac-runner.md](mac-runner.md)), so a test that needs Windows and carries no marker passes in the Windows gate and turns the Mac night red. This ratchet reads the test modules and counts, per file and rule, the tests that touch a Windows-only API with no cover: the marker on the test, its class or the module's `pytestmark`, a platform `skipif`, a platform-guarded `pytest.skip`, or a module-level `importorskip`. Code under a platform `if` or a `try` that catches the `ImportError` is guarded, and a test that fakes the platform or puts a mock in `sys.modules` is clean. **Every rule is on by default**; adopt it alongside `[ci.nightly]`. **Except** one hit with `windows-only-exempt: <reason>` on its line, in the comment block right above it, or on its test's `def`; a marker with no reason exempts nothing and is itself a hit.
+
+```toml
+[windows_only_ratchet]
+enabled = true
+marker  = "windows_only"   # the default; the marker the nightly's exclude_marker filters on
+```
+
+#### `win-module`
+
+An import of a Windows-only module (`winreg`, `msvcrt`, `winsound`, `pywintypes`, `pythoncom`, `wmi`, `comtypes`, any `win32*`) in a test or at module level.
+
+```python
+# bad
+def test_reads_the_run_key():
+    import winreg
+    assert read_run_key(winreg.HKEY_CURRENT_USER)
+
+# fixed
+@pytest.mark.windows_only
+def test_reads_the_run_key():
+    import winreg
+    assert read_run_key(winreg.HKEY_CURRENT_USER)
+```
+
+#### `win-api`
+
+A Windows-only attribute: `ctypes.windll`/`WinDLL`/`oledll`/`OleDLL`, `os.startfile`, the Windows `subprocess` flags (`CREATE_NO_WINDOW`, `STARTUPINFO`, `DETACHED_PROCESS`, `CREATE_NEW_CONSOLE`, `CREATE_NEW_PROCESS_GROUP`), `signal.CTRL_C_EVENT`/`CTRL_BREAK_EVENT`.
+
+```python
+# bad
+def test_spawn_hides_the_console(spawned):
+    assert spawned.kwargs["creationflags"] == subprocess.CREATE_NO_WINDOW
+
+# fixed: read it the way the code does, so the test runs everywhere
+def test_spawn_hides_the_console(spawned):
+    assert spawned.kwargs["creationflags"] == getattr(subprocess, "CREATE_NO_WINDOW", 0)
+```
+
+#### `win-env-read`
+
+`os.environ["<var>"]` for a Windows-only variable (`ProgramFiles`, `LOCALAPPDATA`, `APPDATA`, `USERPROFILE`, `SystemRoot`, ...) that nothing in the file sets: a `KeyError` off Windows.
+
+```python
+# bad
+def test_default_install_root():
+    assert default_root() == Path(os.environ["ProgramFiles"]) / "App"
+
+# fixed
+def test_default_install_root(monkeypatch, tmp_path):
+    monkeypatch.setenv("ProgramFiles", str(tmp_path))
+    assert default_root() == tmp_path / "App"
+```
+
+#### `win-exe-lookup`
+
+One test points a Windows-only variable at a folder and plants a `.exe` path on disk: a Windows install lookup no other OS resolves.
+
+```python
+# bad
+def test_finds_chrome_in_program_files(monkeypatch, tmp_path):
+    exe = tmp_path / "Google" / "Chrome" / "Application" / "chrome.exe"
+    exe.parent.mkdir(parents=True)
+    exe.write_bytes(b"")
+    monkeypatch.setenv("ProgramFiles", str(tmp_path))
+    assert find_browser("chrome") == str(exe)
+
+# fixed
+@pytest.mark.windows_only
+def test_finds_chrome_in_program_files(monkeypatch, tmp_path):
+    ...
+```
+
+A `windows-only-exempt` marker with no reason is a `bare-exempt` hit, the rule the request budget ratchet above shares.
+
 ## Test value
 
 ### Test value ratchet
@@ -1340,6 +1418,7 @@ Which ratchets take which:
 | runtime write | `# runtime-write-exempt: <reason>` | `exclude`, `safe_calls`, `code_folders` |
 | usage track | `<rule>-exempt: <reason>` | `exclude`, `paths`, `builders` |
 | ux surface | `<rule>-exempt: <reason>` | `exclude`, `paths`, `rules` |
+| windows only | `windows-only-exempt: <reason>` | `exclude`, `test_paths`, `rules` |
 | test value | `test-value-exempt: <reason>` (new units only) | `unit_roots` |
 
 **A baseline is a ledger to burn to zero, never a permanent allowance.** It records debt, not approval:
@@ -1351,4 +1430,4 @@ Which ratchets take which:
 
 ## Adoption order
 
-[adopting-ratchets.md](adopting-ratchets.md) has the steps and the prerequisites table, and `scripts/tools/adopt_ratchets.py` does them. A sensible order: start with the set that is Python only and needs no choices (comment, docs, structure, instruction, doc references, dead code, runtime write), then add static once `ruff` is installed, then conventions and usage track by choosing the rules that match the repository, ux surface once the web app has its surface map, and request budget (every rule on, no choices) in any repo, web code or not. Run `--init` on each, review the baseline, and burn it down in later changes.
+[adopting-ratchets.md](adopting-ratchets.md) has the steps and the prerequisites table, and `scripts/tools/adopt_ratchets.py` does them. A sensible order: start with the set that is Python only and needs no choices (comment, docs, structure, instruction, doc references, dead code, runtime write), then add static once `ruff` is installed, then conventions and usage track by choosing the rules that match the repository, ux surface once the web app has its surface map, request budget (every rule on, no choices) in any repo, web code or not, and windows only in any repo the Mac nightly tests. Run `--init` on each, review the baseline, and burn it down in later changes.

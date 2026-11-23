@@ -166,6 +166,13 @@ docs/test-value-ratchet.md"]
   RBRATCHET -.->|reads [request_budget_ratchet] + [request_budget] loops from| FLEETTOML
   ADOPTKIT -->|copies into an outside repo + runs there| RBRATCHET
   RBRATCHET -.->|holds apps to the poll helper + middleware of| REQTIMING
+  WORATCHET["windows_only_ratchet.py (vendor-verbatim, stdlib ast)
+tests using a Windows-only API without the windows_only marker
+may not rise vs .windows-only-ratchet-baseline.json
+opt-in via .fleet.toml [windows_only_ratchet]; exit 3 = not confirmed"]
+  VERIFY -->|runs, opt-in, after the request budget ratchet| WORATCHET
+  WORATCHET -.->|reads [windows_only_ratchet] + [vendored] from| FLEETTOML
+  ADOPTKIT -->|copies into an outside repo + runs there| WORATCHET
   ADOPTKIT -->|writes the adopter's files through| RUNTIMEFILES
   VERIFY -->|runs after the e2e stage| SHOTBASE
   SHOTBASE -.->|reads [shot_baseline] from| FLEETTOML
