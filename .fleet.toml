@@ -236,6 +236,10 @@ path = ".usage-track-ratchet-baseline.json"
 [[e2e.rule]]
 tier = "none"
 path = ".request-budget-ratchet-baseline.json"
+# Likewise the windows-only-ratchet baseline.
+[[e2e.rule]]
+tier = "none"
+path = ".windows-only-ratchet-baseline.json"
 [[e2e.rule]]
 tier = "none"
 path = "LICENSE"
@@ -670,6 +674,19 @@ enabled = false
 enabled = true
 
 # ---------------------------------------------------------------------------
+# Windows-only ratchet. scripts/verify-before-ship.ps1 runs
+# scripts/windows_only_ratchet.py, which fails when a test module gains a test
+# that touches a Windows-only API (a win32/winreg import, ctypes.windll,
+# os.startfile, the Windows subprocess flags, a Windows-only environment read, or
+# a .exe planted under a fake ProgramFiles) without the windows_only marker the
+# Mac nightly's unit leg filters on, beyond the committed baseline. Adopt it
+# alongside [ci.nightly]; opt-in per repo through this table. On here although
+# the scaffold's own [ci.nightly] is not declared: the scaffold dogfoods every
+# ratchet it publishes. Mechanism + limits: docs/windows-only-ratchet.md.
+[windows_only_ratchet]
+enabled = true
+
+# ---------------------------------------------------------------------------
 # Test value ratchet and weekly burst. scripts/test_value_ratchet.py checks a
 # gate run recorded by scripts/unit_ledger.py: a new test unit shows its value
 # (red before the fix, a covered line no other unit covers, or an exempt
@@ -853,6 +870,7 @@ ux_surface_map  = { src = "scripts/ux_surface_map.py" }
 request_budget_ratchet = { src = "scripts/request_budget_ratchet.py", requires = ["request_budget_scan"] }
 # request_budget_ratchet loads this sibling (the JS and Python rule readers); `requires` makes /propagate-vendored carry both.
 request_budget_scan = { src = "scripts/request_budget_scan.py" }
+windows_only_ratchet = { src = "scripts/windows_only_ratchet.py" }
 runtime_write_ratchet = { src = "scripts/runtime_write_ratchet.py", requires = ["runtime_write_resolve"] }
 # runtime_write_ratchet loads this sibling (the static path resolver); `requires` makes /propagate-vendored carry both.
 runtime_write_resolve = { src = "scripts/runtime_write_resolve.py" }

@@ -20,6 +20,7 @@ from scripts import (
     structure_ratchet,
     test_value_ratchet,
     usage_track_ratchet,
+    windows_only_ratchet,
 )
 
 CATALOG = Path(__file__).resolve().parents[2] / "docs" / "ratchet-catalog.md"
@@ -49,6 +50,7 @@ def expected_rules() -> list[str]:
         *conventions_ratchet.RULES,
         *usage_track_ratchet.RULES,
         *request_budget_ratchet.RULES,
+        *windows_only_ratchet.RULES,
         *instruction_ratchet.RULES,
         *instruction_ratchet.SHAPE_RULES,
         *static_ratchet.DEFAULT_RULES,
