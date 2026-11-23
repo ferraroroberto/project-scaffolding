@@ -74,7 +74,7 @@ Write `request-budget-exempt: <reason>` in a comment (`//`, `/* */` or `<!-- -->
 - **Other files.** A function imported from another module is not opened; calling it counts (it cannot be ruled out), which is the safe direction.
 - **Template-literal expressions.** Code inside `${...}` is blanked with the template, so a `fetch` there is not seen.
 - **Self-scheduling `setTimeout` polls.** They do not overlap, so RB1 does not count them; the browser probe ([polling-budget.md](polling-budget.md#the-runtime-check)) catches one that keeps polling while hidden.
-- **Run-time behaviour.** The ratchet reads source. How many requests a page really makes in a minute, visible and hidden, is the runtime check's job.
+- **Run-time behaviour.** The ratchet reads source. How many requests a page really makes in a minute, visible and hidden, is the job of the [runtime check](polling-budget.md#the-runtime-check).
 
 ## Scope
 
