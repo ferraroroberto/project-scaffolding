@@ -9,13 +9,16 @@ that it exits non-zero unless a different process serves ``HEAD``.
 from __future__ import annotations
 
 import json
+import os
 import subprocess
+import sys
 from pathlib import Path
 from typing import Any
 
 import pytest
 
 from src import restart_check
+from src.no_window import NO_WINDOW
 from src.restart_check import EXIT_FAILED, EXIT_NOT_CONFIRMED, EXIT_OK, decide
 
 HEAD = "abc1234"
@@ -230,3 +233,22 @@ def test_cli_rejects_a_version_path_without_a_leading_slash() -> None:
     with pytest.raises(SystemExit) as exc:
         restart_check.main(["restart", "--port", "8000", "--version-path", "admin/api/version"])
     assert exc.value.code == 2
+
+
+def test_ok_line_survives_a_console_that_cannot_encode_emoji() -> None:
+    """A cp1252 stdout must still carry the OK line, with no logging traceback."""
+    child = (
+        "import sys\n"
+        "from src import restart_check\n"
+        "restart_check.restart = lambda *a, **k: (restart_check._log.info('✅ verify OK :1 new build'), 0)[1]\n"
+        "sys.exit(restart_check.main(['restart', '--port', '1']))\n"
+    )
+    done = subprocess.run(
+        [sys.executable, "-c", child],
+        cwd=Path(__file__).resolve().parents[2],
+        env={**os.environ, "PYTHONIOENCODING": "cp1252", "PYTHONUTF8": "0"},
+        capture_output=True, timeout=60, creationflags=NO_WINDOW,
+    )
+    assert done.returncode == 0
+    assert b"verify OK" in done.stdout
+    assert b"Traceback" not in done.stderr and b"UnicodeEncodeError" not in done.stderr
