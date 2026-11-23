@@ -665,13 +665,42 @@ enabled = false
 # nobody is viewing; `[request_budget] visible_requests_per_minute` is the
 # browser probe's budget (tests/e2e/budget/_request_budget.py). The scaffold has no
 # request handlers, so it declares no handler_dirs (scan-per-request prints OFF),
-# and it baselines its six hits: the build-watch poll, four loops whose interval
-# is a caller's argument (the log panel, the tray watchdog's two, the resource
-# probe's breadcrumb), and the usage-log adapter's sub-app, which the host app's
-# own middleware times. Mechanism + limits:
+# and its baseline is empty: the build-watch poll runs through the vendored poll
+# helper, four loops whose interval is a caller's argument are declared below with
+# their reason, and the usage-log adapter's sub-app is excluded because the host
+# app's own middleware times it. Mechanism + limits:
 # docs/request-budget-ratchet.md; the rules and why: docs/polling-budget.md.
 [request_budget_ratchet]
 enabled = true
+# The adapter builds the FastAPI sub-app its one Starlette route serves. The host
+# app's RequestTimingMiddleware already times every request through that route, so
+# a second one on the sub-app would stack two Server-Timing headers and count each
+# request twice in the in-flight stats. The file has no loop, poll or pool.
+exclude = ["src/usage_log_starlette.py"]
+
+[[request_budget.loops]]
+path       = "app/log_panel.py"
+function   = "stream_to_streamlit"
+interval_s = 0.25
+why        = "repaints the live log panel only while the caller's own work() runs and ends the moment it finishes; the person who started that run is the viewer"
+
+[[request_budget.loops]]
+path       = "app/tray/watchdog.py"
+function   = "retry_with_backoff"
+interval_s = 5
+why        = "bounded startup retry: sleeps the caller's delays (5, 15, 30 s by default) between attempts, then raises; it runs once at tray start, before any page exists"
+
+[[request_budget.loops]]
+path       = "app/tray/watchdog.py"
+function   = "HealthWatchdog.run"
+interval_s = 60
+why        = "the tray's health probe exists to notice a dead or wedged webapp while nobody is looking; a viewer-gated probe would never fire"
+
+[[request_budget.loops]]
+path       = "src/resource_probe.py"
+function   = "start_breadcrumb.run"
+interval_s = 300
+why        = "logs the process's thread, handle and memory counts every 5 minutes (the caller's interval) so a leak is diagnosable from the log after the fact; no viewer reads a log line live"
 
 # ---------------------------------------------------------------------------
 # Windows-only ratchet. scripts/verify-before-ship.ps1 runs
@@ -773,7 +802,7 @@ text-size       = { src = "app/webapp/static/_vendored/text-size" }
 # The Edge-only "Full screen" Settings row: a switch that hides the browser chrome, kept per device.
 fullscreen      = { src = "app/webapp/static/_vendored/fullscreen" }
 toast           = { src = "app/webapp/static/_vendored/toast" }
-# The "New version available · Reload" prompt, on the toast's glass.
+# The "New version available · Reload" prompt, on the toast's glass; polls through `poll`.
 build-watch     = { src = "app/webapp/static/_vendored/build-watch" }
 rec-wave        = { src = "app/webapp/static/_vendored/rec-wave" }
 # The recorder's input name and silent-mic warning, built on rec-wave.

@@ -1,10 +1,4 @@
 {
   "version": 1,
-  "entries": [
-    {"key": "app/log_panel.py", "counts": {"unwatched-loop": 1}},
-    {"key": "app/tray/watchdog.py", "counts": {"unwatched-loop": 2}},
-    {"key": "app/webapp/static/_vendored/build-watch/build-watch.js", "counts": {"fixed-rate-poll": 1}},
-    {"key": "src/resource_probe.py", "counts": {"unwatched-loop": 1}},
-    {"key": "src/usage_log_starlette.py", "counts": {"timing-middleware": 1}}
-  ]
+  "entries": []
 }
