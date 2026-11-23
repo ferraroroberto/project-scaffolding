@@ -76,6 +76,47 @@ def test_rb1_an_exempt_marker_with_a_reason_keeps_the_hit_out() -> None:
     assert js(src) == []
 
 
+# ------------------------------------------------- JS masker: nested templates
+
+def _blanked(src: str) -> str:
+    return scan.mask_js(src, "p")
+
+
+def test_mask_nested_template_in_a_substitution_is_fully_blanked() -> None:
+    src = "const a = `x ${b ? `: ${c}` : ''} y`;\nfoo(`<use/>`);\n"
+    out = _blanked(src)
+    assert out == "const a = `" + " " * len("x ${b ? `: ${c}` : ''} y") + "`;\nfoo(`" + " " * 6 + "`);\n"
+    assert len(out) == len(src)
+
+
+def test_mask_keeps_offsets_and_newlines_through_nested_templates() -> None:
+    src = "x = `a ${`b\n${`c`}`} d\n`;\ny = 1;\n"
+    out = _blanked(src)
+    assert len(out) == len(src)
+    assert [i for i, ch in enumerate(out) if ch == "\n"] == [i for i, ch in enumerate(src) if ch == "\n"]
+    assert out.endswith("`;\ny = 1;\n")
+    assert "b" not in out and "c" not in out
+
+
+def test_mask_a_brace_inside_a_nested_string_does_not_close_the_substitution() -> None:
+    template = "`${ f('}') + `${ \"}\" }` }`"
+    out = _blanked(f"a = {template}; setInterval(g, 1);\n")
+    assert out == "a = `" + " " * (len(template) - 2) + "`; setInterval(g, 1);\n"
+
+
+def test_mask_a_comment_or_regex_inside_a_substitution_is_not_code() -> None:
+    src = "a = `${ /* } ` */ x }`; b = `${ y // } `\n}`; z();\n"
+    out = _blanked(src)
+    assert "z();" in out and out.count("`") == 4
+
+
+def test_mask_a_planted_unclosed_nested_template_is_not_confirmed() -> None:
+    with pytest.raises(scan.NotConfirmed):
+        _blanked("a = `x ${ b ? `: ${c}` : '' y;\nfoo();\n")
+    with pytest.raises(scan.NotConfirmed):
+        _blanked("a = `x ${ `never closes ${c} };\n")
+
+
 # ------------------------------------------------------- RB2 poll-floor
 
 def test_rb2_a_fast_start_poll_is_a_hit_and_active_while_clears_it() -> None:
@@ -285,6 +326,7 @@ def test_exemptions_and_stale_declarations_are_printed(repo: Path, capsys: pytes
 
 @pytest.mark.parametrize(("rel", "body", "says"), [
     ("app/webapp/static/bad.js", b"const s = 'never closes;\n", "string does not close"),
+    ("app/webapp/static/nested.js", b"const s = `a ${ b ? `: ${c}` : '' y;\nfoo();\n", "substitution does not close"),
     ("src/bad.py", b"def f(:\n", "does not parse"),
     ("src/latin.py", b"x = '\xe9'\n", "is not UTF-8"),
 ])
