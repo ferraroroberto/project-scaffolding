@@ -5,7 +5,9 @@ browser globals and scripted server answers. The contract pinned here: no
 targets or no route leaves the readout untouched; a restart reloads only once
 a new process answers and the server recorded `ok`; a failed, vanished,
 refused or timed-out restart is said as such and never reloads; a target with
-a warning asks twice; every control and the sheet carry constant tracking ids.
+a warning asks twice; the update check runs only on a tap, offers a pull only
+when behind and never shows unknown as in sync; every control and the sheet
+carry constant tracking ids.
 Node is part of the gate's toolchain, so its absence fails here.
 """
 
@@ -71,8 +73,11 @@ def test_readout_becomes_a_tracked_button_opening_a_tracked_sheet(probe: dict[st
     assert run["readoutClasses"] == ["page-foot-restart"]
     assert run["trackView"] == "build.restart"
     assert run["surface"] == "app.restart-sheet"
-    assert run["tracks"] == ["build.restart-close", "build.restart-confirm"]
-    assert probe["picker"]["tracks"] == ["build.restart-close", "build.restart-target", "build.restart-confirm"]
+    assert run["tracks"] == ["build.restart-close", "build.restart-check", "build.restart-pull", "build.restart-confirm"]
+    assert probe["picker"]["tracks"] == [
+        "build.restart-close", "build.restart-target", "build.restart-check", "build.restart-pull",
+        "build.restart-confirm",
+    ]
 
 
 def test_a_restart_reloads_on_the_new_build(probe: dict[str, Any]) -> None:
@@ -124,6 +129,71 @@ def test_confirm_is_held_while_the_open_reads_the_targets(probe: dict[str, Any])
 def test_a_failed_reread_keeps_the_warning_the_page_loaded_with(probe: dict[str, Any]) -> None:
     run = probe["warning_kept_when_the_reread_fails"]
     assert (run["note"], run["tone"]) == ("This ends 3 live sessions.", "warning")
+
+
+@pytest.mark.parametrize("case", ["update_hidden_without_server_support", "update_hidden_when_off"])
+def test_no_update_offered_unless_the_server_says_so(probe: dict[str, Any], case: str) -> None:
+    assert probe[case]["hidden"] is True
+    assert probe[case]["postsAtOpen"] == 0
+
+
+def test_nothing_is_checked_until_the_tap(probe: dict[str, Any]) -> None:
+    run = probe["update_in_sync"]
+    assert (run["hidden"], run["checkLabel"], run["postsAtOpen"]) == (False, "Check for update", 0)
+    assert run["opened"] == "Check whether the remote has a newer version."
+
+
+def test_in_sync_says_so_and_offers_no_pull(probe: dict[str, Any]) -> None:
+    run = probe["update_in_sync"]
+    assert (run["checked"], run["pullOffered"], run["commits"]) == ("No new version, in sync.", False, [])
+
+
+def test_behind_lists_the_commits_pulls_and_restarts_on_the_pulled_sha(probe: dict[str, Any]) -> None:
+    run = probe["update_behind_pull_restart"]
+    assert (run["checked"], run["commits"], run["pullLabel"]) == ("2 new commits on main.", ["fix b", "add a"], "Pull 2 commits")
+    assert run["pulled"] == "Pulled 2 commits · now at bbb2222. Restart to run it."
+    assert run["pullOfferedAfter"] is False
+    assert run["restartNote"] == "Restarted · Build: bbb2222 · 2026-11-21 10:02"
+    assert run["posts"] == ["/api/restart/check", "/api/restart/pull", "/api/restart"]
+
+
+def test_a_restart_that_comes_back_on_another_sha_says_so(probe: dict[str, Any]) -> None:
+    run = probe["update_restart_on_the_wrong_sha"]
+    assert (run["restartNote"], run["restartTone"]) == (
+        "Restarted, but the app serves aaa1111, not the pulled bbb2222.", "warning")
+
+
+def test_a_refused_pull_says_why(probe: dict[str, Any]) -> None:
+    run = probe["update_pull_refused"]
+    assert run["pulled"].startswith("Pull refused: the pull would delete live files")
+    assert run["pullTone"] == "error"
+
+
+@pytest.mark.parametrize(("state", "text"), [
+    ("ahead", "This checkout has 3 commits the remote does not. No pull offered."),
+    ("diverged", "This checkout and the remote have both moved (2 behind, 1 ahead). No pull offered."),
+    ("dirty", "The checkout has uncommitted changes. No pull offered. 1 commit waiting on main."),
+    ("wrong_branch", "The checkout is on feature, not main. No pull offered."),
+])
+def test_each_no_pull_state_has_its_own_wording(probe: dict[str, Any], state: str, text: str) -> None:
+    assert probe["update_states"][state] == {"text": text, "tone": "warning", "offerPull": False}
+
+
+@pytest.mark.parametrize("state", ["unknown", "garbled", "missing"])
+def test_unknown_is_never_in_sync(probe: dict[str, Any], state: str) -> None:
+    shown = probe["update_states"][state]
+    assert shown["text"].startswith("Could not check for an update")
+    assert (shown["tone"], shown["offerPull"]) == ("error", False)
+    assert "in sync" not in shown["text"]
+
+
+def test_an_unreachable_check_is_an_error(probe: dict[str, Any]) -> None:
+    run = probe["update_check_unreachable"]
+    assert (run["checked"], run["checkTone"], run["pullOffered"]) == ("Could not check for an update (HTTP 500).", "error", False)
+
+
+def test_short_shas_match_across_abbreviation_lengths(probe: dict[str, Any]) -> None:
+    assert probe["sha_matches"] == [True, True, False, False]
 
 
 def test_the_readouts_hit_area_grows_upward_only_with_webkit_slack() -> None:

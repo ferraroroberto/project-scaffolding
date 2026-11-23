@@ -48,7 +48,7 @@ Object.defineProperty(globalThis, 'document', {
 });
 
 const mod = await import(pathToFileURL(MODULE).href);
-const { outcome, initRestartSheet, RESTART_TIMEOUT_MS, POLL_INTERVAL_MS } = mod;
+const { outcome, initRestartSheet, RESTART_TIMEOUT_MS, POLL_INTERVAL_MS, updateText, shaMatches } = mod;
 
 const before = { git_sha: 'aaa1111', built_at: '2026-11-21T10:00:00' };
 const fresh = { git_sha: 'aaa1111', built_at: '2026-11-21T10:01:00' };
@@ -140,6 +140,68 @@ const app = [{ id: 'app', label: 'Restart app', warning: '' }];
 const risky = [...app, { id: 'worker', label: 'Restart worker', warning: 'Stops the running jobs.' }];
 const accepted = { status: 202, body: { restart_id: 'r1', target: 'app' } };
 
+const settle = async () => { for (let i = 0; i < 50; i += 1) await new Promise((res) => setImmediate(res)); };
+
+// One scripted update: `check` and `pull` are the POST answers for the check
+// and the pull; with `restart`, the confirm is tapped after the pull and
+// `versions`/`records` script the restart. Returns what the sheet showed.
+async function updateScenario({ update = true, check, pull = null, restart = false, versions = [before], records = [null] }) {
+  readout = element('p');
+  body.children = [];
+  let clock = 0;
+  let v = 0;
+  let r = 0;
+  const posts = [];
+  const fetchJson = async (url) => {
+    if (url === '/api/restart') {
+      const reply = { targets: app, last: records[Math.min(r++, records.length - 1)] };
+      if (update !== 'absent') reply.update = update;
+      return reply;
+    }
+    const next = versions[Math.min(v++, versions.length - 1)];
+    if (next === null) throw new Error('down');
+    return next;
+  };
+  const postJson = async (url, payload) => {
+    posts.push(url);
+    if (url === '/api/restart/check') return check;
+    if (url === '/api/restart/pull') return pull;
+    return accepted;
+  };
+  await initRestartSheet({
+    readout, fetchJson, postJson,
+    sleep: async (ms) => { clock += ms; }, now: () => clock, reload: () => {},
+  });
+  const card = body.children[0].children[0];
+  const block = card.children.find((c) => c.className === 'restart-sheet-update');
+  const [checkBtn, status, list, pullBtn] = block.children;
+  const confirm = card.children[card.children.length - 1].children[0];
+  const note = card.children.find((c) => c.className === 'restart-sheet-note');
+  await readout.listeners.click();
+  const shown = {
+    hidden: block.hidden, checkLabel: checkBtn.textContent, opened: status.textContent, postsAtOpen: posts.length,
+  };
+  if (block.hidden) return shown;
+  await checkBtn.listeners.click();
+  Object.assign(shown, {
+    checked: status.textContent, checkTone: status.dataset.tone || null,
+    commits: list.hidden ? [] : list.children.map((c) => c.textContent),
+    pullOffered: !pullBtn.hidden, pullLabel: pullBtn.hidden ? null : pullBtn.textContent,
+  });
+  if (pull && !pullBtn.hidden) {
+    await pullBtn.listeners.click();
+    Object.assign(shown, { pulled: status.textContent, pullTone: status.dataset.tone || null, pullOfferedAfter: !pullBtn.hidden });
+  }
+  if (restart) {
+    confirm.listeners.click();
+    for (let i = 0; i < 200 && confirm.disabled; i += 1) await new Promise((res) => setImmediate(res));
+    await settle();
+    Object.assign(shown, { restartNote: note.textContent, restartTone: note.dataset.tone || null });
+  }
+  shown.posts = posts;
+  return shown;
+}
+
 const result = {
   constants: { timeout: RESTART_TIMEOUT_MS, poll: POLL_INTERVAL_MS },
   outcomes,
@@ -169,6 +231,39 @@ const result = {
   }),
   picker: await scenario({ targets: risky, post: accepted, versions: [before, fresh],
     records: [null, { id: 'r1', state: 'ok', exit_code: 0 }] }),
+  update_hidden_without_server_support: await updateScenario({ update: 'absent', check: null }),
+  update_hidden_when_off: await updateScenario({ update: false, check: null }),
+  update_in_sync: await updateScenario({ check: { status: 200, body: { state: 'up-to-date', branch: 'main', behind: 0, ahead: 0, subjects: [] } } }),
+  update_behind_pull_restart: await updateScenario({
+    check: { status: 200, body: { state: 'behind', branch: 'main', behind: 2, ahead: 0, subjects: ['fix b', 'add a'] } },
+    pull: { status: 200, body: { state: 'pulled', sha: 'bbb2222', pulled: 2 } },
+    restart: true,
+    versions: [before, null, { git_sha: 'bbb2222', built_at: '2026-11-21T10:02:00' }],
+    records: [null, null, { id: 'r1', state: 'ok', exit_code: 0 }],
+  }),
+  update_restart_on_the_wrong_sha: await updateScenario({
+    check: { status: 200, body: { state: 'behind', branch: 'main', behind: 1, ahead: 0, subjects: ['x'] } },
+    pull: { status: 200, body: { state: 'pulled', sha: 'bbb2222', pulled: 1 } },
+    restart: true,
+    versions: [before, fresh],
+    records: [null, null, { id: 'r1', state: 'ok', exit_code: 0 }],
+  }),
+  update_pull_refused: await updateScenario({
+    check: { status: 200, body: { state: 'behind', branch: 'main', behind: 1, ahead: 0, subjects: ['x'] } },
+    pull: { status: 200, body: { state: 'refused', reason: 'the pull would delete live files it stops tracking: config.json' } },
+  }),
+  update_states: {
+    ahead: updateText({ state: 'ahead', branch: 'main', behind: 0, ahead: 3 }),
+    diverged: updateText({ state: 'diverged', branch: 'main', behind: 2, ahead: 1 }),
+    dirty: updateText({ state: 'dirty', branch: 'main', behind: 1, ahead: 0 }),
+    wrong_branch: updateText({ state: 'wrong-branch', branch: 'main', current: 'feature' }),
+    unknown: updateText({ state: 'unknown', branch: 'main', reason: 'git fetch did not finish within 30s' }),
+    garbled: updateText({ state: 'synced?' }),
+    missing: updateText(null),
+    behind_one: updateText({ state: 'behind', branch: 'main', behind: 1 }),
+  },
+  update_check_unreachable: await updateScenario({ check: { status: 500, body: null } }),
+  sha_matches: [shaMatches('bbb2222', 'bbb2222'), shaMatches('bbb22224', 'bbb2222'), shaMatches('aaa1111', 'bbb2222'), shaMatches('', 'b')],
 };
 
 process.stdout.write(JSON.stringify(result));
