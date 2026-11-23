@@ -70,6 +70,8 @@ The logger is `request_timing`; a tray-run app attaches its own file handler to 
 
 The clock advances in half-second steps and each step waits for the requests it started to finish, so a self-scheduling poll is measured at its real cadence. The budget: visible at most `[request_budget] visible_requests_per_minute` from the app's `.fleet.toml`, hidden zero, and at most one catch-up read per path.
 
+A count the probe cannot establish is **unknown**, never a pass and never a default: a missing `.fleet.toml`, a missing `[request_budget]` table or key, a value that is not a whole number of 0 or more, or a request that never settles raises `RequestBudgetUnknown` with a `NOT CONFIRMED` message. It is not an `AssertionError`, so pytest reports it as an error (E), apart from a broken budget's failure (F). The probe's unit cases are in `tests/e2e_helpers/test_request_budget_probe.py`.
+
 ```python
 from tests.e2e.budget._request_budget import assert_request_budget, measure_request_budget, visible_budget
 
