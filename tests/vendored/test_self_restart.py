@@ -60,7 +60,7 @@ def test_both_routes_sit_behind_the_apps_guard(tmp_path: Path) -> None:
 
 def test_get_lists_the_declared_targets(tmp_path: Path) -> None:
     body = _client(tmp_path, []).get("/api/restart").json()
-    assert body == {"targets": [{"id": "app", "label": "Restart app", "warning": ""}], "last": None}
+    assert body == {"targets": [{"id": "app", "label": "Restart app", "warning": ""}], "last": None, "update": True}
 
 
 def test_a_callable_warning_is_computed_on_every_get(tmp_path: Path) -> None:
