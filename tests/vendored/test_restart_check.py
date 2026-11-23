@@ -8,6 +8,7 @@ that it exits non-zero unless a different process serves ``HEAD``.
 
 from __future__ import annotations
 
+import json
 import subprocess
 from pathlib import Path
 from typing import Any
@@ -154,3 +155,78 @@ def test_real_bat_runs_by_absolute_path_from_another_cwd(tmp_path: Path, monkeyp
     )
     assert code == EXIT_OK
     assert marker.read_text(encoding="utf-8").strip() == "--restart"
+
+
+class _Resp:
+    def __init__(self, body: bytes) -> None:
+        self._body = body
+
+    def __enter__(self) -> _Resp:
+        return self
+
+    def __exit__(self, *_exc: object) -> None:
+        return None
+
+    def read(self) -> bytes:
+        return self._body
+
+
+def _record_urls(monkeypatch: pytest.MonkeyPatch) -> list[str]:
+    urls: list[str] = []
+
+    def urlopen(url: str, **_kwargs: Any) -> _Resp:
+        urls.append(url)
+        return _Resp(b'{"git_sha": "abc1234", "pid": 7}')
+
+    monkeypatch.setattr(restart_check.urllib.request, "urlopen", urlopen)
+    return urls
+
+
+def test_fetch_version_defaults_to_api_version(monkeypatch: pytest.MonkeyPatch) -> None:
+    urls = _record_urls(monkeypatch)
+    assert restart_check.fetch_version(8080) == {"git_sha": HEAD, "pid": 7}
+    assert urls == ["https://127.0.0.1:8080/api/version"]
+
+
+def test_fetch_version_reads_a_named_path(monkeypatch: pytest.MonkeyPatch) -> None:
+    urls = _record_urls(monkeypatch)
+    assert restart_check.fetch_version(8000, "/admin/api/version") == {"git_sha": HEAD, "pid": 7}
+    assert urls == ["https://127.0.0.1:8000/admin/api/version"]
+
+
+def test_restart_probes_the_named_version_path_before_and_after(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Both the snapshot and the verify poll read ``version_path``, not the default."""
+    urls = _record_urls(monkeypatch)
+    answers = iter([{"git_sha": HEAD, "pid": 1}, {"git_sha": HEAD, "pid": 2}])
+    monkeypatch.setattr(restart_check, "resolve_git_sha", lambda _root: HEAD)
+    monkeypatch.setattr(
+        restart_check.urllib.request, "urlopen",
+        lambda url, **_k: urls.append(url) or _Resp(json.dumps(next(answers)).encode()),
+    )
+    code = restart_check.restart(
+        8000, 5.0, tray_bat=_bat(tmp_path), run=_Run(), version_path="/admin/api/version",
+    )
+    assert code == EXIT_OK
+    assert urls == ["https://127.0.0.1:8000/admin/api/version"] * 2
+
+
+def test_cli_passes_version_path_through(monkeypatch: pytest.MonkeyPatch) -> None:
+    seen: dict[str, Any] = {}
+
+    def fake_restart(port: int, timeout_s: float, **kwargs: Any) -> int:
+        seen.update(port=port, timeout_s=timeout_s, **kwargs)
+        return EXIT_OK
+
+    monkeypatch.setattr(restart_check, "restart", fake_restart)
+    assert restart_check.main(["restart", "--port", "8000", "--version-path", "/admin/api/version"]) == EXIT_OK
+    assert seen["version_path"] == "/admin/api/version"
+    assert restart_check.main(["restart", "--port", "8000"]) == EXIT_OK
+    assert seen["version_path"] == "/api/version"
+
+
+def test_cli_rejects_a_version_path_without_a_leading_slash() -> None:
+    with pytest.raises(SystemExit) as exc:
+        restart_check.main(["restart", "--port", "8000", "--version-path", "admin/api/version"])
+    assert exc.value.code == 2
