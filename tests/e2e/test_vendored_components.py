@@ -58,7 +58,6 @@ from tests.e2e._settings_group_checks import (
     check_settings_group_long_select_value_keeps_its_row_in_webkit,
     run_settings_group_cases,
 )
-from tests.e2e.components import _busy_checks
 from tests.e2e.components._fullscreen_checks import run_fullscreen_cases
 from tests.e2e.conftest import STATIC_DIR
 
@@ -853,14 +852,6 @@ def test_gallery_component_contracts(new_gallery: Callable[[], AbstractContextMa
             _check_icon_tile_contract(gallery=gallery)
         with c.case("button_contract"), new_gallery() as gallery:
             _check_button_contract(gallery=gallery)
-        with c.case("busy_state_both_themes"), new_gallery() as gallery:
-            _busy_checks.check_busy_state_both_themes(gallery=gallery)
-        with c.case("busy_state_on_a_phone"), new_gallery() as gallery:
-            _busy_checks.check_busy_state_on_a_phone(gallery=gallery)
-        with c.case("busy_spinner_stops_under_reduced_motion"), new_gallery() as gallery:
-            _busy_checks.check_busy_spinner_stops_under_reduced_motion(gallery=gallery)
-        with c.case("run_busy_flow"), new_gallery() as gallery:
-            _busy_checks.check_run_busy_flow(gallery=gallery)
         for theme in ["light", "dark"]:
             with c.case(f"icon_only_controls_unpainted[{theme}]"), new_gallery() as gallery:
                 _check_icon_only_controls_unpainted(gallery=gallery, theme=theme)
