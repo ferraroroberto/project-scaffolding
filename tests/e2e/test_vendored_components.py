@@ -31,7 +31,7 @@ from contextlib import AbstractContextManager
 
 from playwright.sync_api import Browser, Page, Playwright, expect
 
-from tests.e2e import _action_row_avatar_checks, _code_listing_checks, _day_checks, _review_rule_checks
+from tests.e2e import _action_row_avatar_checks, _busy_checks, _code_listing_checks, _day_checks, _review_rule_checks
 from tests.e2e._action_row_assertions import (
     assert_action_row,
     assert_action_row_colors,
@@ -852,6 +852,14 @@ def test_gallery_component_contracts(new_gallery: Callable[[], AbstractContextMa
             _check_icon_tile_contract(gallery=gallery)
         with c.case("button_contract"), new_gallery() as gallery:
             _check_button_contract(gallery=gallery)
+        with c.case("busy_state_both_themes"), new_gallery() as gallery:
+            _busy_checks.check_busy_state_both_themes(gallery=gallery)
+        with c.case("busy_state_on_a_phone"), new_gallery() as gallery:
+            _busy_checks.check_busy_state_on_a_phone(gallery=gallery)
+        with c.case("busy_spinner_stops_under_reduced_motion"), new_gallery() as gallery:
+            _busy_checks.check_busy_spinner_stops_under_reduced_motion(gallery=gallery)
+        with c.case("run_busy_flow"), new_gallery() as gallery:
+            _busy_checks.check_run_busy_flow(gallery=gallery)
         for theme in ["light", "dark"]:
             with c.case(f"icon_only_controls_unpainted[{theme}]"), new_gallery() as gallery:
                 _check_icon_only_controls_unpainted(gallery=gallery, theme=theme)

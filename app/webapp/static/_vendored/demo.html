@@ -158,6 +158,22 @@
     <button type="button" class="button-tint danger" id="demoButtonDanger">Delete</button>
   </div>
 
+  <h2>button: busy (aria-busy="true") and runBusy</h2>
+  <div class="card" id="demoBusyStatic" style="display: flex; flex-direction: column; gap: var(--space-sm);">
+    <button type="button" class="button-primary" id="demoBusyPrimary" aria-busy="true">Saving</button>
+    <button type="button" class="button-tint" id="demoBusyTint" aria-busy="true">Running</button>
+    <button type="button" class="button-ghost" id="demoBusyGhost" aria-busy="true">Cancelling</button>
+    <button type="button" class="button-surface" id="demoBusySurface" aria-busy="true">Refreshing</button>
+    <button type="button" class="button-tint danger" id="demoBusyDanger" aria-busy="true">Deleting</button>
+    <button type="button" class="button-surface" id="demoBusyIcon" aria-busy="true"><svg class="icon" aria-hidden="true"><use href="#i-copy"></use></svg>Copying</button>
+  </div>
+  <div class="card" style="display: flex; gap: var(--space-sm); flex-wrap: wrap;">
+    <button type="button" class="button-surface" id="demoBusyRun" data-track="demo-busy-run">Refresh</button>
+    <button type="button" class="button-ghost" id="demoBusyFinish" data-track="demo-busy-finish">Finish</button>
+    <button type="button" class="button-ghost" id="demoBusyFail" data-track="demo-busy-fail">Fail</button>
+    <span id="demoBusyCalls" hidden>0</span>
+  </div>
+
   <h2>button: action to variant (one component per action)</h2>
   <div class="card" id="demoActionMap" style="display: flex; flex-direction: column; gap: var(--space-sm);">
     <div style="display: flex; align-items: center; justify-content: space-between; gap: var(--space-sm);"><span>commit</span><button type="button" class="button-primary" data-action="commit">Save</button></div>
@@ -762,6 +778,7 @@
   import { buildReadoutText } from './page-foot/page-foot.js';
   import { bindTextSize } from './text-size/text-size.js';
   import { showToast } from './toast/toast.js';
+  import { runBusy } from './button/busy.js';
   import { renderHeadStatus } from './home-head/home-head.js';
   import { createRowMenu } from './row-menu/row-menu.js';
   import { bindCodeListing } from './code-listing/code-listing.js';
@@ -862,6 +879,24 @@
       label: 'Undo',
       onClick: () => { document.getElementById('demoToastUndone').hidden = false; },
     } });
+  });
+
+  // runBusy: the work settles only when Finish or Fail is tapped, so the harness
+  // can read the busy button and its toasts without racing a timer. Every call
+  // that actually runs is counted, to show a second tap in flight runs nothing.
+  let demoBusySettle = null;
+  document.getElementById('demoBusyRun').addEventListener('click', (e) => {
+    runBusy(e.currentTarget, () => {
+      const calls = document.getElementById('demoBusyCalls');
+      calls.textContent = String(Number(calls.textContent) + 1);
+      return new Promise((resolve, reject) => { demoBusySettle = { resolve, reject }; });
+    }, { start: 'Refreshing', done: 'Refreshed', fail: 'Refresh failed' });
+  });
+  document.getElementById('demoBusyFinish').addEventListener('click', () => {
+    if (demoBusySettle) demoBusySettle.resolve('ok');
+  });
+  document.getElementById('demoBusyFail').addEventListener('click', () => {
+    if (demoBusySettle) demoBusySettle.reject(new Error('timed out'));
   });
 
   // row-menu: the items are data. One hidden, one disabled (with its hint) and
