@@ -33,7 +33,9 @@ from scripts.conventions_state import (  # noqa: E402 -- needs the sys.path line
 from src.no_window import NO_WINDOW  # noqa: E402 -- needs the sys.path line above
 
 STATE_RULES = ("state-literal", "state-set-repeat", "state-write")
-DEFAULT_BASELINE = ".conventions-ratchet-baseline.json"
+DEFAULT_BASELINE = ".ratchets/conventions.json"
+#: Where the conventions ratchet kept its baseline before `.ratchets/`; an older commit still has it there.
+LEGACY_BASELINE = ".conventions-ratchet-baseline.json"
 # The marker a test carries to prove its machine refuses an illegal transition.
 PROOF_MARKER = "state-machine-proof:"
 _PROOF_RE = re.compile(r"state-machine-proof:\s*([A-Za-z0-9_.-]+)")
@@ -156,7 +158,11 @@ def read_findings(repo: Path, sha: str, config: dict[str, Any], rules: tuple[str
     path = table.get("baseline", DEFAULT_BASELINE)
     if not isinstance(path, str) or not path.strip():
         raise ReadError("[conventions_ratchet] baseline must be a non-empty string")
+    if path == LEGACY_BASELINE:  # the old default adopters wrote out: the ratchet reads it as the new one
+        path = DEFAULT_BASELINE
     text = read_file(repo, sha, path)
+    if text is None and path == DEFAULT_BASELINE:
+        text = read_file(repo, sha, LEGACY_BASELINE)
     if text is None:
         raise ReadError(f"baseline {path} is not committed")
     try:

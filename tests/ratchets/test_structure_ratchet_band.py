@@ -146,6 +146,7 @@ def test_a_baseline_from_before_the_band_passes_then_update_records_it(
 ) -> None:
     write(repo, "src/big.py", lines(25))
     write(repo, "src/near.py", lines(19))
+    (repo / sr.DEFAULT_BASELINE).parent.mkdir(exist_ok=True)
     (repo / sr.DEFAULT_BASELINE).write_text(OLD_BASELINE, encoding="utf-8")
     assert sr.read_baseline(repo / sr.DEFAULT_BASELINE) == {"size:src/big.py": 25}
     assert band(repo) is None
@@ -161,6 +162,7 @@ def test_a_baseline_from_before_the_band_passes_then_update_records_it(
 @pytest.mark.parametrize("value", ['{"files": 1}', '{"files": -1, "functions": 0}', '{"files": true, "functions": 0}',
                                    "[1, 2]", '{"files": 1, "functions": 0, "dirs": 0}'])
 def test_a_malformed_band_is_a_baseline_error(repo: Path, value: str) -> None:
+    (repo / sr.DEFAULT_BASELINE).parent.mkdir(exist_ok=True)
     (repo / sr.DEFAULT_BASELINE).write_text(f'{{"version": 1, "band": {value}, "entries": []}}', encoding="utf-8")
     assert run_mode(repo) == sr.EXIT_CONFIG
 

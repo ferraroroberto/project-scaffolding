@@ -348,6 +348,7 @@ def test_a_fixture_app_missing_ids_fails_then_passes_once_they_are_added(
 ) -> None:
     git(tmp_path, "init", "-q")
     (tmp_path / ".fleet.toml").write_text(FIXTURE_TABLE, encoding="utf-8")
+    (tmp_path / ut.DEFAULT_BASELINE).parent.mkdir(exist_ok=True)
     (tmp_path / ut.DEFAULT_BASELINE).write_text(ut.render_baseline({}), encoding="utf-8")
     write(tmp_path, "app/webapp/static/index.html", FIXTURE_HTML)
     write(tmp_path, "app/webapp/static/app.js", FIXTURE_JS)
@@ -424,7 +425,7 @@ def test_allow_additions_adds_to_the_baseline(repo: Path) -> None:
 
 def test_missing_baseline_fails_instead_of_passing(repo: Path, capsys: pytest.CaptureFixture[str]) -> None:
     assert run_mode(repo) == ut.EXIT_RISE
-    assert "baseline .usage-track-ratchet-baseline.json is missing" in capsys.readouterr().out
+    assert "baseline .ratchets/usage-track.json is missing" in capsys.readouterr().out
 
 
 @pytest.mark.parametrize(
@@ -439,6 +440,7 @@ def test_missing_baseline_fails_instead_of_passing(repo: Path, capsys: pytest.Ca
     ],
 )
 def test_unreadable_baseline_exits_two(repo: Path, text: str) -> None:
+    (repo / ut.DEFAULT_BASELINE).parent.mkdir(exist_ok=True)
     (repo / ut.DEFAULT_BASELINE).write_text(text, encoding="utf-8")
     assert run_mode(repo) == ut.EXIT_CONFIG
 

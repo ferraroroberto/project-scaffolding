@@ -66,7 +66,8 @@ def unit_row(unit: str, status: str, tree: str, utc: str, label: str = "gate", s
 def set_baseline(repo: Path, **fields: Any) -> None:
     data: dict[str, Any] = {"units": {}, "flake_count": 0, "flake_max_age_days": 14, "hermetic": []}
     data.update(fields)
-    (repo / ".test-value-ratchet-baseline.json").write_text(json.dumps(data), encoding="utf-8")
+    (repo / ".ratchets").mkdir(exist_ok=True)
+    (repo / ".ratchets/test-value.json").write_text(json.dumps(data), encoding="utf-8")
 
 
 @pytest.fixture
@@ -80,7 +81,7 @@ def repo(tmp_path: Path) -> Path:
     git(root, "config", "core.hooksPath", str(tmp_path / "no-hooks"))  # the machine's commit hooks are not under test
     write(root, ".fleet.toml", CONFIG)
     set_baseline(root, units={"_old_unit_check": 5})
-    git(root, "add", ".test-value-ratchet-baseline.json")
+    git(root, "add", ".ratchets/test-value.json")
     write(root, "fake_runner.py", FAKE_RUNNER)
     write(root, "src/app.py", "def a():\n    return 1\n    return 2\n")
     write(root, "tests/t.py", "def _old_unit_check():\n    pass\n")
@@ -262,10 +263,10 @@ def test_update_baseline(repo: Path, tmp_path: Path) -> None:
                          unit_row("c", "pass", "t1", stamp(1), spawns=3),
                          {"kind": "run", "run_id": "t1-" + stamp(1), "label": "gate", "utc": stamp(1)}])
     run(repo, "--update-baseline", "--ledger", str(ledger))
-    got = json.loads((repo / ".test-value-ratchet-baseline.json").read_text(encoding="utf-8"))["units"]
+    got = json.loads((repo / ".ratchets/test-value.json").read_text(encoding="utf-8"))["units"]
     assert got == {"a": 4, "b": 2}, "shrinks an entry, never raises one, adds nothing"
     run(repo, "--update-baseline", "--allow-additions", "--ledger", str(ledger))
-    got = json.loads((repo / ".test-value-ratchet-baseline.json").read_text(encoding="utf-8"))["units"]
+    got = json.loads((repo / ".ratchets/test-value.json").read_text(encoding="utf-8"))["units"]
     assert got == {"a": 4, "b": 2, "c": 3}
 
 
@@ -275,7 +276,7 @@ def test_update_baseline_drops_a_unit_no_run_reports(repo: Path, tmp_path: Path)
     write_jsonl(ledger, [unit_row("a", "pass", "t1", stamp(1), spawns=4),
                          {"kind": "run", "run_id": "t1-" + stamp(1), "label": "gate", "utc": stamp(1)}])
     code, out = run(repo, "--update-baseline", "--ledger", str(ledger))
-    got = json.loads((repo / ".test-value-ratchet-baseline.json").read_text(encoding="utf-8"))["units"]
+    got = json.loads((repo / ".ratchets/test-value.json").read_text(encoding="utf-8"))["units"]
     assert got == {"a": 4}, "a deleted unit leaves the baseline, so re-creating it is a new unit again"
     assert code == 0 and "dropped gone" in out
 

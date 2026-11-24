@@ -71,7 +71,7 @@ Tracked and untracked-but-not-ignored files (`git ls-files --cached --others --e
 
 ## The baseline file
 
-`.windows-only-ratchet-baseline.json` (or `baseline`): a version and one entry per file with hits, the count per rule, sorted, no line numbers, so a diff reviews cleanly. It only shrinks on its own: a gone hit prints a hint to run `--update-baseline`.
+`.ratchets/windows-only.json` (or `baseline`): a version and one entry per file with hits, the count per rule, sorted, no line numbers, so a diff reviews cleanly. It only shrinks on its own: a gone hit prints a hint to run `--update-baseline`.
 
 ## Modes
 
@@ -87,7 +87,7 @@ Adopt it in a repo that declares `[ci.nightly]` ([mac-runner.md](mac-runner.md))
 ```toml
 [windows_only_ratchet]
 enabled    = true
-baseline   = ".windows-only-ratchet-baseline.json"  # default
+baseline   = ".ratchets/windows-only.json"  # default
 rules      = ["win-module", "win-api", "win-env-read", "win-exe-lookup", "bare-exempt"]  # default: all
 marker     = "windows_only"                        # default; the marker the nightly's exclude_marker filters on
 test_paths = ["tests/**"]                          # default

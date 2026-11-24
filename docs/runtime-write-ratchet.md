@@ -83,7 +83,7 @@ Both list the untracked **and ignored** files under the code folders (`git statu
 ```toml
 [runtime_write_ratchet]
 enabled      = true
-baseline     = ".runtime-write-ratchet-baseline.json"       # default
+baseline     = ".ratchets/runtime-write.json"       # default
 code_folders = ["src", "app", "scripts", "hooks", "skills"]  # default; top-level folders only
 exclude      = ["src/generated/**"]                          # globs; never scanned or probed
 safe_calls   = ["state_dir"]                                 # calls that return a path outside the tree

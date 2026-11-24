@@ -53,7 +53,7 @@ Never point `smoke` at the live tray or its restart recipe: the check boots its 
 
 ## The baseline file
 
-`.clean-tree-ratchet-baseline.json` (or `baseline`): a version and the sorted list of paths the smoke is known to write. It only shrinks on its own: a baselined path the smoke no longer writes prints a hint to run `--update-baseline`.
+`.ratchets/clean-tree.json` (or `baseline`): a version and the sorted list of paths the smoke is known to write. It only shrinks on its own: a baselined path the smoke no longer writes prints a hint to run `--update-baseline`.
 
 ## Modes
 
@@ -69,7 +69,7 @@ Every mode runs the smoke.
 ```toml
 [clean_tree_ratchet]
 enabled      = true
-baseline     = ".clean-tree-ratchet-baseline.json"   # default
+baseline     = ".ratchets/clean-tree.json"   # default
 smoke        = ["{python}", "-m", "app.webapp.serve", "--host", "127.0.0.1", "--port", "{port}"]  # required
 ready_path   = "/healthz"          # optional; absent = the smoke runs to completion and must exit 0
 timeout_s    = 60                  # default; the start (or run) deadline

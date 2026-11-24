@@ -148,7 +148,7 @@ Re-vendoring the script never breaks a repo that has not opted in: an absent `[d
    ```toml
    [doc_refs_ratchet]
    enabled    = true
-   baseline   = ".doc-refs-ratchet-baseline.json"  # default
+   baseline   = ".ratchets/doc-refs.json"  # default
    include    = ["README.md", "CLAUDE.md", "docs/"] # path prefixes; the default
    exclude    = ["docs/reports/**"]                 # globs, e.g. generated per-run reports
    allow_refs = [":8000", ":8090"]                  # globs; another service's port, a file adopters create

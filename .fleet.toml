@@ -191,63 +191,11 @@ path = ".fleet.toml"
 [[e2e.rule]]
 tier = "none"
 path = ".gitignore"
-# The static-ratchet baseline is data for scripts/static_ratchet.py, not a browser
-# surface; unlisted it would fail safe to the full suite (#410).
+# The ratchet baselines are data for scripts/*_ratchet.py, not a browser surface;
+# unlisted they would fail safe to the full suite.
 [[e2e.rule]]
-tier = "none"
-path = ".static-ratchet-baseline.json"
-# Likewise the comment-ratchet baseline (#411).
-[[e2e.rule]]
-tier = "none"
-path = ".comment-ratchet-baseline.json"
-# Likewise the docs-ratchet baseline.
-[[e2e.rule]]
-tier = "none"
-path = ".docs-ratchet-baseline.json"
-# Likewise the structure-ratchet baseline.
-[[e2e.rule]]
-tier = "none"
-path = ".structure-ratchet-baseline.json"
-# Likewise the instruction-ratchet baseline.
-[[e2e.rule]]
-tier = "none"
-path = ".instruction-ratchet-baseline.json"
-# Likewise the doc-references-ratchet baseline.
-[[e2e.rule]]
-tier = "none"
-path = ".doc-refs-ratchet-baseline.json"
-# Likewise the dead-code-ratchet baseline.
-[[e2e.rule]]
-tier = "none"
-path = ".dead-code-ratchet-baseline.json"
-# Likewise the conventions-ratchet baseline.
-[[e2e.rule]]
-tier = "none"
-path = ".conventions-ratchet-baseline.json"
-# Likewise the runtime-write-ratchet baseline.
-[[e2e.rule]]
-tier = "none"
-path = ".runtime-write-ratchet-baseline.json"
-# Likewise the usage-track-ratchet baseline.
-[[e2e.rule]]
-tier = "none"
-path = ".usage-track-ratchet-baseline.json"
-# Likewise the request-budget-ratchet baseline.
-[[e2e.rule]]
-tier = "none"
-path = ".request-budget-ratchet-baseline.json"
-# Likewise the windows-only-ratchet baseline.
-[[e2e.rule]]
-tier = "none"
-path = ".windows-only-ratchet-baseline.json"
-# Likewise the port-host-ratchet baseline.
-[[e2e.rule]]
-tier = "none"
-path = ".port-host-ratchet-baseline.json"
-# Likewise the clean-tree-ratchet baseline.
-[[e2e.rule]]
-tier = "none"
-path = ".clean-tree-ratchet-baseline.json"
+tier   = "none"
+prefix = ".ratchets/"
 [[e2e.rule]]
 tier = "none"
 path = "LICENSE"
@@ -904,40 +852,43 @@ resource_soak   = { src = "tests/soak/_resource_soak.py" }
 
 # Scripts + library modules copied byte-for-byte into adopters.
 classify_e2e    = { src = "scripts/classify_e2e.py" }
-static_ratchet = { src = "scripts/static_ratchet.py" }
-comment_ratchet = { src = "scripts/comment_ratchet.py" }
-docs_ratchet    = { src = "scripts/docs_ratchet.py" }
-structure_ratchet = { src = "scripts/structure_ratchet.py", requires = ["structure_layout", "structure_band"] }
+# Every ratchet loads this sibling to find its baseline in .ratchets/ and move an old root copy there once;
+# each ratchet's `requires` names it, so /propagate-vendored carries it.
+ratchet_baseline = { src = "scripts/ratchet_baseline.py" }
+static_ratchet = { src = "scripts/static_ratchet.py", requires = ["ratchet_baseline"] }
+comment_ratchet = { src = "scripts/comment_ratchet.py", requires = ["ratchet_baseline"] }
+docs_ratchet    = { src = "scripts/docs_ratchet.py", requires = ["ratchet_baseline"] }
+structure_ratchet = { src = "scripts/structure_ratchet.py", requires = ["structure_layout", "structure_band", "ratchet_baseline"] }
 # structure_ratchet loads these siblings (shape presets, extra roots, placement; the near-limit band
 # and its warning lines); `requires` makes /propagate-vendored carry all three.
 structure_layout = { src = "scripts/structure_layout.py" }
 structure_band  = { src = "scripts/structure_band.py" }
-instruction_ratchet = { src = "scripts/instruction_ratchet.py", requires = ["instruction_frontmatter", "instruction_repeats"] }
+instruction_ratchet = { src = "scripts/instruction_ratchet.py", requires = ["instruction_frontmatter", "instruction_repeats", "ratchet_baseline"] }
 # instruction_ratchet loads this sibling (the SKILL.md frontmatter reader); `requires` makes /propagate-vendored carry it.
 instruction_frontmatter = { src = "scripts/instruction_frontmatter.py" }
 # ...and, only when `repeated_text_words` is set (S-04), this one (the repeated-text finder).
 instruction_repeats = { src = "scripts/instruction_repeats.py" }
-doc_refs_ratchet = { src = "scripts/doc_refs_ratchet.py" }
-dead_code_ratchet = { src = "scripts/dead_code_ratchet.py" }
-conventions_ratchet = { src = "scripts/conventions_ratchet.py", requires = ["conventions_readers", "conventions_state"] }
+doc_refs_ratchet = { src = "scripts/doc_refs_ratchet.py", requires = ["ratchet_baseline"] }
+dead_code_ratchet = { src = "scripts/dead_code_ratchet.py", requires = ["ratchet_baseline"] }
+conventions_ratchet = { src = "scripts/conventions_ratchet.py", requires = ["conventions_readers", "conventions_state", "ratchet_baseline"] }
 # conventions_ratchet loads these siblings (the syntax-tree predicates and the web and text line rules; the
 # implicit-state-machine readers); `requires` makes /propagate-vendored carry all three.
 conventions_readers = { src = "scripts/conventions_readers.py" }
 conventions_state = { src = "scripts/conventions_state.py" }
-usage_track_ratchet = { src = "scripts/usage_track_ratchet.py", requires = ["usage_track_scan"] }
+usage_track_ratchet = { src = "scripts/usage_track_ratchet.py", requires = ["usage_track_scan", "ratchet_baseline"] }
 # usage_track_ratchet loads this sibling (the HTML and JS readers); `requires` makes /propagate-vendored carry both.
 usage_track_scan = { src = "scripts/usage_track_scan.py" }
 # ux_surface_ratchet reads JS through usage_track_scan's tokenizer and the YAML map through ux_surface_map (also
 # the page generator adopters run); `requires` makes /propagate-vendored carry all three.
-ux_surface_ratchet = { src = "scripts/ux_surface_ratchet.py", requires = ["usage_track_scan", "ux_surface_map"] }
+ux_surface_ratchet = { src = "scripts/ux_surface_ratchet.py", requires = ["usage_track_scan", "ux_surface_map", "ratchet_baseline"] }
 ux_surface_map  = { src = "scripts/ux_surface_map.py" }
-request_budget_ratchet = { src = "scripts/request_budget_ratchet.py", requires = ["request_budget_scan"] }
+request_budget_ratchet = { src = "scripts/request_budget_ratchet.py", requires = ["request_budget_scan", "ratchet_baseline"] }
 # request_budget_ratchet loads this sibling (the JS and Python rule readers); `requires` makes /propagate-vendored carry both.
 request_budget_scan = { src = "scripts/request_budget_scan.py" }
-windows_only_ratchet = { src = "scripts/windows_only_ratchet.py" }
-port_host_ratchet = { src = "scripts/port_host_ratchet.py" }
-clean_tree_ratchet = { src = "scripts/clean_tree_ratchet.py" }
-runtime_write_ratchet = { src = "scripts/runtime_write_ratchet.py", requires = ["runtime_write_resolve"] }
+windows_only_ratchet = { src = "scripts/windows_only_ratchet.py", requires = ["ratchet_baseline"] }
+port_host_ratchet = { src = "scripts/port_host_ratchet.py", requires = ["ratchet_baseline"] }
+clean_tree_ratchet = { src = "scripts/clean_tree_ratchet.py", requires = ["ratchet_baseline"] }
+runtime_write_ratchet = { src = "scripts/runtime_write_ratchet.py", requires = ["runtime_write_resolve", "ratchet_baseline"] }
 # runtime_write_ratchet loads this sibling (the static path resolver); `requires` makes /propagate-vendored carry both.
 runtime_write_resolve = { src = "scripts/runtime_write_resolve.py" }
 # The cross-platform ratchet runner adopt_ratchets.py copies into an outside repo (docs/adopting-ratchets.md).
@@ -947,7 +898,7 @@ run_ratchets = { src = "scripts/run_ratchets.py" }
 unit_ledger     = { src = "scripts/unit_ledger.py", requires = ["spawn_probe"] }
 spawn_probe     = { src = "scripts/spawn_probe" }
 unit_ledger_pytest = { src = "scripts/unit_ledger_pytest.py", requires = ["unit_ledger"] }
-test_value_ratchet = { src = "scripts/test_value_ratchet.py" }
+test_value_ratchet = { src = "scripts/test_value_ratchet.py", requires = ["ratchet_baseline"] }
 weekly_burst    = { src = "scripts/weekly_burst.py", requires = ["unit_ledger", "test_value_ratchet"] }
 shot_baseline   = { src = "scripts/shot_baseline.py" }
 # Dot-sourced at the top of a gate script; holds the shared box load lock for the run.

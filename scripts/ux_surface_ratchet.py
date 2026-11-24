@@ -34,7 +34,7 @@ Opt-in, per adopter, in its own `.fleet.toml`:
 
     [ux_surface_ratchet]
     enabled  = true
-    baseline = ".ux-surface-ratchet-baseline.json"            # default
+    baseline = ".ratchets/ux-surface.json"            # default
     map      = "docs/ux-surfaces.yaml"                         # default: the source
     page     = "docs/ux-surface-map.md"                        # default: generated from it
     rules    = ["unmarked-surface", "invalid-surface-id", "unmapped-surface", "stale-entry", "duplicate-surface",
@@ -86,18 +86,19 @@ def _load_sibling(name: str) -> ModuleType:
         return module
     except (ImportError, OSError, SyntaxError):
         print(f"ux surface ratchet: NOT CONFIRMED: {name}.py is missing beside this script -- vendor it with its "
-              "siblings (manifest keys ux_surface_ratchet, usage_track_scan, ux_surface_map)")
+              "siblings (manifest keys ux_surface_ratchet, usage_track_scan, ux_surface_map, ratchet_baseline)")
         sys.exit(3)
 
 
 scan = _load_sibling("usage_track_scan")
 smap = _load_sibling("ux_surface_map")
+_baseline = _load_sibling("ratchet_baseline")  # where the baseline lives, and its move into .ratchets/
 NotConfirmed: type[RuntimeError] = scan.NotConfirmed
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
 BASELINE_VERSION = 1
-DEFAULT_BASELINE = ".ux-surface-ratchet-baseline.json"
+DEFAULT_BASELINE = ".ratchets/ux-surface.json"
 DEFAULT_MAP: str = smap.DEFAULT_MAP
 DEFAULT_PAGE: str = smap.DEFAULT_PAGE
 DEFAULT_PATHS = ("app/webapp/static/**", "app/webapp/templates/**")
@@ -209,7 +210,7 @@ def parse_config(toml_text: str) -> Config | None:
                           f"{DEFAULT_MAP} (docs/ux-surface-map.md, \"Moving a Markdown map\") and drop `map`")
     if source == page:
         raise ConfigError("[ux_surface_ratchet] map and page must be different files")
-    return Config(_str(table, "baseline", DEFAULT_BASELINE), tuple(r for r in RULES if r in rules),
+    return Config(_baseline.configured(_str(table, "baseline", DEFAULT_BASELINE), DEFAULT_BASELINE), tuple(r for r in RULES if r in rules),
                   source, paths, _str_list(table, "exclude", ()), page)
 
 
@@ -738,7 +739,9 @@ def run(root: Path, *, init: bool, update: bool, allow_additions: bool) -> int:
             return EXIT_CONFIG
         print("ux surface ratchet: not enabled (no [ux_surface_ratchet] enabled = true in .fleet.toml)")
         return EXIT_PASS
-    baseline_path = root / cfg.baseline
+    baseline_path = _baseline.resolve(root, cfg.baseline, DEFAULT_BASELINE, "ux surface ratchet")
+    if baseline_path is None:
+        return EXIT_CONFIG
     baseline = _load_baseline(baseline_path, cfg, init)
     if isinstance(baseline, int):
         return baseline

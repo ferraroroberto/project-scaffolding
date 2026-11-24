@@ -44,7 +44,7 @@ def test_absent_or_disabled_table_is_not_enabled() -> None:
 
 def test_enabled_table_gets_the_documented_defaults() -> None:
     assert dr.parse_config("[doc_refs_ratchet]\nenabled = true\n") == dr.Config(
-        ".doc-refs-ratchet-baseline.json", ("README.md", "CLAUDE.md", "docs/"), (), ()
+        ".ratchets/doc-refs.json", ("README.md", "CLAUDE.md", "docs/"), (), ()
     )
 
 
@@ -354,6 +354,7 @@ def test_missing_baseline_fails_instead_of_passing(repo: Path, capsys: pytest.Ca
     ],
 )
 def test_unreadable_baseline_exits_two(repo: Path, text: str) -> None:
+    (repo / dr.DEFAULT_BASELINE).parent.mkdir(exist_ok=True)
     (repo / dr.DEFAULT_BASELINE).write_text(text, encoding="utf-8")
     assert run_mode(repo) == dr.EXIT_CONFIG
 

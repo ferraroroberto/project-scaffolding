@@ -29,15 +29,15 @@ Each ratchet is off until the repository's `.fleet.toml` has a table for it with
 ```toml
 [comment_ratchet]
 enabled  = true
-baseline = ".comment-ratchet-baseline.json"   # the default; one baseline file per ratchet
-include  = ["src/"]                            # path prefixes; the default is the whole tree
+baseline = ".ratchets/comment.json"   # the default; one baseline file per ratchet
+include  = ["src/"]                    # path prefixes; the default is the whole tree
 ```
 
 The first run writes the baseline. It is sorted JSON with one entry per line and no line numbers, so an edit above a finding never churns it:
 
 ```
 $ .venv/Scripts/python.exe scripts/comment_ratchet.py --init
-comment ratchet: wrote .comment-ratchet-baseline.json with 1 entr(ies), 1 finding(s)
+comment ratchet: wrote .ratchets/comment.json with 1 entr(ies), 1 finding(s)
 ```
 
 ```json
@@ -62,7 +62,7 @@ Paying debt down is a separate, visible step:
 
 ```
 $ .venv/Scripts/python.exe scripts/comment_ratchet.py --update-baseline
-comment ratchet: .comment-ratchet-baseline.json now has 0 entr(ies), 0 finding(s) (1 lowered or dropped, 0 raised or added)
+comment ratchet: .ratchets/comment.json now has 0 entr(ies), 0 finding(s) (1 lowered or dropped, 0 raised or added)
 ```
 
 | Command | What it does |
@@ -78,6 +78,8 @@ comment ratchet: .comment-ratchet-baseline.json now has 0 entr(ies), 0 finding(s
 | 1 | A count rose, or the baseline file is missing | fails |
 | 2 | Bad configuration, baseline or arguments | fails |
 | 3 | **Not confirmed**: the check could not run (a tool, sibling module or file missing, `git` unusable). Its own state, never folded into a pass | fails |
+
+Every baseline lives in the `.ratchets/` folder at the repository root, one `<name>.json` per ratchet, so the root shows what the project is rather than its debt records. Every ratchet resolves the path through one shared sibling, `scripts/ratchet_baseline.py`, vendored with each. A ratchet that finds its baseline at the old root path (`.<name>-ratchet-baseline.json`) moves it into `.ratchets/` on its next run and says so; commit the move. It never keeps two copies: when both exist it stops with exit 2 and leaves both untouched until one is deleted. A `baseline` key in `.fleet.toml` that names the old root path is read as the new default, so an adopter's existing table needs no edit; any other `baseline` value is used as written.
 
 A check that is switched off (`duplicates = false`, a runtime probe with no test command) prints **OFF**, never "clean". `scripts/run_ratchets.py` runs every enabled ratchet in stage order: static, comment, docs, structure, instruction, doc references, dead code, conventions, runtime write, usage track, ux surface.
 
@@ -193,7 +195,7 @@ A declared `extra_roots` folder that the shape's preset does not already list. I
 
 #### `rootfile`
 
-A tracked file at the repository root that neither the common set (`README.md`, `CLAUDE.md`, `.fleet.toml`, `pyproject.toml` and similar) nor the shape lists. Baselined by name. **Default:** on once `shape` is declared. Except by `extra_root_files`, which is also where the reason lives.
+The root allowlist. A tracked file at the repository root that neither the common set (`README.md`, `CLAUDE.md`, `.fleet.toml`, `pyproject.toml` and similar) nor the shape lists. Baselined by name, so a new one fails and the existing ones only shrink. **Default:** on once `shape` is declared. A file the repo must keep at the root (a framework reads it there, a scheduled job calls it by path) is declared in `extra_root_files` in `.fleet.toml` with its reason in a comment beside it; the declaration is a to-do, not a permission, so the file stays recorded until it moves. The ratchet baselines are not root files: they live in `.ratchets/`.
 
 ```
 # bad:  notes.txt at the root
@@ -1473,7 +1475,7 @@ A hit has five possible fates. Pick the narrowest.
 | **A reasoned marker** (`# <rule>-exempt: <reason>`, or `# noqa: <code>` for the static ratchet) | This one call or control is a deliberate exception, and the reason belongs next to it. A marker with no reason, or for another rule, exempts nothing. | a comment at the call |
 | **A setting** (`allow`, `allow_refs`, `safe_calls`, `entry_decorators`, `builders`, `extra_roots`, `extra_root_files`) | A whole class of thing is legitimate in this repository: a function a framework calls, an intentional link, a folder the shape does not list. | a line in `.fleet.toml` |
 | **`exclude`** | Generated or third-party code the repository does not own. Excluded files are never scanned, so it also hides future hits; keep the glob narrow. A vendor-verbatim copy listed in `[vendored]` is excluded for you. | a glob in `.fleet.toml` |
-| **The baseline** | Existing debt that cannot be fixed in this change. | added lines in a `.<name>-ratchet-baseline.json` |
+| **The baseline** | Existing debt that cannot be fixed in this change. | added lines in a `.ratchets/<name>.json` |
 
 Which ratchets take which:
 

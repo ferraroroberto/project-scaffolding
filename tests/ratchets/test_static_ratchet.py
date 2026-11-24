@@ -61,7 +61,7 @@ def test_absent_or_disabled_table_is_not_enabled() -> None:
 
 def test_enabled_table_gets_the_documented_defaults() -> None:
     cfg = sr.parse_config("[static_ratchet]\nenabled = true\n")
-    assert cfg == sr.Config(".static-ratchet-baseline.json", 10, 100, ())
+    assert cfg == sr.Config(".ratchets/static.json", 10, 100, ())
 
 
 def test_enabled_table_honours_every_key() -> None:
@@ -300,6 +300,7 @@ def stub_findings(monkeypatch: pytest.MonkeyPatch, *keys: str) -> None:
 
 def write_baseline(root: Path, *keys: str) -> Path:
     path = root / sr.DEFAULT_BASELINE
+    path.parent.mkdir(exist_ok=True)
     path.write_text(sr.render_baseline({k: finding(k) for k in keys}, {"jscpd": "x", "ruff": "y"}), encoding="utf-8")
     return path
 
@@ -384,6 +385,7 @@ def test_init_writes_a_baseline_and_never_overwrites(repo: Path, monkeypatch: py
 
 
 def test_unreadable_baseline_exits_two(repo: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    (repo / sr.DEFAULT_BASELINE).parent.mkdir(exist_ok=True)
     (repo / sr.DEFAULT_BASELINE).write_text("{oops", encoding="utf-8")
     stub_findings(monkeypatch)
     assert run_mode(repo) == sr.EXIT_CONFIG

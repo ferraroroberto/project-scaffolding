@@ -179,6 +179,7 @@ scripts/
   instruction_ratchet.py      gate stage: prompt-audit lint hits, size caps and (opt-in) CI-expectations, AGENTS.md-pointer, CLAUDE.md-length and repeated-text findings in instruction files may not rise above a committed baseline
   instruction_frontmatter.py  the instruction ratchet's sibling: the SKILL.md frontmatter reader (vendored with it)
   instruction_repeats.py      the instruction ratchet's sibling: the repeated-text finder behind the opt-in S-04 rule (vendored with it)
+  ratchet_baseline.py         every ratchet's sibling: the baseline in .ratchets/<name>.json and the one-time move from the root
   run_ratchets.py             cross-platform runner of every enabled ratchet, with the runtime write probe around a test command
   shot_baseline.py             gate stage: recaptured screenshots may not visibly drift from the committed baseline
   static_ratchet.py            gate stage: new duplicate code, unused names or bug/security patterns may not rise above a committed baseline

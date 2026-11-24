@@ -365,7 +365,7 @@ def test_the_script_is_catalogued_with_its_sibling() -> None:
     catalog = load_catalog(REPO_ROOT)
     assert catalog["request_budget_ratchet"]["src"] == "scripts/request_budget_ratchet.py"
     assert catalog["request_budget_scan"]["src"] == "scripts/request_budget_scan.py"
-    assert 'requires = ["request_budget_scan"]' in (REPO_ROOT / ".fleet.toml").read_text(encoding="utf-8")
+    assert 'requires = ["request_budget_scan", "ratchet_baseline"]' in (REPO_ROOT / ".fleet.toml").read_text(encoding="utf-8")
 
 
 def test_every_rule_is_documented() -> None:

@@ -60,7 +60,7 @@ def good_files(**extra: str) -> dict[str, str]:
     entries = [{"key": "src/a.py", "counts": {"state-literal": 4, "state-write": 1}},
                {"key": "src/b.py", "counts": {"state-set-repeat": 2}},
                {"key": "web/app.js", "counts": {"state-literal": 3}}]
-    return {".fleet.toml": toml(), ".conventions-ratchet-baseline.json": baseline(entries),
+    return {".fleet.toml": toml(), ".ratchets/conventions.json": baseline(entries),
             "src/job_state.py": ENUM, **extra}
 
 
@@ -95,7 +95,7 @@ def test_two_runs_at_one_commit_are_byte_identical(tmp_path: Path, capsys: pytes
 
 def test_unreadable_baseline_is_unknown_never_zero(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     make_repo(tmp_path, "missing", {".fleet.toml": toml(), "src/job_state.py": ENUM})
-    make_repo(tmp_path, "broken", {**good_files(), ".conventions-ratchet-baseline.json": "{not json"})
+    make_repo(tmp_path, "broken", {**good_files(), ".ratchets/conventions.json": "{not json"})
     make_repo(tmp_path, "badtoml", {".fleet.toml": "[[oops"})
     code, rows = run(tmp_path)
     assert code == 3
@@ -106,7 +106,7 @@ def test_unreadable_baseline_is_unknown_never_zero(tmp_path: Path, capsys: pytes
     assert sb.main(["--root", str(tmp_path)]) == 3
     table = capsys.readouterr().out
     assert " ?" in table.splitlines()[3]
-    assert "baseline .conventions-ratchet-baseline.json is not committed" in table
+    assert "baseline .ratchets/conventions.json is not committed" in table
 
 
 def test_not_enrolled_is_not_counted_as_zero(tmp_path: Path) -> None:
@@ -122,7 +122,7 @@ def test_not_enrolled_is_not_counted_as_zero(tmp_path: Path) -> None:
 
 def test_a_date_before_history_is_absent_and_a_date_picks_the_older_numbers(tmp_path: Path) -> None:
     root = make_repo(tmp_path, "alpha", good_files(), when="2026-03-01T12:00:00+00:00")
-    write(root, ".conventions-ratchet-baseline.json", baseline([]))
+    write(root, ".ratchets/conventions.json", baseline([]))
     commit(root, "2026-06-01T12:00:00+00:00")
     assert sb.measure(root, "2026-02-01")["status"] == "absent"
     old, new = sb.measure(root, "2026-04-01"), sb.measure(root, "2026-07-01")

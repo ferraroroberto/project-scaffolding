@@ -220,7 +220,7 @@ Re-vendoring the script never breaks a repo that has not opted in: an absent `[s
    ```toml
    [structure_ratchet]
    enabled            = true
-   baseline           = ".structure-ratchet-baseline.json"   # default
+   baseline           = ".ratchets/structure.json"   # default
    max_file_lines     = 1000                                 # default
    max_function_lines = 100                                  # default
    max_dir_modules    = 40                                   # default

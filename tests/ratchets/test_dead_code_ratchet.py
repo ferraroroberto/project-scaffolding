@@ -290,11 +290,12 @@ def test_allow_additions_adds_to_the_baseline(repo: Path) -> None:
 
 def test_missing_baseline_fails_instead_of_passing(repo: Path, capsys: pytest.CaptureFixture[str]) -> None:
     assert run_mode(repo) == dc.EXIT_RISE
-    assert "baseline .dead-code-ratchet-baseline.json is missing" in capsys.readouterr().out
+    assert "baseline .ratchets/dead-code.json is missing" in capsys.readouterr().out
 
 
 @pytest.mark.parametrize("text", ["not json", '{"version": 9, "entries": []}', '{"version": 1, "entries": [{"key": "a"}]}'])
 def test_unreadable_baseline_exits_two(repo: Path, text: str) -> None:
+    (repo / dc.DEFAULT_BASELINE).parent.mkdir(exist_ok=True)
     (repo / dc.DEFAULT_BASELINE).write_text(text, encoding="utf-8")
     assert run_mode(repo) == dc.EXIT_CONFIG
 
