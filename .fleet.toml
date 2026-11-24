@@ -556,7 +556,7 @@ allow   = [
 [conventions_ratchet]
 enabled = true
 rules   = ["no-window", "logging-not-print", "no-drive-path", "password-input-vendored", "nav-standalone-head", "login-lockout",
-           "subprocess-timeout", "browser-per-iteration", "host-identity", "state-literal", "state-set-repeat", "state-write"]
+           "subprocess-timeout", "browser-per-iteration", "path-sep", "host-identity", "state-literal", "state-set-repeat", "state-write"]
 
 # Outbound HTTP goes through the pooled session, not a bare requests call.
 [[conventions_ratchet.must_use]]

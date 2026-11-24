@@ -768,6 +768,20 @@ with paced_walk(browser, port) as walk:
         walk.visit(url)
 ```
 
+#### `path-sep`
+
+Text a regex parsed in the same function (`.group()`, `.groups()`, `.groupdict()`, `.findall()`, `.expand()`), carried through `str` methods, slices, f-strings and assignment, reaching `<path> / <text>`, `Path(...)`, `PurePath(...)`, `PurePosixPath(...)`, `.joinpath(...)` or `os.path.join(...)` without `.replace` of the backslash with `/`, `.split` on the backslash or `PureWindowsPath(...)`. A `.bat` or Windows config spells its paths with backslashes, which POSIX reads as part of one file name, so the join works on the Windows gate and fails on the Mac nightly. Whole-file reads, `posixpath.join`, parameters and test modules are not read. Marker: `# path-sep-exempt: <reason>`, for text the repo itself writes with `/`.
+
+```python
+# bad
+for match in BAT_PY_RE.findall(text):
+    candidate = root / match
+
+# fixed
+for match in BAT_PY_RE.findall(text):
+    candidate = root / match.replace("\\", "/")
+```
+
 #### `host-identity`
 
 A test reading the real account name or home folder: `getpass.getuser()`, `os.getlogin()`, `pwd.getpw*`, `Path.home()`, `os.path.expanduser("~...")` or `Path("~...").expanduser()`, or `USERNAME`/`USER`/`LOGNAME`/`LNAME`/`HOME`/`USERPROFILE`/`HOMEDRIVE`/`HOMEPATH` read through `os.environ[...]`, `os.environ.get` or `os.getenv`. Test modules only: on the developer's machine the real value is the expected one, so the test fails first on another host. Writes (`monkeypatch.setenv`) and `sys.executable` are not hits. Marker: `# host-identity-exempt: <reason>`, for a privacy check or a live-install guard.
