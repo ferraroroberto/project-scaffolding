@@ -774,3 +774,68 @@ def test_a_baselined_unsorted_block_passes_and_a_second_one_fails(tree: Path) ->
     result = ratchet(tree)
     assert result.returncode == sr.EXIT_NEW, result.stdout
     assert "import json" in result.stdout
+
+
+# ------------------------------------------- jscpd native crash: retry once, record why
+
+NATIVE_CRASH = 0xC0000005  # a Windows access violation, the crash seen in the gate
+CLEAN_REPORT = {"duplicates": []}
+
+
+def fake_runner(monkeypatch: pytest.MonkeyPatch, *outcomes: tuple[int, str, object]) -> tuple[list[list[str]], sr.Runner]:
+    """A `_run` stand-in: each call consumes (exit code, stderr, report-or-None)."""
+    monkeypatch.setattr(shutil, "which", lambda name, *a, **k: "npx")
+    calls: list[list[str]] = []
+    queue = list(outcomes)
+
+    def runner(cmd: list[str], cwd: Path, what: str) -> subprocess.CompletedProcess[str]:
+        calls.append(cmd)
+        code, stderr, report = queue.pop(0)
+        if report is not None:
+            out = Path(cmd[cmd.index("--output") + 1])
+            (out / "jscpd-report.json").write_text(json.dumps(report), encoding="utf-8")
+        return subprocess.CompletedProcess(cmd, code, "", stderr)
+
+    return calls, runner
+
+
+def jscpd_cfg() -> sr.Config:
+    return sr.Config(sr.DEFAULT_BASELINE, 10, 100, ())
+
+
+def test_native_crash_then_good_run_retries_once_and_passes(
+    repo: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str],
+) -> None:
+    calls, runner = fake_runner(monkeypatch, (NATIVE_CRASH, "boom", None), (0, "", CLEAN_REPORT))
+    assert sr.run_jscpd(repo, jscpd_cfg(), runner) == []
+    assert len(calls) == 2
+    err = capsys.readouterr().err
+    assert str(NATIVE_CRASH) in err and "boom" in err  # the breadcrumb names the code and stderr
+
+
+def test_findings_exit_is_never_retried(repo: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    # jscpd's own non-zero exit (1) with no report is a plain unknown, one attempt only.
+    calls, runner = fake_runner(monkeypatch, (1, "threshold exceeded", None), (0, "", CLEAN_REPORT))
+    with pytest.raises(sr.NotConfirmed, match="exited 1"):
+        sr.run_jscpd(repo, jscpd_cfg(), runner)
+    assert len(calls) == 1
+
+
+def test_a_report_with_findings_is_never_retried(repo: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    calls, runner = fake_runner(monkeypatch, (0, "", CLEAN_REPORT), (0, "", CLEAN_REPORT))
+    sr.run_jscpd(repo, jscpd_cfg(), runner)
+    assert len(calls) == 1
+
+
+def test_two_crashes_are_unknown_with_the_recorded_reason(repo: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    calls, runner = fake_runner(monkeypatch, (NATIVE_CRASH, "first", None), (-11, "second", None))
+    with pytest.raises(sr.NotConfirmed) as exc:
+        sr.run_jscpd(repo, jscpd_cfg(), runner)
+    assert len(calls) == 2
+    assert str(NATIVE_CRASH) in str(exc.value) and "-11" in str(exc.value) and "second" in str(exc.value)
+
+
+@pytest.mark.parametrize("code,crash", [(0, False), (1, False), (2, False), (-6, True), (134, True),
+                                        (139, True), (0xC0000005, True), (0xC0000409, True), (3221225477, True)])
+def test_native_crash_codes(code: int, crash: bool) -> None:
+    assert sr.is_native_crash(code) is crash

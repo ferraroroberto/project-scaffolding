@@ -71,6 +71,8 @@ An adopter that sets its own `ruff_rules` list does not get `I001` unless it lis
 | `2` | Bad `[static_ratchet]` table, unreadable baseline, bad arguments | fails |
 | `3` | **NOT CONFIRMED**: a detector could not run (no `npx`, no network on the first `npx`, ruff missing, timeout, unparseable output) | fails |
 
+`jscpd` is an external Node process and sometimes dies instead of answering (a Windows access violation, a POSIX signal). When it exits with such a native crash code (negative, `0xC0000000` and up, or 128 plus SIGILL/SIGABRT/SIGBUS/SIGFPE/SIGSEGV) and left no report, the script prints the exit code and the last lines of stderr, then retries **once**. A second crash is exit 3 with both exit codes and the stderr tail in the message. jscpd's own non-zero exit, a timeout or an unreadable report is never retried, and a run that produced a report is never retried: only a missing report plus a crash code is evidence that the tool, not the tree, failed.
+
 Exit 3 is its own state and is never folded into a pass: a tool that did not run has established nothing, so it must not read as "no new findings". Re-run once the prerequisite is fixed.
 
 A baselined finding that has **disappeared** passes, and the run prints `N baselined finding(s) are gone -- run --update-baseline`. Failing instead would force the baseline edit into the same PR; the trade accepted here is that a stale entry lets the identical block regrow silently until someone shrinks the baseline, so shrink it in the PR that removes the debt.
