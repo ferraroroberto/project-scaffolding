@@ -28,16 +28,19 @@ OLD = {"git_sha": HEAD, "pid": 100, "built_at": "2026-01-01T10:00:00"}
 class _Run:
     """Stands in for ``subprocess.run`` and records the call."""
 
-    def __init__(self, returncode: int = 0, raises: BaseException | None = None) -> None:
+    def __init__(
+        self, returncode: int = 0, raises: BaseException | None = None, output: bytes | None = None,
+    ) -> None:
         self.returncode = returncode
         self.raises = raises
+        self.output = output
         self.calls: list[tuple[list[str], dict[str, Any]]] = []
 
     def __call__(self, argv: list[str], **kwargs: Any) -> subprocess.CompletedProcess[Any]:
         self.calls.append((argv, kwargs))
         if self.raises is not None:
             raise self.raises
-        return subprocess.CompletedProcess(argv, self.returncode)
+        return subprocess.CompletedProcess(argv, self.returncode, stdout=self.output)
 
 
 def _bat(tmp_path: Path) -> Path:
@@ -98,6 +101,50 @@ def test_bat_exiting_nonzero_fails_without_polling(tmp_path: Path) -> None:
 @pytest.mark.parametrize("error", [OSError("not found"), subprocess.TimeoutExpired("tray.bat", 180)])
 def test_bat_that_cannot_run_or_hangs_fails(tmp_path: Path, error: BaseException) -> None:
     assert _restart(tmp_path, _Run(raises=error), [OLD]) == EXIT_FAILED
+
+
+def test_failing_bat_leaves_its_last_output_lines_in_the_log(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture, capsys: pytest.CaptureFixture[str], synthetic_host: Any,
+) -> None:
+    home = str(synthetic_host.home)
+    lines = [f"step {n}" for n in range(40)] + [f"ERROR cannot open {home}/app/tray.log", "", "tray start failed"]
+    run = _Run(returncode=1, output="\r\n".join(lines).encode("utf-8"))
+    with caplog.at_level("INFO", logger="restart_check"):
+        assert _restart(tmp_path, run, [OLD, {**OLD, "pid": 200}]) == EXIT_FAILED
+    text = caplog.text
+    assert "tray.bat exited 1" in text
+    assert "tray start failed" in text and "step 39" in text
+    assert "step 0" not in text and "step 20" not in text  # bounded to the tail
+    tail = [r.getMessage() for r in caplog.records if r.getMessage().startswith("   |")]
+    assert tail and all(home not in line for line in tail) and "   | ERROR cannot open ~/app/tray.log" in tail
+    assert "step 0" in capsys.readouterr().out  # the caller still sees the whole output
+
+
+def test_failing_bat_with_no_output_says_its_error_is_unknown(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture,
+) -> None:
+    with caplog.at_level("INFO", logger="restart_check"):
+        assert _restart(tmp_path, _Run(returncode=1), [OLD]) == EXIT_FAILED
+    assert "wrote no output" in caplog.text
+
+
+def test_hung_bat_keeps_the_output_it_wrote_before_the_timeout(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture,
+) -> None:
+    hung = subprocess.TimeoutExpired("tray.bat", 180, output=b"waiting for port 8080\r\n")
+    with caplog.at_level("INFO", logger="restart_check"):
+        assert _restart(tmp_path, _Run(raises=hung), [OLD]) == EXIT_FAILED
+    assert "waiting for port 8080" in caplog.text
+
+
+def test_successful_restart_passes_output_through_and_logs_no_tail(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture, capsys: pytest.CaptureFixture[str],
+) -> None:
+    run = _Run(output=b"starting tray\r\ntray up\r\n")
+    with caplog.at_level("INFO", logger="restart_check"):
+        assert _restart(tmp_path, run, [OLD, {**OLD, "pid": 200}]) == EXIT_OK
+    assert "tray up" in capsys.readouterr().out
+    assert "tray.bat output" not in caplog.text and "verify OK" in caplog.text
 
 
 def test_new_pid_serving_head_passes() -> None:
