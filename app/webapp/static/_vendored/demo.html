@@ -158,6 +158,22 @@
     <button type="button" class="button-tint danger" id="demoButtonDanger">Delete</button>
   </div>
 
+  <h2>button: busy (aria-busy="true") and runBusy</h2>
+  <div class="card" id="demoBusyStatic" style="display: flex; flex-direction: column; gap: var(--space-sm);">
+    <button type="button" class="button-primary" id="demoBusyPrimary" aria-busy="true">Saving</button>
+    <button type="button" class="button-tint" id="demoBusyTint" aria-busy="true">Running</button>
+    <button type="button" class="button-ghost" id="demoBusyGhost" aria-busy="true">Cancelling</button>
+    <button type="button" class="button-surface" id="demoBusySurface" aria-busy="true">Refreshing</button>
+    <button type="button" class="button-tint danger" id="demoBusyDanger" aria-busy="true">Deleting</button>
+    <button type="button" class="button-surface" id="demoBusyIcon" aria-busy="true"><svg class="icon" aria-hidden="true"><use href="#i-copy"></use></svg>Copying</button>
+  </div>
+  <div class="card" style="display: flex; gap: var(--space-sm); flex-wrap: wrap;">
+    <button type="button" class="button-surface" id="demoBusyRun" data-track="demo-busy-run">Refresh</button>
+    <button type="button" class="button-ghost" id="demoBusyFinish" data-track="demo-busy-finish">Finish</button>
+    <button type="button" class="button-ghost" id="demoBusyFail" data-track="demo-busy-fail">Fail</button>
+    <span id="demoBusyCalls" hidden>0</span>
+  </div>
+
   <h2>button: action to variant (one component per action)</h2>
   <div class="card" id="demoActionMap" style="display: flex; flex-direction: column; gap: var(--space-sm);">
     <div style="display: flex; align-items: center; justify-content: space-between; gap: var(--space-sm);"><span>commit</span><button type="button" class="button-primary" data-action="commit">Save</button></div>
@@ -756,6 +772,7 @@
 </div>
 
 <script type="module" src="demo-settings.js"></script>
+<script type="module" src="demo-busy.js"></script>
 <script type="module">
   import { emptyStateEl } from './empty-state/empty-state.js';
   import { switchEl, setSwitch } from './switch/switch.js';

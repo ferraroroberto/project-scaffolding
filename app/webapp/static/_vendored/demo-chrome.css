@@ -40,3 +40,9 @@ body {
 .demo-day-cell.today { background: var(--accent-soft); color: var(--accent-text); }
 .demo-day-num { font-size: var(--font-body-sm); font-weight: 600; font-variant-numeric: tabular-nums; }
 .demo-rec { display: inline-flex; align-items: center; gap: var(--space-sm); }
+/* The busy card: its buttons stay busy for the whole page, so the ring is held
+   still (an endless animation would keep every wait-for-idle probe waiting); the
+   live runBusy button below it spins for real while its work is in flight. The
+   Finish and Fail controls are 44px wide, the fleet's minimum target. */
+#demoBusyStatic [aria-busy="true"]::after { animation: none; }
+#demoBusyFinish, #demoBusyFail { min-width: 44px; }

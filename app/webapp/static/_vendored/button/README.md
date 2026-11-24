@@ -14,7 +14,8 @@ The fleet's canonical **button**: four tiers covering every action, settled by t
 
 | File | Role |
 | --- | --- |
-| `button.css` | Visual contract — the four tiers, the outlined danger variant, the shared disabled recipe. References design tokens only. |
+| `button.css` | Visual contract — the four tiers, the outlined danger variant, the shared disabled recipe, the busy state. References design tokens only. |
+| `busy.js` | `runBusy(button, work, opts)`: sets the busy state for a slow action, ignores a second tap in flight and reports the outcome through the [`toast`](../toast/). |
 | `button.html` | Markup skeletons to copy and adapt. |
 
 ## How to vendor
@@ -24,6 +25,7 @@ The fleet's canonical **button**: four tiers covering every action, settled by t
    ```html
    <link rel="stylesheet" href="/static/_vendored/button/button.css">
    ```
+3. For a slow action, import `busy.js` and vendor `toast/` beside it (see "Busy state and `runBusy`").
 
 ## Markup contract
 
@@ -39,6 +41,37 @@ The fleet's canonical **button**: four tiers covering every action, settled by t
 - Exactly **one** `.button-primary` per view — secondary emphasis is `.button-tint`, never a second solid fill.
 - Disabled is the plain `disabled` attribute on any tier, not a separate class — the shared recipe handles the look.
 - `.danger` only composes with `.button-tint` and is outlined, so use it for every destructive verb, a confirm dialog's Delete included (the vendored recipe covers that one combination; a primary/ghost/surface destructive action is out of scope until a real usage shows up).
+
+## Busy state and `runBusy` — a slow action says it is working
+
+A button that starts slow work (Refresh, Sync, Run, Save) shows it is working instead of looking dead. `[aria-busy="true"]` on any tier:
+
+- keeps the label and draws an inline spinner before it, in place of a leading `.icon` glyph (hidden while busy);
+- takes the disabled recipe's flat control fill and `--line` border, never opacity on a solid fill, so it reads the same in light and dark;
+- keeps the label at AA — `--muted` in light (4.93:1), `--ink` in dark (12.88:1) — because a busy control is still saying what is happening, unlike a disabled one;
+- ignores taps (`pointer-events: none`, `cursor: progress`) but is **not** `disabled`: focus stays on it and a screen reader hears the busy state;
+- stops the ring turning under `prefers-reduced-motion`; the dimmed fill and the open arc still read as working.
+
+`runBusy` owns the whole sequence, so an app never hand-rolls an in-flight flag:
+
+```js
+import { runBusy } from '/static/_vendored/button/busy.js';
+
+refreshBtn.addEventListener('click', () => runBusy(refreshBtn, () => api.refresh(), {
+  start: 'Refreshing',          // optional: shown while the work runs
+  done: 'Refreshed',            // string, or (result) => string
+  fail: 'Refresh failed',       // lead text; the error's own message follows
+}));
+```
+
+- A second call for a button that is already busy runs nothing and resolves `{ ok: false, ignored: true }`.
+- Busy is cleared in `finally`: on success, on a rejection and on a synchronous throw.
+- A failure always toasts as an error with the error's text (`Refresh failed: timed out`), even with no `fail`; `fail` may be a function that builds the whole text.
+- With `start` and no `done`, the start toast is dismissed when the work ends.
+- The promise never rejects: it resolves `{ ok: true, value }` or `{ ok: false, error }`.
+- `opts.host` is a sheet's own toast element, as for `showToast`, for a button inside an open dialog.
+
+`busy.js` imports `../toast/toast.js`, so an app that uses it vendors `toast/` beside `button/`.
 
 ## Action → variant (one component per action)
 
