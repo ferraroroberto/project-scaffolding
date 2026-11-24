@@ -7,5 +7,7 @@
     "redundant": [],
     "folder_types": {}
   },
-  "entries": []
+  "entries": [
+    {"key": "dir:scripts", "modules": 41}
+  ]
 }

@@ -1,41 +1,21 @@
 """Ratchet on doc references to repo paths, modules and ports that do not exist.
 
-A README, a doc or a CLAUDE.md that names a script that moved, a module that was
-renamed or a port the app no longer binds sends the next reader (agent or human)
-down a dead end, and nothing fails when the code moves. This stage resolves each
-such reference against the tracked tree, per file, against a committed baseline:
-it fails only on a dangling reference the baseline does not already record.
-Existing debt never blocks work, but it cannot grow.
+A README, a doc or a CLAUDE.md that names a script that moved, a module that was renamed or a port the
+app no longer binds sends the next reader down a dead end, and nothing fails when the code moves. This
+stage resolves each such reference against the tracked tree and fails only on a dangling reference the
+committed baseline does not already record. Existing debt never blocks work, but it cannot grow.
 
-What is a reference (outside fenced blocks and HTML comments):
+What is a reference, outside fenced blocks and HTML comments: a path in inline code whose first segment
+is a tracked top-level directory (read word by word; a span after a possessive, a pronoun or a repo slug is
+another owner's), `python -m <module>` in inline code, a relative Markdown link, image or `href`/`src`
+target, and a loopback port when `.fleet.toml` declares the app's own `port`. A path resolves when it is
+tracked, a folder holding a tracked file, or ignored by git; `trees = true` reads fenced layout trees too;
+`allow_refs` lists intentional pointers. Placeholders, absolute paths, URLs and other repos' trees are not
+checked. The exact rules: docs/doc-refs-ratchet.md.
 
-  * a path in inline code -- a token whose first segment is a tracked top-level
-    directory (`scripts/x.py`, `docs/`, `.\\scripts\\gate.ps1 -Flag`). Every
-    whitespace token of a span is read, so a command span is checked word by
-    word. A span right after a possessive, a pronoun or a repo slug
-    (`fleet-config`'s `docs/x.md`, its, `| task-os |`) is another owner's;
-  * `python -m <module>` in inline code, when the module's first segment is a
-    tracked top-level directory or root `.py` file (stdlib and installed tools
-    are someone else's);
-  * a relative Markdown link, image, reference definition or `href`/`src`
-    target, resolved from the doc's own folder (`#fragment` and `?query` dropped);
-  * a loopback port (`localhost:N`, `127.0.0.1:N`, `0.0.0.0:N`, inline `:N`),
-    checked only when `.fleet.toml` declares the app's own `port`.
-
-A path resolves when it is a tracked file or a folder holding one, or when git
-ignores it (`.env`, a build output: machine-local by design). With `trees = true`
-a fenced layout tree (`├──` / `└──` lines) is read too, each entry resolved under
-the tree's root. Not checked: placeholders (`<name>`, `*`, `{a,b}`, `$VAR`),
-absolute and home paths, URLs, links that leave the repo, other fenced blocks,
-bare file names, and paths whose first segment is not a tracked root folder
-(another repo's tree reads the same as a typo). `allow_refs` lists
-intentional pointers as globs over the reported reference.
-
-A repo can also list names it has retired (`retired`): a removed `--flag`, a
-`/skill`, an env var, a config key. Each occurrence of such a term, on word
-boundaries in prose, code spans and fenced blocks alike, is a hit that prints
-its `why`. With `retired` set, `SKILL.md` files and the Markdown files they link
-to are read for retired terms too (and for nothing else). Off while the list is empty.
+A repo can also list names it has retired (`retired`: a removed `--flag`, a `/skill`, an env var, a config
+key); each occurrence, in prose, code spans and fenced blocks alike, is a hit that prints its `why`, and
+`SKILL.md` files and the Markdown they link to are read for those terms too. Off while the list is empty.
 
 Opt-in, per adopter, in its own `.fleet.toml`:
 
@@ -43,19 +23,16 @@ Opt-in, per adopter, in its own `.fleet.toml`:
     enabled    = true
     baseline   = ".ratchets/doc-refs.json"  # default
     include    = ["README.md", "CLAUDE.md", "docs/"] # path prefixes; the default
-    exclude    = ["docs/reports/**"]                 # globs
     allow_refs = ["docs/layout.md", ":8000"]         # globs over the reported text
     retired    = [{ term = "--old-flag", why = "flag removed; use --new-flag" }]
     trees      = false                               # true: also check fenced layout trees
 
-Exit codes: 0 pass or not enabled; 1 a new dangling reference, or the baseline is
-missing / a mode was refused; 2 bad configuration, baseline or arguments; 3 NOT
-CONFIRMED (`git` unusable, a file not UTF-8, an unclosed fence or comment) -- the
-gate fails on it. Modes: `check`, `--init`, `--update-baseline` (shrink only),
-`--update-baseline --allow-additions` (shows in review).
+Exit codes: 0 pass or not enabled; 1 a new dangling reference, or the baseline is missing / a mode was
+refused; 2 bad configuration, baseline or arguments; 3 NOT CONFIRMED (`git` unusable, a file not UTF-8, an
+unclosed fence or comment), which the gate fails on. Modes: `check`, `--init`, `--update-baseline` (shrink
+only), `--update-baseline --allow-additions` (shows in review).
 
-Vendor-verbatim (manifest key `doc_refs_ratchet`), stdlib-only. Procedure and
-limits: docs/doc-refs-ratchet.md.
+Vendor-verbatim (manifest key `doc_refs_ratchet`, sibling `ratchet_baseline`), stdlib-only. Procedure: docs/doc-refs-ratchet.md.
 """
 
 from __future__ import annotations

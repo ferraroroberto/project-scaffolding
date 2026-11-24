@@ -1,11 +1,9 @@
 """Ratchet on fleet conventions that one AST or markup rule can check in every repo.
 
-The global instructions carry a handful of rules that each repo used to guard
-with its own one-off test (no-window spawns, one constant-time secret compare,
-git through the repo's wrapper). This stage holds them in one vendored place:
-a small set of stdlib `ast` rules, each opted into per repo, counted per file
-and rule against a committed baseline. It fails only when a count rises.
-Existing debt never blocks work, but it cannot grow.
+The global instructions carry a handful of rules that each repo used to guard with its own one-off test
+(no-window spawns, one constant-time secret compare, git through the repo's wrapper). This stage holds them
+in one vendored place: stdlib `ast` rules, each opted into per repo, counted per file and rule against a
+committed baseline. It fails only when a count rises; existing debt never blocks work, but cannot grow.
 
 The rules (each one quotes its global-instruction line in docs/conventions-ratchet.md):
 
@@ -61,11 +59,10 @@ The rules (each one quotes its global-instruction line in docs/conventions-ratch
   * `state-literal`, `state-set-repeat`, `state-write` -- implicit-state-machine suspects in Python and
     JS/TS, read by `conventions_state.py`; a module `[[state_machines]]` declares is never reported.
 
-Test modules (and every file under a `tests/` or `test/` folder) are skipped by
-every rule except `no-window` and `browser-per-iteration`; `host-identity` reads only them. A single call keeps its exception with a
-`# <rule>-exempt: <reason>` comment on its own lines or in the comment block
-right above it (in a web file the comment is `<!-- ... -->`, `// ...` or
-`/* ... */`); a marker with no reason exempts nothing.
+Test modules (and every file under a `tests/` or `test/` folder) are skipped by every rule except
+`no-window` and `browser-per-iteration`; `host-identity` reads only them. A single call keeps its exception
+with a `# <rule>-exempt: <reason>` comment on its own lines or in the comment block right above it (in a
+web file `<!-- ... -->`, `// ...` or `/* ... */`); a marker with no reason exempts nothing.
 
 Opt-in, per adopter, in its own `.fleet.toml`:
 
