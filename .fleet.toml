@@ -244,6 +244,10 @@ path = ".windows-only-ratchet-baseline.json"
 [[e2e.rule]]
 tier = "none"
 path = ".port-host-ratchet-baseline.json"
+# Likewise the clean-tree-ratchet baseline.
+[[e2e.rule]]
+tier = "none"
+path = ".clean-tree-ratchet-baseline.json"
 [[e2e.rule]]
 tier = "none"
 path = "LICENSE"
@@ -733,6 +737,20 @@ enabled = true
 enabled = true
 
 # ---------------------------------------------------------------------------
+# Clean tree ratchet. scripts/verify-before-ship.ps1 runs
+# scripts/clean_tree_ratchet.py, which records `git status --porcelain`, runs
+# the start smoke below once, and fails when it added, modified or deleted a
+# path beyond the committed baseline: starting a repo leaves `git status`
+# unchanged. A Streamlit server answers its health route before any page runs,
+# so the smoke runs the app's page headlessly through AppTest instead, with the
+# app folder on sys.path as `streamlit run` puts it; a page exception exits 1.
+# Opt-in per repo through this table. Mechanism + limits: docs/clean-tree-ratchet.md.
+[clean_tree_ratchet]
+enabled   = true
+smoke     = ["{python}", "-c", """import sys; sys.path.insert(0, 'app'); from streamlit.testing.v1 import AppTest; at = AppTest.from_file('app/app.py', default_timeout=30).run(); sys.exit(1 if at.exception else 0)"""]
+timeout_s = 90
+
+# ---------------------------------------------------------------------------
 # Test value ratchet and weekly burst. scripts/test_value_ratchet.py checks a
 # gate run recorded by scripts/unit_ledger.py: a new test unit shows its value
 # (red before the fix, a covered line no other unit covers, or an exempt
@@ -918,6 +936,7 @@ request_budget_ratchet = { src = "scripts/request_budget_ratchet.py", requires =
 request_budget_scan = { src = "scripts/request_budget_scan.py" }
 windows_only_ratchet = { src = "scripts/windows_only_ratchet.py" }
 port_host_ratchet = { src = "scripts/port_host_ratchet.py" }
+clean_tree_ratchet = { src = "scripts/clean_tree_ratchet.py" }
 runtime_write_ratchet = { src = "scripts/runtime_write_ratchet.py", requires = ["runtime_write_resolve"] }
 # runtime_write_ratchet loads this sibling (the static path resolver); `requires` makes /propagate-vendored carry both.
 runtime_write_resolve = { src = "scripts/runtime_write_resolve.py" }

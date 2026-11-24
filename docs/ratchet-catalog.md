@@ -15,7 +15,7 @@ The ratchets are the baseline-and-ratchet stages of the pre-ship gate: stdlib-on
 - [UX surfaces: ux surface](#ux-surfaces)
 - [Request budget: request budget](#request-budget)
 - [Windows-only tests: windows only](#windows-only-tests)
-- [Machine-local values: port host](#machine-local-values)
+- [Machine-local values: port host, clean tree](#machine-local-values)
 - [Test value: test value](#test-value)
 - [Exceptions and burn-down](#exceptions-and-burn-down)
 - [Adoption order](#adoption-order)
@@ -1392,6 +1392,29 @@ NAS_URL = "http://192.168.1.20:5000"
 NAS_URL = app_config.load().nas_url
 ```
 
+### Clean tree ratchet
+
+[clean-tree-ratchet.md](clean-tree-ratchet.md). The same decision's second check: starting a repo leaves `git status` unchanged. The ratchet records `git status --porcelain` with each listed file's content hash, runs the start smoke the repo declares in `smoke` once (a free loopback `{port}`, a scratch `{data_dir}`, never the live instance), records the status again and fails on a path beyond the baseline. A smoke that does not start, dies, exits non-zero or is not ready in time is exit 3, never a pass. **On once enabled; it needs a declared `smoke`.** **No per-hit marker:** a path that must stay goes in the baseline, reviewed.
+
+```toml
+[clean_tree_ratchet]
+enabled    = true
+smoke      = ["{python}", "-m", "app.webapp.serve", "--host", "127.0.0.1", "--port", "{port}"]
+ready_path = "/healthz"   # absent: the smoke runs to completion and must exit 0
+```
+
+#### `tree-write`
+
+A path whose `git status` entry or content the smoke changed: a new untracked file, a tracked file modified or deleted, or a file already dirty before the run that the smoke changed again or reverted. Ignored files never count. A path an earlier red run flagged and nobody reverted is still a hit, so re-running the gate does not clear it.
+
+```python
+# bad: the app writes its state next to its code on every start
+STATE = Path(__file__).parent / "state.json"
+
+# fixed: runtime output lives under the runtime root (or an ignored folder)
+STATE = runtime_db_path("myapp", "state.json")
+```
+
 ## Test value
 
 ### Test value ratchet
@@ -1469,6 +1492,7 @@ Which ratchets take which:
 | ux surface | `<rule>-exempt: <reason>` | `exclude`, `paths`, `rules` |
 | windows only | `windows-only-exempt: <reason>` | `exclude`, `test_paths`, `rules` |
 | port host | `port-host-exempt: <reason>` | `resolvers`, `exclude`, `include_tests`, `rules` |
+| clean tree | none: the baseline names a path that must stay | `smoke`, `ready_path`, `timeout_s`, `settle_s`, `data_dir_env` |
 | test value | `test-value-exempt: <reason>` (new units only) | `unit_roots` |
 
 **A baseline is a ledger to burn to zero, never a permanent allowance.** It records debt, not approval:
@@ -1480,4 +1504,4 @@ Which ratchets take which:
 
 ## Adoption order
 
-[adopting-ratchets.md](adopting-ratchets.md) has the steps and the prerequisites table, and `scripts/tools/adopt_ratchets.py` does them. A sensible order: start with the set that is Python only and needs no choices (comment, docs, structure, instruction, doc references, dead code, runtime write), then add static once `ruff` is installed, then conventions and usage track by choosing the rules that match the repository, ux surface once the web app has its surface map, request budget (every rule on, no choices) in any repo, web code or not, windows only in any repo the Mac nightly tests, and port host once the repo has a config resolver to list. Run `--init` on each, review the baseline, and burn it down in later changes.
+[adopting-ratchets.md](adopting-ratchets.md) has the steps and the prerequisites table, and `scripts/tools/adopt_ratchets.py` does them. A sensible order: start with the set that is Python only and needs no choices (comment, docs, structure, instruction, doc references, dead code, runtime write), then add static once `ruff` is installed, then conventions and usage track by choosing the rules that match the repository, ux surface once the web app has its surface map, request budget (every rule on, no choices) in any repo, web code or not, windows only in any repo the Mac nightly tests, and port host once the repo has a config resolver to list, then clean tree once it has a disposable start smoke to declare. Run `--init` on each, review the baseline, and burn it down in later changes.

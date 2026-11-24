@@ -11,6 +11,7 @@ import re
 from pathlib import Path
 
 from scripts import (
+    clean_tree_ratchet,
     comment_ratchet,
     conventions_ratchet,
     instruction_ratchet,
@@ -53,6 +54,7 @@ def expected_rules() -> list[str]:
         *request_budget_ratchet.RULES,
         *windows_only_ratchet.RULES,
         *port_host_ratchet.RULES,
+        *clean_tree_ratchet.RULES,
         *instruction_ratchet.RULES,
         *instruction_ratchet.SHAPE_RULES,
         *static_ratchet.DEFAULT_RULES,

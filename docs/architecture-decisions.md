@@ -147,7 +147,7 @@ Updating any fleet app on any machine is exactly a clean `git pull --ff-only` fo
 
 Why: a machine running a second launcher beside another under AllSigned needed its ports and signatures edited into tracked files, so every update meant discarding local edits before the pull and re-applying them after, the opposite of an app that can be exported to another machine.
 
-Enforcement: the [port host ratchet](port-host-ratchet.md) fails a new port or machine-local host literal in scripts and code outside the declared config resolvers and the samples. A second check, a start or restart smoke in the gate followed by an empty `git status --porcelain`, is its own follow-up issue. The lite family adopts both first, then every other repo through the scaffold.
+Enforcement: the [port host ratchet](port-host-ratchet.md) fails a new port or machine-local host literal in scripts and code outside the declared config resolvers and the samples. The [clean tree ratchet](clean-tree-ratchet.md) is the second: it runs the repo's declared start smoke in the gate on a free port and a scratch data dir, and fails when `git status --porcelain` shows a path the run wrote. The lite family adopts both first, then every other repo through the scaffold.
 
 Issue: https://github.com/ferraroroberto/project-scaffolding/issues/891
 
