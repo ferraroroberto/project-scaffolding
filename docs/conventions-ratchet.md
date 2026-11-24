@@ -408,7 +408,7 @@ Every `.py` file git lists (tracked, or untracked and not ignored), every web fi
 
 `exclude` hides a file from every rule at once. `exclude_by_rule = { <rule> = [globs] }` hides it from that one rule and leaves the file scanned for the others: a repo that keeps `tests/**` out of `no-window` writes `exclude_by_rule = { no-window = ["tests/**"] }` and `host-identity`, which reads test modules only, still scans them. Plain `exclude` on `tests/**` would switch `host-identity` off with nothing reporting it. A key naming a rule not listed in `rules` (a typo included), or a value that is not a list of glob strings, is a config error (exit 2), and a repo without the key behaves exactly as before. Use `exclude_by_rule` for a documented exemption that covers a whole folder and a `<rule>-exempt: <reason>` marker for a single line.
 
-Only Python source, web files and (for `no-pwsh-stub`) the text files above are read. A baseline (this stage's or any other ratchet's, a file named `*-ratchet-baseline.json` or the configured `baseline`) is JSON and is never read as a hit or as evidence about one.
+Only Python source, web files and (for `no-pwsh-stub`) the text files above are read. A baseline (this stage's or any other ratchet's, a file under `.ratchets/`, a file named `*-ratchet-baseline.json` at the old root path, or the configured `baseline`) is JSON and is never read as a hit or as evidence about one.
 
 ## Exit codes
 
@@ -457,7 +457,7 @@ Re-vendoring the script never breaks a repo that has not opted in: an absent `[c
    ```toml
    [conventions_ratchet]
    enabled        = true
-   baseline       = ".conventions-ratchet-baseline.json"  # default
+   baseline       = ".ratchets/conventions.json"  # default
    rules          = ["no-window", "no-drive-path", "secret-compare", "git-wrapper"]
    exclude        = ["src/generated/**"]                    # globs; never scanned
    exclude_by_rule = { no-window = ["tests/**"] }           # globs one rule skips; see Scope

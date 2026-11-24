@@ -65,7 +65,7 @@ A single hit keeps its exception with a `<rule>-exempt: <reason>` comment (`//` 
 ```toml
 [ux_surface_ratchet]
 enabled  = true
-baseline = ".ux-surface-ratchet-baseline.json"            # the default
+baseline = ".ratchets/ux-surface.json"            # the default
 map      = "docs/ux-surfaces.yaml"                         # the default: the source
 page     = "docs/ux-surface-map.md"                        # the default: generated from the map
 rules    = ["unmarked-surface", "invalid-surface-id", "unmapped-surface", "stale-entry", "duplicate-surface",

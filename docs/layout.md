@@ -16,7 +16,7 @@ This repo is the scaffold: it is both a working Streamlit starter and the publis
 
 ## Root files
 
-The root holds the instructions (`CLAUDE.md`, `AGENTS.md`, `README.md`), the project config (`.fleet.toml`, `pyproject.toml`, `pytest.ini`, `requirements.txt`, `.gitignore`, `LICENSE`), the `.*-ratchet-baseline.json` files, the four launchers (`launch_app.*`, `launch_server.*`) and `tray.bat.template`. Each is in the `streamlit` shape's list of root files; nothing else belongs at the root.
+The root holds the instructions (`CLAUDE.md`, `AGENTS.md`, `README.md`), the project config (`.fleet.toml`, `pyproject.toml`, `pytest.ini`, `requirements.txt`, `.gitignore`, `LICENSE`), the four launchers (`launch_app.*`, `launch_server.*`) and `tray.bat.template`. Each is in the `streamlit` shape's list of root files; nothing else belongs at the root. The ratchet baselines live in `.ratchets/`.
 
 ## Where new code goes
 

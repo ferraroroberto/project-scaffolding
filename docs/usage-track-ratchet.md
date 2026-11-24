@@ -163,7 +163,7 @@ Re-vendoring the script never breaks a repo that has not opted in: an absent `[u
    ```toml
    [usage_track_ratchet]
    enabled  = true
-   baseline = ".usage-track-ratchet-baseline.json"           # default
+   baseline = ".ratchets/usage-track.json"           # default
    rules    = ["untracked-control", "untracked-sheet", "dynamic-id", "usage-log-wired"]
    paths    = ["app/webapp/static/**", "app/webapp/templates/**"]  # default
    exclude  = ["app/webapp/static/vendor/**"]                 # third-party code

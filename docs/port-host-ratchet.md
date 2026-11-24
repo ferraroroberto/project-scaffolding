@@ -68,7 +68,7 @@ Tracked and untracked-but-not-ignored files (`git ls-files --cached --others --e
 
 ## The baseline file
 
-`.port-host-ratchet-baseline.json` (or `baseline`): a version and one entry per file with hits, the count per rule, sorted, no line numbers, so a diff reviews cleanly. It only shrinks on its own: a gone hit prints a hint to run `--update-baseline`.
+`.ratchets/port-host.json` (or `baseline`): a version and one entry per file with hits, the count per rule, sorted, no line numbers, so a diff reviews cleanly. It only shrinks on its own: a gone hit prints a hint to run `--update-baseline`.
 
 ## Modes
 
@@ -82,7 +82,7 @@ Tracked and untracked-but-not-ignored files (`git ls-files --cached --others --e
 ```toml
 [port_host_ratchet]
 enabled       = true
-baseline      = ".port-host-ratchet-baseline.json"  # default
+baseline      = ".ratchets/port-host.json"  # default
 rules         = ["port-literal", "host-literal", "bare-exempt"]  # default: all
 resolvers     = ["src/app_config.py"]              # globs; the files that own the defaults
 include_tests = false                              # default

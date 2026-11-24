@@ -96,7 +96,7 @@ Exit 3 is its own state and never folded into a pass: a file the stage cannot re
 
 ## The baseline file
 
-`.request-budget-ratchet-baseline.json` at the repo root (or `baseline`), one entry per file with hits, its counts per rule, no line numbers:
+`.ratchets/request-budget.json` at the repo root (or `baseline`), one entry per file with hits, its counts per rule, no line numbers:
 
 ```json
 {

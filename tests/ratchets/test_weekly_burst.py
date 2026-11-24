@@ -68,7 +68,7 @@ def burst(tmp_path: Path) -> wb.Burst:
     (repo / "IGNORED_MARKER").write_text("only the working tree has this\n", encoding="utf-8")
     write(repo, "src.py", "VALUE = 1\n")
     write(repo, ".fleet.toml", "[test_value_ratchet]\nenabled = true\n")
-    write(repo, ".test-value-ratchet-baseline.json", '{"units": {}}\n')
+    write(repo, ".ratchets/test-value.json", '{"units": {}}\n')
     git(repo, "commit", "-q", "-m", "fake commands")
     state = tmp_path / "state"
     return wb.Burst(repo=repo, ledger=state / "ledger.jsonl", coverage_map=state / "map.json",
@@ -103,7 +103,7 @@ def test_every_leg_green(burst: wb.Burst) -> None:
     assert summary["medians"]["state"] == "green" and summary["medians"]["top"][0]["unit"] == "steady"
     assert all((burst.results_dir / leg["log"]).is_file() for leg in summary["legs"])
     assert sorted(p.name for p in burst.repo.iterdir()) == sorted(
-        [".fleet.toml", ".git", ".gitignore", ".test-value-ratchet-baseline.json", "IGNORED_MARKER", "src.py", "tests"]), \
+        [".fleet.toml", ".git", ".gitignore", ".ratchets", "IGNORED_MARKER", "src.py", "tests"]), \
         "nothing is written next to the code"
     in_tree = {r["unit"] for r in ul.load(burst.ledger, label="weekly-units") if r.get("kind") == "unit"}
     in_clone = {r["unit"] for r in ul.load(burst.ledger, label="weekly-hermetic-gate") if r.get("kind") == "unit"}

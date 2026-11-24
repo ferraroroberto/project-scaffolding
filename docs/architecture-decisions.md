@@ -23,7 +23,7 @@ A convention that can be checked mechanically is enforced by a baseline-and-ratc
 
 - one stdlib script, `scripts/<name>_ratchet.py`, vendored byte-for-byte into adopters and declared in `[vendored]`;
 - a `[<name>_ratchet]` table in `.fleet.toml` (`enabled`, `baseline`, scope options);
-- a committed `.<name>-ratchet-baseline.json`: `--update-baseline` only shrinks it, `--allow-additions` adds and shows in review;
+- a committed `.ratchets/<name>.json`: `--update-baseline` only shrinks it, `--allow-additions` adds and shows in review;
 - exit 0 pass, 1 a measure rose, 2 bad config, 3 not confirmed (fails the gate, never a skip);
 - its own stage in `verify-before-ship`, never path-routed;
 - a `docs/<name>-ratchet.md` explaining the rule and how to fix a hit;

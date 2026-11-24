@@ -267,6 +267,7 @@ def test_a_baseline_from_before_the_layout_checks_passes_then_records(
     old = recorded(tmp_path)
     del old["root_extras"]
     old["entries"] = [e for e in old["entries"] if not str(e["key"]).startswith("place:")]  # type: ignore[attr-defined]
+    (tmp_path / sr.DEFAULT_BASELINE).parent.mkdir(exist_ok=True)
     (tmp_path / sr.DEFAULT_BASELINE).write_text(json.dumps(old), encoding="utf-8")
     capsys.readouterr()
     assert run(tmp_path) == sr.EXIT_PASS
@@ -281,6 +282,7 @@ def test_a_baseline_from_before_the_layout_checks_passes_then_records(
 def test_a_malformed_root_extras_is_a_baseline_error(tmp_path: Path, value: str) -> None:
     make_repo(tmp_path, "webapp-tray", WEBAPP)
     text = (tmp_path / sr.DEFAULT_BASELINE).read_text(encoding="utf-8").replace('"root_extras": []', f'"root_extras": {value}')
+    (tmp_path / sr.DEFAULT_BASELINE).parent.mkdir(exist_ok=True)
     (tmp_path / sr.DEFAULT_BASELINE).write_text(text, encoding="utf-8")
     assert run(tmp_path) == sr.EXIT_CONFIG
 
@@ -304,7 +306,7 @@ def _assert_runs_only_beside_both_siblings(tmp_path: Path, *interpreter_flags: s
     (tmp_path / ".fleet.toml").write_text("layer = 'x'\n", encoding="utf-8")
     command = [sys.executable, *interpreter_flags, str(scripts / "structure_ratchet.py"), "--root", str(tmp_path)]
     env = {k: v for k, v in os.environ.items() if k != "PYTHONPATH"}  # the repo's own scripts/ must not resolve
-    for sibling in ("structure_layout.py", "structure_band.py"):
+    for sibling in ("structure_layout.py", "structure_band.py", "ratchet_baseline.py"):
         missing = subprocess.run(command, capture_output=True, text=True, env=env, cwd=tmp_path,
                                  creationflags=NO_WINDOW, check=False)
         assert missing.returncode == sr.EXIT_NOT_CONFIRMED, missing.stdout + missing.stderr

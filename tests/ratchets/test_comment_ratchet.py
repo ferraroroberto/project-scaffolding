@@ -42,7 +42,7 @@ def test_absent_or_disabled_table_is_not_enabled() -> None:
 
 
 def test_enabled_table_gets_the_documented_defaults() -> None:
-    assert cr.parse_config("[comment_ratchet]\nenabled = true\n") == cr.Config(".comment-ratchet-baseline.json", (), ())
+    assert cr.parse_config("[comment_ratchet]\nenabled = true\n") == cr.Config(".ratchets/comment.json", (), ())
 
 
 def test_enabled_table_honours_every_key() -> None:
@@ -469,6 +469,7 @@ def test_missing_baseline_fails_instead_of_passing(repo: Path, capsys: pytest.Ca
 @pytest.mark.parametrize("text", ["not json", "[]", '{"version": 2, "entries": []}', '{"version": 1, "entries": [{"key": "a"}]}',
                                   '{"version": 1, "entries": [{"key": "a", "count": 0}]}'])
 def test_unreadable_baseline_exits_two(repo: Path, text: str) -> None:
+    (repo / cr.DEFAULT_BASELINE).parent.mkdir(exist_ok=True)
     (repo / cr.DEFAULT_BASELINE).write_text(text, encoding="utf-8")
     assert run_mode(repo) == cr.EXIT_CONFIG
 

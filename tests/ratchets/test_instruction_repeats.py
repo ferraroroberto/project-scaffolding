@@ -285,7 +285,7 @@ def test_editing_a_doc_to_repeat_claude_md_raises_the_count(tmp_path: Path) -> N
 def _lone_script(tmp_path: Path, *siblings: str) -> Path:
     lone = tmp_path / "scripts"
     lone.mkdir()
-    for name in ("instruction_ratchet", "instruction_frontmatter", *siblings):
+    for name in ("instruction_ratchet", "instruction_frontmatter", "ratchet_baseline", *siblings):
         (lone / f"{name}.py").write_bytes((REPO_ROOT / "scripts" / f"{name}.py").read_bytes())
     return lone / "instruction_ratchet.py"
 

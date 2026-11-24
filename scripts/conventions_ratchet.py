@@ -71,7 +71,7 @@ Opt-in, per adopter, in its own `.fleet.toml`:
 
     [conventions_ratchet]
     enabled        = true
-    baseline       = ".conventions-ratchet-baseline.json"  # default
+    baseline       = ".ratchets/conventions.json"  # default
     rules          = ["no-window", "no-drive-path"]          # required: the rules this repo enforces
     exclude        = ["src/generated/**"]                    # globs; never scanned
     print_paths    = ["app/", "src/"]                        # logging-not-print scope (default)
@@ -131,13 +131,14 @@ def _load_sibling(name: str) -> ModuleType:
         spec.loader.exec_module(module)
         return module
     except (ImportError, OSError, SyntaxError):
-        print(f"conventions ratchet: NOT CONFIRMED: {name}.py is missing beside this script -- vendor all three "
-              "(manifest keys conventions_ratchet, conventions_readers and conventions_state)")
+        print(f"conventions ratchet: NOT CONFIRMED: {name}.py is missing beside this script -- vendor all four "
+              "(manifest keys conventions_ratchet, conventions_readers, conventions_state and ratchet_baseline)")
         sys.exit(3)
 
 
 # The pure readers (syntax-tree predicates, the web and text line rules) live in the sibling.
 _readers = _load_sibling("conventions_readers")
+_baseline = _load_sibling("ratchet_baseline")  # where the baseline lives, and its move into .ratchets/
 _Findings = Callable[[Union[bytes, str], frozenset[str]], list[tuple[int, str]]]  # noqa: UP007, UP045 -- Python 3.9 evaluates this alias at import, where `X | Y` raises
 _RuleFindings = Callable[[Union[bytes, str], frozenset[str]], list[tuple[int, str, str]]]  # noqa: UP007, UP045 -- Python 3.9 evaluates this alias at import, where `X | Y` raises
 SIGN_IN_DIR: str = _readers.SIGN_IN_DIR
@@ -162,7 +163,7 @@ STATE_RULES = frozenset(_state.STATE_RULES)
 StateMachine = _state.StateMachine
 
 BASELINE_VERSION = 1
-DEFAULT_BASELINE = ".conventions-ratchet-baseline.json"
+DEFAULT_BASELINE = ".ratchets/conventions.json"
 DEFAULT_PRINT_PATHS = ("app/", "src/")
 #: Always excluded, whatever the adopter's own `exclude` adds.
 BUILTIN_EXCLUDES = ("**/node_modules/**", "**/.venv/**", "**/venv/**")
@@ -340,7 +341,7 @@ def parse_config(toml_text: str) -> Config | None:
         raise ConfigError("[conventions_ratchet] enabled must be true or false")
     if not enabled:
         return None
-    baseline = table.get("baseline", DEFAULT_BASELINE)
+    baseline = _baseline.configured(table.get("baseline", DEFAULT_BASELINE), DEFAULT_BASELINE)
     if not isinstance(baseline, str) or not baseline:
         raise ConfigError("[conventions_ratchet] baseline must be a non-empty string")
     rules = _str_list(table, "rules", ())
@@ -409,7 +410,7 @@ def in_scope(path: str, cfg: Config, vendored: tuple[str, ...]) -> bool:
         return False
     if any(_under(path, d) for d in vendored):
         return False
-    if path == cfg.baseline or path.endswith("-ratchet-baseline.json"):
+    if path == cfg.baseline or path.startswith(".ratchets/") or path.endswith("-ratchet-baseline.json"):
         return False  # a baseline is data about hits, never a hit
     return not matches_any(path, BUILTIN_EXCLUDES + cfg.exclude)
 
@@ -819,7 +820,9 @@ def run(root: Path, *, init: bool, update: bool, allow_additions: bool) -> int:
             return EXIT_CONFIG
         print("conventions ratchet: not enabled (no [conventions_ratchet] enabled = true in .fleet.toml)")
         return EXIT_PASS
-    baseline_path = root / cfg.baseline
+    baseline_path = _baseline.resolve(root, cfg.baseline, DEFAULT_BASELINE, "conventions ratchet")
+    if baseline_path is None:
+        return EXIT_CONFIG
 
     baseline: Counts = {}
     if init:

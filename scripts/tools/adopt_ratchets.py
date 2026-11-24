@@ -59,24 +59,24 @@ class Ratchet:
 
 #: Every ratchet, in gate stage order (scripts/verify-before-ship.ps1, run_ratchets.py).
 RATCHETS: tuple[Ratchet, ...] = (
-    Ratchet("static", (), "ruff (pip install ruff); Node with npx for the duplicate check, else duplicates = false"),
-    Ratchet("comment", (), "-"),
-    Ratchet("docs", (), "-"),
-    Ratchet("structure", ("structure_layout", "structure_band"), "-"),
-    Ratchet("instruction", ("instruction_frontmatter", "instruction_repeats"), "-"),
-    Ratchet("doc_refs", (), "-"),
-    Ratchet("dead_code", (), "-"),
-    Ratchet("conventions", ("conventions_readers", "conventions_state"), "-",
+    Ratchet("static", ("ratchet_baseline",), "ruff (pip install ruff); Node with npx for the duplicate check, else duplicates = false"),
+    Ratchet("comment", ("ratchet_baseline",), "-"),
+    Ratchet("docs", ("ratchet_baseline",), "-"),
+    Ratchet("structure", ("structure_layout", "structure_band", "ratchet_baseline"), "-"),
+    Ratchet("instruction", ("instruction_frontmatter", "instruction_repeats", "ratchet_baseline"), "-"),
+    Ratchet("doc_refs", ("ratchet_baseline",), "-"),
+    Ratchet("dead_code", ("ratchet_baseline",), "-"),
+    Ratchet("conventions", ("conventions_readers", "conventions_state", "ratchet_baseline"), "-",
             'rules = ["subprocess-timeout"]  # pick more: docs/conventions-ratchet.md\n'),
-    Ratchet("runtime_write", ("runtime_write_resolve",), "-"),
-    Ratchet("usage_track", ("usage_track_scan",), "a web UI (HTML/JS) to scan",
+    Ratchet("runtime_write", ("runtime_write_resolve", "ratchet_baseline"), "-"),
+    Ratchet("usage_track", ("usage_track_scan", "ratchet_baseline"), "a web UI (HTML/JS) to scan",
             'rules = ["untracked-control", "untracked-sheet", "dynamic-id"]  # docs/usage-track-ratchet.md\n'),
-    Ratchet("ux_surface", ("usage_track_scan", "ux_surface_map"),
+    Ratchet("ux_surface", ("usage_track_scan", "ux_surface_map", "ratchet_baseline"),
             "a web UI (HTML/JS) to scan and its docs/ux-surfaces.yaml (docs/ux-surface-map.md)"),
-    Ratchet("request_budget", ("request_budget_scan",), "-"),
-    Ratchet("windows_only", (), "pytest tests marked windows_only for the Mac nightly ([ci.nightly])"),
-    Ratchet("port_host", (), "ports and hosts read from the repo's config resolver (declare it in `resolvers`)"),
-    Ratchet("clean_tree", (), "a disposable start smoke declared in `smoke` (a free `{port}`, a scratch `{data_dir}`)",
+    Ratchet("request_budget", ("request_budget_scan", "ratchet_baseline"), "-"),
+    Ratchet("windows_only", ("ratchet_baseline",), "pytest tests marked windows_only for the Mac nightly ([ci.nightly])"),
+    Ratchet("port_host", ("ratchet_baseline",), "ports and hosts read from the repo's config resolver (declare it in `resolvers`)"),
+    Ratchet("clean_tree", ("ratchet_baseline",), "a disposable start smoke declared in `smoke` (a free `{port}`, a scratch `{data_dir}`)",
             '# smoke = ["{python}", "-m", "myapp", "--port", "{port}"]  # required before --init: '
             'docs/clean-tree-ratchet.md\n'),
 )
@@ -193,18 +193,23 @@ def plan_toml(target: Path, chosen: list[Ratchet], files: list[str], sha: str | 
 
 # ---------------------------------------------------------------------- init
 
-def baseline_path(target: Path, r: Ratchet) -> Path:
-    """The ratchet's baseline file: the table's `baseline` key, else the scripts' shared default."""
+def baseline_paths(target: Path, r: Ratchet) -> tuple[Path, Path]:
+    """(the ratchet's baseline file, the root path an older version kept it at).
+
+    The baseline file is the table's `baseline` key, else the scripts' shared default in `.ratchets/`; a key
+    naming the old root default means the default, as the scripts read it. The ratchet moves an old root copy
+    into place on its next run, so either one existing means a baseline exists."""
     text = (target / ".fleet.toml").read_text(encoding="utf-8")
     table = tomllib.loads(text).get(r.table, {})
-    default = "." + r.name.replace("_", "-") + "-ratchet-baseline.json"
+    hyphenated = r.name.replace("_", "-")
+    default, legacy = f".ratchets/{hyphenated}.json", f".{hyphenated}-ratchet-baseline.json"
     name = table.get("baseline", default) if isinstance(table, dict) else default
-    return target / str(name)
+    return target / (default if name == legacy else str(name)), target / legacy
 
 
 def init_ratchet(target: Path, r: Ratchet) -> tuple[int, str]:
     """(exit code, last output line) of `--init`, or of a plain check when a baseline exists."""
-    mode = [] if baseline_path(target, r).exists() else ["--init"]
+    mode = [] if any(path.exists() for path in baseline_paths(target, r)) else ["--init"]
     try:
         proc = _run([sys.executable, f"scripts/{r.table}.py", *mode], target, INIT_TIMEOUT_S)
     except (OSError, subprocess.TimeoutExpired) as exc:
@@ -252,13 +257,20 @@ def adopt(target: Path, chosen: list[Ratchet]) -> int:
         failed = True
     refused: set[str] = set()
     files: list[str] = []
+    refused_files: set[str] = set()
     for r in chosen:
         for name in r.files:
+            if name in refused_files:  # a sibling several ratchets share is copied and recorded once
+                refused.add(r.name)
+                continue
+            if name in files:
+                continue
             state = copy_file(name, target)
             print(f"  scripts/{name}: {state}")
             if state == "refused":
                 print(f"    differs from this scaffold's copy -- not overwritten; compare, then delete it or keep {r.name} out")
                 refused.add(r.name)
+                refused_files.add(name)
             else:
                 files.append(name)
     runner_state = copy_file(RUNNER, target)
@@ -291,7 +303,7 @@ def adopt(target: Path, chosen: list[Ratchet]) -> int:
         code, last = init_ratchet(target, r)
         print(f"  {r.name}: exit {code} ({EXIT_MEANING.get(code, 'unexpected')}) -- {last}")
         failed |= code != 0
-    print("next: review and commit scripts/, .fleet.toml and the .*-ratchet-baseline.json files; "
+    print("next: review and commit scripts/, .fleet.toml and the .ratchets/ baseline files; "
           f"then wire `python scripts/{RUNNER}` into the gate (docs/adopting-ratchets.md)")
     return EXIT_FAILED if failed else EXIT_OK
 

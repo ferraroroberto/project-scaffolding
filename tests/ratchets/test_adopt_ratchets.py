@@ -97,7 +97,7 @@ def test_adopt_copies_declares_inits_and_is_idempotent(tmp_path: Path, capsys: p
     assert data["structure_ratchet"] == {"enabled": True}
     assert data["vendored"]["structure_band"]["dest"] == "scripts/structure_band.py"
     for b in ("comment", "structure", "runtime-write"):
-        assert (target / f".{b}-ratchet-baseline.json").is_file()
+        assert (target / f".ratchets/{b}.json").is_file()
     before = (target / ".fleet.toml").read_bytes()
     assert ar.main([str(target), "--ratchets", "comment,structure,runtime_write"]) == ar.EXIT_OK
     assert (target / ".fleet.toml").read_bytes() == before

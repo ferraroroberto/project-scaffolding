@@ -70,7 +70,7 @@ def test_absent_or_disabled_table_is_not_enabled() -> None:
 
 def test_enabled_table_gets_the_documented_defaults() -> None:
     assert ir.parse_config("[instruction_ratchet]\nenabled = true\n") == ir.Config(
-        ".instruction-ratchet-baseline.json", (".claude/skills",), ()
+        ".ratchets/instruction.json", (".claude/skills",), ()
     )
 
 
@@ -398,6 +398,7 @@ def test_missing_baseline_fails_instead_of_passing(repo: Path, capsys: pytest.Ca
     ],
 )
 def test_unreadable_baseline_exits_two(repo: Path, text: str) -> None:
+    (repo / ir.DEFAULT_BASELINE).parent.mkdir(exist_ok=True)
     (repo / ir.DEFAULT_BASELINE).write_text(text, encoding="utf-8")
     assert run_mode(repo) == ir.EXIT_CONFIG
 

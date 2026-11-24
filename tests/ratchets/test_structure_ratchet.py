@@ -63,7 +63,7 @@ def test_absent_or_disabled_table_is_not_enabled() -> None:
 
 def test_enabled_table_gets_the_documented_defaults() -> None:
     assert sr.parse_config("[structure_ratchet]\nenabled = true\n") == sr.Config(
-        ".structure-ratchet-baseline.json", 1000, 100, 40, (("src", "app"),), ()
+        ".ratchets/structure.json", 1000, 100, 40, (("src", "app"),), ()
     )
 
 
@@ -504,6 +504,7 @@ def test_missing_baseline_fails_instead_of_passing(repo: Path, capsys: pytest.Ca
     ],
 )
 def test_unreadable_baseline_exits_two(repo: Path, text: str) -> None:
+    (repo / sr.DEFAULT_BASELINE).parent.mkdir(exist_ok=True)
     (repo / sr.DEFAULT_BASELINE).write_text(text, encoding="utf-8")
     assert run_mode(repo) == sr.EXIT_CONFIG
 

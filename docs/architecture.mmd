@@ -89,20 +89,23 @@ Recibo / Revisión / Report keep their first letters"]
   subgraph scriptsdir["scripts/"]
     VERIFY["verify-before-ship.ps1\nbyte-compile -> ruff -> static ratchet\n-> comment ratchet -> docs ratchet -> structure ratchet -> instruction ratchet -> doc refs ratchet -> dead code ratchet -> conventions ratchet -> runtime write ratchet -> usage track ratchet -> ux surface ratchet -> mypy --strict (vendored primitives) -> pytest (non-e2e)\n-> routed e2e (skip/static/full) -> shot baseline -> runtime write probe"]
     CLASSIFY["classify_e2e.py (vendor-verbatim, #180)\ndiff-proportionate e2e routing\nreads .fleet.toml [e2e] rules, fail-safe to full"]
-    RATCHET["static_ratchet.py (vendor-verbatim, #410)\nfails only on NEW duplicates (jscpd) / unused code\n(ruff F401,F841) / bug + security patterns (ruff B,S) vs .static-ratchet-baseline.json\nopt-in via .fleet.toml [static_ratchet]; exit 3 = not confirmed"]
-    CRATCHET["comment_ratchet.py (vendor-verbatim, #411)\nfails when a file's count of #NNN refs inside comments\n(py/js/css/ps1) rises vs .comment-ratchet-baseline.json\nopt-in via .fleet.toml [comment_ratchet]; exit 3 = not confirmed"]
-    DRATCHET["docs_ratchet.py (vendor-verbatim)\nfails when the root README passes its byte budget or a file's\ncount of history markers (#NNN refs, dated/changelog headings)\nin README.md + docs/ rises vs .docs-ratchet-baseline.json\nopt-in via .fleet.toml [docs_ratchet]; exit 3 = not confirmed"]
-    SRATCHET["structure_ratchet.py (vendor-verbatim, stdlib)\nfails when a file passes 1,000 lines, a py/js function 100,\na directory 40 modules, or src/ imports app/,\nbeyond .structure-ratchet-baseline.json\nloads sibling structure_layout.py: shape presets,\nextra roots, second-level placement\nand structure_band.py: near-limit band, warning lines\nopt-in via .fleet.toml [structure_ratchet]; exit 3 = not confirmed"]
-    IRATCHET["instruction_ratchet.py (vendor-verbatim, stdlib)\nprompt-audit lint rules (violation cap for the file's reader)\n+ size caps over CLAUDE.md, AGENTS.md, rules, SKILL.md, skill refs\n+ opt-in shape rules: CI expectations, AGENTS.md pointer, CLAUDE.md cap, repeated text\nmay not rise vs .instruction-ratchet-baseline.json\nopt-in via .fleet.toml [instruction_ratchet]; exit 3 = not confirmed\nloads instruction_frontmatter.py + instruction_repeats.py (siblings)"]
-    RRATCHET["doc_refs_ratchet.py (vendor-verbatim, stdlib)\nREADME.md, CLAUDE.md, docs/ references to repo paths,\npython -m modules and ports (vs .fleet.toml port) that do\nnot exist may not rise vs .doc-refs-ratchet-baseline.json\nopt-in via .fleet.toml [doc_refs_ratchet]; exit 3 = not confirmed"]
-    XRATCHET["dead_code_ratchet.py (vendor-verbatim, stdlib ast)\nPython functions, classes and methods nothing references\n(entry points: routes, __all__, tests, hooks, [components] API, allow)\nmay not rise vs .dead-code-ratchet-baseline.json\nopt-in via .fleet.toml [dead_code_ratchet]; exit 3 = not confirmed"]
-    VRATCHET["conventions_ratchet.py (vendor-verbatim, stdlib ast)\nfleet-convention rules opted into per repo: no-window spawns,\nprint in app code, drive paths, raw secret compare, raw git,\npassword input outside sign-in/, login route without login_lockout,\ncall outside its declared must_use helper,\na test reading the real account or home (host-identity, tests only)\nmay not rise per file and rule vs .conventions-ratchet-baseline.json\nloads siblings conventions_readers.py (syntax-tree and line readers)\nand conventions_state.py (implicit-state-machine suspects)\nopt-in via .fleet.toml [conventions_ratchet]; exit 3 = not confirmed"]
-    WRATCHET["runtime_write_ratchet.py (vendor-verbatim, stdlib ast)\nwrite targets resolving under code folders may not rise\nvs .runtime-write-ratchet-baseline.json; unresolved = exit 3\n--snapshot/--probe: no new runtime file under code folders after the tests\nloads sibling runtime_write_resolve.py: the path resolver\nopt-in via .fleet.toml [runtime_write_ratchet]"]
-    UTRATCHET["usage_track_ratchet.py (vendor-verbatim, stdlib html.parser + JS tokenizer)\ncontrols with no constant data-track, dialogs with no data-track-view,\ntracking ids built at run time may not rise per file and rule\nvs .usage-track-ratchet-baseline.json; usage-log-wired never baselined\nloads sibling usage_track_scan.py: the HTML + JS readers\nopt-in via .fleet.toml [usage_track_ratchet]; exit 3 = not confirmed"]
+    RBASE["ratchet_baseline.py (vendor-verbatim, stdlib)
+every ratchet's sibling: its baseline lives in .ratchets/<name>.json;
+an old root .<name>-ratchet-baseline.json moves there once"]
+    RATCHET["static_ratchet.py (vendor-verbatim, #410)\nfails only on NEW duplicates (jscpd) / unused code\n(ruff F401,F841) / bug + security patterns (ruff B,S) vs .ratchets/static.json\nopt-in via .fleet.toml [static_ratchet]; exit 3 = not confirmed"]
+    CRATCHET["comment_ratchet.py (vendor-verbatim, #411)\nfails when a file's count of #NNN refs inside comments\n(py/js/css/ps1) rises vs .ratchets/comment.json\nopt-in via .fleet.toml [comment_ratchet]; exit 3 = not confirmed"]
+    DRATCHET["docs_ratchet.py (vendor-verbatim)\nfails when the root README passes its byte budget or a file's\ncount of history markers (#NNN refs, dated/changelog headings)\nin README.md + docs/ rises vs .ratchets/docs.json\nopt-in via .fleet.toml [docs_ratchet]; exit 3 = not confirmed"]
+    SRATCHET["structure_ratchet.py (vendor-verbatim, stdlib)\nfails when a file passes 1,000 lines, a py/js function 100,\na directory 40 modules, or src/ imports app/,\nbeyond .ratchets/structure.json\nloads sibling structure_layout.py: shape presets,\nextra roots, second-level placement\nand structure_band.py: near-limit band, warning lines\nopt-in via .fleet.toml [structure_ratchet]; exit 3 = not confirmed"]
+    IRATCHET["instruction_ratchet.py (vendor-verbatim, stdlib)\nprompt-audit lint rules (violation cap for the file's reader)\n+ size caps over CLAUDE.md, AGENTS.md, rules, SKILL.md, skill refs\n+ opt-in shape rules: CI expectations, AGENTS.md pointer, CLAUDE.md cap, repeated text\nmay not rise vs .ratchets/instruction.json\nopt-in via .fleet.toml [instruction_ratchet]; exit 3 = not confirmed\nloads instruction_frontmatter.py + instruction_repeats.py (siblings)"]
+    RRATCHET["doc_refs_ratchet.py (vendor-verbatim, stdlib)\nREADME.md, CLAUDE.md, docs/ references to repo paths,\npython -m modules and ports (vs .fleet.toml port) that do\nnot exist may not rise vs .ratchets/doc-refs.json\nopt-in via .fleet.toml [doc_refs_ratchet]; exit 3 = not confirmed"]
+    XRATCHET["dead_code_ratchet.py (vendor-verbatim, stdlib ast)\nPython functions, classes and methods nothing references\n(entry points: routes, __all__, tests, hooks, [components] API, allow)\nmay not rise vs .ratchets/dead-code.json\nopt-in via .fleet.toml [dead_code_ratchet]; exit 3 = not confirmed"]
+    VRATCHET["conventions_ratchet.py (vendor-verbatim, stdlib ast)\nfleet-convention rules opted into per repo: no-window spawns,\nprint in app code, drive paths, raw secret compare, raw git,\npassword input outside sign-in/, login route without login_lockout,\ncall outside its declared must_use helper,\na test reading the real account or home (host-identity, tests only)\nmay not rise per file and rule vs .ratchets/conventions.json\nloads siblings conventions_readers.py (syntax-tree and line readers)\nand conventions_state.py (implicit-state-machine suspects)\nopt-in via .fleet.toml [conventions_ratchet]; exit 3 = not confirmed"]
+    WRATCHET["runtime_write_ratchet.py (vendor-verbatim, stdlib ast)\nwrite targets resolving under code folders may not rise\nvs .ratchets/runtime-write.json; unresolved = exit 3\n--snapshot/--probe: no new runtime file under code folders after the tests\nloads sibling runtime_write_resolve.py: the path resolver\nopt-in via .fleet.toml [runtime_write_ratchet]"]
+    UTRATCHET["usage_track_ratchet.py (vendor-verbatim, stdlib html.parser + JS tokenizer)\ncontrols with no constant data-track, dialogs with no data-track-view,\ntracking ids built at run time may not rise per file and rule\nvs .ratchets/usage-track.json; usage-log-wired never baselined\nloads sibling usage_track_scan.py: the HTML + JS readers\nopt-in via .fleet.toml [usage_track_ratchet]; exit 3 = not confirmed"]
     USRATCHET["ux_surface_ratchet.py (vendor-verbatim, stdlib html.parser + shared JS tokenizer)
 surface roots with no constant data-surface, ids with no docs/ux-surfaces.yaml entry,
 entries no element carries, duplicated ids, dangling links, a page not regenerated
-may not rise per file and rule vs .ux-surface-ratchet-baseline.json;
+may not rise per file and rule vs .ratchets/ux-surface.json;
 reads JS through usage_track_scan.py, the YAML map through ux_surface_map.py
 (which also generates docs/ux-surface-map.md: one Mermaid diagram per area)
 opt-in via .fleet.toml [ux_surface_ratchet]; exit 3 = not confirmed"]
@@ -126,7 +129,7 @@ unit_ledger.py: run wrapper + per-unit JSONL ledger (machine-local state)
 spawn_probe/ (sitecustomize.py): per-unit spawn count + covered lines
 unit_ledger_pytest.py: one pytest module = one unit, honours FLEET_GATE_ONLY
 test_value_ratchet.py: new-test-value, spawn-budget, flake-ledger, hermetic
-vs .test-value-ratchet-baseline.json; exit 3 = not confirmed
+vs .ratchets/test-value.json; exit 3 = not confirmed
 weekly_burst.py: weekly units, fresh-clone gate, coverage map, medians
 docs/test-value-ratchet.md"]
   end
@@ -162,28 +165,28 @@ docs/test-value-ratchet.md"]
   VERIFY -->|runs, opt-in, after the usage track ratchet| USRATCHET
   USRATCHET -.->|reads [ux_surface_ratchet] + [vendored] from| FLEETTOML
   USRATCHET -->|loads the JS tokenizer of| UTRATCHET
-  RBRATCHET["request_budget_ratchet.py (vendor-verbatim, stdlib ast + JS masker)\nfixed-rate fetch polls, polls under 2 s, undeclared fast server loops,\nscans in request handlers, default-pool submits, a web app without\nthe timing middleware may not rise vs .request-budget-ratchet-baseline.json\nloads sibling request_budget_scan.py: the JS + Python readers\nopt-in via .fleet.toml [request_budget_ratchet]; exit 3 = not confirmed"]
+  RBRATCHET["request_budget_ratchet.py (vendor-verbatim, stdlib ast + JS masker)\nfixed-rate fetch polls, polls under 2 s, undeclared fast server loops,\nscans in request handlers, default-pool submits, a web app without\nthe timing middleware may not rise vs .ratchets/request-budget.json\nloads sibling request_budget_scan.py: the JS + Python readers\nopt-in via .fleet.toml [request_budget_ratchet]; exit 3 = not confirmed"]
   VERIFY -->|runs, opt-in, after the ux surface ratchet| RBRATCHET
   RBRATCHET -.->|reads [request_budget_ratchet] + [request_budget] loops from| FLEETTOML
   ADOPTKIT -->|copies into an outside repo + runs there| RBRATCHET
   RBRATCHET -.->|holds apps to the poll helper + middleware of| REQTIMING
   WORATCHET["windows_only_ratchet.py (vendor-verbatim, stdlib ast)
 tests using a Windows-only API without the windows_only marker
-may not rise vs .windows-only-ratchet-baseline.json
+may not rise vs .ratchets/windows-only.json
 opt-in via .fleet.toml [windows_only_ratchet]; exit 3 = not confirmed"]
   VERIFY -->|runs, opt-in, after the request budget ratchet| WORATCHET
   WORATCHET -.->|reads [windows_only_ratchet] + [vendored] from| FLEETTOML
   ADOPTKIT -->|copies into an outside repo + runs there| WORATCHET
   PHRATCHET["port_host_ratchet.py (vendor-verbatim, stdlib re + ast)
 port and machine-local host literals outside the config resolvers and samples
-may not rise vs .port-host-ratchet-baseline.json
+may not rise vs .ratchets/port-host.json
 opt-in via .fleet.toml [port_host_ratchet]; exit 3 = not confirmed"]
   VERIFY -->|runs, opt-in, after the windows only ratchet| PHRATCHET
   PHRATCHET -.->|reads [port_host_ratchet] + [vendored] from| FLEETTOML
   ADOPTKIT -->|copies into an outside repo + runs there| PHRATCHET
   CTRATCHET["clean_tree_ratchet.py (vendor-verbatim, stdlib subprocess + urllib)
 boots the declared start smoke once on a free port
-paths it writes into git status may not rise vs .clean-tree-ratchet-baseline.json
+paths it writes into git status may not rise vs .ratchets/clean-tree.json
 opt-in via .fleet.toml [clean_tree_ratchet]; exit 3 = not confirmed"]
   VERIFY -->|runs, opt-in, after the port host ratchet| CTRATCHET
   CTRATCHET -.->|reads [clean_tree_ratchet] from| FLEETTOML

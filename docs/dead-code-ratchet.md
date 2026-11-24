@@ -97,7 +97,7 @@ Re-vendoring the script never breaks a repo that has not opted in: an absent `[d
    ```toml
    [dead_code_ratchet]
    enabled          = true
-   baseline         = ".dead-code-ratchet-baseline.json"  # default
+   baseline         = ".ratchets/dead-code.json"  # default
    include          = ["src/", "app/"]                    # path prefixes; default: the whole repo
    exclude          = ["src/generated/**"]                # globs; never reported, still read for references
    min_confidence   = 100                                 # default

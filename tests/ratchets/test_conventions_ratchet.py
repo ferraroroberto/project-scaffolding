@@ -572,6 +572,7 @@ def test_the_pwsh_rule_is_opt_in_and_test_folders_and_other_text_are_not_held_to
 def test_a_baseline_file_is_never_read_for_pwsh() -> None:
     assert not cr.in_scope(".dead-code-ratchet-baseline.json", ALL, ())
     assert not cr.in_scope(".conventions-ratchet-baseline.json", ALL, ())
+    assert not cr.in_scope(".ratchets/dead-code.json", ALL, ())
     assert not cr.in_scope("state/custom-baseline-name.json", cr.Config("state/custom-baseline-name.json", cr.RULES), ())
 
 
@@ -651,7 +652,7 @@ def test_allow_additions_adds_to_the_baseline(repo: Path) -> None:
 
 def test_missing_baseline_fails_instead_of_passing(repo: Path, capsys: pytest.CaptureFixture[str]) -> None:
     assert run_mode(repo) == cr.EXIT_RISE
-    assert "baseline .conventions-ratchet-baseline.json is missing" in capsys.readouterr().out
+    assert "baseline .ratchets/conventions.json is missing" in capsys.readouterr().out
 
 
 @pytest.mark.parametrize(
@@ -665,6 +666,7 @@ def test_missing_baseline_fails_instead_of_passing(repo: Path, capsys: pytest.Ca
     ],
 )
 def test_unreadable_baseline_exits_two(repo: Path, text: str) -> None:
+    (repo / cr.DEFAULT_BASELINE).parent.mkdir(exist_ok=True)
     (repo / cr.DEFAULT_BASELINE).write_text(text, encoding="utf-8")
     assert run_mode(repo) == cr.EXIT_CONFIG
 
@@ -775,7 +777,7 @@ def test_a_ratchet_vendored_without_its_readers_is_not_confirmed(tmp_path: Path)
                           env={**os.environ, "PYTHONUTF8": "1"}, creationflags=NO_WINDOW, timeout=60, check=False)
     assert done.returncode == cr.EXIT_NOT_CONFIRMED
     assert "conventions_readers.py is missing beside this script" in done.stdout
-    for sibling in ("conventions_readers.py", "conventions_state.py"):
+    for sibling in ("conventions_readers.py", "conventions_state.py", "ratchet_baseline.py"):
         shutil.copyfile(REPO_ROOT / "scripts" / sibling, alone.with_name(sibling))
     again = subprocess.run([sys.executable, "-P", str(alone), "--root", str(tmp_path)], capture_output=True, text=True,
                            encoding="utf-8", env={**os.environ, "PYTHONUTF8": "1"}, creationflags=NO_WINDOW,

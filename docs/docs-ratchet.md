@@ -115,7 +115,7 @@ Re-vendoring the script never breaks a repo that has not opted in: an absent `[d
    ```toml
    [docs_ratchet]
    enabled          = true
-   baseline         = ".docs-ratchet-baseline.json"   # default
+   baseline         = ".ratchets/docs.json"   # default
    include          = ["README.md", "docs/"]           # path prefixes; the default
    exclude          = ["docs/reports/**"]              # globs, e.g. generated per-run reports
    readme_max_bytes = 40960                            # default: 40 KiB
@@ -128,7 +128,7 @@ Re-vendoring the script never breaks a repo that has not opted in: an absent `[d
 
 The script spawns `git` with `CREATE_NO_WINDOW`, derived locally (it is vendor-verbatim, so it cannot import `src/no_window.py`).
 
-The vendored ratchets share config-loading and glob helpers, because each vendored file must be self-contained. `static_ratchet.py` leaves every `[vendored]` destination out of its duplicate check, so an adopter has nothing to baseline for them. The scaffold has no `[vendored]` table, and its `.static-ratchet-baseline.json` still carries those pairs because it owns the sources.
+The vendored ratchets share config-loading and glob helpers, because each vendored file must be self-contained. `static_ratchet.py` leaves every `[vendored]` destination out of its duplicate check, so an adopter has nothing to baseline for them. The scaffold has no `[vendored]` table, and its `.ratchets/static.json` still carries those pairs because it owns the sources.
 
 ## Cost
 

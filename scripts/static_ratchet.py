@@ -37,7 +37,7 @@ repo that has not opted in:
 
     [static_ratchet]
     enabled    = true
-    baseline   = ".static-ratchet-baseline.json"   # default
+    baseline   = ".ratchets/static.json"   # default
     min_lines  = 10                                  # default
     min_tokens = 100                                 # default
     exclude    = ["**/_vendored/**"]                 # added to the built-in set
@@ -76,6 +76,8 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import importlib
+import importlib.util
 import json
 import re
 import shutil
@@ -87,6 +89,26 @@ from collections import Counter
 from collections.abc import Callable
 from dataclasses import dataclass, replace
 from pathlib import Path
+from types import ModuleType
+
+
+def _load_sibling(name: str) -> ModuleType:
+    """A sibling module, loaded by path so `python -P` (scripts/ off `sys.path`) finds it."""
+    try:
+        if __package__:  # imported as a package member (the tests)
+            return importlib.import_module(f"{__package__}.{name}")
+        spec = importlib.util.spec_from_file_location(name, Path(__file__).with_name(f"{name}.py"))
+        assert spec is not None and spec.loader is not None
+        module = sys.modules[spec.name] = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module
+    except (ImportError, OSError, SyntaxError):
+        print(f"static ratchet: NOT CONFIRMED: {name}.py is missing beside this script -- vendor both "
+              "(manifest keys static_ratchet and ratchet_baseline)")
+        sys.exit(3)
+
+
+_baseline = _load_sibling("ratchet_baseline")  # where the baseline lives, and its move into .ratchets/
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
@@ -95,7 +117,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 JSCPD_VERSION = "5.4.0"
 
 BASELINE_VERSION = 1
-DEFAULT_BASELINE = ".static-ratchet-baseline.json"
+DEFAULT_BASELINE = ".ratchets/static.json"
 DEFAULT_MIN_LINES = 10
 DEFAULT_MIN_TOKENS = 100
 #: Always excluded, whatever the adopter's own `exclude` adds.
@@ -224,7 +246,7 @@ def parse_config(toml_text: str) -> Config | None:
         raise ConfigError("[static_ratchet] enabled must be true or false")
     if not enabled:
         return None
-    baseline = table.get("baseline", DEFAULT_BASELINE)
+    baseline = _baseline.configured(table.get("baseline", DEFAULT_BASELINE), DEFAULT_BASELINE)
     if not isinstance(baseline, str) or not baseline:
         raise ConfigError("[static_ratchet] baseline must be a non-empty string")
     ints: dict[str, int] = {}
@@ -608,7 +630,9 @@ def run(root: Path, *, init: bool, update: bool, allow_additions: bool) -> int:
             return EXIT_CONFIG
         print("static ratchet: not enabled (no [static_ratchet] enabled = true in .fleet.toml)")
         return EXIT_PASS
-    baseline_path = root / cfg.baseline
+    baseline_path = _baseline.resolve(root, cfg.baseline, DEFAULT_BASELINE, "static ratchet")
+    if baseline_path is None:
+        return EXIT_CONFIG
     for name in cfg.off_checks():
         print(f"static ratchet: {name}: OFF ({name} = false in .fleet.toml) -- not checked, not clean")
 

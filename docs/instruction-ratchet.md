@@ -133,7 +133,7 @@ Re-vendoring the script never breaks a repo that has not opted in: an absent `[i
    ```toml
    [instruction_ratchet]
    enabled     = true
-   baseline    = ".instruction-ratchet-baseline.json"   # default
+   baseline    = ".ratchets/instruction.json"   # default
    skill_dirs  = [".claude/skills"]                      # default; each holds <name>/SKILL.md
    extra_files = []                                      # more instruction files, e.g. a global CLAUDE.md
    ci_expectations     = true                            # S-01, optional, default off

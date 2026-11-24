@@ -17,7 +17,7 @@ Nothing else: no fleet tooling, no private skill, no configuration repository.
 
 ## The ratchets
 
-Listed in gate stage order, the order `scripts/run_ratchets.py` runs them. **Siblings** are modules the script loads from its own folder; copy them with it or it exits 3. **Start** marks the recommended first set: Python only, nothing to choose, and the default of `adopt_ratchets.py`.
+Listed in gate stage order, the order `scripts/run_ratchets.py` runs them. **Siblings** are modules the script loads from its own folder; copy them with it or it exits 3. Every script also loads `ratchet_baseline.py`, which keeps its baseline in `.ratchets/`; the table leaves it out of each row. **Start** marks the recommended first set: Python only, nothing to choose, and the default of `adopt_ratchets.py`.
 
 | Ratchet | Script and siblings | Extra prerequisites | Cost | Start | Reference |
 |---|---|---|---|---|---|
@@ -57,7 +57,7 @@ Clone this repository anywhere (it is the source; nothing is installed from it),
 
    Without the script, do the same by hand: copy the files from the table, add `[<name>_ratchet]` with `enabled = true` to `.fleet.toml`, add a `[vendored]` line `<module> = { src = "scripts/<file>", dest = "scripts/<file>" }` per copied file, and run `python scripts/<name>_ratchet.py --init` for each.
 
-2. **Review the baselines.** Each `.<name>-ratchet-baseline.json` at the repo root is today's debt, one entry per line. Adoption never requires cleaning it up first.
+2. **Review the baselines.** Each `.ratchets/<name>.json` is today's debt, one entry per line. Adoption never requires cleaning it up first.
 
 3. **Commit** `scripts/`, `.fleet.toml` and the baseline files together.
 
@@ -163,7 +163,7 @@ The row carries the three rules' counts split Python / JavaScript, the duplicate
 
 ## Updating later
 
-Re-run `adopt_ratchets.py` from a newer scaffold checkout. Unchanged copies are skipped. A copy the scaffold has since changed reads as "differs" and is refused, so delete the old copy first, re-run, and review the diff. The `sha` in each `[vendored]` line records which scaffold commit it came from.
+Re-run `adopt_ratchets.py` from a newer scaffold checkout. Unchanged copies are skipped. A ratchet from before the `.ratchets/` folder kept its baseline at the root as `.<name>-ratchet-baseline.json`; the newer copy moves it into `.ratchets/` on its first run, so commit that move with the update. A copy the scaffold has since changed reads as "differs" and is refused, so delete the old copy first, re-run, and review the diff. The `sha` in each `[vendored]` line records which scaffold commit it came from.
 
 ## Prompt for an outside agent
 

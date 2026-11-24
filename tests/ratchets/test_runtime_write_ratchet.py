@@ -344,6 +344,7 @@ def test_the_script_runs_standalone_beside_its_sibling_and_exits_three_without_i
     assert missing.returncode == rw.EXIT_NOT_CONFIRMED, missing.stdout + missing.stderr
     assert "runtime_write_resolve.py is missing" in missing.stdout
     shutil.copy(REPO_ROOT / "scripts" / "runtime_write_resolve.py", scripts)
+    shutil.copy(REPO_ROOT / "scripts" / "ratchet_baseline.py", scripts)
     present = subprocess.run(command, capture_output=True, text=True, env=env, cwd=tmp_path,
                              creationflags=NO_WINDOW, check=False)
     assert present.returncode == rw.EXIT_PASS, present.stdout + present.stderr

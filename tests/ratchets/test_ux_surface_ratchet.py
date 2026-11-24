@@ -461,7 +461,7 @@ def test_the_script_is_catalogued_with_its_siblings() -> None:
     assert catalog["ux_surface_ratchet"]["src"] == "scripts/ux_surface_ratchet.py"
     assert catalog["ux_surface_map"]["src"] == "scripts/ux_surface_map.py"
     toml = (REPO_ROOT / ".fleet.toml").read_text(encoding="utf-8")
-    assert 'requires = ["usage_track_scan", "ux_surface_map"]' in toml
+    assert 'requires = ["usage_track_scan", "ux_surface_map", "ratchet_baseline"]' in toml
 
 
 def test_every_rule_is_documented() -> None:

@@ -325,6 +325,7 @@ def test_a_new_home_violation_fails_in_a_shape_that_gained_homes(tmp_path: Path,
 def _drop_contract(root: Path) -> dict[str, object]:
     data: dict[str, object] = json.loads((root / sr.DEFAULT_BASELINE).read_text(encoding="utf-8"))
     del data["shape_contract"]
+    (root / sr.DEFAULT_BASELINE).parent.mkdir(exist_ok=True)
     (root / sr.DEFAULT_BASELINE).write_text(json.dumps(data), encoding="utf-8")
     return data
 
@@ -336,6 +337,7 @@ def test_a_baseline_from_before_the_contract_passes_then_records_then_ratchets(
               extra_roots=("config",))
     data = _drop_contract(tmp_path)
     data["entries"] = []  # the placement entries a streamlit baseline never had before streamlit gained homes
+    (tmp_path / sr.DEFAULT_BASELINE).parent.mkdir(exist_ok=True)
     (tmp_path / sr.DEFAULT_BASELINE).write_text(json.dumps(data), encoding="utf-8")
     capsys.readouterr()
     assert run(tmp_path) == sr.EXIT_PASS
@@ -368,6 +370,7 @@ def test_a_malformed_shape_contract_is_a_baseline_error(tmp_path: Path, value: s
     make_repo(tmp_path, "streamlit", STREAMLIT)
     data = json.loads((tmp_path / sr.DEFAULT_BASELINE).read_text(encoding="utf-8"))
     data["shape_contract"] = json.loads(value)
+    (tmp_path / sr.DEFAULT_BASELINE).parent.mkdir(exist_ok=True)
     (tmp_path / sr.DEFAULT_BASELINE).write_text(json.dumps(data), encoding="utf-8")
     assert run(tmp_path) == sr.EXIT_CONFIG
 
@@ -376,6 +379,7 @@ def test_a_contract_kind_inside_entries_is_a_baseline_error(tmp_path: Path) -> N
     make_repo(tmp_path, "streamlit", STREAMLIT)
     data = json.loads((tmp_path / sr.DEFAULT_BASELINE).read_text(encoding="utf-8"))
     data["entries"] = [{"key": "type:docs", "files": 1}]
+    (tmp_path / sr.DEFAULT_BASELINE).parent.mkdir(exist_ok=True)
     (tmp_path / sr.DEFAULT_BASELINE).write_text(json.dumps(data), encoding="utf-8")
     assert run(tmp_path) == sr.EXIT_CONFIG
 

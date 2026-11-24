@@ -124,7 +124,7 @@ Re-vendoring the script never breaks a repo that has not opted in: an absent `[s
    ```toml
    [static_ratchet]
    enabled    = true
-   baseline   = ".static-ratchet-baseline.json"   # default
+   baseline   = ".ratchets/static.json"   # default
    min_lines  = 10                                  # default
    min_tokens = 100                                 # default
    exclude    = ["**/_vendored/**"]                 # added to the built-in set
