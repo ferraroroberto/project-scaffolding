@@ -84,6 +84,7 @@ import sys
 import tempfile
 import tomllib
 from collections import Counter
+from collections.abc import Callable
 from dataclasses import dataclass, replace
 from pathlib import Path
 
@@ -421,29 +422,66 @@ def _tail(text: str) -> str:
     return " | ".join(lines[-3:]) if lines else "(no output)"
 
 
-def run_jscpd(root: Path, cfg: Config) -> list[Finding]:
+Runner = Callable[[list[str], Path, str], subprocess.CompletedProcess[str]]
+
+#: Exit codes that mean the process died instead of answering: a negative code
+#: (POSIX signal), a Windows NTSTATUS error (0xC0000000 and up, e.g. an access
+#: violation) or a shell-style 128+signal for SIGILL/SIGABRT/SIGBUS/SIGFPE/SIGSEGV.
+#: jscpd's own failures exit 1, which is deliberately not a crash.
+_SHELL_CRASH_CODES = frozenset(128 + sig for sig in (4, 6, 7, 8, 11))
+_NTSTATUS_ERROR_FLOOR = 0xC0000000
+
+
+def is_native_crash(returncode: int) -> bool:
+    """True when `returncode` says the process was killed, not that jscpd gave an answer."""
+    return returncode < 0 or returncode >= _NTSTATUS_ERROR_FLOOR or returncode in _SHELL_CRASH_CODES
+
+
+def _jscpd_attempt(
+    cmd: list[str], root: Path, runner: Runner,
+) -> tuple[subprocess.CompletedProcess[str], object | None]:
+    """One jscpd run in a fresh output folder -> (process, parsed report, None when absent)."""
+    with tempfile.TemporaryDirectory(prefix="static-ratchet-") as out_dir:
+        proc = runner([*cmd, "--output", out_dir], root, "jscpd")
+        report_path = Path(out_dir) / "jscpd-report.json"
+        if not report_path.is_file():
+            return proc, None
+        try:
+            return proc, json.loads(report_path.read_text(encoding="utf-8"))
+        except (OSError, ValueError) as exc:
+            raise NotConfirmed(f"jscpd report unreadable: {exc}") from exc
+
+
+def run_jscpd(root: Path, cfg: Config, runner: Runner = _run) -> list[Finding]:
     npx = shutil.which("npx")
     if npx is None:
         raise NotConfirmed("npx not found -- Node is a prerequisite for the duplication check")
     excludes = BUILTIN_EXCLUDES + cfg.exclude
-    with tempfile.TemporaryDirectory(prefix="static-ratchet-") as out_dir:
-        proc = _run(
-            [
-                npx, "--yes", f"jscpd@{JSCPD_VERSION}", ".",
-                "--reporters", "json", "--output", out_dir, "--silent",
-                "--format", JSCPD_FORMATS,
-                "--min-lines", str(cfg.min_lines), "--min-tokens", str(cfg.min_tokens),
-                "--ignore", ",".join(excludes),
-            ],
-            root, "jscpd",
+    cmd = [
+        npx, "--yes", f"jscpd@{JSCPD_VERSION}", ".",
+        "--reporters", "json", "--silent",
+        "--format", JSCPD_FORMATS,
+        "--min-lines", str(cfg.min_lines), "--min-tokens", str(cfg.min_tokens),
+        "--ignore", ",".join(excludes),
+    ]
+    proc, report = _jscpd_attempt(cmd, root, runner)
+    if report is None and is_native_crash(proc.returncode):
+        # A native crash is intermittent and says nothing about the tree: retry once,
+        # keeping the first exit code and stderr tail so the cause survives either way.
+        first = proc.returncode
+        print(
+            f"static ratchet: jscpd crashed (exit {first}, no report): "
+            f"{_tail(proc.stderr or proc.stdout)} -- retrying once",
+            file=sys.stderr,
         )
-        report_path = Path(out_dir) / "jscpd-report.json"
-        if proc.returncode != 0 or not report_path.is_file():
-            raise NotConfirmed(f"jscpd exited {proc.returncode} without a report: {_tail(proc.stderr or proc.stdout)}")
-        try:
-            report = json.loads(report_path.read_text(encoding="utf-8"))
-        except (OSError, ValueError) as exc:
-            raise NotConfirmed(f"jscpd report unreadable: {exc}") from exc
+        proc, report = _jscpd_attempt(cmd, root, runner)
+        if report is None:
+            raise NotConfirmed(
+                f"jscpd crashed twice without a report (exit {first}, then {proc.returncode}): "
+                f"{_tail(proc.stderr or proc.stdout)}"
+            )
+    if report is None or proc.returncode != 0:
+        raise NotConfirmed(f"jscpd exited {proc.returncode} without a report: {_tail(proc.stderr or proc.stdout)}")
     return parse_jscpd(report, root, excludes)
 
 
