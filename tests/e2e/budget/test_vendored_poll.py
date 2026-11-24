@@ -27,6 +27,20 @@ _BUSY_ONLY = "import { startPoll } from './poll.js';\n" \
              "startPoll(() => fetch('/api/progress'), 1000, { activeWhile: () => window.job.running });"
 
 
+# An EventSource the page opens at load, closes when hidden and reopens when visible.
+_STREAM_CLOSES_ON_HIDE = (
+    "let es = null;\n"
+    "const open = () => { es = new EventSource('/api/events'); };\n"
+    "const close = () => { if (es) es.close(); es = null; };\n"
+    "open();\n"
+    "document.addEventListener('visibilitychange', () => (document.hidden ? close() : open()));"
+)
+# The same stream, kept open while the page is hidden.
+_STREAM_KEPT_WHILE_HIDDEN = "new EventSource('/api/events');"
+# A stream the page opens late, in the visible minute.
+_STREAM_OPENED_LATE = "setTimeout(() => new EventSource('/api/events'), 5000);"
+
+
 def _probe(page: Page, base_url: str, script: str) -> str:
     html = f"<!doctype html><html><body><script type=\"module\">{script}</script></body></html>"
 
@@ -36,8 +50,13 @@ def _probe(page: Page, base_url: str, script: str) -> str:
     def answer_api(route: Route) -> None:
         route.fulfill(status=200, content_type="application/json", body="{}")
 
+    def hold_stream(route: Route) -> None:
+        # Never answered: the request stays out for as long as the page lives, like a real stream.
+        pass
+
     page.route(f"**{_PAGE}", answer_page)
     page.route("**/api/**", answer_api)
+    page.route("**/api/events", hold_stream)
     return f"{base_url}{_PAGE}"
 
 
@@ -60,7 +79,34 @@ def _busy_only_poll_is_silent_when_idle(page: Page, base_url: str) -> None:
     assert not reading.visible and not reading.hidden and not reading.catch_up, reading.summary()
 
 
+_STREAMS = ("/api/events",)
+
+
+def _measure_streaming(page: Page, base_url: str, script: str):
+    return measure_request_budget(page, _probe(page, base_url, script), stream_paths=_STREAMS)
+
+
+def _stream_is_measured_not_unknown(page: Page, base_url: str) -> None:
+    reading = _measure_streaming(page, base_url, _STREAM_OPENED_LATE)
+    assert reading.visible == {"/api/events": 1}, reading.summary()
+
+
+def _stream_closed_on_hide_is_one_catch_up_read(page: Page, base_url: str) -> None:
+    reading = _measure_streaming(page, base_url, _STREAM_CLOSES_ON_HIDE)
+    assert_request_budget(reading, visible_max=12)
+    assert not reading.visible, f"the stream opened at boot is not counted: {reading.summary()}"
+    assert reading.catch_up == {"/api/events": 1}, reading.summary()
+
+
+def _stream_kept_while_hidden_breaks_the_budget(page: Page, base_url: str) -> None:
+    reading = _measure_streaming(page, base_url, _STREAM_KEPT_WHILE_HIDDEN)
+    assert any("while hidden" in p for p in request_budget_problems(reading, visible_max=12)), reading.summary()
+
+
 _CHECKS = (
+    ("a stream is measured, not unknown", _stream_is_measured_not_unknown),
+    ("a stream closed on hide is one catch-up read", _stream_closed_on_hide_is_one_catch_up_read),
+    ("a stream kept while hidden breaks the budget", _stream_kept_while_hidden_breaks_the_budget),
     ("startPoll keeps the budget", _keeps_the_budget),
     ("a setInterval poll breaks it", _catches_a_set_interval_poll),
     ("a busy-only poll reads nothing while idle", _busy_only_poll_is_silent_when_idle),

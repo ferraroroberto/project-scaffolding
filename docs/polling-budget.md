@@ -70,6 +70,8 @@ The logger is `request_timing`; a tray-run app attaches its own file handler to 
 
 The clock advances in half-second steps and each step waits for the requests it started to finish, so a self-scheduling poll is measured at its real cadence. The budget: visible at most `[request_budget] visible_requests_per_minute` from the app's `.fleet.toml`, hidden zero, and at most one catch-up read per path.
 
+A page that opens a server-sent event stream (an `EventSource`) holds that request out for as long as it lives, so the probe would never see it settle. Name the stream's path prefixes in `stream_paths` (`measure_request_budget(page, url, stream_paths=("/api/events",))`): a matching request under the `api_prefix` is never waited for, and is counted when it opens, in the phase it opens in. A page that closes its stream on hide and reopens it on return shows up as one catch-up read; a stream the page opens in the hidden minute counts there, and so does one that was open when the page hid and is still open when the minute ends, so a page that keeps its stream while hidden fails the hidden budget of zero. A stream already open when the minute starts is a boot request and is not counted as visible.
+
 A count the probe cannot establish is **unknown**, never a pass and never a default: a missing `.fleet.toml`, a missing `[request_budget]` table or key, a value that is not a whole number of 0 or more, or a request that never settles raises `RequestBudgetUnknown` with a `NOT CONFIRMED` message. It is not an `AssertionError`, so pytest reports it as an error (E), apart from a broken budget's failure (F). The probe's unit cases are in `tests/e2e_helpers/test_request_budget_probe.py`.
 
 ```python
