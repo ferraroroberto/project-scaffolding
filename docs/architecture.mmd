@@ -174,6 +174,13 @@ opt-in via .fleet.toml [windows_only_ratchet]; exit 3 = not confirmed"]
   VERIFY -->|runs, opt-in, after the request budget ratchet| WORATCHET
   WORATCHET -.->|reads [windows_only_ratchet] + [vendored] from| FLEETTOML
   ADOPTKIT -->|copies into an outside repo + runs there| WORATCHET
+  PHRATCHET["port_host_ratchet.py (vendor-verbatim, stdlib re + ast)
+port and machine-local host literals outside the config resolvers and samples
+may not rise vs .port-host-ratchet-baseline.json
+opt-in via .fleet.toml [port_host_ratchet]; exit 3 = not confirmed"]
+  VERIFY -->|runs, opt-in, after the windows only ratchet| PHRATCHET
+  PHRATCHET -.->|reads [port_host_ratchet] + [vendored] from| FLEETTOML
+  ADOPTKIT -->|copies into an outside repo + runs there| PHRATCHET
   ADOPTKIT -->|writes the adopter's files through| RUNTIMEFILES
   VERIFY -->|runs after the e2e stage| SHOTBASE
   SHOTBASE -.->|reads [shot_baseline] from| FLEETTOML

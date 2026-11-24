@@ -75,6 +75,7 @@ RATCHETS: tuple[Ratchet, ...] = (
             "a web UI (HTML/JS) to scan and its docs/ux-surfaces.yaml (docs/ux-surface-map.md)"),
     Ratchet("request_budget", ("request_budget_scan",), "-"),
     Ratchet("windows_only", (), "pytest tests marked windows_only for the Mac nightly ([ci.nightly])"),
+    Ratchet("port_host", (), "ports and hosts read from the repo's config resolver (declare it in `resolvers`)"),
 )
 BY_NAME = {r.name: r for r in RATCHETS}
 #: Ratchets that read a recorded test run, so they run after the tests and are wired by hand

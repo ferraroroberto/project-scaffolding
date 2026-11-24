@@ -240,6 +240,10 @@ path = ".request-budget-ratchet-baseline.json"
 [[e2e.rule]]
 tier = "none"
 path = ".windows-only-ratchet-baseline.json"
+# Likewise the port-host-ratchet baseline.
+[[e2e.rule]]
+tier = "none"
+path = ".port-host-ratchet-baseline.json"
 [[e2e.rule]]
 tier = "none"
 path = "LICENSE"
@@ -716,6 +720,19 @@ why        = "logs the process's thread, handle and memory counts every 5 minute
 enabled = true
 
 # ---------------------------------------------------------------------------
+# Port host ratchet. scripts/verify-before-ship.ps1 runs
+# scripts/port_host_ratchet.py, which fails when a script or code file gains a
+# port literal (`127.0.0.1:8445`, `PORT=8501`, `--port 8130`) or a machine-local
+# host (a LAN or tailnet address, a *.ts.net name) outside the files listed in
+# `resolvers` and the samples, beyond the committed baseline: a clean pull plus
+# restart is the whole update, so machine-local values live in ignored config.
+# Opt-in per repo through this table. The scaffold has no config resolver, so it
+# lists none and baselines its launcher and probe defaults.
+# Mechanism + limits: docs/port-host-ratchet.md.
+[port_host_ratchet]
+enabled = true
+
+# ---------------------------------------------------------------------------
 # Test value ratchet and weekly burst. scripts/test_value_ratchet.py checks a
 # gate run recorded by scripts/unit_ledger.py: a new test unit shows its value
 # (red before the fix, a covered line no other unit covers, or an exempt
@@ -900,6 +917,7 @@ request_budget_ratchet = { src = "scripts/request_budget_ratchet.py", requires =
 # request_budget_ratchet loads this sibling (the JS and Python rule readers); `requires` makes /propagate-vendored carry both.
 request_budget_scan = { src = "scripts/request_budget_scan.py" }
 windows_only_ratchet = { src = "scripts/windows_only_ratchet.py" }
+port_host_ratchet = { src = "scripts/port_host_ratchet.py" }
 runtime_write_ratchet = { src = "scripts/runtime_write_ratchet.py", requires = ["runtime_write_resolve"] }
 # runtime_write_ratchet loads this sibling (the static path resolver); `requires` makes /propagate-vendored carry both.
 runtime_write_resolve = { src = "scripts/runtime_write_resolve.py" }

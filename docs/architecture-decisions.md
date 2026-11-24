@@ -141,6 +141,16 @@ Why: fleet repos have no branch protection and CI's only signal beyond the local
 
 Issue: https://github.com/ferraroroberto/project-scaffolding/issues/635
 
+### A clean pull plus restart is the whole update
+
+Updating any fleet app on any machine is exactly a clean `git pull --ff-only` followed by the repo's own restart recipe; no machine ever edits a tracked file to run an app. Ports, hosts, paths and per-machine toggles live only in an ignored `config/*.json` (or `.env`) with a tracked `*.sample` default, and code, scripts and `.bat` files read them through the repo's config resolver. Nothing is signed or re-pointed in place: a machine that needs signed scripts gets them from an ignored, regenerated copy, and repo PowerShell scripts start through the AllSigned-safe launcher pattern. Starting, restarting and gating a repo leaves `git status` unchanged, with runtime output in ignored state dirs, and two instances of one app on a machine differ only in their ignored config.
+
+Why: a machine running a second launcher beside another under AllSigned needed its ports and signatures edited into tracked files, so every update meant discarding local edits before the pull and re-applying them after, the opposite of an app that can be exported to another machine.
+
+Enforcement: the [port host ratchet](port-host-ratchet.md) fails a new port or machine-local host literal in scripts and code outside the declared config resolvers and the samples. A second check, a start or restart smoke in the gate followed by an empty `git status --porcelain`, is its own follow-up issue. The lite family adopts both first, then every other repo through the scaffold.
+
+Issue: https://github.com/ferraroroberto/project-scaffolding/issues/891
+
 ### Runtime data lives on a fast drive
 
 A long-lived process resolves its SQLite and other fsync-heavy state through the vendored `src/runtime_data.py`: `runtime_db_path(app, filename, env_var=...)` returns `<root>/<app>/<filename>`, the root being `FLEET_DATA_ROOT` or a fixed per-OS default. A repo-relative database path is a defect, fixed by changing the path and never by a junction; a harness that spawns the app sets `<APP>_DATA_DIR` to a per-run temp folder.

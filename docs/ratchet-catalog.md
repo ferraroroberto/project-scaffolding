@@ -15,6 +15,7 @@ The ratchets are the baseline-and-ratchet stages of the pre-ship gate: stdlib-on
 - [UX surfaces: ux surface](#ux-surfaces)
 - [Request budget: request budget](#request-budget)
 - [Windows-only tests: windows only](#windows-only-tests)
+- [Machine-local values: port host](#machine-local-values)
 - [Test value: test value](#test-value)
 - [Exceptions and burn-down](#exceptions-and-burn-down)
 - [Adoption order](#adoption-order)
@@ -1343,6 +1344,40 @@ def test_finds_chrome_in_program_files(monkeypatch, tmp_path):
 
 A `windows-only-exempt` marker with no reason is a `bare-exempt` hit, the rule the request budget ratchet above shares.
 
+## Machine-local values
+
+[port-host-ratchet.md](port-host-ratchet.md). Updating a fleet app is a clean `git pull --ff-only` plus its restart recipe ([architecture-decisions.md](architecture-decisions.md)), so a port or host a machine might need to change lives in ignored config with a tracked sample, read through the repo's config resolver. This ratchet reads the tracked scripts and code (`.py`, `.ps1`, `.psm1`, `.bat`, `.cmd`, `.sh`, `.js`, `.mjs`, `.cjs`, `.ts`) and counts, per file and rule, the literals written outside the files listed in `resolvers`, the samples (a name holding `.sample` or `.example`), tests (unless `include_tests = true`) and vendored copies. Full-line comments, PowerShell `<# ... #>` and JS `/* ... */` blocks and Python docstrings are prose and are skipped. **Every rule is on by default.** **Except** one hit with `port-host-exempt: <reason>` on its line or the comment line right above it; a marker with no reason exempts nothing and is itself a `bare-exempt` hit, the rule the request budget ratchet above shares.
+
+```toml
+[port_host_ratchet]
+enabled   = true
+resolvers = ["src/app_config.py"]   # the files that own the defaults
+```
+
+#### `port-literal`
+
+A port number written next to a host (`127.0.0.1:8445`, `localhost:8501`, `{host}:8445`, `%HOST%:8445`) or given to a port name (`PORT=8501`, `--port 8130`, `DEFAULT_PORT = 8446`, `-Ports "8465"`, `"port": 8000`). A side-by-side instance moves its port in config, never in a tracked script.
+
+```bat
+:: bad
+set "PORT=8445"
+
+:: fixed: the resolver reads config/config.json (ignored) over its tracked sample
+for /f %%p in ('.venv\Scripts\python.exe -m src.app_config port') do set "PORT=%%p"
+```
+
+#### `host-literal`
+
+A private-LAN or CGNAT/tailnet IPv4 address (`10.x`, `172.16-31.x`, `192.168.x`, `100.64-127.x`) or a `*.ts.net` name. Loopback, `0.0.0.0`, public addresses and CIDR networks (`100.64.0.0/10`) are not hits.
+
+```python
+# bad
+NAS_URL = "http://192.168.1.20:5000"
+
+# fixed
+NAS_URL = app_config.load().nas_url
+```
+
 ## Test value
 
 ### Test value ratchet
@@ -1419,6 +1454,7 @@ Which ratchets take which:
 | usage track | `<rule>-exempt: <reason>` | `exclude`, `paths`, `builders` |
 | ux surface | `<rule>-exempt: <reason>` | `exclude`, `paths`, `rules` |
 | windows only | `windows-only-exempt: <reason>` | `exclude`, `test_paths`, `rules` |
+| port host | `port-host-exempt: <reason>` | `resolvers`, `exclude`, `include_tests`, `rules` |
 | test value | `test-value-exempt: <reason>` (new units only) | `unit_roots` |
 
 **A baseline is a ledger to burn to zero, never a permanent allowance.** It records debt, not approval:
@@ -1430,4 +1466,4 @@ Which ratchets take which:
 
 ## Adoption order
 
-[adopting-ratchets.md](adopting-ratchets.md) has the steps and the prerequisites table, and `scripts/tools/adopt_ratchets.py` does them. A sensible order: start with the set that is Python only and needs no choices (comment, docs, structure, instruction, doc references, dead code, runtime write), then add static once `ruff` is installed, then conventions and usage track by choosing the rules that match the repository, ux surface once the web app has its surface map, request budget (every rule on, no choices) in any repo, web code or not, and windows only in any repo the Mac nightly tests. Run `--init` on each, review the baseline, and burn it down in later changes.
+[adopting-ratchets.md](adopting-ratchets.md) has the steps and the prerequisites table, and `scripts/tools/adopt_ratchets.py` does them. A sensible order: start with the set that is Python only and needs no choices (comment, docs, structure, instruction, doc references, dead code, runtime write), then add static once `ruff` is installed, then conventions and usage track by choosing the rules that match the repository, ux surface once the web app has its surface map, request budget (every rule on, no choices) in any repo, web code or not, windows only in any repo the Mac nightly tests, and port host once the repo has a config resolver to list. Run `--init` on each, review the baseline, and burn it down in later changes.
