@@ -30,7 +30,7 @@ def _check_busy_look(page: Page, theme: str) -> None:
         # A busy control still says what is happening: its label clears AA.
         assert _contrast(_style(page, sel, "color"), fill, fill) >= _AA, (theme, tier)
         spin = page.evaluate(_SPIN_JS, sel)
-        assert spin["name"] == "button-busy-spin" and spin["content"] != "none", (theme, tier, spin)
+        assert spin["content"] != "none", (theme, tier, spin)
         assert abs(spin["w"] - spin["h"]) < 0.5 and spin["w"] > 8, (theme, tier, spin)
     # The ring stands in for a leading glyph: the glyph is gone while busy.
     assert _style(page, "#demoBusyIcon > .icon", "display") == "none", theme
@@ -55,10 +55,12 @@ def check_busy_state_on_a_phone(gallery: Page) -> None:
 
 
 def check_busy_spinner_stops_under_reduced_motion(gallery: Page) -> None:
-    """busy: prefers-reduced-motion keeps the ring but stops it turning."""
+    """busy: prefers-reduced-motion keeps the ring but stops it turning (live button)."""
     gallery.emulate_media(reduced_motion="reduce")
-    spin = gallery.evaluate(_SPIN_JS, "#demoBusySurface")
+    gallery.click("#demoBusyRun")
+    spin = gallery.evaluate(_SPIN_JS, "#demoBusyRun")
     assert spin["name"] == "none" and spin["content"] != "none", spin
+    gallery.click("#demoBusyFinish")
 
 
 def check_run_busy_flow(gallery: Page) -> None:
@@ -69,6 +71,8 @@ def check_run_busy_flow(gallery: Page) -> None:
     expect(toast).to_have_text("Refreshing")
     # A second tap in flight: pointer events are off, and a scripted click is ignored too.
     assert _style(gallery, "#demoBusyRun", "pointerEvents") == "none"
+    # The ring turns while the work is in flight.
+    assert gallery.evaluate(_SPIN_JS, "#demoBusyRun")["name"] == "button-busy-spin"
     gallery.evaluate("document.getElementById('demoBusyRun').click()")
     expect(calls).to_have_text("1")
     gallery.click("#demoBusyFinish")
