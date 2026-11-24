@@ -110,6 +110,14 @@
                          .fleet.toml [port_host_ratchet]; exit 3 = "not
                          confirmed", a failure, never a pass
                          (docs/port-host-ratchet.md)
+     12f. clean tree ratchet — scripts/clean_tree_ratchet.py: records `git
+                         status --porcelain`, runs the repo's declared start
+                         smoke once (a free port, a scratch data dir), and
+                         fails when it wrote a path beyond the committed
+                         baseline; opt-in via .fleet.toml [clean_tree_ratchet];
+                         a smoke that did not start, or git unusable, is an
+                         "exit 3, not confirmed": a failure, never a pass
+                         (docs/clean-tree-ratchet.md)
      13. mypy --strict — the vendor-verbatim primitives only; the list is
                          derived from .fleet.toml's [components] catalog via
                          scripts/vendored_catalog.py, never hand-maintained here
@@ -241,6 +249,7 @@ Invoke-Stage "ux surface ratchet"                 { & $py "scripts/ux_surface_ra
 Invoke-Stage "request budget ratchet"             { & $py "scripts/request_budget_ratchet.py" }
 Invoke-Stage "windows only ratchet"               { & $py "scripts/windows_only_ratchet.py" }
 Invoke-Stage "port host ratchet"                  { & $py "scripts/port_host_ratchet.py" }
+Invoke-Stage "clean tree ratchet"                 { & $py "scripts/clean_tree_ratchet.py" }
 Invoke-Stage "mypy --strict (vendored)"           { & $py -m mypy @VendoredModules }
 Invoke-Stage "py39 (vendored)"                    { & $py "scripts/tools/vendored_py39_check.py" }
 # Runtime write probe, first half: what already sits untracked or ignored under
