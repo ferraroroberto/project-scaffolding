@@ -12,6 +12,12 @@
         "title": "ADR: tests read host identity only through a synthetic fixture"
     },
     {
+        "number": 891,
+        "state": "OPEN",
+        "stateReason": "",
+        "title": "ADR: a clean git pull plus restart is the whole update on every machine"
+    },
+    {
         "number": 858,
         "state": "OPEN",
         "stateReason": "",

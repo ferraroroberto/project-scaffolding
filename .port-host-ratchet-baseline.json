@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "entries": [
+    {"key": "launch_app.bat", "counts": {"port-literal": 1}},
+    {"key": "launch_server.bat", "counts": {"port-literal": 1}},
+    {"key": "launch_server.sh", "counts": {"port-literal": 1}},
+    {"key": "scripts/ci/audio_latency_probe.py", "counts": {"port-literal": 1}},
+    {"key": "src/doc_capture/engine.py", "counts": {"port-literal": 1}}
+  ]
+}
