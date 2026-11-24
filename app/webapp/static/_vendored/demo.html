@@ -772,13 +772,13 @@
 </div>
 
 <script type="module" src="demo-settings.js"></script>
+<script type="module" src="demo-busy.js"></script>
 <script type="module">
   import { emptyStateEl } from './empty-state/empty-state.js';
   import { switchEl, setSwitch } from './switch/switch.js';
   import { buildReadoutText } from './page-foot/page-foot.js';
   import { bindTextSize } from './text-size/text-size.js';
   import { showToast } from './toast/toast.js';
-  import { runBusy } from './button/busy.js';
   import { renderHeadStatus } from './home-head/home-head.js';
   import { createRowMenu } from './row-menu/row-menu.js';
   import { bindCodeListing } from './code-listing/code-listing.js';
@@ -879,24 +879,6 @@
       label: 'Undo',
       onClick: () => { document.getElementById('demoToastUndone').hidden = false; },
     } });
-  });
-
-  // runBusy: the work settles only when Finish or Fail is tapped, so the harness
-  // can read the busy button and its toasts without racing a timer. Every call
-  // that actually runs is counted, to show a second tap in flight runs nothing.
-  let demoBusySettle = null;
-  document.getElementById('demoBusyRun').addEventListener('click', (e) => {
-    runBusy(e.currentTarget, () => {
-      const calls = document.getElementById('demoBusyCalls');
-      calls.textContent = String(Number(calls.textContent) + 1);
-      return new Promise((resolve, reject) => { demoBusySettle = { resolve, reject }; });
-    }, { start: 'Refreshing', done: 'Refreshed', fail: 'Refresh failed' });
-  });
-  document.getElementById('demoBusyFinish').addEventListener('click', () => {
-    if (demoBusySettle) demoBusySettle.resolve('ok');
-  });
-  document.getElementById('demoBusyFail').addEventListener('click', () => {
-    if (demoBusySettle) demoBusySettle.reject(new Error('timed out'));
   });
 
   // row-menu: the items are data. One hidden, one disabled (with its hint) and

@@ -31,7 +31,7 @@ from contextlib import AbstractContextManager
 
 from playwright.sync_api import Browser, Page, Playwright, expect
 
-from tests.e2e import _action_row_avatar_checks, _busy_checks, _code_listing_checks, _day_checks, _review_rule_checks
+from tests.e2e import _action_row_avatar_checks, _code_listing_checks, _day_checks, _review_rule_checks
 from tests.e2e._action_row_assertions import (
     assert_action_row,
     assert_action_row_colors,
@@ -58,6 +58,7 @@ from tests.e2e._settings_group_checks import (
     check_settings_group_long_select_value_keeps_its_row_in_webkit,
     run_settings_group_cases,
 )
+from tests.e2e.components import _busy_checks
 from tests.e2e.components._fullscreen_checks import run_fullscreen_cases
 from tests.e2e.conftest import STATIC_DIR
 
