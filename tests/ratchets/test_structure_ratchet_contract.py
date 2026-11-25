@@ -59,7 +59,7 @@ def contract(root: Path) -> dict[str, object]:
 @pytest.mark.parametrize(
     ("shape", "name"),
     [
-        ("streamlit", "README.md"), ("streamlit", ".structure-ratchet-baseline.json"), ("node", "package-lock.json"),
+        ("streamlit", "README.md"), ("node", "package-lock.json"),
         ("webapp-tray", "requirements-dev.txt"), ("webapp-tray", "tray.bat"), ("streamlit", "launch_app.sh"),
         ("pipeline-cli", "launch_scan.bat"), ("static-site", "about.html"), ("service", "run_hub.sh"),
         ("skills-governance", "install.ps1"),
@@ -74,6 +74,7 @@ def test_a_root_file_the_common_set_or_the_shape_lists_is_allowed(shape: str, na
     [
         ("streamlit", "main.py"), ("streamlit", "tray.bat"), ("pipeline-cli", "main_scan.py"), ("node", "about.html"),
         ("webapp-tray", ".env.sample"), ("skills-governance", "design.md"), ("streamlit", "readme.md"),
+        ("streamlit", ".structure-ratchet-baseline.json"), ("webapp-tray", ".docstring-issue-refs-baseline.json"),
     ],
 )
 def test_any_other_root_file_is_loose(shape: str, name: str) -> None:
