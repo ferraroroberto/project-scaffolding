@@ -148,8 +148,7 @@ def run(root: Path, python: str) -> int:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0] if __doc__ else None)
-    parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parent.parent,
-                        help="the repo root (default: this script's parent's parent)")
+    parser.add_argument("--root", type=Path, default=Path.cwd(), help="the repo root (default: the current directory)")
     args = parser.parse_args(argv)
     return run(args.root.resolve(), sys.executable)
 

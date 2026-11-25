@@ -7,7 +7,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from scripts import webkit_budget_check as wbc
+from scripts.tools import webkit_budget_check as wbc
 
 
 def _write(root: Path, relative: str, text: str) -> None:

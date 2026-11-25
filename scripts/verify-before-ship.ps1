@@ -132,7 +132,7 @@
                          rules (skip / static / full), fail-safe to full
                          (docs/e2e-routing.md). Auto-boots Streamlit per
                          its fixture.
-     15b. request budget on webkit — scripts/webkit_budget_check.py: runs the
+     15b. request budget on webkit — scripts/tools/webkit_budget_check.py: runs the
                          tests that call measure_request_budget( on WebKit, as
                          the Mac nightly does; runs with the browser slice only.
                          WebKit not installed, or no budget test, prints
@@ -324,7 +324,7 @@ if ($tier -eq "skip") {
         # anything else, 3 (not confirmed) included, fails the gate.
         Write-Host ""
         Write-Host ">> request budget on webkit" -ForegroundColor Cyan
-        & $py "scripts/webkit_budget_check.py"
+        & $py "scripts/tools/webkit_budget_check.py"
         $webkitBudget = $LASTEXITCODE
         if ($webkitBudget -eq 0) {
             Write-Host "[PASS] request budget on webkit" -ForegroundColor Green
