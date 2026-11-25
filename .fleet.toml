@@ -156,6 +156,11 @@ path = "src/usage_log.py"
 tier = "full"
 path = "scripts/shot_baseline.py"
 
+# The WebKit rerun of the request-budget test drives a browser too.
+[[e2e.rule]]
+tier = "full"
+path = "scripts/tools/webkit_budget_check.py"
+
 # Backend/tooling with no browser impact -> no browser suite needed.
 [[e2e.rule]]
 tier       = "none"
@@ -352,11 +357,12 @@ pytest_targets = ["tests/e2e/test_vendored_sign_in.py"]
 # The capture helper tests/e2e/_shot.py stays out: conftest imports it, so an
 # edit there runs the whole suite.
 # The poll helper and the request-budget probe that proves it; the probe page is a
-# route of the test itself, so no other harness reads either.
+# route of the test itself, so no other harness reads either. The WebKit stage that
+# reruns the same test (scripts/tools/webkit_budget_check.py) belongs here too.
 [[e2e.surface]]
 name           = "poll"
 prefixes       = ["app/webapp/static/_vendored/poll/"]
-paths          = ["tests/e2e/budget/_request_budget.py", "tests/e2e/budget/test_vendored_poll.py"]
+paths          = ["tests/e2e/budget/_request_budget.py", "tests/e2e/budget/test_vendored_poll.py", "scripts/tools/webkit_budget_check.py"]
 pytest_targets = ["tests/e2e/budget/test_vendored_poll.py"]
 
 [[e2e.surface]]
