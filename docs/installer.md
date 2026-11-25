@@ -7,7 +7,7 @@ Every app in the toolbox moves to another Windows PC the same way: `git clone`, 
 | Piece | Source here | In the app | How it travels |
 | --- | --- | --- | --- |
 | The installer | `src/installer.py` | `src/installer.py` | vendored verbatim, manifest key `installer` |
-| The launcher | `setup.bat.template` | `setup.bat` | copied once, renamed; it needs no edit |
+| The launcher | `scripts/templates/setup.bat` | `setup.bat` | copied once, renamed; it needs no edit |
 | The playbook | `docs/templates/install-playbook.md` | `docs/install-playbook.md` | copied once, placeholders filled per app |
 
 The module is stdlib only, because on a fresh PC it runs on the system python before any requirement is installed. `setup.bat` runs it as a script in isolated mode, `python -I src\installer.py`: `src/` stays off `sys.path`, so an app whose `src/__init__.py` imports a third-party package still installs, and no module of the app can shadow the standard library. Reading `.fleet.toml` needs Python 3.11 or newer (`tomllib`); an older interpreter fails the run with that message.
@@ -72,7 +72,7 @@ A malformed table fails the run before any step, naming the key.
 ## Adopting it
 
 1. Vendor `src/installer.py` and list it under `[vendored]` in the app's `.fleet.toml`. An older entry script that ran the installer is deleted: `setup.bat` runs the module directly.
-2. Copy `setup.bat.template` to `setup.bat` at the repo root. An app that already has a `setup.bat` with extra steps (another installer it offers, a closing banner) keeps them after the `src\installer.py` line.
+2. Copy `scripts/templates/setup.bat` to `setup.bat` at the repo root. An app that already has a `setup.bat` with extra steps (another installer it offers, a closing banner) keeps them after the `src\installer.py` line.
 3. Declare the `[install]` table. Keep every config's sample tracked and its target gitignored. A check or autostart that lives in the app's own code gets a small command-line entry that exits 0, 1 or another code, as above.
 4. Copy `docs/templates/install-playbook.md` to `docs/install-playbook.md`, fill each placeholder and delete the lines that do not apply. The migrate section names the app's own configs, state and certificates; it never deletes the old copy, which is retired only after the owner confirms.
 5. Link the playbook from the README's install section.

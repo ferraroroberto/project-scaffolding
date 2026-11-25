@@ -8,7 +8,7 @@ This repo is the scaffold: it is both a working Streamlit starter and the publis
 
 - `app/` — the Streamlit shell. `app.py` is the entry point (page config, then navigation); `views/` holds one `render()` module per view and `styles/` the CSS overlays. Three folders beside them are vendored components that adopters carry at the same path: `tray/` (single-instance mutex and watchdog), `webapp/` (the HTTP/2 launch module and the `_vendored/` static channel with the nav, the usage log and the other shared UI components) and `site/` (the static-site starter).
 - `src/` — non-UI logic: config, logging, runtime-data paths, the pooled HTTP client, the compression and login-lockout middleware, the usage log, and the example pipelines under `pipelines/` and notifier under `notify/`. No `streamlit` import, and nothing here imports `app` (the ratchet's layer check fails it).
-- `scripts/` — operations CLIs. The flat folder holds what adopters vendor, byte-identical: the ratchets and their helpers (the test value family's `spawn_probe/` is a folder because the interpreter loads its `sitecustomize.py` from `PYTHONPATH`), `classify_e2e.py`, the site tooling, `verify-before-ship.ps1` (the pre-ship gate), plus `vendored_catalog.py`, `usage_summary.py` and the certificate generator. Scaffold-only tooling is grouped: `scripts/ci/` (nightly Mac run) and `scripts/tools/` (`adopt_ratchets.py`, `gen_verify_skill.py`, `vendored_py39_check.py`, `brand_gen.py`, the audits and scoreboard). `scripts/brand_gen.py` is the one flat exception: a re-export of `render_set` so the icon generators that put `scripts/` on `sys.path` keep importing it. Never imported by `app/`.
+- `scripts/` — operations CLIs. The flat folder holds what adopters vendor, byte-identical: the ratchets and their helpers (the test value family's `spawn_probe/` is a folder because the interpreter loads its `sitecustomize.py` from `PYTHONPATH`), `classify_e2e.py`, the site tooling, `verify-before-ship.ps1` (the pre-ship gate), plus `vendored_catalog.py`, `usage_summary.py` and the certificate generator. Copy-to-adapt launchers an adopter renames into its root live in `scripts/templates/` (the installer's `setup.bat`). Scaffold-only tooling is grouped: `scripts/ci/` (nightly Mac run) and `scripts/tools/` (`adopt_ratchets.py`, `gen_verify_skill.py`, `vendored_py39_check.py`, `brand_gen.py`, the audits and scoreboard). `scripts/brand_gen.py` is the one flat exception: a re-export of `render_set` so the icon generators that put `scripts/` on `sys.path` keep importing it. Never imported by `app/`.
 - `tests/` — pytest suite mirroring what it tests (`ratchets/`, `site/`, `locations/`, `ci/`, `vendored/`, `docs/`), the soak harness under `soak/`, the Playwright regression suite under `e2e/` and the pages it serves under `fixtures/` and `e2e/fixtures/`.
 - `docs/` — durable reference: the conventions, the ratchet references, the onboarding playbook and the architecture diagram.
 - `brand/` — the fleet icon masters (`*.svg`) and `catalog.json`, which `scripts/tools/brand_gen.py` turns into the generated icons.
@@ -16,7 +16,7 @@ This repo is the scaffold: it is both a working Streamlit starter and the publis
 
 ## Root files
 
-The root holds the instructions (`CLAUDE.md`, `AGENTS.md`, `README.md`), the project config (`.fleet.toml`, `pyproject.toml`, `pytest.ini`, `requirements.txt`, `.gitignore`, `LICENSE`), the four launchers (`launch_app.*`, `launch_server.*`), `tray.bat.template` and `setup.bat.template`. Each but the last is in the `streamlit` shape's list of root files; `setup.bat.template` is the one declared exception below. Nothing else belongs at the root. The ratchet baselines live in `.ratchets/`.
+The root holds the instructions (`CLAUDE.md`, `AGENTS.md`, `README.md`), the project config (`.fleet.toml`, `pyproject.toml`, `pytest.ini`, `requirements.txt`, `.gitignore`, `LICENSE`), the four launchers (`launch_app.*`, `launch_server.*`) and `tray.bat.template`. Each is in the `streamlit` shape's list of root files; nothing else belongs at the root. The ratchet baselines live in `.ratchets/`.
 
 ## Where new code goes
 
@@ -28,6 +28,4 @@ The root holds the instructions (`CLAUDE.md`, `AGENTS.md`, `README.md`), the pro
 
 ## Exceptions
 
-- `setup.bat.template` (in `extra_root_files`): the copy-to-adapt launcher of the clone-and-setup installer ([installer.md](installer.md)). It sits at the root because an adopter's copy, `setup.bat`, runs from there; unlike `tray.bat.template` it is not in the `streamlit` preset, because a repo cloned from the scaffold copies it only when it adopts the installer.
-
-`extra_roots` is empty, and the structure baseline records no folder type, placement or redundant entry. A new exception needs its reason in this file and in `.fleet.toml`.
+None. `extra_roots` and `extra_root_files` are empty, and the structure baseline records no root file, folder type, placement or redundant entry. A new exception needs its reason in this file and in `.fleet.toml`.

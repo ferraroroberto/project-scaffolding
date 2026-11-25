@@ -3,7 +3,7 @@
   "band": {"files": 5, "functions": 2},
   "root_extras": [],
   "shape_contract": {
-    "root_files": ["setup.bat.template"],
+    "root_files": [],
     "redundant": [],
     "folder_types": {}
   },

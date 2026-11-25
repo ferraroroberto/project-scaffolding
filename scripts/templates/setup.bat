@@ -3,7 +3,7 @@ chcp 65001 >nul
 REM ============================================================================
 REM  SETUP - install this app on this PC, or bring its setup up to date
 REM ----------------------------------------------------------------------------
-REM  Copy to setup.bat at the repo root. It needs no edit: what is specific to
+REM  Copy to setup.bat at the repo root; it needs no edit. What is specific to
 REM  the app is declared in the [install] table of .fleet.toml.
 REM  Safe to run any number of times; it never overwrites what this PC has
 REM  configured. The work is src\installer.py (docs\install-playbook.md):

@@ -259,7 +259,7 @@ def test_no_fleet_toml_uses_the_defaults(tmp_path: Path) -> None:
 
 
 def test_setup_bat_runs_the_module_isolated_with_its_flags_passed_through() -> None:
-    template = (REPO_ROOT / "setup.bat.template").read_text(encoding="ascii")
+    template = (REPO_ROOT / "scripts" / "templates" / "setup.bat").read_text(encoding="ascii")
     assert r'"%PY_EXE%" %PY_ARGS% -I "%SCRIPT_DIR%src\installer.py" %*' in template
 
 
