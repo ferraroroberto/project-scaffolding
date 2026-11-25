@@ -28,16 +28,24 @@ FIXED_NOW = datetime.datetime(2026, 1, 2, 3, 4, 5)
 class FakeRunner:
     """Stands in for `subprocess.run`: records commands, creates the venv, answers probes."""
 
-    def __init__(self, root: Path, probe_codes: dict[str, int] | None = None, fail_pip: bool = False) -> None:
+    def __init__(self, root: Path, probe_codes: dict[str, int] | None = None, fail_pip: bool = False,
+                 git: str = "ignored") -> None:
         self.root = root
         self.calls: list[list[str]] = []
         self.probe_codes = probe_codes or {}
         self.fail_pip = fail_pip
+        self.git = git
 
-    def __call__(self, command: list[str], **_: Any) -> subprocess.CompletedProcess[str]:
+    def __call__(self, command: list[str], **kwargs: Any) -> subprocess.CompletedProcess[str]:
         self.calls.append(list(command))
         code = 0
-        if command[1:3] == ["-m", "venv"]:
+        if command[:2] == ["git", "check-ignore"]:
+            if self.git == "real":
+                return subprocess.run(command, **kwargs)  # no-window-exempt: kwargs carry the installer's own creationflags=NO_WINDOW
+            if self.git == "absent":
+                raise FileNotFoundError("git")
+            code = {"ignored": 0, "not ignored": 1, "not a repo": 128}[self.git]
+        elif command[1:3] == ["-m", "venv"]:
             python = installer.venv_python(self.root)
             python.parent.mkdir(parents=True, exist_ok=True)
             python.write_text("", encoding="utf-8")
@@ -131,6 +139,52 @@ def test_settings_top_up_adds_missing_keys_after_a_backup_and_keeps_values(tmp_p
     assert added == [("added", "config/config.json", "keys: ui.dense (backup config.json.bak-20260102-030405)")]
 
 
+def _stale_settings(tmp_path: Path) -> tuple[Path, Path, bytes]:
+    root = _repo(tmp_path)
+    target = root / "config" / "config.json"
+    target.write_text(json.dumps({"port": 9999, "token": "s3cret"}), encoding="utf-8")
+    return root, target, target.read_bytes()
+
+
+def _assert_untouched(root: Path, target: Path, before: bytes) -> None:
+    assert target.read_bytes() == before
+    assert not list(target.parent.glob("config.json.bak-*"))
+
+
+def test_top_up_is_refused_when_the_backup_would_not_be_gitignored(tmp_path: Path) -> None:
+    root, target, before = _stale_settings(tmp_path)
+    report = _run(root, FakeRunner(root, git="not ignored"))
+    assert report.failed
+    _assert_untouched(root, target, before)
+    [(status, _, detail)] = [line for line in report.lines if line[1] == "config/config.json"]
+    assert status == "refused"
+    assert installer.BACKUP_IGNORE_PATTERN in detail
+
+
+@pytest.mark.parametrize("git", ["not a repo", "absent"])
+def test_top_up_is_not_confirmed_when_git_cannot_tell(tmp_path: Path, git: str) -> None:
+    root, target, before = _stale_settings(tmp_path)
+    report = _run(root, FakeRunner(root, git=git))
+    assert report.failed
+    _assert_untouched(root, target, before)
+    assert [line[0] for line in report.lines if line[1] == "config/config.json"] == ["not confirmed"]
+
+
+@pytest.mark.skipif(shutil.which("git") is None, reason="needs git on PATH")
+def test_a_config_only_ignore_rule_does_not_cover_the_backup_until_the_pattern_is_added(tmp_path: Path) -> None:
+    root, target, before = _stale_settings(tmp_path)
+    subprocess.run(["git", "init", "-q", str(root)], check=True, creationflags=NO_WINDOW)
+    (root / ".gitignore").write_text("config/*.json\n", encoding="utf-8")
+    report = _run(root, FakeRunner(root, git="real"))
+    assert [line[0] for line in report.lines if line[1] == "config/config.json"] == ["refused"]
+    _assert_untouched(root, target, before)
+    (root / ".gitignore").write_text(f"config/*.json\n{installer.BACKUP_IGNORE_PATTERN}\n", encoding="utf-8")
+    report = _run(root, FakeRunner(root, git="real"))
+    assert not report.failed
+    assert [line[0] for line in report.lines if line[1] == "config/config.json"] == ["added"]
+    assert (root / "config" / "config.json.bak-20260102-030405").read_bytes() == before
+
+
 def test_registry_is_never_rewritten(tmp_path: Path) -> None:
     root = _repo(tmp_path)
     registry = root / "config" / "apps.json"
@@ -158,7 +212,7 @@ def test_what_if_changes_nothing_and_runs_nothing(tmp_path: Path) -> None:
     before = _snapshot(root)
     runner = FakeRunner(root)
     report = _run(root, runner, what_if=True, startup=True)
-    assert runner.calls == []
+    assert [c[:2] for c in runner.calls] == [["git", "check-ignore"]]
     assert _snapshot(root) == before
     statuses = {item: status for status, item, _ in report.lines}
     assert statuses[".venv"] == "would create"
