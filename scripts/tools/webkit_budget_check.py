@@ -195,6 +195,10 @@ def run(root: Path, python: str) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
+    # Status lines carry emoji; a cp1252 pipe (a gate capturing without PYTHONUTF8) would crash instead of giving a verdict.
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(encoding="utf-8", errors="replace")
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0] if __doc__ else None)
     parser.add_argument("--root", type=Path, default=Path.cwd(), help="the repo root (default: the current directory)")
     args = parser.parse_args(argv)

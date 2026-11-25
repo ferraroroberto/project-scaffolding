@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import os
+import subprocess
+import sys
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -143,3 +146,17 @@ def test_the_probe_reads_pytest_help_for_the_exact_option(
     monkeypatch.setattr(wbc.subprocess, "run", fake_run)
     assert _REAL_HAS_BROWSER_OPTION(tmp_path, "python", ["tests/a.py"]) is expected
     assert calls == [["python", "-m", "pytest", "tests/a.py", "--help"]]
+
+
+def test_status_lines_survive_a_cp1252_pipe(tmp_path: Path) -> None:
+    """A gate that captures the stage on Windows without `PYTHONUTF8` hands it a cp1252 pipe."""
+    env = {k: v for k, v in os.environ.items() if k not in {"PYTHONUTF8", "PYTHONIOENCODING"}}
+    env["PYTHONIOENCODING"] = "cp1252"
+    script = Path(wbc.__file__).resolve()
+    # no-window-exempt: a short foreground child whose output is captured, never shown
+    result = subprocess.run(  # noqa: S603
+        [sys.executable, str(script), "--root", str(tmp_path)],
+        capture_output=True, env=env, check=False, timeout=60)
+    assert result.returncode == wbc.EXIT_NO_TESTS, result.stderr.decode("utf-8", "replace")
+    assert result.stdout.decode("utf-8").strip().splitlines()[-1] == "WEBKIT_BUDGET=no-tests"
+    assert "ℹ️".encode() in result.stdout
