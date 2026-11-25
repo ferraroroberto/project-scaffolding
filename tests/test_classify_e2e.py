@@ -529,6 +529,9 @@ def test_the_poll_surface_runs_only_the_poll_harness() -> None:
     cfg = load_config(REAL_FLEET_TOML)
     result = classify(["app/webapp/static/_vendored/poll/poll.js", "tests/e2e/budget/_request_budget.py"], cfg)
     assert (result.tier, result.pytest_target) == ("surface", "tests/e2e/budget/test_vendored_poll.py")
+    # The WebKit stage reruns that same test, so editing the stage routes to it.
+    stage = classify(["scripts/tools/webkit_budget_check.py"], cfg)
+    assert (stage.tier, stage.pytest_target) == ("surface", "tests/e2e/budget/test_vendored_poll.py")
 
 
 def test_real_surface_helpers_are_only_imported_by_their_own_targets() -> None:
