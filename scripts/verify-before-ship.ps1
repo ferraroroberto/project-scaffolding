@@ -135,8 +135,8 @@
      15b. request budget on webkit — scripts/tools/webkit_budget_check.py: runs the
                          tests that call measure_request_budget( on WebKit, as
                          the Mac nightly does; runs with the browser slice only.
-                         WebKit not installed, or no budget test, prints
-                         [NOT RUN] and is never a pass; exit 3 = "not
+                         WebKit not installed, no budget test, or no pytest
+                         --browser option, prints [NOT RUN], never a pass; exit 3 = "not
                          confirmed", a failure (docs/polling-budget.md)
      16. shot baseline — scripts/shot_baseline.py: compares the screenshots the
                          e2e slice recaptured (phone + desktop, light + dark)
@@ -319,8 +319,8 @@ if ($tier -eq "skip") {
         Write-Host "[SKIP] request budget on webkit - an inert-asset diff runs only the smoke target" -ForegroundColor DarkGray
     } else {
         # The Mac nightly runs the request-budget tests on WebKit, which the Chromium
-        # slice above never does. 0 passed; 4 (WebKit not installed) and 5 (the repo
-        # has no budget test) are "not run", printed as such and never as a pass;
+        # slice above never does. 0 passed; 4 (WebKit not installed), 5 (the repo
+        # has no budget test) and 6 (no pytest --browser option) are "not run", printed as such and never as a pass;
         # anything else, 3 (not confirmed) included, fails the gate.
         Write-Host ""
         Write-Host ">> request budget on webkit" -ForegroundColor Cyan
@@ -332,6 +332,8 @@ if ($tier -eq "skip") {
             Write-Host "[NOT RUN] request budget on webkit - WebKit is not installed here, so the nightly's engine was not checked" -ForegroundColor Yellow
         } elseif ($webkitBudget -eq 5) {
             Write-Host "[NOT RUN] request budget on webkit - no request-budget test in this repo" -ForegroundColor Yellow
+        } elseif ($webkitBudget -eq 6) {
+            Write-Host "[NOT RUN] request budget on webkit - this repo's pytest has no --browser option, so the nightly's engine was not checked" -ForegroundColor Yellow
         } else {
             Write-Host "[FAIL] request budget on webkit (exit $webkitBudget)" -ForegroundColor Red
             Complete-Gate 1

@@ -93,7 +93,7 @@ The scaffold's own `tests/e2e/budget/test_vendored_poll.py` runs it on the real 
 
 The local gate's browser slice runs on Chromium; the Mac nightly runs the same suite on WebKit, where timer and poll behaviour differ enough to cross a budget edge. `scripts/tools/webkit_budget_check.py` (manifest key `webkit_budget_check`) is the gate stage that runs the request-budget tests on WebKit locally: the test files that call `measure_request_budget(`, or the files `[webkit_budget] targets` lists when a repo's budget tests share a file with others. It runs with the browser slice and is skipped for an inert-asset (`static`) diff.
 
-Its last line is one verdict, and only `pass` is a pass: `fail` (exit 1) and `unknown` (exit 3, Playwright missing or a declared target absent) fail the gate; `not-installed` (exit 4, no WebKit build here: `python -m playwright install webkit`) and `no-tests` (exit 5) print `[NOT RUN]` and are never counted as a pass.
+Its last line is one verdict, and only `pass` is a pass: `fail` (exit 1) and `unknown` (exit 3, Playwright missing or a declared target absent) fail the gate; `not-installed` (exit 4, no WebKit build here: `python -m playwright install webkit`), `no-tests` (exit 5) and `no-browser-option` (exit 6, the repo's pytest has no `--browser` option because its browser fixtures drive raw `playwright.sync_api` instead of pytest-playwright, so the tests cannot be pointed at WebKit from outside) print `[NOT RUN]` and are never counted as a pass. The option is found by `pytest <targets> --help`, an unanswered probe is `unknown`. A repo that wants the check adds pytest-playwright and moves its fixtures onto it.
 
 ## Every limit is a setting
 
