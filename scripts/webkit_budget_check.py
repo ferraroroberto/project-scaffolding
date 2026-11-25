@@ -39,7 +39,6 @@ import subprocess
 import sys
 import tomllib
 from pathlib import Path
-from typing import Optional
 
 EXIT_PASS = 0
 EXIT_FAIL = 1
@@ -58,7 +57,7 @@ def _verdict(word: str, detail: str = "") -> None:
     print(f"WEBKIT_BUDGET={word}")
 
 
-def declared_targets(root: Path) -> Optional[list[str]]:
+def declared_targets(root: Path) -> list[str] | None:
     """`[request_budget] webkit_targets` from `.fleet.toml`, or None when not declared.
 
     Raises ValueError for a table that is present but not a list of strings.
@@ -95,7 +94,7 @@ def discover_targets(root: Path) -> list[str]:
     return found
 
 
-def webkit_installed() -> Optional[bool]:
+def webkit_installed() -> bool | None:
     """Whether Playwright's WebKit build is on disk; None when Playwright cannot say."""
     try:
         from playwright.sync_api import sync_playwright
@@ -147,7 +146,7 @@ def run(root: Path, python: str) -> int:
     return EXIT_UNKNOWN
 
 
-def main(argv: Optional[list[str]] = None) -> int:
+def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0] if __doc__ else None)
     parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parent.parent,
                         help="the repo root (default: this script's parent's parent)")

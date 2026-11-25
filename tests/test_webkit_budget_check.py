@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Optional
 
 import pytest
 
@@ -87,7 +86,7 @@ def test_pytest_outcome_maps_to_one_verdict(
         return SimpleNamespace(returncode=pytest_exit)
 
     monkeypatch.setattr(wbc.subprocess, "run", fake_run)
-    code: Optional[int] = wbc.run(tmp_path, "python")
+    code = wbc.run(tmp_path, "python")
     assert code == expected_exit
     assert _last_line(capsys) == f"WEBKIT_BUDGET={word}"
     assert calls == [["python", "-m", "pytest", "tests/e2e/test_budget.py", "--browser", "webkit"]]
