@@ -47,6 +47,8 @@ EXIT_NOT_INSTALLED = 4
 EXIT_NO_TESTS = 5
 
 PROBE_HELPER = "_request_budget.py"
+# The probe runs a fake-clock minute per case; a hung browser must end the gate, not stall it.
+RUN_TIMEOUT_S = 900
 _MARKER = "measure_request_budget("
 _SKIP_DIRS = frozenset({".venv", "venv", "node_modules", ".git", "__pycache__", ".tox"})
 
@@ -135,7 +137,13 @@ def run(root: Path, python: str) -> int:
         return EXIT_NOT_INSTALLED
 
     print(f"ℹ️ request budget on WebKit: {' '.join(targets)}")
-    result = subprocess.run([python, "-m", "pytest", *targets, "--browser", "webkit"], cwd=root, check=False)  # noqa: S603
+    try:
+        # no-window-exempt: the run streams its output into the gate's own console, which a windowless child would not share
+        result = subprocess.run(  # noqa: S603
+            [python, "-m", "pytest", *targets, "--browser", "webkit"], cwd=root, check=False, timeout=RUN_TIMEOUT_S)
+    except subprocess.TimeoutExpired:
+        _verdict("unknown", f"❌ NOT CONFIRMED: the WebKit run did not finish within {RUN_TIMEOUT_S} s")
+        return EXIT_UNKNOWN
     if result.returncode == 0:
         _verdict("pass")
         return EXIT_PASS
