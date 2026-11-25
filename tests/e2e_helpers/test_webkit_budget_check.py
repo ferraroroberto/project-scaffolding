@@ -153,6 +153,7 @@ def test_status_lines_survive_a_cp1252_pipe(tmp_path: Path) -> None:
     env = {k: v for k, v in os.environ.items() if k not in {"PYTHONUTF8", "PYTHONIOENCODING"}}
     env["PYTHONIOENCODING"] = "cp1252"
     script = Path(wbc.__file__).resolve()
+    # no-window-exempt: a short foreground child whose output is captured, never shown
     result = subprocess.run(  # noqa: S603
         [sys.executable, str(script), "--root", str(tmp_path)],
         capture_output=True, env=env, check=False, timeout=60)
