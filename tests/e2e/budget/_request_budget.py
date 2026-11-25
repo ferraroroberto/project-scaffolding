@@ -49,6 +49,10 @@ MINUTE_MS = 60_000
 DEFAULT_STEP_MS = 500
 # How long one step may wait, in real time, for the requests it started.
 SETTLE_TIMEOUT_S = 10.0
+# WebKit announces a held stream's `request` event 0.1 to 0.2 s of real time after the
+# load settles, where Chromium announces it before: wait this long so a stream the page
+# opens at boot is not counted as a request of the visible minute.
+STREAM_BOOT_GRACE_S = 1.0
 
 # Makes `document.hidden` and `visibilityState` writable from the test and fires
 # the same `visibilitychange` a real tab switch or screen lock would.
@@ -153,6 +157,8 @@ def measure_request_budget(
     page.goto(url)
     page.wait_for_load_state("load")
     counter.settle()
+    if stream_paths:
+        page.wait_for_timeout(int(STREAM_BOOT_GRACE_S * 1000))
     reading = BudgetReading()
 
     counter.phase = reading.visible
