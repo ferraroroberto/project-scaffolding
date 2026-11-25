@@ -39,6 +39,10 @@ _STREAM_CLOSES_ON_HIDE = (
 _STREAM_KEPT_WHILE_HIDDEN = "new EventSource('/api/events');"
 # A stream the page opens late, in the visible minute.
 _STREAM_OPENED_LATE = "setTimeout(() => new EventSource('/api/events'), 5000);"
+# Two boot waves: the second starts when the first has answered.
+_TWO_WAVE_BOOT = (
+    "fetch('/api/who').then(() => Promise.all(['/api/tasks', '/api/today'].map((p) => fetch(p))));"
+)
 
 
 def _probe(page: Page, base_url: str, script: str) -> str:
@@ -79,6 +83,11 @@ def _busy_only_poll_is_silent_when_idle(page: Page, base_url: str) -> None:
     assert not reading.visible and not reading.hidden and not reading.catch_up, reading.summary()
 
 
+def _second_boot_wave_is_not_visible(page: Page, base_url: str) -> None:
+    reading = measure_request_budget(page, _probe(page, base_url, _TWO_WAVE_BOOT))
+    assert not reading.visible and not reading.hidden and not reading.catch_up, reading.summary()
+
+
 _STREAMS = ("/api/events",)
 
 
@@ -110,6 +119,7 @@ _CHECKS = (
     ("startPoll keeps the budget", _keeps_the_budget),
     ("a setInterval poll breaks it", _catches_a_set_interval_poll),
     ("a busy-only poll reads nothing while idle", _busy_only_poll_is_silent_when_idle),
+    ("a two-wave boot is not the visible minute", _second_boot_wave_is_not_visible),
 )
 
 
