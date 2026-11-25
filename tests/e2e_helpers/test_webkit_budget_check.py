@@ -9,11 +9,19 @@ import pytest
 
 from scripts.tools import webkit_budget_check as wbc
 
+_REAL_HAS_BROWSER_OPTION = wbc.has_browser_option
+
 
 def _write(root: Path, relative: str, text: str) -> None:
     path = root / relative
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(text, encoding="utf-8")
+
+
+@pytest.fixture(autouse=True)
+def _harness_has_browser_option(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Default to a pytest-playwright harness; the tests for the other states override it."""
+    monkeypatch.setattr(wbc, "has_browser_option", lambda root, python, targets: True)
 
 
 def _last_line(capsys: pytest.CaptureFixture[str]) -> str:
@@ -90,3 +98,48 @@ def test_pytest_outcome_maps_to_one_verdict(
     assert code == expected_exit
     assert _last_line(capsys) == f"WEBKIT_BUDGET={word}"
     assert calls == [["python", "-m", "pytest", "tests/e2e/test_budget.py", "--browser", "webkit"]]
+
+
+def test_a_harness_without_a_browser_option_is_not_run_never_unknown(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _write(tmp_path, "tests/e2e/test_budget.py", "measure_request_budget(page, url)\n")
+    monkeypatch.setattr(wbc, "has_browser_option", lambda root, python, targets: False)
+    ran: list[object] = []
+    monkeypatch.setattr(wbc.subprocess, "run", lambda *a, **k: ran.append(a))
+    assert wbc.run(tmp_path, "python") == wbc.EXIT_NO_BROWSER_OPTION
+    assert wbc.EXIT_NO_BROWSER_OPTION not in (wbc.EXIT_PASS, wbc.EXIT_FAIL, wbc.EXIT_UNKNOWN)
+    assert _last_line(capsys) == "WEBKIT_BUDGET=no-browser-option"
+    assert not ran
+
+
+def test_a_probe_that_cannot_answer_is_unknown(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _write(tmp_path, "tests/e2e/test_budget.py", "measure_request_budget(page, url)\n")
+    monkeypatch.setattr(wbc, "has_browser_option", lambda root, python, targets: None)
+    assert wbc.run(tmp_path, "python") == wbc.EXIT_UNKNOWN
+    assert _last_line(capsys) == "WEBKIT_BUDGET=unknown"
+
+
+@pytest.mark.parametrize(
+    ("returncode", "stdout", "expected"),
+    [
+        (0, "  --browser {chromium,firefox,webkit}\n  --browser-channel X\n", True),
+        (0, "  --browser-channel X\n  --browserless\n", False),
+        (0, "usage: pytest [options]\n", False),
+        (4, "", None),
+    ],
+)
+def test_the_probe_reads_pytest_help_for_the_exact_option(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, returncode: int, stdout: str, expected: bool | None,
+) -> None:
+    calls: list[list[str]] = []
+
+    def fake_run(argv: list[str], **_: object) -> SimpleNamespace:
+        calls.append(argv)
+        return SimpleNamespace(returncode=returncode, stdout=stdout, stderr="")
+
+    monkeypatch.setattr(wbc.subprocess, "run", fake_run)
+    assert _REAL_HAS_BROWSER_OPTION(tmp_path, "python", ["tests/a.py"]) is expected
+    assert calls == [["python", "-m", "pytest", "tests/a.py", "--help"]]
