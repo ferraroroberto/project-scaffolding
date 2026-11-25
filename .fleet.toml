@@ -637,8 +637,8 @@ exclude = ["src/usage_log_starlette.py"]
 # The browser tests scripts/tools/webkit_budget_check.py runs on WebKit. Declared because
 # discovery (every test file that calls the probe) would also pick up that script's
 # own unit test, which names the probe call in a string.
-[request_budget]
-webkit_targets = ["tests/e2e/budget/test_vendored_poll.py"]
+[webkit_budget]
+targets = ["tests/e2e/budget/test_vendored_poll.py"]
 
 [[request_budget.loops]]
 path       = "app/log_panel.py"

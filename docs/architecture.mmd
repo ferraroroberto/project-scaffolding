@@ -89,7 +89,7 @@ Recibo / Revisión / Report keep their first letters"]
   subgraph scriptsdir["scripts/"]
     VERIFY["verify-before-ship.ps1\nbyte-compile -> ruff -> static ratchet\n-> comment ratchet -> docs ratchet -> structure ratchet -> instruction ratchet -> doc refs ratchet -> dead code ratchet -> conventions ratchet -> runtime write ratchet -> usage track ratchet -> ux surface ratchet -> mypy --strict (vendored primitives) -> pytest (non-e2e)\n-> routed e2e (skip/static/full) -> shot baseline -> runtime write probe"]
     CLASSIFY["classify_e2e.py (vendor-verbatim, #180)\ndiff-proportionate e2e routing\nreads .fleet.toml [e2e] rules, fail-safe to full"]
-    WEBKITBUDGET["webkit_budget_check.py (vendor-verbatim)\nruns the tests that call measure_request_budget( on WebKit\nas the Mac nightly does; WebKit not installed = not run, never a pass\noptional [request_budget] webkit_targets"]
+    WEBKITBUDGET["webkit_budget_check.py (vendor-verbatim)\nruns the tests that call measure_request_budget( on WebKit\nas the Mac nightly does; WebKit not installed = not run, never a pass\noptional [webkit_budget] targets"]
     RBASE["ratchet_baseline.py (vendor-verbatim, stdlib)
 every ratchet's sibling: its baseline lives in .ratchets/<name>.json;
 an old root .<name>-ratchet-baseline.json moves there once"]
@@ -143,7 +143,7 @@ docs/test-value-ratchet.md"]
   VERIFY -->|routes e2e phase via| CLASSIFY
   CLASSIFY -.->|reads [e2e] rules from| FLEETTOML
   VERIFY -->|runs the budget tests on WebKit via| WEBKITBUDGET
-  WEBKITBUDGET -.->|reads [request_budget] webkit_targets from| FLEETTOML
+  WEBKITBUDGET -.->|reads [webkit_budget] targets from| FLEETTOML
   VERIFY -->|runs, opt-in, before mypy| RATCHET
   RATCHET -.->|reads [static_ratchet] from| FLEETTOML
   VERIFY -->|runs, opt-in, after the static ratchet| CRATCHET

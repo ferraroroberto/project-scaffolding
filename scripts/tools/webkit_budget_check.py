@@ -10,15 +10,15 @@ The tests are the test files that call `measure_request_budget(` (the probe
 helper itself, `_request_budget.py`, is not one). A repo whose budget tests sit
 in files that also hold unrelated tests names the files instead:
 
-    [request_budget]
-    webkit_targets = ["tests/e2e/test_request_budget.py"]
+    [webkit_budget]
+    targets = ["tests/e2e/test_request_budget.py"]
 
 The last stdout line is the verdict, one of:
 
   WEBKIT_BUDGET=pass            exit 0  the tests ran on WebKit and passed
   WEBKIT_BUDGET=fail            exit 1  a budget test failed on WebKit
   WEBKIT_BUDGET=unknown         exit 3  NOT CONFIRMED: Playwright missing, a
-                                        malformed `webkit_targets`, or a
+                                        malformed `[webkit_budget] targets`, or a
                                         pytest run that never reported
   WEBKIT_BUDGET=not-installed   exit 4  WebKit's browser build is not installed
                                         here, so nothing ran (never a pass:
@@ -60,7 +60,7 @@ def _verdict(word: str, detail: str = "") -> None:
 
 
 def declared_targets(root: Path) -> list[str] | None:
-    """`[request_budget] webkit_targets` from `.fleet.toml`, or None when not declared.
+    """`[webkit_budget] targets` from `.fleet.toml`, or None when not declared.
 
     Raises ValueError for a table that is present but not a list of strings.
     """
@@ -68,12 +68,12 @@ def declared_targets(root: Path) -> list[str] | None:
     if not config.is_file():
         return None
     with config.open("rb") as handle:
-        table = tomllib.load(handle).get("request_budget", {})
-    if not isinstance(table, dict) or "webkit_targets" not in table:
+        table = tomllib.load(handle).get("webkit_budget", {})
+    if not isinstance(table, dict) or "targets" not in table:
         return None
-    targets = table["webkit_targets"]
+    targets = table["targets"]
     if not isinstance(targets, list) or not all(isinstance(t, str) and t for t in targets):
-        raise ValueError("[request_budget] webkit_targets must be a list of non-empty path strings")
+        raise ValueError("[webkit_budget] targets must be a list of non-empty path strings")
     return list(targets)
 
 
@@ -123,7 +123,7 @@ def run(root: Path, python: str) -> int:
         return EXIT_NO_TESTS
     missing = [t for t in targets if not (root / t).exists()]
     if missing:
-        _verdict("unknown", f"❌ NOT CONFIRMED: declared webkit_targets that do not exist: {', '.join(missing)}")
+        _verdict("unknown", f"❌ NOT CONFIRMED: declared [webkit_budget] targets that do not exist: {', '.join(missing)}")
         return EXIT_UNKNOWN
 
     installed = webkit_installed()
