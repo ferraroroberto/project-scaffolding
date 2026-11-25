@@ -30,9 +30,9 @@ def test_discovery_finds_the_test_that_measures_and_not_the_probe_helper(tmp_pat
 
 def test_declared_targets_override_discovery_and_must_be_a_list_of_paths(tmp_path: Path) -> None:
     assert wbc.declared_targets(tmp_path) is None
-    _write(tmp_path, ".fleet.toml", '[request_budget]\nwebkit_targets = ["tests/e2e/test_request_budget.py"]\n')
+    _write(tmp_path, ".fleet.toml", '[webkit_budget]\ntargets = ["tests/e2e/test_request_budget.py"]\n')
     assert wbc.declared_targets(tmp_path) == ["tests/e2e/test_request_budget.py"]
-    _write(tmp_path, ".fleet.toml", "[request_budget]\nwebkit_targets = 3\n")
+    _write(tmp_path, ".fleet.toml", "[webkit_budget]\ntargets = 3\n")
     with pytest.raises(ValueError):
         wbc.declared_targets(tmp_path)
 
@@ -64,7 +64,7 @@ def test_playwright_that_cannot_answer_is_unknown(
 
 
 def test_a_declared_target_that_is_missing_is_unknown(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
-    _write(tmp_path, ".fleet.toml", '[request_budget]\nwebkit_targets = ["tests/nope.py"]\n')
+    _write(tmp_path, ".fleet.toml", '[webkit_budget]\ntargets = ["tests/nope.py"]\n')
     assert wbc.run(tmp_path, "python") == wbc.EXIT_UNKNOWN
     assert _last_line(capsys) == "WEBKIT_BUDGET=unknown"
 
