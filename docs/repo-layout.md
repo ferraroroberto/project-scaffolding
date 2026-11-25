@@ -32,13 +32,13 @@ Every exception is a to-do, not a permission. **An `extra_roots` or `extra_root_
 
 ### Root files
 
-*Enforced, shrink-only.* A file directly at the root is one the common set or the shape's contract table lists, as a name or a glob. Anything else (a loose script, a second README, a one-off launcher) goes into a folder the shape lists: `scripts/` for a tool, `docs/` for a document, `config/` for a sample. A root file a repo must keep (a framework reads it there, a scheduled job calls it by path) is declared in `extra_root_files` in `.fleet.toml` with its reason in a comment beside it, and is recorded in the baseline like an extra root.
+*Enforced, shrink-only.* A file directly at the root is one the common set or the shape's contract table lists, as a name or a glob. Anything else (a loose script, a second README, a one-off launcher) goes into a folder the shape lists: `scripts/` for a tool, `docs/` for a document, `config/` for a sample. A ratchet baseline lives in `.ratchets/<name>.json`, never at the root. A root file a repo must keep (a framework reads it there, a scheduled job calls it by path) is declared in `extra_root_files` in `.fleet.toml` with its reason in a comment beside it, and is recorded in the baseline like an extra root.
 
 A config template (`*.example.*`, `*.sample.*`, `*.json.example`) is the committed copy of a gitignored machine-local file the app reads from the root, so it sits beside that file; the `webapp-tray` and `streamlit` presets list the forms their repos use.
 
 | Common root files (every shape) |
 |---|
-| `README.md`, `CLAUDE.md`, `AGENTS.md`, `LICENSE`, `.fleet.toml`, `.gitignore`, `.gitattributes`, `.ignore`, `.env.example`, `.*-baseline.json`, `requirements*.txt`, `pyproject.toml`, `pytest.ini`, `package*.json` |
+| `README.md`, `CLAUDE.md`, `AGENTS.md`, `LICENSE`, `.fleet.toml`, `.gitignore`, `.gitattributes`, `.ignore`, `.env.example`, `requirements*.txt`, `pyproject.toml`, `pytest.ini`, `package*.json` |
 
 ### Folder types
 
