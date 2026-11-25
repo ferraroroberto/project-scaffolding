@@ -148,6 +148,23 @@ def test_the_probe_reads_pytest_help_for_the_exact_option(
     assert calls == [["python", "-m", "pytest", "tests/a.py", "--help"]]
 
 
+def test_the_probe_spawn_is_windowless_and_carries_no_exempt_marker(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Adopters' no-window guards allowlist per function, so the captured probe must pass the flag itself."""
+    kwargs_seen: list[dict[str, object]] = []
+
+    def fake_run(argv: list[str], **kwargs: object) -> SimpleNamespace:
+        kwargs_seen.append(kwargs)
+        return SimpleNamespace(returncode=0, stdout="  --browser X\n", stderr="")
+
+    monkeypatch.setattr(wbc.subprocess, "run", fake_run)
+    _REAL_HAS_BROWSER_OPTION(tmp_path, "python", ["tests/a.py"])
+    expected = wbc.subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
+    assert kwargs_seen[0]["creationflags"] == expected
+    assert "no-window-exempt" not in Path(wbc.__file__).read_text(encoding="utf-8").split("def has_browser_option")[1].split("def run(")[0]
+
+
 def test_status_lines_survive_a_cp1252_pipe(tmp_path: Path) -> None:
     """A gate that captures the stage on Windows without `PYTHONUTF8` hands it a cp1252 pipe."""
     env = {k: v for k, v in os.environ.items() if k not in {"PYTHONUTF8", "PYTHONIOENCODING"}}
