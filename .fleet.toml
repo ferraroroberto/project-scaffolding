@@ -25,7 +25,7 @@ description = "Canonical master — the scaffold &amp; CLAUDE.md every project d
 # A root file the shape does not list goes in `extra_root_files`, each with its reason.
 shape            = "streamlit"
 extra_roots      = []
-extra_root_files = []
+extra_root_files = ["setup.bat.template"]
 
 # Wide views (fleet-config#1113, design.md Layout): page width follows the shape of a
 # view's content, per view. A one-dimensional view (settings, a form, one list, a
@@ -480,6 +480,7 @@ allow_refs = [
     "scripts/gen_icons.py",
     "scripts/gen_ssl_cert.py",
     "docs/ux-surfaces.yaml",
+    "docs/install-playbook.md",
 ]
 
 # ---------------------------------------------------------------------------
@@ -926,6 +927,8 @@ doc_capture     = { src = "src/doc_capture" }
 build_info      = { src = "src/build_info.py" }
 # GET /healthz + GET /api/version for every web app, from build_info; usage_track_ratchet's health-routes-wired holds apps to it.
 health_routes   = { src = "src/health_routes.py", requires = ["build_info"] }
+# The clone-and-setup installer setup.bat runs as `python -I src\installer.py` (docs/installer.md).
+installer       = { src = "src/installer.py" }
 # One shell-neutral tray restart: runs tray.bat by absolute path, fails unless a new process serves HEAD.
 restart_check   = { src = "src/restart_check.py", requires = ["build_info"] }
 # The page-foot restart sheet's server half: declared targets, detached runner, recorded endings.

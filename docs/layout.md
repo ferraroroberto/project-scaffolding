@@ -16,7 +16,7 @@ This repo is the scaffold: it is both a working Streamlit starter and the publis
 
 ## Root files
 
-The root holds the instructions (`CLAUDE.md`, `AGENTS.md`, `README.md`), the project config (`.fleet.toml`, `pyproject.toml`, `pytest.ini`, `requirements.txt`, `.gitignore`, `LICENSE`), the four launchers (`launch_app.*`, `launch_server.*`) and `tray.bat.template`. Each is in the `streamlit` shape's list of root files; nothing else belongs at the root. The ratchet baselines live in `.ratchets/`.
+The root holds the instructions (`CLAUDE.md`, `AGENTS.md`, `README.md`), the project config (`.fleet.toml`, `pyproject.toml`, `pytest.ini`, `requirements.txt`, `.gitignore`, `LICENSE`), the four launchers (`launch_app.*`, `launch_server.*`), `tray.bat.template` and `setup.bat.template`. Each but the last is in the `streamlit` shape's list of root files; `setup.bat.template` is the one declared exception below. Nothing else belongs at the root. The ratchet baselines live in `.ratchets/`.
 
 ## Where new code goes
 
@@ -28,4 +28,6 @@ The root holds the instructions (`CLAUDE.md`, `AGENTS.md`, `README.md`), the pro
 
 ## Exceptions
 
-None. `extra_roots` and `extra_root_files` are empty, and the structure baseline records no root file, folder type, placement or redundant entry. A new exception needs its reason in this file and in `.fleet.toml`.
+- `setup.bat.template` (in `extra_root_files`): the copy-to-adapt launcher of the clone-and-setup installer ([installer.md](installer.md)). It sits at the root because an adopter's copy, `setup.bat`, runs from there; unlike `tray.bat.template` it is not in the `streamlit` preset, because a repo cloned from the scaffold copies it only when it adopts the installer.
+
+`extra_roots` is empty, and the structure baseline records no folder type, placement or redundant entry. A new exception needs its reason in this file and in `.fleet.toml`.
