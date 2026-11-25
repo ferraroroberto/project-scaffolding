@@ -59,7 +59,7 @@ RUN_TIMEOUT_S = 900
 # `pytest --help` only imports the plugins and conftests, so it ends in seconds; a hang is "cannot say".
 PROBE_TIMEOUT_S = 120
 # The probe's output is captured and never shown, so its child gets no console window of its own.
-_PROBE_NO_WINDOW = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
+NO_WINDOW = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
 # `--browser` exactly: pytest-playwright also registers `--browser-channel`, which must not count.
 _BROWSER_OPTION = re.compile(r"(?<![\w-])--browser(?![\w-])")
 _MARKER = "measure_request_budget("
@@ -131,7 +131,7 @@ def has_browser_option(root: Path, python: str, targets: list[str]) -> bool | No
     try:
         result = subprocess.run(  # noqa: S603
             [python, "-m", "pytest", *targets, "--help"], cwd=root, check=False, capture_output=True,
-            text=True, timeout=PROBE_TIMEOUT_S, creationflags=_PROBE_NO_WINDOW)
+            text=True, timeout=PROBE_TIMEOUT_S, creationflags=NO_WINDOW)
     except (subprocess.TimeoutExpired, OSError) as exc:
         print(f"⚠️ could not ask pytest for its options: {exc}", file=sys.stderr)
         return None
