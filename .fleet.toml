@@ -634,6 +634,12 @@ enabled = true
 # request twice in the in-flight stats. The file has no loop, poll or pool.
 exclude = ["src/usage_log_starlette.py"]
 
+# The browser tests scripts/webkit_budget_check.py runs on WebKit. Declared because
+# discovery (every test file that calls the probe) would also pick up that script's
+# own unit test, which names the probe call in a string.
+[request_budget]
+webkit_targets = ["tests/e2e/budget/test_vendored_poll.py"]
+
 [[request_budget.loops]]
 path       = "app/log_panel.py"
 function   = "stream_to_streamlit"
@@ -852,6 +858,8 @@ resource_soak   = { src = "tests/soak/_resource_soak.py" }
 
 # Scripts + library modules copied byte-for-byte into adopters.
 classify_e2e    = { src = "scripts/classify_e2e.py" }
+# Runs the request-budget browser tests on WebKit as the Mac nightly does; not run (never a pass) without the browser.
+webkit_budget_check = { src = "scripts/webkit_budget_check.py" }
 # Every ratchet loads this sibling to find its baseline in .ratchets/ and move an old root copy there once;
 # each ratchet's `requires` names it, so /propagate-vendored carries it.
 ratchet_baseline = { src = "scripts/ratchet_baseline.py" }

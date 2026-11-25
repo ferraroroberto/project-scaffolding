@@ -132,6 +132,12 @@
                          rules (skip / static / full), fail-safe to full
                          (docs/e2e-routing.md). Auto-boots Streamlit per
                          its fixture.
+     15b. request budget on webkit — scripts/webkit_budget_check.py: runs the
+                         tests that call measure_request_budget( on WebKit, as
+                         the Mac nightly does; runs with the browser slice only.
+                         WebKit not installed, or no budget test, prints
+                         [NOT RUN] and is never a pass; exit 3 = "not
+                         confirmed", a failure (docs/polling-budget.md)
      16. shot baseline — scripts/shot_baseline.py: compares the screenshots the
                          e2e slice recaptured (phone + desktop, light + dark)
                          with the committed baseline, fails on a visible change,
@@ -308,6 +314,29 @@ if ($tier -eq "skip") {
     # Taken before the run: a shot written after it was recaptured by it.
     $shotSince = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds() / 1000.0
     Invoke-Stage "pytest e2e (${tier}: $e2eTarget, $label)" { & $py -m pytest @e2eArgs }
+
+    if ($tier -eq "static") {
+        Write-Host "[SKIP] request budget on webkit - an inert-asset diff runs only the smoke target" -ForegroundColor DarkGray
+    } else {
+        # The Mac nightly runs the request-budget tests on WebKit, which the Chromium
+        # slice above never does. 0 passed; 4 (WebKit not installed) and 5 (the repo
+        # has no budget test) are "not run", printed as such and never as a pass;
+        # anything else, 3 (not confirmed) included, fails the gate.
+        Write-Host ""
+        Write-Host ">> request budget on webkit" -ForegroundColor Cyan
+        & $py "scripts/webkit_budget_check.py"
+        $webkitBudget = $LASTEXITCODE
+        if ($webkitBudget -eq 0) {
+            Write-Host "[PASS] request budget on webkit" -ForegroundColor Green
+        } elseif ($webkitBudget -eq 4) {
+            Write-Host "[NOT RUN] request budget on webkit - WebKit is not installed here, so the nightly's engine was not checked" -ForegroundColor Yellow
+        } elseif ($webkitBudget -eq 5) {
+            Write-Host "[NOT RUN] request budget on webkit - no request-budget test in this repo" -ForegroundColor Yellow
+        } else {
+            Write-Host "[FAIL] request budget on webkit (exit $webkitBudget)" -ForegroundColor Red
+            Complete-Gate 1
+        }
+    }
 
     # Screenshot baseline: when the slice just ran the capture, compare what it
     # wrote; otherwise run the capture itself. Either way the tree is restored.

@@ -89,6 +89,12 @@ visible_requests_per_minute = 30   # what the main page may read in a visible mi
 
 The scaffold's own `tests/e2e/budget/test_vendored_poll.py` runs it on the real helper: a 5 s `startPoll` reads 12 times in a visible minute, never while hidden, and once on the return; a 2 s `setInterval` poll reads 30 times visible and 30 times hidden, and the probe names both breaches.
 
+### Also on WebKit
+
+The local gate's browser slice runs on Chromium; the Mac nightly runs the same suite on WebKit, where timer and poll behaviour differ enough to cross a budget edge. `scripts/webkit_budget_check.py` (manifest key `webkit_budget_check`) is the gate stage that runs the request-budget tests on WebKit locally: the test files that call `measure_request_budget(`, or the files `[request_budget] webkit_targets` lists when a repo's budget tests share a file with others. It runs with the browser slice and is skipped for an inert-asset (`static`) diff.
+
+Its last line is one verdict, and only `pass` is a pass: `fail` (exit 1) and `unknown` (exit 3, Playwright missing or a declared target absent) fail the gate; `not-installed` (exit 4, no WebKit build here: `python -m playwright install webkit`) and `no-tests` (exit 5) print `[NOT RUN]` and are never counted as a pass.
+
 ## Every limit is a setting
 
 Poll intervals, pool sizes, scan TTLs and concurrency caps are owner settings in the app's Settings, with sensible defaults and a "Light machine" preset, never constants only code can change: a slower computer should be fixable from Settings. The ratchet's floors hold the defaults to a sane range; the middleware reads its budget overrides on every request, so a change applies live. Session or state rows whose process is gone are reconciled out of the hot poll set, so stale history costs no work on every tick.
