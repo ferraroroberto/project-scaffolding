@@ -1004,7 +1004,7 @@ The four file-shape rules count a property of the files, not a line. Each is off
 ```toml
 [usage_track_ratchet]
 enabled  = true
-rules    = ["untracked-control", "untracked-sheet", "dynamic-id", "usage-log-wired"]
+rules    = ["untracked-control", "untracked-sheet", "dynamic-id", "usage-log-wired", "health-routes-wired"]
 paths    = ["app/webapp/static/**", "app/webapp/templates/**"]   # the default
 exclude  = ["app/webapp/static/vendor/**"]
 builders = ["app/webapp/static/row.js:row"]   # control builders whose callers pass `track:`
@@ -1055,6 +1055,19 @@ usage track ratchet: [usage-log-wired] the app does not reach its usage log:
   `[vendored]` does not declare `usage-log` (the client)
   `[vendored]` does not declare `usage_log` (the server)
   no file in `paths` calls `initUsageLog(`
+```
+
+#### `health-routes-wired`
+
+The second repository-level check, also **never baselined**: `[vendored]` declares `health_routes` and a tracked Python file outside the vendored copies and tests calls `health_router(`, so the app answers `GET /healthz` and `GET /api/version`. A hand-wired route does not count.
+
+```python
+# bad
+@app.get("/healthz")
+def healthz(): return {"ok": True}
+
+# fixed
+app.include_router(health_router(service="my-app", authorize=is_signed_in))
 ```
 
 ## UX surfaces

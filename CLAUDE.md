@@ -63,7 +63,7 @@ Diff-keyed gate at finish: checks the touched web UI still conforms to the desig
 
 ## Webapp PWA required surfaces (build-identity footer + Settings/CA-install) *(PWA)*
 
-- **Version endpoint and footer — `GET /api/version` → `{git_sha, built_at}`**, captured once at module load via a hardened `git rev-parse`, rendered by the vendored `page-foot` component (the one shared build line, last child of `.app`, outside every card), auth-gated with loopback bypass. Universal; restart verification depends on it.
+- **`GET /healthz` + `GET /api/version` → `{git_sha, built_at}`** come only from the vendored `health_routes` router (`health-routes-wired` rule). Identity captured once at module load via `build_info`, rendered by the vendored `page-foot` component (the one shared build line, last child of `.app`, outside every card), auth-gated with loopback bypass. Universal; restart verification depends on it.
 - **Collapsible `⚙️ Settings` block** with a plain `<a href>` to the auth-exempt `/install-ca` route, shipped only on the self-signed/LAN-only HTTPS path. Full text: `docs/webapp-pwa-conventions.md` → "Webapp PWA required surfaces". (`#74`.)
 
 ## Webapp PWA static-asset cache-busting (`CachingStaticFiles` + fleet hash) *(PWA)*

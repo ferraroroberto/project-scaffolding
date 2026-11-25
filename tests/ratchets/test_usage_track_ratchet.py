@@ -564,6 +564,47 @@ def test_a_vendored_file_other_than_the_adapter_is_still_not_scanned(repo: Path)
     assert run_mode(repo) == ut.EXIT_RISE
 
 
+HEALTH_TABLE = FIXTURE_TABLE.replace('"dynamic-id"]', '"dynamic-id", "health-routes-wired"]')
+HEALTH_VENDORED = '[vendored]\nhealth_routes = { dest = "src/health_routes.py" }\n'
+
+
+def test_an_app_without_the_health_routes_fails_whatever_the_baseline(
+    repo: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    (repo / ".fleet.toml").write_text(HEALTH_TABLE, encoding="utf-8")
+    assert run_mode(repo, init=True) == ut.EXIT_PASS
+    assert "health-routes-wired" not in baseline_text(repo)
+    write(repo, "app/webapp/server.py", '@app.get("/healthz")\ndef healthz():\n    return {}\n')
+    capsys.readouterr()
+    assert run_mode(repo) == ut.EXIT_RISE, "a hand-wired route is not the component"
+    out = capsys.readouterr().out
+    assert "[health-routes-wired]" in out
+    assert "`[vendored]` does not declare `health_routes`" in out
+    assert "no tracked Python file calls `health_router(`" in out
+
+
+def test_an_app_mounting_the_health_routes_passes_and_the_vendored_copy_is_not_scanned(repo: Path) -> None:
+    (repo / ".fleet.toml").write_text(HEALTH_TABLE + HEALTH_VENDORED, encoding="utf-8")
+    write(repo, "src/health_routes.py", "def health_router(*, service):\n    x = health_router(service=service)\n")
+    run_mode(repo, init=True)
+    assert run_mode(repo) == ut.EXIT_RISE, "the vendored copy calling itself is not a mount"
+    write(repo, "tests/test_server.py", 'app.include_router(health_router(service="t"))\n')
+    assert run_mode(repo) == ut.EXIT_RISE, "a test mounting it is not the app"
+    write(repo, "app/webapp/server.py", 'app.include_router(health_router(service="demo"))\n')
+    assert run_mode(repo) == ut.EXIT_PASS
+
+
+def test_both_wiring_rules_are_read_from_the_same_python_files(repo: Path) -> None:
+    table = FIXTURE_TABLE.replace('"dynamic-id"]', '"dynamic-id", "usage-log-wired", "health-routes-wired"]')
+    (repo / ".fleet.toml").write_text(table + VENDORED + 'health_routes = { dest = "src/health_routes.py" }\n',
+                                      encoding="utf-8")
+    write(repo, "app/webapp/static/app.js", "const usage = initUsageLog();\n")
+    write(repo, "app/webapp/routes.py", "router = usage_router(db)\n")
+    write(repo, "app/webapp/server.py", 'app.include_router(health_router(service="demo"))\n')
+    run_mode(repo, init=True)
+    assert run_mode(repo) == ut.EXIT_PASS
+
+
 # ------------------------------------------------------- not confirmed
 
 @pytest.mark.parametrize(

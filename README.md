@@ -149,6 +149,7 @@ src/
   subject_text.py           vendor-verbatim reply/forward subject-prefix stripper (`clean_subject`, colon required)
   resource_probe.py         vendor-verbatim thread/handle/RSS sampler + runtime breadcrumb
   build_info.py             vendor-verbatim process build-identity capture (git_sha + built_at, captured once at import)
+  health_routes.py          vendor-verbatim /healthz + /api/version router
   self_restart.py           vendor-verbatim page-foot restart: /api/restart, detached runner, recorded endings
   notify/                   vendor-verbatim Telegram notifier (send_text + factory/config)
   doc_capture/              vendor-verbatim doc-capture screenshot engine (manifest-driven, fail-safe-masked, input-hash-idempotent + README tour regen)
