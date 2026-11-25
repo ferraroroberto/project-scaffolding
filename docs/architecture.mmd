@@ -52,6 +52,11 @@ routing_audit, gen_verify_skill, ios_sim_smoke)"]
     USAGELOGSTAR["usage_log_starlette.py\nusage_route(db_path) -> Starlette Route\nvendor-verbatim; hands /api/usage/{rest:path} to a small FastAPI app\nGET summary/time owner-only: loopback or tailnet,\nread from Tailscale-Funnel-Request + X-Forwarded-For"]
     REQTIMING["request_timing.py\nRequestTimingMiddleware (pure ASGI): Server-Timing queue/worker/app,\nslow + in-flight lines, soft/hard budgets per declared class (live overrides)\nTimedExecutor named pools + default_executor(); RequestStats peaks + verdicts\nvendor-verbatim, stdlib only"]
     BUILDINFO["build_info.py (#199/#246/#247)\nbuild_identity(): git_sha + built_at\ncaptured once at import, bounded retry inside\nthe capture, never re-resolved later\nvendor-verbatim, self-contained (no local imports)"]
+    HEALTHROUTES["health_routes.py
+health_router(service=, authorize=, extra=, version=)
+GET /healthz (open, no I/O) + GET /api/version
+identity from build_info, captured once;
+loopback without proxy headers skips authorize"]
     RESTARTCHECK["restart_check.py\none shell-neutral tray restart: runs tray.bat by\nabsolute path, exits non-zero unless a new process\nserves HEAD (needs build_info.py)"]
     SELFRESTART["self_restart.py\nGET/POST /api/restart behind the app's own guard\nruns only targets declared in code, runner detached\nvia cmd /c start, every ending recorded\n(server half of _vendored/page-foot/restart-sheet.js)"]
     RESOURCEPROBE["resource_probe.py\nsample_process(pid): threads, handles, RSS\nstart_breadcrumb(logger) logs them on an interval\nvendor-verbatim; unreadable = SampleUnavailable, never 0"]
@@ -251,6 +256,7 @@ opt-in via .fleet.toml [clean_tree_ratchet]; exit 3 = not confirmed"]
   E2E -->|creationflags=NO_WINDOW| NOWINDOW
   TRAYBEHAVIOR -->|creationflags=NO_WINDOW| NOWINDOW
   TRAYBEHAVIOR -->|materializes + drives| TRAYTMPL
+  HEALTHROUTES -->|imports build_identity| BUILDINFO
   RESTARTCHECK -.->|runs by absolute path, verifies a new pid serves HEAD| TRAYTMPL
   TRAYBEHAVIOR -->|resolves (shared path, falls back to\nfleet-config primary checkout), drives real lifecycle| FLEETCFGTRAY
 

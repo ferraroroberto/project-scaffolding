@@ -924,6 +924,8 @@ fleet_root      = { src = "src/fleet_root.py" }
 notify          = { src = "src/notify" }
 doc_capture     = { src = "src/doc_capture" }
 build_info      = { src = "src/build_info.py" }
+# GET /healthz + GET /api/version for every web app, from build_info; usage_track_ratchet's health-routes-wired holds apps to it.
+health_routes   = { src = "src/health_routes.py", requires = ["build_info"] }
 # One shell-neutral tray restart: runs tray.bat by absolute path, fails unless a new process serves HEAD.
 restart_check   = { src = "src/restart_check.py", requires = ["build_info"] }
 # The page-foot restart sheet's server half: declared targets, detached runner, recorded endings.

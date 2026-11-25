@@ -12,7 +12,7 @@ It has the shape of the [conventions ratchet](conventions-ratchet.md): an opt-in
 
 ## The rules
 
-Each rule is opted into by name in `rules`. The first three are counted per file against the baseline; `usage-log-wired` is a fact about the repo and is never baselined.
+Each rule is opted into by name in `rules`. The first three are counted per file against the baseline; `usage-log-wired` and `health-routes-wired` are facts about the repo and are never baselined.
 
 ### `untracked-control`
 
@@ -79,6 +79,12 @@ A repo-level check, never baselined, run in the check mode only: it passes when 
 
 A repo declares itself a web app by enabling this table; the table is the declaration. The fleet-wide cross-check that every repo whose `## UX surface` says `design spec applies: yes` has it enabled belongs to `fleet-config`'s drift test, not to this stage.
 
+### `health-routes-wired`
+
+> every fleet web app answers `GET /healthz` and `GET /api/version` through the vendored health routes
+
+A repo-level check, never baselined, run in the check mode only, beside `usage-log-wired`: it passes when `[vendored]` declares `health_routes` and a tracked Python file outside the vendored copies and tests calls `health_router(`. A hand-wired `@app.get("/healthz")` does not count: the routes drift when each app writes its own, which is why the component exists. It lives in this stage because every fleet web app already runs it. The component and its options (`authorize`, `extra`, `version=False` for an app whose own `/api/version` is richer) are described in `docs/webapp-pwa-conventions.md`, "Webapp PWA required surfaces".
+
 ### Exempting one hit
 
 A hit that must stay keeps a reasoned marker on one of its own lines, or in the comment block directly above it:
@@ -140,7 +146,7 @@ Committed, sorted JSON, one source file per line, keyed by repo-relative path, c
 }
 ```
 
-There are no line numbers, so edits elsewhere in a file never churn it. A fix and a new hit of the same rule in the same file cancel out; that is the accepted trade for a baseline that does not churn. `usage-log-wired` is never in it: a baseline that names it is refused (exit 2).
+There are no line numbers, so edits elsewhere in a file never churn it. A fix and a new hit of the same rule in the same file cancel out; that is the accepted trade for a baseline that does not churn. Neither `-wired` rule is ever in it: a baseline that names one is refused (exit 2).
 
 ## Modes
 
@@ -164,13 +170,13 @@ Re-vendoring the script never breaks a repo that has not opted in: an absent `[u
    [usage_track_ratchet]
    enabled  = true
    baseline = ".ratchets/usage-track.json"           # default
-   rules    = ["untracked-control", "untracked-sheet", "dynamic-id", "usage-log-wired"]
+   rules    = ["untracked-control", "untracked-sheet", "dynamic-id", "usage-log-wired", "health-routes-wired"]
    paths    = ["app/webapp/static/**", "app/webapp/templates/**"]  # default
    exclude  = ["app/webapp/static/vendor/**"]                 # third-party code
    builders = ["app/webapp/static/row.js:row"]                # control builders, if any
    ```
 
-   A fleet web app lists all four rules.
+   A fleet web app lists all five rules.
 3. Run `python scripts/usage_track_ratchet.py --init`, review the baseline and commit it. **Adoption never requires the fixes first.**
 4. Add a gate stage that runs `python scripts/usage_track_ratchet.py` and fails on any non-zero exit. The scaffold's `scripts/verify-before-ship.ps1` places it after the runtime write ratchet and before `mypy`. **Do not path-route it**: it is cheap, and the wiring rule must see the whole tree.
 5. Only if the repo uses this scaffold's diff-proportionate e2e routing ([e2e-routing.md](e2e-routing.md)), add a `tier = "none"` rule for the baseline file to `.fleet.toml` `[e2e]` and a matching assertion in its `test_classify_e2e.py`.
