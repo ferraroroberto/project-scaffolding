@@ -7,9 +7,11 @@ so every request is counted without a server.
 
 from __future__ import annotations
 
+import time
 from collections.abc import Callable
 from contextlib import AbstractContextManager
 
+import pytest
 from playwright.sync_api import Page, Route
 
 from tests.e2e._cases import cases
@@ -151,7 +153,40 @@ def _a_named_flush_is_allowed_once(page: Page, base_url: str) -> None:
     assert reading.hidden == {path: 1}, f"the repeat is a hidden request: {reading.summary()}"
 
 
+def _assert_timers_run_on_a_second_page(page: Page, base_url: str) -> None:
+    """A page opened later in the probed context still gets its `setTimeout` calls."""
+    second = page.context.new_page()
+    second.goto(_probe(second, base_url, ""))
+    second.evaluate("() => { window.fired = false; setTimeout(() => { window.fired = true; }, 50); }")
+    # Waited for from the driver: every in-page wait runs on the clock under test.
+    deadline = time.monotonic() + 5
+    while not second.evaluate("window.fired") and time.monotonic() < deadline:
+        second.wait_for_timeout(50)
+    assert second.evaluate("window.fired"), "the probe left the context's clock stopped"
+
+
+def _the_clock_runs_after_a_reading(page: Page, base_url: str) -> None:
+    measure_request_budget(page, _probe(page, base_url, _STARTPOLL), minute_ms=2_000)
+    _assert_timers_run_on_a_second_page(page, base_url)
+
+
+def _the_clock_runs_after_a_failed_reading(page: Page, base_url: str) -> None:
+    evaluate = page.evaluate
+
+    def broken(expression: str, *args: object) -> object:
+        if "__requestBudgetSetHidden(true)" in expression:
+            raise RuntimeError("the hide failed")
+        return evaluate(expression, *args)
+
+    page.evaluate = broken
+    with pytest.raises(RuntimeError, match="the hide failed"):
+        measure_request_budget(page, _probe(page, base_url, _STARTPOLL), minute_ms=2_000)
+    _assert_timers_run_on_a_second_page(page, base_url)
+
+
 _CHECKS = (
+    ("a reading leaves the context's clock running", _the_clock_runs_after_a_reading),
+    ("a failed reading leaves the context's clock running", _the_clock_runs_after_a_failed_reading),
     ("a named flush is allowed once", _a_named_flush_is_allowed_once),
     ("a poll due before the hide is not a hidden request", _visible_read_before_the_hide_is_not_hidden),
     ("a stream is measured, not unknown", _stream_is_measured_not_unknown),

@@ -13,6 +13,7 @@ from collections.abc import Callable
 from types import SimpleNamespace
 
 import pytest
+from playwright.sync_api import Error as PlaywrightError
 
 from tests.e2e.budget import _request_budget as probe
 from tests.e2e.budget._request_budget import RequestBudgetUnknown, measure_request_budget
@@ -35,7 +36,10 @@ class _FakePage:
         self.handlers: dict[str, list[Callable[[_Request], None]]] = {}
         self.events: list[Event] = []
         self.clock = SimpleNamespace(
-            install=lambda: None, pause_at=lambda at: None, run_for=lambda ms: self._advance(0.005)
+            install=lambda: None,
+            pause_at=lambda at: None,
+            resume=lambda: None,
+            run_for=lambda ms: self._advance(0.005),
         )
 
     def on(self, name: str, handler: Callable[[_Request], None]) -> None:
@@ -128,3 +132,13 @@ def test_a_late_read_of_the_visible_minute_is_not_hidden() -> None:
     reading = measure_request_budget(_LateChainPage(), "https://app.test/", minute_ms=2_000)  # type: ignore[arg-type]
     assert reading.visible == {"/api/chained": 1}, reading.summary()
     assert not reading.hidden, reading.summary()
+
+
+def test_a_failed_resume_does_not_mask_the_measurement_error() -> None:
+    def refuse() -> None:
+        raise PlaywrightError("the context is closed")
+
+    page = _NeverQuietPage()
+    page.clock.resume = refuse
+    with pytest.raises(RequestBudgetUnknown, match="not quiet"):
+        measure_request_budget(page, "https://app.test/", minute_ms=2_000)  # type: ignore[arg-type]
