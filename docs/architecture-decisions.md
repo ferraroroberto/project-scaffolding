@@ -6,6 +6,7 @@ The register of every standing architecture decision in the fleet. Read it befor
 
 An architecture decision record (ADR) here is one GitHub issue in this repo labelled `adr`, written as Context / Decision / Consequences / Status. The issue holds the full reasoning; this page holds the decision in force, in a sentence or two, with its why and a link to the issue.
 
+- **When one is offered:** only a decision that passes all [three tests](owner-decisions.md#when-a-decision-is-offered-as-an-adr).
 - **Add one:** file the issue with the `adr` label, then add its entry below in the same PR that applies the decision.
 - **Supersede one:** file the new `adr` issue, comment on the old one linking the new, close the old one as not planned, and replace the entry here in the same PR. A superseded decision does not stay listed.
 - **Keep it present tense:** an entry says what is true now. History lives in the issue and in `git log`.

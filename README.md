@@ -60,6 +60,7 @@ Clone this directory, rename it, and start building.
 - `.fleet.toml`'s `[components]` table + `scripts/vendored_catalog.py` — the canonical catalog of every vendor-verbatim component this scaffold publishes. See [`docs/components.md`](docs/components.md).
 - `docs/agents/` — the master AGENTS/CLAUDE templates, the adapt prompt and the rollout runbook.
 - [`docs/architecture-decisions.md`](docs/architecture-decisions.md) — the register of standing architecture decisions, one `adr` issue each.
+- [`docs/owner-decisions.md`](docs/owner-decisions.md) — grill rounds and proposal reports.
 - [`docs/ux-surface-map.md`](docs/ux-surface-map.md) — the per-app map of every user-facing surface (the `docs/ux-surfaces.yaml` schema, stable ids, the `data-surface` attribute in code, the generated page with one diagram per area), with the copy-to-start [`docs/templates/ux-surfaces.yaml`](docs/templates/ux-surfaces.yaml).
 - [`docs/implicit-state-machines.md`](docs/implicit-state-machines.md) — what an implicit state machine is, how to spot one (signs, a deterministic scan then an agent deep-dive), and the declared-state shape that replaces it.
 - [`docs/repo-layout.md`](docs/repo-layout.md) — where code goes: canonical tree, placement rules, extra roots per repo shape.
@@ -67,7 +68,7 @@ Clone this directory, rename it, and start building.
 - `docs/playwright-ui-testing.md` — the two-loop browser-testing recipe (headed agent verification + optional headless regression suite).
 - `docs/shared-chrome-profile.md` — serializing access to a persistent Chrome profile shared across jobs.
 - `docs/windows-tray.md` — canonical `tray.bat` shape: idempotent single-instance start, orphan-proof `--restart`.
-- `docs/app-onboarding.md` — end-to-end playbook for standing up a new self-hosted PWA app from this scaffold.
+- `docs/app-onboarding.md` — playbook for a new self-hosted PWA app from this scaffold.
 
 ## Setup
 
