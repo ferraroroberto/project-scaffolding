@@ -1,4 +1,5 @@
 import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -6,7 +7,7 @@ from pathlib import Path
 import pytest
 
 from src.no_window import NO_WINDOW
-from tests.e2e._tray_harness import resolve_tray_lifecycle_path
+from tests.e2e._tray_harness import make_stub_venv, resolve_tray_lifecycle_path
 
 ROOT = Path(__file__).resolve().parents[1]
 # Fleet convention: always the absolute PowerShell 5.1 path, never `shutil.which`
@@ -25,17 +26,25 @@ def _active_batch_lines() -> list[str]:
     return lines
 
 
-def test_tray_template_delegates_lifecycle_to_one_powershell_call() -> None:
-    calls = [
-        line
-        for line in _active_batch_lines()
-        if "%PS%" in line and "-File" in line and "%TRAY_PS%" in line
-    ]
+def test_tray_template_delegates_lifecycle_to_one_call_per_path() -> None:
+    """One launcher call when the venv exists, one `-File` call when it does not."""
+    lines = _active_batch_lines()
+    launcher = [line for line in lines if "-m src.ps_script" in line]
+    plain = [line for line in lines if "-File" in line and '"%TRAY_PS%"' in line]
 
-    assert len(calls) == 1
-    assert " launch " in calls[0]
-    assert "-Restart" not in calls[0]
-    assert "!RESTART_ARG!" in calls[0]
+    assert len(launcher) == 1 and len(plain) == 1
+    # The launcher's command line stops at the action: the helper matches running trays by
+    # command line, so TRAY_LAUNCH on it would make the launcher look like the tray (#1003).
+    assert launcher[0].endswith('-m src.ps_script "%TRAY_PS%" launch')
+    assert " launch " in plain[0]
+    assert "-Restart" not in plain[0]
+    assert "!RESTART_ARG!" in plain[0]
+
+
+def test_tray_template_never_sets_an_execution_policy() -> None:
+    text = " ".join(_active_batch_lines()).lower()
+
+    assert "-executionpolicy" not in text and "set-executionpolicy" not in text
 
 
 def test_tray_template_does_not_parse_detect_output_with_for_f() -> None:
@@ -45,9 +54,82 @@ def test_tray_template_does_not_parse_detect_output_with_for_f() -> None:
     assert not any("usebackq" in line for line in active_lines)
 
 
+_STUB_PARAMS = (
+    "[CmdletBinding()]\n"
+    "param([Parameter(Position=0)][string]$Action, [string]$AppName,\n"
+    " [string]$ScriptDir, [string]$VenvDir, [string]$TrayMatch,\n"
+    " [string]$Ports, [string]$TrayLaunch, [string]$VersionUrl, [switch]$Restart)\n"
+)
+_ECHO_ARGS = (
+    'Write-Output "ACTION=$Action"\n'
+    'Write-Output "SCRIPTDIR=$ScriptDir"\n'
+    'Write-Output "TRAYMATCH=$TrayMatch"\n'
+    'Write-Output "TRAYLAUNCH=$TrayLaunch"\n'
+    'Write-Output "PORTS=$Ports"\n'
+    'Write-Output "RESTART=$($Restart.IsPresent)"\n'
+)
+
+
+def _make_app(tmp_path: Path, helper_body: str, *, venv: bool) -> dict[str, str]:
+    """A throwaway app with the filled template and a stub helper; returns its environment.
+
+    The template resolves the helper at %USERPROFILE%/.claude/tray/tray_lifecycle.ps1
+    (project-scaffolding#153), so the stub lives under a fake home. With ``venv`` the app also
+    gets a stub `.venv` and the vendored launcher, as a real adopter has.
+    """
+    probe = tmp_path / "_home" / ".claude" / "tray" / "tray_lifecycle.ps1"
+    probe.parent.mkdir(parents=True)
+    probe.write_text(_STUB_PARAMS + helper_body, encoding="utf-8")
+
+    batch = (ROOT / "tray.bat.template").read_text(encoding="utf-8")
+    batch = (
+        batch.replace("__APP_NAME__", "ProbeApp")
+        .replace("__TRAY_LAUNCH__", "-m app.tray")
+        .replace("__TRAY_MATCH__", r"-m\s+app\.tray")
+        .replace("__OWNED_PORTS__", "8445")
+    )
+    (tmp_path / "tray.bat").write_text(batch, encoding="utf-8")
+    if venv:
+        make_stub_venv(tmp_path / ".venv")
+        (tmp_path / "src").mkdir()
+        (tmp_path / "src" / "__init__.py").write_text("", encoding="utf-8")
+        shutil.copy2(ROOT / "src" / "ps_script.py", tmp_path / "src" / "ps_script.py")
+
+    env = {k: v for k, v in os.environ.items() if k.upper() != "APP_NAME"}
+    env["USERPROFILE"] = str(tmp_path / "_home")
+    return env
+
+
+def _run_bat(
+    tmp_path: Path, env: dict[str, str], *args: str, policy: str | None = None
+) -> tuple[subprocess.CompletedProcess[str], dict[str, str]]:
+    """Run the app's tray.bat, from a child PowerShell under *policy* when one is given.
+
+    ``-ExecutionPolicy`` sets that child's process scope only, which the processes it starts
+    inherit; no machine or user setting is touched.
+    """
+    bat = tmp_path / "tray.bat"
+    if policy is None:
+        argv = ["cmd", "/c", str(bat), *args]
+    else:
+        command = f"& '{bat}' {' '.join(args)}; exit $LASTEXITCODE"
+        argv = [POWERSHELL, "-NoProfile", "-NonInteractive", "-ExecutionPolicy", policy, "-Command", command]
+    result = subprocess.run(
+        argv, check=False, capture_output=True, text=True, errors="replace", timeout=120,
+        cwd=str(tmp_path), env=env, creationflags=NO_WINDOW,
+    )
+    out = dict(
+        line.split("=", 1)
+        for line in result.stdout.splitlines()
+        if "=" in line and line.split("=", 1)[0].isupper()
+    )
+    return result, out
+
+
 @pytest.mark.skipif(sys.platform != "win32", reason="tray lifecycle is Windows-only")
-def test_tray_template_launch_args_survive_argv_parsing(tmp_path: Path) -> None:
-    """The template's launch line must deliver every switch intact (#145).
+@pytest.mark.parametrize("venv", [False, True], ids=["no-venv", "venv"])
+def test_tray_template_launch_args_survive_argv_parsing(tmp_path: Path, venv: bool) -> None:
+    """The template must deliver every switch intact on both launch paths (#145).
 
     `%~dp0` ends in a backslash, and Windows argv parsing treats an odd run of
     backslashes before a closing quote as escaping it. Passing `-ScriptDir
@@ -56,65 +138,62 @@ def test_tray_template_launch_args_survive_argv_parsing(tmp_path: Path) -> None:
     reclaim reclaims nothing, and `--restart` degrades to the adopt-the-stale-
     build start the whole template exists to prevent. Grepping the batch text
     cannot catch that, so drive the real template through a real `cmd` + real
-    `powershell -File` and read the parsed values back.
+    PowerShell and read the parsed values back.
     """
     assert Path(POWERSHELL).exists(), f"expected PowerShell at {POWERSHELL}"
+    env = _make_app(tmp_path, _ECHO_ARGS, venv=venv)
 
-    # project-scaffolding#153: the template resolves the helper at
-    # %USERPROFILE%/.claude/tray/tray_lifecycle.ps1, not <ScriptDir>\app\tray\,
-    # so the probe stub lives under a throwaway fake home and the subprocess
-    # gets USERPROFILE pointed there -- same shape as tests/e2e/_tray_harness.py.
-    fake_home = tmp_path / "_home"
-    probe = fake_home / ".claude" / "tray" / "tray_lifecycle.ps1"
-    probe.parent.mkdir(parents=True)
-    probe.write_text(
-        "param([Parameter(Position=0)][string]$Action, [string]$AppName,\n"
-        " [string]$ScriptDir, [string]$VenvDir, [string]$TrayMatch,\n"
-        " [string]$Ports, [string]$TrayLaunch, [string]$VersionUrl, [switch]$Restart)\n"
-        "Write-Output \"ACTION=$Action\"\n"
-        "Write-Output \"SCRIPTDIR=$ScriptDir\"\n"
-        "Write-Output \"TRAYMATCH=$TrayMatch\"\n"
-        "Write-Output \"PORTS=$Ports\"\n",
-        encoding="utf-8",
-    )
-
-    batch = (ROOT / "tray.bat.template").read_text(encoding="utf-8")
-    batch = (
-        batch.replace("__APP_NAME__", "ProbeApp")
-        .replace("__TRAY_LAUNCH__", "launcher.py tray")
-        .replace("__TRAY_MATCH__", r"launcher\.py\s+tray")
-        .replace("__OWNED_PORTS__", "8445")
-    )
-    (tmp_path / "tray.bat").write_text(batch, encoding="utf-8")
-
-    env = dict(os.environ)
-    env["USERPROFILE"] = str(fake_home)
-    result = subprocess.run(
-        ["cmd", "/c", str(tmp_path / "tray.bat")],
-        check=False,
-        capture_output=True,
-        text=True,
-        cwd=str(tmp_path),
-        env=env,
-        creationflags=NO_WINDOW,
-    )
-    out = dict(
-        line.split("=", 1)
-        for line in result.stdout.splitlines()
-        if "=" in line and line.split("=", 1)[0].isupper()
-    )
+    result, out = _run_bat(tmp_path, env)
 
     # The two switches that follow -ScriptDir are the ones a swallowed quote eats.
-    assert out.get("TRAYMATCH") == r"launcher\.py\s+tray", result.stdout
+    assert out.get("TRAYMATCH") == r"-m\s+app\.tray", result.stdout + result.stderr
     assert out.get("PORTS") == "8445", result.stdout
     assert out.get("ACTION") == "launch", result.stdout
+    assert out.get("TRAYLAUNCH") == "-m app.tray", result.stdout
+    assert out.get("RESTART") == "False", result.stdout
     # ScriptDir still arrives, just without the trailing separator.
     assert out.get("SCRIPTDIR", "").rstrip("\\") == str(tmp_path).rstrip("\\")
     assert not out.get("SCRIPTDIR", "x").endswith("\\")
 
 
+@pytest.mark.windows_only
 @pytest.mark.skipif(sys.platform != "win32", reason="tray lifecycle is Windows-only")
-def test_tray_template_does_not_leak_app_name_to_children(tmp_path: Path) -> None:
+@pytest.mark.parametrize(("policy", "method"), [("AllSigned", "ScriptBlock"), ("RemoteSigned", "-File")])
+@pytest.mark.parametrize("restart", [False, True], ids=["start", "restart"])
+def test_tray_template_reaches_the_helper_under_the_policy(
+    tmp_path: Path, policy: str, method: str, restart: bool
+) -> None:
+    """Start and --restart both enter the helper, and say which launch they used (#1003)."""
+    env = _make_app(tmp_path, _ECHO_ARGS, venv=True)
+    # A switch left in the caller's environment must not turn a plain start into a restart.
+    env["PSL_SWITCH_Restart"] = "1"
+
+    result, out = _run_bat(tmp_path, env, *(["--restart"] if restart else []), policy=policy)
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert out.get("ACTION") == "launch", result.stdout + result.stderr
+    assert out.get("RESTART") == str(restart), result.stdout
+    assert f"PowerShell launch: {method} for tray_lifecycle.ps1" in result.stdout + result.stderr
+
+
+@pytest.mark.windows_only
+@pytest.mark.skipif(sys.platform != "win32", reason="tray lifecycle is Windows-only")
+@pytest.mark.parametrize(
+    "body", ["throw 'helper broke'\n", "exit 5\n", "function {\n"], ids=["throws", "exits", "unparsable"]
+)
+def test_tray_template_restart_fails_when_the_helper_does(tmp_path: Path, body: str) -> None:
+    """A --restart the helper could not carry out is a non-zero exit, never a plain start."""
+    env = _make_app(tmp_path, body, venv=True)
+
+    result, _ = _run_bat(tmp_path, env, "--restart", policy="AllSigned")
+
+    assert result.returncode != 0, result.stdout + result.stderr
+    assert "starting the ProbeApp tray standalone" not in result.stdout
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="tray lifecycle is Windows-only")
+@pytest.mark.parametrize("venv", [False, True], ids=["no-venv", "venv"])
+def test_tray_template_does_not_leak_app_name_to_children(tmp_path: Path, venv: bool) -> None:
     """The template must not hand a bare `APP_NAME` to the tray it starts (#264).
 
     `setlocal` scopes a variable away from the *calling* console only; every
@@ -127,46 +206,16 @@ def test_tray_template_does_not_leak_app_name_to_children(tmp_path: Path) -> Non
     records the environment it inherited plus its `-AppName` argument.
     """
     assert Path(POWERSHELL).exists(), f"expected PowerShell at {POWERSHELL}"
-
-    fake_home = tmp_path / "_home"
-    probe = fake_home / ".claude" / "tray" / "tray_lifecycle.ps1"
-    probe.parent.mkdir(parents=True)
-    probe.write_text(
-        "param([Parameter(Position=0)][string]$Action, [string]$AppName,\n"
-        " [string]$ScriptDir, [string]$VenvDir, [string]$TrayMatch,\n"
-        " [string]$Ports, [string]$TrayLaunch, [string]$VersionUrl, [switch]$Restart)\n"
+    env = _make_app(
+        tmp_path,
         "$state = if (Test-Path Env:APP_NAME) { 'present:' + $env:APP_NAME } else { 'absent' }\n"
-        "Write-Output \"APPNAMEENV=$state\"\n"
-        "Write-Output \"APPNAMEARG=$AppName\"\n",
-        encoding="utf-8",
+        'Write-Output "APPNAMEENV=$state"\n'
+        'Write-Output "APPNAMEARG=$AppName"\n',
+        venv=venv,
     )
-
-    batch = (ROOT / "tray.bat.template").read_text(encoding="utf-8")
-    batch = (
-        batch.replace("__APP_NAME__", "ProbeApp")
-        .replace("__TRAY_LAUNCH__", "launcher.py tray")
-        .replace("__TRAY_MATCH__", r"launcher\.py\s+tray")
-        .replace("__OWNED_PORTS__", "8445")
-    )
-    (tmp_path / "tray.bat").write_text(batch, encoding="utf-8")
-
-    env = {k: v for k, v in os.environ.items() if k.upper() != "APP_NAME"}
     env["APP_NAME"] = "LeakedFromCaller"
-    env["USERPROFILE"] = str(fake_home)
-    result = subprocess.run(
-        ["cmd", "/c", str(tmp_path / "tray.bat")],
-        check=False,
-        capture_output=True,
-        text=True,
-        cwd=str(tmp_path),
-        env=env,
-        creationflags=NO_WINDOW,
-    )
-    out = dict(
-        line.split("=", 1)
-        for line in result.stdout.splitlines()
-        if "=" in line and line.split("=", 1)[0].isupper()
-    )
+
+    result, out = _run_bat(tmp_path, env)
 
     assert out.get("APPNAMEENV") == "absent", result.stdout + result.stderr
     # The display name still reaches the lifecycle helper as its argument.

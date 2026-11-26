@@ -41,6 +41,7 @@ ROOT = _HERE.parents[2]
 DUMMY_APP = _HERE.parent / "_dummy_tray_app.py"
 REAL_VENV = ROOT / ".venv"
 TRAY_BAT_TEMPLATE = ROOT / "tray.bat.template"
+PS_SCRIPT = ROOT / "src" / "ps_script.py"
 POWERSHELL = r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe"
 
 # fleet-config's PRIMARY checkout -- not this box's only possible location,
@@ -241,6 +242,10 @@ def materialize_tray_bat(
     )
     tray_bat = script_dir / "tray.bat"
     tray_bat.write_text(text, encoding="utf-8")
+    # The launcher tray.bat starts the helper through, vendored as an adopter carries it.
+    (script_dir / "src").mkdir(exist_ok=True)
+    (script_dir / "src" / "__init__.py").write_text("", encoding="utf-8")
+    shutil.copy2(PS_SCRIPT, script_dir / "src" / "ps_script.py")
 
     fake_tray_home = fake_home_dir(script_dir) / ".claude" / "tray"
     fake_tray_home.mkdir(parents=True, exist_ok=True)
@@ -270,6 +275,7 @@ def remove_shared_helper(script_dir: Path) -> Path:
 
 def run_tray_bat(
     tray_bat: Path, args: list[str], *, nested: bool = False, timeout: float = 90.0,
+    policy: str | None = None,
 ) -> subprocess.CompletedProcess[str]:
     """Invoke the materialized tray.bat.
 
@@ -284,8 +290,15 @@ def run_tray_bat(
     tray_lifecycle.ps1` resolution finds the harness's throwaway copy
     regardless of whether fleet-config's install.ps1 has run on this box
     (project-scaffolding#153).
+
+    ``policy`` starts the bat from a child PowerShell under that execution policy
+    (``-ExecutionPolicy``: process scope only, inherited by everything it starts;
+    no machine or user setting is touched).
     """
     cmd = ["cmd", "/c", str(tray_bat), *args]
+    if policy:
+        command = f"& '{tray_bat}' {' '.join(args)}; exit $LASTEXITCODE"
+        cmd = [POWERSHELL, "-NoProfile", "-NonInteractive", "-ExecutionPolicy", policy, "-Command", command]
     env = dict(os.environ)
     env["USERPROFILE"] = str(fake_home_dir(tray_bat.parent))
     kwargs: dict[str, object] = dict(
