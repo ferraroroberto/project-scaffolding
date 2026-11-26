@@ -200,6 +200,12 @@ Run it standalone to see how the current branch would route:
 & .\.venv\Scripts\python.exe scripts\classify_e2e.py a.js b.svg  # classify an explicit list
 ```
 
+## Timing source
+
+`fleet-config`'s `/e2e-audit` prices waits, durations and parallelism from the gate's own record. `[e2e] junit_xml` names it (`data/logs/e2e-junit.xml`, ignored by git). The gate writes it on a `full`-tier browser run only, so a surface or smoke slice never replaces the whole suite's timing, and copies a green one from a linked worktree to the primary checkout, which outlives the worktree. `E2E_JUNIT_PUBLISH=0` keeps a run's report in its own checkout. A copy that fails warns and leaves the verdict alone.
+
+The report holds the last full run, not a history, so a red seen in an earlier run is not in it.
+
 ## Anti-drift guard
 
 A routing table is only safe if it stays honest as the layout evolves — a new view directory that nobody adds a `full` rule for would silently route to `skip` if some broader `none` rule swallowed it. Two things guard against that:

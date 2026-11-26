@@ -131,7 +131,9 @@
                          scripts/classify_e2e.py against the .fleet.toml [e2e]
                          rules (skip / static / full), fail-safe to full
                          (docs/e2e-routing.md). Auto-boots Streamlit per
-                         its fixture.
+                         its fixture. A full-tier run writes the JUnit XML
+                         .fleet.toml [e2e] junit_xml names, and a green one is
+                         copied to the primary checkout.
      15b. request budget on webkit — scripts/tools/webkit_budget_check.py: runs the
                          tests that call measure_request_budget( on WebKit, as
                          the Mac nightly does; runs with the browser slice only.
@@ -206,6 +208,32 @@ function Invoke-Stage {
     Write-Host "[PASS] $Name" -ForegroundColor Green
 }
 # gate-verdict:end
+
+# e2e-timing:begin
+# Timing source for the e2e audit (.fleet.toml [e2e] junit_xml): the JUnit XML
+# of the last full-tier browser run. A linked worktree is removed after its PR,
+# so a green run is also copied to the primary checkout, written aside and moved
+# into place so a reader never sees half a file. E2E_JUNIT_PUBLISH=0 keeps it
+# local. A copy that fails warns and never fails the gate: it checks nothing.
+$e2eJunit = "data/logs/e2e-junit.xml"
+
+function Publish-E2eJunit([string]$Report) {
+    if ($env:E2E_JUNIT_PUBLISH -eq "0") { return }
+    try {
+        $common = git rev-parse --path-format=absolute --git-common-dir
+        if ($LASTEXITCODE -ne 0 -or -not $common) { throw "git could not name the primary checkout" }
+        $source = [IO.Path]::GetFullPath((Join-Path (Get-Location).Path $Report))
+        $target = [IO.Path]::GetFullPath((Join-Path (Split-Path $common -Parent) $Report))
+        if ($source -eq $target) { return }
+        New-Item -ItemType Directory -Force (Split-Path $target -Parent) | Out-Null
+        Copy-Item -LiteralPath $source -Destination "$target.$PID.tmp" -Force
+        Move-Item -LiteralPath "$target.$PID.tmp" -Destination $target -Force
+        Write-Host "e2e timing copied to $target" -ForegroundColor DarkGray
+    } catch {
+        Write-Host "[WARN] e2e timing not copied to the primary checkout: $($_.Exception.Message)" -ForegroundColor Yellow
+    }
+}
+# e2e-timing:end
 
 Set-Location (Join-Path $PSScriptRoot "..")
 
@@ -313,7 +341,11 @@ if ($tier -eq "skip") {
     $label = if ($e2eBrowsers) { $e2eBrowsers } else { "suite-default" }
     # Taken before the run: a shot written after it was recaptured by it.
     $shotSince = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds() / 1000.0
+    # A slice would overwrite the whole suite's timing with a few modules'.
+    if ($tier -eq "full") { $e2eArgs += "--junitxml=$e2eJunit" }
     Invoke-Stage "pytest e2e (${tier}: $e2eTarget, $label)" { & $py -m pytest @e2eArgs }
+    # Reached only when the stage passed: a red run's durations stay local.
+    if ($tier -eq "full") { Publish-E2eJunit $e2eJunit }
 
     if ($tier -eq "static") {
         Write-Host "[SKIP] request budget on webkit - an inert-asset diff runs only the smoke target" -ForegroundColor DarkGray

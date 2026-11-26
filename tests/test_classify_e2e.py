@@ -172,6 +172,14 @@ def test_real_rules_route_representative_paths() -> None:
     assert tier("tests/e2e/conftest.py") == "full"
     assert tier("tests/_streamlit_lifecycle.py") == "full"
     assert tier("tests/_port_probe.py") == "full"
+    assert tier("tests/conftest.py") == "full"
+    assert tier("tests/host/_synthetic_host.py") == "full"
+    assert tier("tests/_git_repo.py") == "full"
+    # Only the unit ratchet tests import it, so no browser test can break on it.
+    assert tier("tests/_ratchet_not_confirmed.py") == "skip"
+    # A vendored README is prose, even beside a surface's own files.
+    assert tier("app/webapp/static/_vendored/README.md") == "skip"
+    assert tier("app/webapp/static/_vendored/nav/README.md") == "skip"
 
     # Inert static assets -> static.
     assert tier("app/webapp/static/icons/foo.svg") == "static"

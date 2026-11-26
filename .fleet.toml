@@ -71,12 +71,15 @@ reason = "component gallery harness, no app shell; demo.html is deliberately a 4
 static_pytest_target = "tests/e2e/test_smoke.py"
 static_browsers       = ["chromium"]
 full_pytest_target    = "tests/e2e"
+# Timing source for fleet-config's /e2e-audit: the gate writes this JUnit XML on
+# every full-tier browser run and copies a green one to the primary checkout.
+junit_xml             = "data/logs/e2e-junit.xml"
 # Suite-size ratchet in collected pytest nodes, read by fleet-config's /e2e
 # budget step (not classify_e2e.py); adopters set their own count, or omit it
-# for the scaffold's default of 15 (#260). This repo ratchets at its current
-# 16 nodes (no redundancy found in the audit) plus the poll helper's budget probe;
+# for the scaffold's default of 15. This repo ratchets at its current 19 nodes,
+# one broad contract test per vendored component with no redundancy found;
 # lower it as the suite trims.
-test_budget           = 17
+test_budget           = 19
 
 # Inert image/font assets under the vendored static tree -> smoke is enough.
 [[e2e.rule]]
@@ -107,6 +110,13 @@ path = "app/webapp/static/_vendored/text-size/text-size-boot.html"
 tier       = "static"
 prefix     = "app/webapp/static/_vendored/"
 extensions = ["html"]
+
+# A vendored README is prose beside the component: no browser test reads one.
+# Must precede the app/webapp/ rule.
+[[e2e.rule]]
+tier       = "none"
+prefix     = "app/webapp/static/_vendored/"
+extensions = ["md"]
 
 # The HTTP/2 launch module is a server process with no browser surface of its own:
 # tests/test_serve.py boots it as a real process. Must precede the app/webapp/ rule.
@@ -143,6 +153,19 @@ path = "tests/_streamlit_lifecycle.py"
 [[e2e.rule]]
 tier = "full"
 path = "tests/_port_probe.py"
+
+# Test support the suite loads from outside tests/e2e/: the root conftest, the
+# synthetic host it registers and the git helper the screenshot proof imports.
+# Must precede the tests/ -> none rule.
+[[e2e.rule]]
+tier = "full"
+path = "tests/conftest.py"
+[[e2e.rule]]
+tier = "full"
+path = "tests/host/_synthetic_host.py"
+[[e2e.rule]]
+tier = "full"
+path = "tests/_git_repo.py"
 
 # The usage-log router is the server the usage-log e2e drives (#349), so it is
 # a browser surface despite living under src/. Must precede the src/ rule.
