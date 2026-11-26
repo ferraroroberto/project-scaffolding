@@ -167,6 +167,12 @@ path = "tests/host/_synthetic_host.py"
 tier = "full"
 path = "tests/_git_repo.py"
 
+# The no-window flag: the suite's boot, port probe and tray helpers import it,
+# so a break there stops the suite starting. Must precede the src/ -> none rule.
+[[e2e.rule]]
+tier = "full"
+path = "src/no_window.py"
+
 # The usage-log router is the server the usage-log e2e drives (#349), so it is
 # a browser surface despite living under src/. Must precede the src/ rule.
 [[e2e.rule]]
