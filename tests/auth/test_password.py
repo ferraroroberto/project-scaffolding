@@ -81,11 +81,11 @@ def test_non_ascii_legacy_compare_does_not_raise(pw_file: Path) -> None:
 
 @pytest.mark.parametrize(
     "content",
-    ["not json", "[]", json.dumps({"password_hash": 5}), json.dumps({"password_hash": "plaintext"})],
+    ["not json", "[]", json.dumps({"password_hash": 5}), json.dumps({"password_hash": "plaintext"}), b"\xff\xfe"],
 )
-def test_broken_file_falls_back_to_legacy(pw_file: Path, content: str) -> None:
+def test_broken_file_falls_back_to_legacy(pw_file: Path, content: str | bytes) -> None:
     pw_file.parent.mkdir(parents=True)
-    pw_file.write_text(content, encoding="utf-8")
+    pw_file.write_bytes(content if isinstance(content, bytes) else content.encode("utf-8"))
     assert password.stored_hash() == ""
     assert password.check_password("old", legacy="old")
 
@@ -123,12 +123,53 @@ def test_cli_set_empty_stdin_is_refused(pw_file: Path, monkeypatch: pytest.Monke
 
 
 def test_cli_status(pw_file: Path, capsys: pytest.CaptureFixture[str]) -> None:
-    assert password.main(["status"]) == 0
-    assert "not stored" in capsys.readouterr().out
+    # The installer reads this exit code: 0 ok, 1 missing, anything else unknown.
+    assert password.main(["status"]) == 1
+    assert "No password stored" in capsys.readouterr().out
     password.set_password("1234")
     assert password.main(["status"]) == 0
     out = capsys.readouterr().out
-    assert "stored" in out and "not stored" not in out and "1234" not in out
+    assert "hash stored" in out and "1234" not in out
+
+
+@pytest.mark.parametrize(
+    "config,code", [({"auth_password": "old-fixture"}, 0), ({"auth_password": ""}, 1), ({}, 1)]
+)
+def test_cli_status_counts_a_legacy_password(
+    pw_file: Path, tmp_path: Path, capsys: pytest.CaptureFixture[str], config: dict, code: int
+) -> None:
+    app_config = tmp_path / "webapp_config.json"
+    app_config.write_text(json.dumps(config), encoding="utf-8")
+    assert password.main(["status", "--legacy", str(app_config), "auth_password"]) == code
+    assert "old-fixture" not in capsys.readouterr().out
+
+
+@pytest.mark.parametrize("content", [None, "not json", "[]"])
+def test_cli_status_unreadable_legacy_config_is_unknown(pw_file: Path, tmp_path: Path, content: str | None) -> None:
+    app_config = tmp_path / "webapp_config.json"
+    if content is not None:
+        app_config.write_text(content, encoding="utf-8")
+    argv = ["status", "--legacy", str(app_config), "auth_password"]
+    assert password.main(argv) == 2
+    password.set_password("1234")
+    assert password.main(argv) == 0
+
+
+def test_cli_status_unreadable_password_file_is_unknown(pw_file: Path) -> None:
+    pw_file.mkdir(parents=True)
+    assert password.main(["status"]) == 2
+
+
+@pytest.mark.parametrize("stored,code", [(False, 1), (True, 0)])
+def test_cli_status_exit_code_survives_a_cp1252_pipe(
+    pw_file: Path, monkeypatch: pytest.MonkeyPatch, stored: bool, code: int
+) -> None:
+    # A captured Windows child prints through the ANSI code page; a print that
+    # raises there exits 1, which the installer reads as "missing".
+    if stored:
+        password.set_password("1234")
+    monkeypatch.setattr("sys.stdout", io.TextIOWrapper(io.BytesIO(), encoding="cp1252"))
+    assert password.main(["status"]) == code
 
 
 def test_password_never_logged(pw_file: Path, caplog: pytest.LogCaptureFixture) -> None:
