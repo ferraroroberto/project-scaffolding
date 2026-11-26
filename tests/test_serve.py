@@ -218,6 +218,85 @@ def test_every_request_on_a_long_lived_h2_connection_is_answered() -> None:
     assert asyncio.run(_unanswered_h2_requests(total, batch=20)) == []
 
 
+async def _answered_after_a_late_body() -> bool:
+    """Serve over h2c with the launch config; on one connection, let the app answer a
+    POST before its body arrives, send that body once the stream has closed, then ask
+    again. Whether the second request is answered on the same connection."""
+    import h2.config
+    import h2.connection
+    import h2.events
+    from hypercorn.asyncio import serve as hypercorn_serve
+
+    async def app(scope: Any, receive: Any, send: Any) -> None:
+        if scope["type"] != "http":
+            return
+        # Answers without reading the body, as a fast 4xx or a redirect does.
+        await send({"type": "http.response.start", "status": 200, "headers": []})
+        await send({"type": "http.response.body", "body": b"ok"})
+
+    port = _free_port()
+    stop = asyncio.Event()
+    server = asyncio.create_task(
+        hypercorn_serve(app, serve.build_config("127.0.0.1", port), shutdown_trigger=stop.wait)
+    )
+    headers = [(":scheme", "http"), (":authority", "t")]
+
+    async def until_ended(stream_id: int) -> bool:
+        while True:
+            try:
+                data = await asyncio.wait_for(reader.read(65_536), 2)
+            except TimeoutError:
+                return False
+            if not data:
+                return False
+            events = conn.receive_data(data)
+            writer.write(conn.data_to_send())
+            if any(isinstance(e, h2.events.StreamEnded) and e.stream_id == stream_id for e in events):
+                return True
+
+    try:
+        for _ in range(100):
+            try:
+                reader, writer = await asyncio.open_connection("127.0.0.1", port)
+                break
+            except OSError:
+                await asyncio.sleep(0.05)
+        else:
+            raise AssertionError("hypercorn never listened")
+        conn = h2.connection.H2Connection(h2.config.H2Configuration(client_side=True))
+        conn.initiate_connection()
+        early = conn.get_next_available_stream_id()
+        conn.send_headers(early, [(":method", "POST"), (":path", "/upload"), *headers])
+        writer.write(conn.data_to_send())
+        assert await until_ended(early), "the early answer never arrived"
+        await asyncio.sleep(0.2)  # the server closes its side of the stream
+        conn.send_data(early, b"late body", end_stream=True)
+        writer.write(conn.data_to_send())
+        nxt = conn.get_next_available_stream_id()
+        conn.send_headers(nxt, [(":method", "GET"), (":path", "/next"), *headers], end_stream=True)
+        writer.write(conn.data_to_send())
+        answered = await until_ended(nxt)
+        writer.close()
+        return answered
+    finally:
+        stop.set()
+        server.cancel()
+        try:
+            await server
+        except BaseException:
+            pass
+
+
+def test_a_late_body_for_a_closed_h2_stream_keeps_the_connection(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A browser may still be sending a request body when the response is already out.
+    That late body must not take down the connection every other request shares."""
+    from hypercorn.protocol.h2 import H2Protocol
+
+    monkeypatch.setattr(H2Protocol, "_handle_events", H2Protocol._handle_events)  # restored after the test
+    serve.skip_late_h2_stream_events()
+    assert asyncio.run(_answered_after_a_late_body())
+
+
 # ------------------------------------------------------------ process half
 
 
