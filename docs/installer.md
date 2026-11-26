@@ -52,6 +52,9 @@ register = ["{python}", "-m", "src.boot_autostart", "enable"]
 
 # Extra checklist items: exactly one of paths (all must exist), which (a CLI on PATH) or command
 # (exit 0 ok, 1 missing, anything else unknown). The hint is printed while the item is not ok.
+# `status` exits 0 when a password is stored, 1 when not, 2 when a file it needs cannot be read.
+# An app that still honours an old plaintext value adds where it lives, a top-level key of a JSON file:
+# "--legacy", "config/webapp_config.json", "auth_password".
 [[install.check]]
 name  = "Sign-in password"
 command = ["{python}", "-m", "src.password", "status"]
