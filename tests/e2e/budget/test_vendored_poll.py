@@ -112,7 +112,48 @@ def _stream_kept_while_hidden_breaks_the_budget(page: Page, base_url: str) -> No
     assert any("while hidden" in p for p in request_budget_problems(reading, visible_max=12)), reading.summary()
 
 
+# A well-behaved poll quick enough to come due inside a short delay before the hide.
+_QUICK_STARTPOLL = _STARTPOLL.replace("5000", "2000")
+_HIDE_DELAY_MS = 2500
+
+
+def _delay_the_hide(page: Page) -> None:
+    """Stall the probe's hide call, as a loaded box does: real time passes with the page still visible."""
+    evaluate = page.evaluate
+
+    def delayed(expression: str, *args: object) -> object:
+        if "__requestBudgetSetHidden(true)" in expression:
+            page.wait_for_timeout(_HIDE_DELAY_MS)
+        return evaluate(expression, *args)
+
+    page.evaluate = delayed
+
+
+def _visible_read_before_the_hide_is_not_hidden(page: Page, base_url: str) -> None:
+    _delay_the_hide(page)
+    reading = measure_request_budget(page, _probe(page, base_url, _QUICK_STARTPOLL))
+    assert not reading.hidden, reading.summary()
+
+
+# One flush as the page hides, then the same path again from a timer while hidden.
+_FLUSHES_ON_HIDE = (
+    "const flush = () => fetch('/api/usage/events', { method: 'POST' });\n"
+    "document.addEventListener('visibilitychange', () => {\n"
+    "  if (document.hidden) { flush(); setTimeout(flush, 5000); }\n"
+    "});"
+)
+
+
+def _a_named_flush_is_allowed_once(page: Page, base_url: str) -> None:
+    path = "/api/usage/events"
+    reading = measure_request_budget(page, _probe(page, base_url, _FLUSHES_ON_HIDE), hidden_flushes=(path,))
+    assert reading.flushed == {path: 1}, reading.summary()
+    assert reading.hidden == {path: 1}, f"the repeat is a hidden request: {reading.summary()}"
+
+
 _CHECKS = (
+    ("a named flush is allowed once", _a_named_flush_is_allowed_once),
+    ("a poll due before the hide is not a hidden request", _visible_read_before_the_hide_is_not_hidden),
     ("a stream is measured, not unknown", _stream_is_measured_not_unknown),
     ("a stream closed on hide is one catch-up read", _stream_closed_on_hide_is_one_catch_up_read),
     ("a stream kept while hidden breaks the budget", _stream_kept_while_hidden_breaks_the_budget),
