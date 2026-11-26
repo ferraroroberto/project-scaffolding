@@ -17,7 +17,7 @@ import pytest
 from src import ps_script
 from src.no_window import NO_WINDOW
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 POWERSHELL = ps_script.POWERSHELL_EXE
 
 # The shape of tray_lifecycle.ps1: CmdletBinding, one positional action, strings and a switch.
