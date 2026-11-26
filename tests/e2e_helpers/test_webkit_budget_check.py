@@ -82,7 +82,7 @@ def test_a_declared_target_that_is_missing_is_unknown(tmp_path: Path, capsys: py
 
 @pytest.mark.parametrize(
     ("pytest_exit", "expected_exit", "word"),
-    [(0, wbc.EXIT_PASS, "pass"), (1, wbc.EXIT_FAIL, "fail"), (5, wbc.EXIT_UNKNOWN, "unknown"), (2, wbc.EXIT_UNKNOWN, "unknown")],
+    [(0, wbc.EXIT_PASS, "pass"), (1, wbc.EXIT_FAIL, "fail"), (2, wbc.EXIT_UNKNOWN, "unknown")],
 )
 def test_pytest_outcome_maps_to_one_verdict(
     tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch,
@@ -94,13 +94,55 @@ def test_pytest_outcome_maps_to_one_verdict(
 
     def fake_run(argv: list[str], **_: object) -> SimpleNamespace:
         calls.append(argv)
+        Path(argv[-1].removeprefix("--junitxml=")).write_text(
+            '<testsuites><testsuite tests="1" skipped="0" failures="0" errors="0"/></testsuites>', encoding="utf-8")
         return SimpleNamespace(returncode=pytest_exit)
 
     monkeypatch.setattr(wbc.subprocess, "run", fake_run)
     code = wbc.run(tmp_path, "python")
     assert code == expected_exit
     assert _last_line(capsys) == f"WEBKIT_BUDGET={word}"
-    assert calls == [["python", "-m", "pytest", "tests/e2e/test_budget.py", "--browser", "webkit"]]
+    assert [argv[:-1] for argv in calls] == [["python", "-m", "pytest", "tests/e2e/test_budget.py", "--browser", "webkit"]]
+    assert calls[0][-1].startswith("--junitxml=")
+
+
+def test_a_run_that_leaves_no_report_is_unknown_never_a_pass(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _write(tmp_path, "tests/e2e/test_budget.py", "measure_request_budget(page, url)\n")
+    monkeypatch.setattr(wbc, "webkit_installed", lambda: True)
+    monkeypatch.setattr(wbc.subprocess, "run", lambda argv, **_: SimpleNamespace(returncode=0))
+    assert wbc.run(tmp_path, "python") == wbc.EXIT_UNKNOWN
+    assert _last_line(capsys) == "WEBKIT_BUDGET=unknown"
+
+
+_SKIPPED = '@pytest.mark.skip(reason="x")\ndef test_skipped():\n    pass\n'
+_PASSED = "def test_passed():\n    pass\n"
+
+
+@pytest.mark.parametrize(
+    ("body", "expected_exit", "word", "message"),
+    [
+        (_SKIPPED, 7, "not-run", "skipped"),
+        ('pytest.skip("x", allow_module_level=True)\n', 7, "not-run", "skipped"),
+        ("", 7, "not-run", "no tests collected"),
+        (_SKIPPED + _PASSED, 0, "pass", ""),
+    ],
+    ids=["all-skipped", "module-skipped", "none-collected", "one-passed"],
+)
+def test_only_a_run_with_a_passed_test_is_a_pass(
+    tmp_path: Path, capfd: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch,
+    body: str, expected_exit: int, word: str, message: str,
+) -> None:
+    """A real pytest run: its exit code is 0 when every test is skipped, so the verdict cannot rest on it."""
+    _write(tmp_path, "tests/e2e/test_budget.py", f"import pytest\n# measure_request_budget(\n{body}")
+    _write(tmp_path, "pytest.ini", "[pytest]\naddopts = -p no:cacheprovider\n")
+    monkeypatch.setattr(wbc, "webkit_installed", lambda: True)
+    assert wbc.run(tmp_path, sys.executable) == expected_exit
+    out = capfd.readouterr().out.strip().splitlines()
+    assert out[-1] == f"WEBKIT_BUDGET={word}"
+    if message:
+        assert message in out[-2]
 
 
 def test_a_harness_without_a_browser_option_is_not_run_never_unknown(

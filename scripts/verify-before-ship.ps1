@@ -139,7 +139,8 @@
                          the Mac nightly does; runs with the browser slice only.
                          WebKit not installed, no budget test, or no pytest
                          --browser option, prints [NOT RUN], never a pass; exit 3 = "not
-                         confirmed", a failure (docs/polling-budget.md)
+                         confirmed" and exit 7 = no test passed (all skipped or none
+                         collected) are failures (docs/polling-budget.md)
      16. shot baseline — scripts/shot_baseline.py: compares the screenshots the
                          e2e slice recaptured (phone + desktop, light + dark)
                          with the committed baseline, fails on a visible change,
@@ -353,7 +354,7 @@ if ($tier -eq "skip") {
         # The Mac nightly runs the request-budget tests on WebKit, which the Chromium
         # slice above never does. 0 passed; 4 (WebKit not installed), 5 (the repo
         # has no budget test) and 6 (no pytest --browser option) are "not run", printed as such and never as a pass;
-        # anything else, 3 (not confirmed) included, fails the gate.
+        # anything else, 3 (not confirmed) and 7 (no test passed) included, fails the gate.
         Write-Host ""
         Write-Host ">> request budget on webkit" -ForegroundColor Cyan
         & $py "scripts/tools/webkit_budget_check.py"
