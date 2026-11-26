@@ -195,12 +195,13 @@ def _status(legacy: list[str] | None) -> int:
     if stored_hash(target):
         print(f"ℹ️ Password hash stored: {target}")
         return 0
-    old = _legacy_value(*legacy) if legacy else ""
+    source, key = legacy or ("", "")
+    old = _legacy_value(source, key) if legacy else ""
     if old:
-        print(f"ℹ️ Password hash not stored; the old password ({legacy[1]} in {legacy[0]}) still works.")
+        print(f"ℹ️ Password hash not stored; the old password ({key} in {source}) still works.")
         return 0
     if old is None or _unreadable(target):
-        unread = legacy[0] if old is None else target
+        unread = source if old is None else target
         print(f"⚠️ Cannot tell whether a password is stored: {unread} could not be read.")
         return 2
     print(f"ℹ️ No password stored: {target}")
