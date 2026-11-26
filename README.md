@@ -12,13 +12,12 @@ Clone this directory, rename it, and start building.
 - A **light-mode toggle** in the sidebar, CSS overlay, no restart. See [Theming](#theming).
 - `launch_app.{bat,sh}` — one-click local launch.
 - `launch_server.{bat,sh}` — local launch + Cloudflare Tunnel for public sharing.
-- `tray.bat.template` — copy-to-adapt Windows tray launcher for a long-lived-service app. See [`docs/windows-tray.md`](docs/windows-tray.md).
+- `tray.bat.template` + vendor-verbatim `src/ps_script.py` (manifest key `ps_script`) — copy-to-adapt Windows tray launcher over the shared `tray_lifecycle.ps1`, AllSigned-safe. See [`docs/windows-tray.md`](docs/windows-tray.md).
 - `scripts/templates/setup.bat` + `src/installer.py` — clone-and-setup installer (manifest key `installer`). See [`docs/installer.md`](docs/installer.md).
 - `.github/workflows/ci.yml.template` — copy-to-adapt web-app CI gate (unit + Playwright desktop/phone). See [`docs/ci-conventions.md`](docs/ci-conventions.md) ("Web-app CI template").
 - `.github/workflows/nightly-mac.yml` + `scripts/ci/nightly_matrix.py` + `.github/nightly-adopters.txt` + `scripts/ci/ios_sim_smoke.py` + `scripts/ci/mac_runner_setup.sh` (+ `scripts/ci/audio_latency_probe.py`, the speech-to-text latency check, and `scripts/tools/routing_audit.py`, the audit of what per-change e2e routing skipped, and `scripts/ci/nightly_mac_fallback.py`, the PC-side trigger that dispatches the workflow when the schedule has not created a run) — the fleet's nightly CI on the Mac Mini self-hosted runner: for each adopter whose `main` changed (all of them on Sunday), its unit suite, WebKit e2e and an iOS Simulator Mobile Safari smoke, built from its `.fleet.toml` `[ci.nightly]` table, with one retry and flakes recorded. See [`docs/mac-runner.md`](docs/mac-runner.md).
 - `.github/workflows/main-gate-watch.yml.template` — copy-to-adapt watcher that files a tracking issue when your Actions gate goes red on `main`. See `CLAUDE.md` ("GitHub Actions CI conventions").
 - `scripts/gen_tailscale_cert.py` — copy-to-adapt HTTPS cert generator via `tailscale cert`. See [`docs/app-onboarding.md`](docs/app-onboarding.md) §2.
-- `%USERPROFILE%/.claude/tray/tray_lifecycle.ps1` — the one shared, machine-local tray lifecycle helper `tray.bat.template` shells to. See [`docs/windows-tray.md`](docs/windows-tray.md).
 - `app/tray/single_instance.py` — vendor-verbatim named-mutex primitive for tray apps. See [`docs/windows-tray.md`](docs/windows-tray.md) (single-instance gotcha).
 - `app/tray/watchdog.py` — vendor-verbatim tray self-heal primitives (manifest key `tray_watchdog`): spawn retry/backoff, dead/wedged health watchdog, breadcrumb log. See [`docs/windows-tray.md`](docs/windows-tray.md) (webapp self-heal gotcha).
 - `app/webapp/static/_vendored/` — vendor-verbatim fleet design-system component library (nav, card, modal, switch, toast, usage-log, day-row, ...) for the FastAPI + static PWA shape. See [`app/webapp/static/_vendored/README.md`](app/webapp/static/_vendored/README.md) and `CLAUDE.md` ("Web-app visual identity").
@@ -137,6 +136,7 @@ src/
   config.py                 paths + env-driven settings
   logger.py                 the elegant logger
   no_window.py              the one CREATE_NO_WINDOW flag every spawn imports
+  ps_script.py              vendor-verbatim AllSigned-safe PowerShell launcher
   pooled_http.py            vendor-verbatim pooled outbound HTTP client (keep-alive session + single-retry dispatch)
   request_timing.py         vendor-verbatim request-timing middleware (Server-Timing queue/worker, budgets, timed pools)
   runtime_files.py          repo-local guarded writer for caller-named paths (refuses a code folder at run time)

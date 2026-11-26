@@ -55,7 +55,7 @@ A port that is **mutex-shared with another app** must **not** go in the reclaim 
 
 ## Platform gotcha (Windows / PowerShell 5.1)
 
-- `tray.bat` shells out to **Windows PowerShell 5.1** (`C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe`), running the whole lifecycle via one `-File %USERPROFILE%/.claude/tray/tray_lifecycle.ps1 launch ...` call against the ONE shared, machine-local copy owned by `fleet-config`. Keep that `.ps1` **ASCII-only** — a stray em-dash or other non-ASCII char breaks PS 5.1 parsing. (Write the prose with em-dashes; keep the *code* plain.)
+- `tray.bat` shells out to **Windows PowerShell 5.1** (`C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe`), running the whole lifecycle via one `launch` call of the ONE shared, machine-local `%USERPROFILE%/.claude/tray/tray_lifecycle.ps1` owned by `fleet-config`, started through `src/ps_script.py` ("Execution policy" below). Keep that `.ps1` **ASCII-only** — a stray em-dash or other non-ASCII char breaks PS 5.1 parsing. (Write the prose with em-dashes; keep the *code* plain.)
 - Match the listener via `Get-NetTCPConnection -LocalPort <p> -State Listen`, take `OwningProcess`, then resolve its CommandLine via `Get-CimInstance Win32_Process -Filter 'ProcessId = <pid>'`. `Get-Process` alone won't give you the command line.
 - `tray.bat.template` itself must **also** stay ASCII-only, for a distinct reason: it opens with `chcp 65001` to switch the console to UTF-8, but `cmd.exe` read-ahead-buffers a chunk of the batch file for parsing at whatever codepage was active when the buffer was filled. A multi-byte UTF-8 character anywhere inside that pre-fetch window gets misparsed once the codepage switches mid-file, throwing spurious `'X' is not recognized as an internal or external command` errors on unrelated later lines — reproduced with a minimal `chcp 65001` + em-dash-in-a-REM-comment `.bat` invoked non-interactively (`cmd.exe //c` from Git Bash), confirmed fixed by removing the non-ASCII character. Same rule as the `.ps1` above, different underlying mechanism (cmd.exe batch read-ahead, not PS 5.1's parser).
 
@@ -76,15 +76,39 @@ REM  can't carry (it escapes the closing quote and swallows every later
 REM  switch empty -- project-scaffolding#145). Pass the de-slashed copy.
 set "SCRIPT_DIR_ARG=%SCRIPT_DIR:~0,-1%"
 
-%PS% -NoProfile -NonInteractive -File "%TRAY_PS%" launch -AppName "%TRAY_APP_NAME%" -ScriptDir "%SCRIPT_DIR_ARG%" -VenvDir "%TRAY_VENV%" -TrayMatch "launcher\.py\s+tray" -Ports "%OWNED_PORTS%" -TrayLaunch "%TRAY_LAUNCH%" -VersionUrl "%VERSION_URL%" !RESTART_ARG!
+set "PSL_ARG_AppName=%TRAY_APP_NAME%"
+set "PSL_ARG_ScriptDir=%SCRIPT_DIR_ARG%"
+set "PSL_ARG_VenvDir=%TRAY_VENV%"
+set "PSL_ARG_TrayMatch=%TRAY_MATCH%"
+set "PSL_ARG_Ports=%OWNED_PORTS%"
+set "PSL_ARG_TrayLaunch=%TRAY_LAUNCH%"
+set "PSL_ARG_VersionUrl=%VERSION_URL%"
+set "PSL_SWITCH_Restart="
+if defined WANT_RESTART set "PSL_SWITCH_Restart=1"
+"%TRAY_VENV%\Scripts\python.exe" -m src.ps_script "%TRAY_PS%" launch
 exit /b %ERRORLEVEL%
 ```
 
 Inside the helper, `launch` performs idempotent start when `-Restart` is absent; when `-Restart` is present it detects matching tray PIDs, kills the tray subtree, reclaims owned ports by CommandLine-scoped PID, starts the tray, and polls the version endpoint until served `git_sha` matches repo `HEAD`.
 
+### Execution policy: the helper is started without weakening it
+
+`powershell -File` refuses an unsigned script under `AllSigned` and `Restricted`, and the policy is the machine owner's: nothing here sets or overrides it, and `-ExecutionPolicy Bypass` is never the fix. `tray.bat` therefore starts the helper through **`src/ps_script.py`** (vendor-verbatim, manifest key `ps_script`, standard library only), which reads the effective policy:
+
+- `Bypass` / `Unrestricted` / `RemoteSigned`: the plain `-File` launch.
+- Anything else, or a policy that could not be read: the script is loaded as text and run as a ScriptBlock, which is not a file execution, so the policy does not apply and stays as it was.
+
+It prints the method used (`PowerShell launch: -File …` or `… ScriptBlock …`) and exits with the script's own code. A script it cannot read, parse, bind or run to its end exits non-zero, so a failed `--restart` is never reported as a start. The shared helper being present does not mean it is loadable: under `AllSigned` only this launch path reaches it.
+
+- **Arguments travel as environment variables.** The helper finds a running tray by matching the command lines of `python.exe` processes under the repo's `.venv`. A launcher with `-TrayLaunch` on its command line would match: a plain start would say "already running" and `--restart` would stop itself. `tray.bat` sets `PSL_ARG_<Name>` / `PSL_SWITCH_<Name>` and passes only the script and `launch`; no `PSL_` variable reaches the helper's environment or the tray it starts. For the same reason `TRAY_MATCH` must be more specific than a bare word such as `tray`.
+- **A repo with no `.venv`** takes the plain `-File` line, which says so; under `AllSigned` that exits non-zero.
+- **A script run this way** must not rely on `$PSCommandPath` or `$MyInvocation.MyCommand.Path` (empty under a ScriptBlock); `$PSScriptRoot` is supplied. A statement-terminating error ends it with exit 1, where `-File` would print it and carry on.
+
+An adopter carries `src/ps_script.py` byte-for-byte and re-copies the matching `tray.bat` lines; those lines without the file exit non-zero.
+
 ### The lifecycle lives in one shared `.ps1`, not cmd capture (the non-interactive fix)
 
-The batch shells to `%PS% … -File "%USERPROFILE%/.claude/tray/tray_lifecycle.ps1" launch ...` once rather than embedding the CIM/`Get-NetTCPConnection` logic in inline `powershell.exe -Command "…"` or parsing helper output through `for /f`. This is load-bearing, not cosmetic. The first broken shape needed a CIM `-Filter` with **doubled single quotes nested inside the batch's double quotes**, all inside a `for /f usebackq` **backtick** block. The second broken shape moved the CIM logic to `-File` but still wrapped `detect` in `for /f`; launched **non-interactively through a nested shell** — Git Bash → `cmd /c "tray.bat --restart"`, or a finisher skill's Bash tool — that capture can still return **empty**. Neither the running tray nor the port holder is found, so `--restart` silently degrades to a plain start.
+The batch shells to the helper's `launch` action once rather than embedding the CIM/`Get-NetTCPConnection` logic in inline `powershell.exe -Command "…"` or parsing helper output through `for /f`. This is load-bearing, not cosmetic. The first broken shape needed a CIM `-Filter` with **doubled single quotes nested inside the batch's double quotes**, all inside a `for /f usebackq` **backtick** block. The second broken shape moved the CIM logic to `-File` but still wrapped `detect` in `for /f`; launched **non-interactively through a nested shell** — Git Bash → `cmd /c "tray.bat --restart"`, or a finisher skill's Bash tool — that capture can still return **empty**. Neither the running tray nor the port holder is found, so `--restart` silently degrades to a plain start.
 
 That degradation is dangerous precisely because **a plain start adopts whatever is already serving the port**: a tray's `WebappManager.start()` runs `status()` first and, finding a live listener, *adopts* it (`OWNERSHIP_EXTERNAL`) and returns healthy — it never swaps in new code. The **only** thing that forces a new build to load is `--restart`'s reclaim killing the old holder *before* the fresh tray starts. So a mangled detection doesn't just "miss a kill" — it turns `--restart` into "adopt the stale build" while reporting success. Observed live (`whatsapp-radar`): the run emitted only the `cmd` banner, none of the batch's own `Stopping previous…` echoes, the old trays survived, and `GET /api/version` kept reporting the previous `git_sha`.
 
@@ -105,7 +129,7 @@ Don't re-derive the lifecycle logic per project. A copy-to-adapt **`tray.bat.tem
 
 **The lifecycle helper `tray_lifecycle.ps1` is machine infrastructure, not app code — it lives as ONE shared, machine-local copy owned by `fleet-config`, not a per-app vendored file.** It is deliberately not vendored byte-for-byte into each repo the way the mutex primitive below is: every copy would run on the exact same Windows box and always propagate together, so per-repo copies only multiply mechanical downstream PRs for every bugfix. The canonical source lives at `fleet-config`'s `tray/tray_lifecycle.ps1`, exposed at `%USERPROFILE%\.claude\tray\tray_lifecycle.ps1` by that repo's `install.ps1` junction (the same mechanism `fleet-config` already used for `hooks/` and `skills/`). Every `tray.bat` calls that one path directly — nothing to copy into a new tray app, and a fix merged in `fleet-config` is live everywhere instantly. `fleet-config`'s `tray/tray_lifecycle.ps1` is the file's **canonical source** — edit it there, not here — and this repo does not carry the file; `project-scaffolding` keeps only its **behavioral e2e harness** (`tests/e2e/test_tray_lifecycle_behavior.py`, resolved via `_tray_harness.py`'s `resolve_tray_lifecycle_path()`) and this doc. `tray.bat` hard-errors (never silently no-ops) if the shared path is missing, naming `fleet-config`'s `install.ps1` as the fix — see the non-interactive-fix section above.
 
-The in-process single-instance + race-safe adopt-or-spawn primitive (see the single-instance section below) is the other channel and is vendored: **`app/tray/single_instance.py`** is **vendored verbatim** — copy it byte-for-byte into each tray app, never edit it per-app (the app-specific mutex *names* are passed at the call site, so the file stays identical fleet-wide). A fix made once in the scaffold re-propagates by re-copying. The split follows the channel rule in `app/webapp/static/_vendored/README.md`: `single_instance.py` is imported Python that ships *inside* each app's own process (an app-shipped asset → vendor + manifest); `tray_lifecycle.ps1` is shelled to by path and never imported, never ships anywhere but this one machine (machine-local infra → one shared copy). A new tray app therefore vendors **two** scaffold files — `single_instance.py` (single-instance) and `watchdog.py` (self-heal) — plus the filled-in `tray.bat`, and needs `fleet-config` installed on the machine for the shared helper. Both are imported Python running inside the app's own process, so both take the app-shipped channel; both keep the same rule that only *call-site arguments* differ per app, never the file's bytes.
+The in-process single-instance + race-safe adopt-or-spawn primitive (see the single-instance section below) is the other channel and is vendored: **`app/tray/single_instance.py`** is **vendored verbatim** — copy it byte-for-byte into each tray app, never edit it per-app (the app-specific mutex *names* are passed at the call site, so the file stays identical fleet-wide). A fix made once in the scaffold re-propagates by re-copying. The split follows the channel rule in `app/webapp/static/_vendored/README.md`: `single_instance.py` is imported Python that ships *inside* each app's own process (an app-shipped asset → vendor + manifest); `tray_lifecycle.ps1` is shelled to by path and never imported, never ships anywhere but this one machine (machine-local infra → one shared copy). A new tray app therefore vendors **three** scaffold files — `single_instance.py` (single-instance), `watchdog.py` (self-heal) and `src/ps_script.py` (policy-safe start) — plus the filled-in `tray.bat`, and needs `fleet-config` installed on the machine for the shared helper. Both are imported Python running inside the app's own process, so both take the app-shipped channel; both keep the same rule that only *call-site arguments* differ per app, never the file's bytes.
 
 ## Gotcha 4 — single-instance must hold in-process; adopt-or-spawn must be race-safe
 

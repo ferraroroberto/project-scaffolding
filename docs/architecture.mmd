@@ -38,6 +38,7 @@ flowchart TB
   subgraph srcdir["src/ — non-UI Python (reusable from CLI + tests)"]
     CONFIG["config.py\npaths + env-driven settings"]
     LOGGER["logger.py\nterminal + rotating file +\nin-memory ring buffer, one log.info() call\n(never imports streamlit: ruff TID251, #256)"]
+    PSSCRIPT["ps_script.py\nstarts a PowerShell script without weakening the\nexecution policy: -File, or a ScriptBlock under\nAllSigned / Restricted (vendor-verbatim)"]
     NOWINDOW["no_window.py (#209)\nthe ONE CREATE_NO_WINDOW flag\nevery subprocess spawn imports\n(vendor-verbatim files keep a local copy)"]
     PIPELINES["pipelines/\nexample_pipeline.py\none run() per file, returns summary dict"]
     NOTIFY["notify/\nbase.py, factory.py, config.py, telegram.py\nvendor-verbatim Telegram notifier"]
@@ -259,6 +260,8 @@ opt-in via .fleet.toml [clean_tree_ratchet]; exit 3 = not confirmed"]
   E2E -->|creationflags=NO_WINDOW| NOWINDOW
   TRAYBEHAVIOR -->|creationflags=NO_WINDOW| NOWINDOW
   TRAYBEHAVIOR -->|materializes + drives| TRAYTMPL
+  TRAYTMPL -->|starts the helper through| PSSCRIPT
+  PSSCRIPT -.->|runs| FLEETCFGTRAY
   HEALTHROUTES -->|imports build_identity| BUILDINFO
   RESTARTCHECK -.->|runs by absolute path, verifies a new pid serves HEAD| TRAYTMPL
   TRAYBEHAVIOR -->|resolves (shared path, falls back to\nfleet-config primary checkout), drives real lifecycle| FLEETCFGTRAY

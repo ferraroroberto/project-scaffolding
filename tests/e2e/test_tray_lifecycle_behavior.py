@@ -159,6 +159,27 @@ def _check_https_loopback_self_signed_cert_restart_verifies(env_https: harness.T
     assert served == new_sha
 
 
+def _check_allsigned_start_and_restart_serve_head(env: harness.TrayEnv) -> None:
+    """Under a process-scope AllSigned policy, where `-File` refuses the unsigned
+    helper, a plain start and `--restart` both enter it and serve HEAD, and the
+    launcher is not mistaken for the tray it starts (project-scaffolding#1003)."""
+    first = harness.run_tray_bat(env.tray_bat, [], policy="AllSigned")
+    assert first.returncode == 0, first.stdout + first.stderr
+    assert "PowerShell launch: ScriptBlock" in first.stdout + first.stderr
+    assert "already running" not in first.stdout, first.stdout
+    assert harness.wait_for_tray_pids(env.venv_dir, env.tray_match)
+    old_sha = harness.poll_version(env.port, https=True)["git_sha"]
+    assert old_sha == harness.head_sha(env.script_dir)
+
+    new_sha = harness.git_commit_allow_empty(env.script_dir, "bump build (allsigned)")
+    restarted = harness.run_tray_bat(env.tray_bat, ["--restart"], policy="AllSigned")
+    assert restarted.returncode == 0, restarted.stdout + restarted.stderr
+    assert "from a new process" in restarted.stdout, restarted.stdout + restarted.stderr
+
+    served = harness.poll_version(env.port, https=True, timeout=30)["git_sha"]
+    assert served == new_sha != old_sha
+
+
 def _check_plain_start_without_shared_helper_serves_and_does_not_duplicate(
     env: harness.TrayEnv,
 ) -> None:
@@ -251,6 +272,8 @@ def test_tray_lifecycle(tmp_path_factory: pytest.TempPathFactory) -> None:
             _check_restart_via_noninteractive_nested_shell_serves_new_build(env=env)
         with c.case("https_loopback_self_signed_cert_restart_verifies"), _env(tmp_path_factory.mktemp("tray"), https=True) as env_https:
             _check_https_loopback_self_signed_cert_restart_verifies(env_https=env_https)
+        with c.case("allsigned_start_and_restart_serve_head"), _env(tmp_path_factory.mktemp("tray"), https=True) as env_https:
+            _check_allsigned_start_and_restart_serve_head(env=env_https)
         with c.case("plain_start_without_shared_helper_serves_and_does_not_duplicate"), _env(tmp_path_factory.mktemp("tray")) as env:
             _check_plain_start_without_shared_helper_serves_and_does_not_duplicate(env=env)
         with c.case("restart_without_shared_helper_is_still_a_hard_error"), _env(tmp_path_factory.mktemp("tray")) as env:

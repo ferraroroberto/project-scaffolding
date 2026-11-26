@@ -173,6 +173,12 @@ path = "tests/_git_repo.py"
 tier = "full"
 path = "src/no_window.py"
 
+# The launcher tray.bat starts the shared helper through: the tray lifecycle e2e
+# drives it, so it must not route "none" just because it lives under src/.
+[[e2e.rule]]
+tier = "full"
+path = "src/ps_script.py"
+
 # The usage-log router is the server the usage-log e2e drives (#349), so it is
 # a browser surface despite living under src/. Must precede the src/ rule.
 [[e2e.rule]]
@@ -949,6 +955,8 @@ shot_baseline   = { src = "scripts/shot_baseline.py" }
 box_lock_gate   = { src = "scripts/box_lock_gate.ps1" }
 pooled_http     = { src = "src/pooled_http.py" }
 no_window       = { src = "src/no_window.py" }
+# tray.bat starts the shared tray helper through it: -File, or a ScriptBlock under AllSigned / Restricted.
+ps_script       = { src = "src/ps_script.py" }
 runtime_data    = { src = "src/runtime_data.py" }
 fleet_root      = { src = "src/fleet_root.py" }
 notify          = { src = "src/notify" }
