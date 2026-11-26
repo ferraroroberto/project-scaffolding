@@ -175,6 +175,8 @@ def test_real_rules_route_representative_paths() -> None:
     assert tier("tests/conftest.py") == "full"
     assert tier("tests/host/_synthetic_host.py") == "full"
     assert tier("tests/_git_repo.py") == "full"
+    # The suite's boot, port probe and tray helpers import the no-window flag.
+    assert tier("src/no_window.py") == "full"
     # Only the unit ratchet tests import it, so no browser test can break on it.
     assert tier("tests/_ratchet_not_confirmed.py") == "skip"
     # A vendored README is prose, even beside a surface's own files.
