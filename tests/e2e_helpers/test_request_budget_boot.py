@@ -1,9 +1,10 @@
-"""The request-budget probe starts its visible minute only after the page's boot is over.
+"""The request-budget probe moves to its next phase only once the page's traffic is quiet.
 
-No browser: a fake page and a fake real-time clock replay what WebKit does to an app
-that boots in two waves. The second wave's requests are announced to the driver a
-fraction of a second after the first wave's last `requestfinished`, so a probe that
-starts its minute the moment nothing is in flight counts the second wave as visible.
+No browser: a fake page and a fake real-time clock replay requests the driver hears of
+late. WebKit announces a second boot wave a fraction of a second after the first wave's
+last `requestfinished`, and a read chained on an answer can arrive the same way at the
+end of a minute: a probe that moves on the moment nothing is in flight counts it in the
+wrong phase.
 """
 
 from __future__ import annotations
@@ -33,7 +34,9 @@ class _FakePage:
         _CURRENT.append(self)
         self.handlers: dict[str, list[Callable[[_Request], None]]] = {}
         self.events: list[Event] = []
-        self.clock = SimpleNamespace(install=lambda: None, run_for=lambda ms: self._advance(0.005))
+        self.clock = SimpleNamespace(
+            install=lambda: None, pause_at=lambda at: None, run_for=lambda ms: self._advance(0.005)
+        )
 
     def on(self, name: str, handler: Callable[[_Request], None]) -> None:
         self.handlers.setdefault(name, []).append(handler)
@@ -44,8 +47,8 @@ class _FakePage:
     def wait_for_load_state(self, state: str = "load", **kwargs: object) -> None:
         pass
 
-    def evaluate(self, script: str) -> None:
-        pass
+    def evaluate(self, script: str) -> int:
+        return 0
 
     def wait_for_timeout(self, ms: int) -> None:
         self._advance(ms / 1000)
@@ -90,6 +93,21 @@ class _NeverQuietPage(_FakePage):
             self.request("/api/spin", at=i * 0.1, answered_after=0.01)
 
 
+class _LateChainPage(_FakePage):
+    """A read the driver hears of just after the visible minute's last step has returned."""
+
+    def boot(self) -> None:
+        steps: list[int] = []
+
+        def run_for(ms: int) -> None:
+            steps.append(ms)
+            if len(steps) == 4:
+                self.request("/api/chained", at=0.01)
+            self._advance(0.005)
+
+        self.clock.run_for = run_for
+
+
 @pytest.fixture(autouse=True)
 def _fake_real_time(monkeypatch: pytest.MonkeyPatch) -> None:
     _CURRENT.clear()
@@ -104,3 +122,9 @@ def test_a_second_boot_wave_is_not_the_visible_minute() -> None:
 def test_a_page_that_never_goes_quiet_is_not_confirmed() -> None:
     with pytest.raises(RequestBudgetUnknown, match="NOT CONFIRMED"):
         measure_request_budget(_NeverQuietPage(), "https://app.test/", minute_ms=2_000)  # type: ignore[arg-type]
+
+
+def test_a_late_read_of_the_visible_minute_is_not_hidden() -> None:
+    reading = measure_request_budget(_LateChainPage(), "https://app.test/", minute_ms=2_000)  # type: ignore[arg-type]
+    assert reading.visible == {"/api/chained": 1}, reading.summary()
+    assert not reading.hidden, reading.summary()
