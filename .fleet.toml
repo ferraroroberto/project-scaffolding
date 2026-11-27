@@ -775,6 +775,19 @@ smoke     = ["{python}", "-c", """import sys; sys.path.insert(0, 'app'); from st
 timeout_s = 90
 
 # ---------------------------------------------------------------------------
+# Personal data ratchet. scripts/verify-before-ship.ps1 runs
+# scripts/personal_data_ratchet.py, which fails when a tracked file gains an
+# absolute local path, a personal email address or the owner's handle used as a
+# value beyond the committed baseline. The term rules read a list outside the
+# repo (~/.config/personal-data/terms.toml, never committed); the scaffold lists
+# the pattern rules only, so its gate needs no machine-local file and prints the
+# term rules as OFF. Opt-in per repo through this table.
+# Mechanism + limits: docs/personal-data-ratchet.md.
+[personal_data_ratchet]
+enabled = true
+rules   = ["user-path", "personal-email", "handle-default", "bare-exempt"]
+
+# ---------------------------------------------------------------------------
 # Test value ratchet and weekly burst. scripts/test_value_ratchet.py checks a
 # gate run recorded by scripts/unit_ledger.py: a new test unit shows its value
 # (red before the fix, a covered line no other unit covers, or an exempt
@@ -969,6 +982,7 @@ port_host_ratchet = { src = "scripts/port_host_ratchet.py", requires = ["ratchet
 # Pins the installer modules' content: re-vendor it with installer, installer_migrate, installer_declaration and installer_inplace.
 install_standard_ratchet = { src = "scripts/install_standard_ratchet.py", requires = ["ratchet_baseline"] }
 clean_tree_ratchet = { src = "scripts/clean_tree_ratchet.py", requires = ["ratchet_baseline"] }
+personal_data_ratchet = { src = "scripts/personal_data_ratchet.py", requires = ["ratchet_baseline"] }
 runtime_write_ratchet = { src = "scripts/runtime_write_ratchet.py", requires = ["runtime_write_resolve", "ratchet_baseline"] }
 # runtime_write_ratchet loads this sibling (the static path resolver); `requires` makes /propagate-vendored carry both.
 runtime_write_resolve = { src = "scripts/runtime_write_resolve.py" }

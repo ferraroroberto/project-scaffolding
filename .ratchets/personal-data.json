@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "entries": [
+    {"key": ".github/workflows/nightly-mac.yml", "counts": {"user-path": 1, "handle-default": 3}},
+    {"key": "docs/app-onboarding.md", "counts": {"user-path": 2}},
+    {"key": "docs/brand-icons.md", "counts": {"user-path": 3}},
+    {"key": "docs/mac-runner.md", "counts": {"user-path": 4}},
+    {"key": "docs/playwright-ui-testing.md", "counts": {"user-path": 1}},
+    {"key": "docs/windows-tray.md", "counts": {"user-path": 1}},
+    {"key": "scripts/ci/mac_runner_setup.sh", "counts": {"user-path": 3, "handle-default": 1}},
+    {"key": "scripts/ci/nightly_mac_fallback.py", "counts": {"handle-default": 1}},
+    {"key": "scripts/tools/brand_gen.py", "counts": {"user-path": 2}},
+    {"key": "scripts/tools/routing_audit.py", "counts": {"handle-default": 1}},
+    {"key": "tests/ci/test_nightly_mac_workflow.py", "counts": {"handle-default": 7}},
+    {"key": "tests/e2e/_browser_sweep.py", "counts": {"user-path": 1}},
+    {"key": "tests/e2e/_tray_harness.py", "counts": {"user-path": 2, "handle-default": 1}},
+    {"key": "tests/e2e/test_tray_lifecycle_behavior.py", "counts": {"user-path": 1}},
+    {"key": "tests/ratchets/test_conventions_ratchet.py", "counts": {"user-path": 2}},
+    {"key": "tests/ratchets/test_doc_refs_ratchet.py", "counts": {"user-path": 1}},
+    {"key": "tests/ratchets/test_docs_ratchet_commands.py", "counts": {"user-path": 1}},
+    {"key": "tests/test_brand_gen.py", "counts": {"user-path": 1}},
+    {"key": "tests/test_browser_sweep.py", "counts": {"user-path": 7}},
+    {"key": "tests/test_main_gate_watch_template.py", "counts": {"handle-default": 1}},
+    {"key": "tests/vendored/test_installer_discovery.py", "counts": {"user-path": 1}},
+    {"key": "tests/vendored/test_installer_migrate.py", "counts": {"user-path": 1}},
+    {"key": "tests/vendored/test_self_restart.py", "counts": {"user-path": 2}},
+    {"key": "tray.bat.template", "counts": {"handle-default": 1}}
+  ]
+}

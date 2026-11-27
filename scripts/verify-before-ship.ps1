@@ -137,6 +137,14 @@
                          a smoke that did not start, or git unusable, is an
                          "exit 3, not confirmed": a failure, never a pass
                          (docs/clean-tree-ratchet.md)
+     12i. personal data ratchet — scripts/personal_data_ratchet.py: fails when
+                         a tracked file gains an absolute local path, a personal
+                         email, the owner's handle used as a value or a term
+                         from the machine-local list beyond the committed
+                         baseline; opt-in via .fleet.toml
+                         [personal_data_ratchet]; a term rule with no list is
+                         unknown, "exit 3, not confirmed": a failure, never a
+                         pass (docs/personal-data-ratchet.md)
      13. mypy --strict — the vendor-verbatim primitives only; the list is
                          derived from .fleet.toml's [components] catalog via
                          scripts/vendored_catalog.py, never hand-maintained here
@@ -306,6 +314,7 @@ Invoke-Stage "probe fake ratchet"                 { & $py "scripts/probe_fake_ra
 Invoke-Stage "port host ratchet"                  { & $py "scripts/port_host_ratchet.py" }
 Invoke-Stage "install standard ratchet"           { & $py "scripts/install_standard_ratchet.py" }
 Invoke-Stage "clean tree ratchet"                 { & $py "scripts/clean_tree_ratchet.py" }
+Invoke-Stage "personal data ratchet"              { & $py "scripts/personal_data_ratchet.py" }
 Invoke-Stage "mypy --strict (vendored)"           { & $py -m mypy @VendoredModules }
 Invoke-Stage "py39 (vendored)"                    { & $py "scripts/tools/vendored_py39_check.py" }
 # Runtime write probe, first half: what already sits untracked or ignored under
