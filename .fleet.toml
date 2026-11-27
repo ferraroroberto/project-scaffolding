@@ -981,7 +981,7 @@ build_info      = { src = "src/build_info.py" }
 health_routes   = { src = "src/health_routes.py", requires = ["build_info"] }
 # The clone-and-setup installer setup.bat runs as `python -I src\installer.py` (docs/installer.md).
 installer       = { src = "src/installer.py" }
-# setup.bat -MigrateFrom / -InPlace: copy, rebind, install, start, verify the clone serves (docs/installer.md).
+# setup.bat -MigrateFrom / -InPlace / -Replace: copy, rebind, install, start, verify the clone serves (docs/installer.md).
 installer_migrate = { src = "src/installer_migrate.py", requires = ["installer", "installer_declaration"] }
 # The [install.migrate] / [install.endpoint] declaration and the port this PC's config sets; installer_migrate loads it by path.
 installer_declaration = { src = "src/installer_declaration.py" }
