@@ -9,13 +9,13 @@ Every app in the toolbox moves to another Windows PC the same way: `git clone`, 
 | The installer | `src/installer.py` | `src/installer.py` | vendored verbatim, manifest key `installer` |
 | Migration | `src/installer_migrate.py` | `src/installer_migrate.py` | vendored verbatim, manifest key `installer_migrate` |
 | Its declaration | `src/installer_declaration.py` | `src/installer_declaration.py` | vendored verbatim, manifest key `installer_declaration`; `installer_migrate.py` loads it by path |
-| In-place replace | `src/installer_inplace.py` | `src/installer_inplace.py` | vendored verbatim, manifest key `installer_inplace` |
+| Replace at the same path (`-Replace`, `-InPlace`) | `src/installer_inplace.py` | `src/installer_inplace.py` | vendored verbatim, manifest key `installer_inplace` |
 | The launcher | `scripts/templates/setup.bat` | `setup.bat` | copied once, renamed; it needs no edit |
 | The playbook | `docs/templates/install-playbook.md` | `docs/install.md` | copied once, placeholders filled per app; its Install, Update and Migrate sections are checked by the [install standard ratchet](install-standard-ratchet.md) |
 
 The module is stdlib only, because on a fresh PC it runs on the system python before any requirement is installed. `setup.bat` runs it as a script in isolated mode, `python -I src\installer.py`: `src/` stays off `sys.path`, so an app whose `src/__init__.py` imports a third-party package still installs, and no module of the app can shadow the standard library. Reading `.fleet.toml` needs Python 3.11 or newer (`tomllib`); an older interpreter fails the run with that message.
 
-`setup.bat` is a batch file, not a `.ps1`, so the PowerShell execution policy (`AllSigned` included) never refuses it. It runs the repo's `.venv` python once that exists, else the `py` launcher, else `python` on `PATH`, and passes every argument through. `-InPlace` always takes the system python ([below](#setupbat--inplace)).
+`setup.bat` is a batch file, not a `.ps1`, so the PowerShell execution policy (`AllSigned` included) never refuses it. It runs the repo's `.venv` python once that exists, else the `py` launcher, else `python` on `PATH`, and passes every argument through. `-Replace` and `-InPlace` always take the system python ([below](#replacing-an-install-at-its-path--replace-and--inplace)).
 
 ## What a run does
 
@@ -148,7 +148,7 @@ The `-StopOld` wait and verify's owner check count only the listeners a connecti
 
 Run in a fresh clone beside the old copy. `-StopOld` first stops the old copy; `-WhatIf` and `-Json` apply as usual.
 
-**On the same PC, pass `-StopOld`.** Two copies of one app cannot both run there: the tray's single-instance lock is named per app, not per folder, so the second tray exits while the first runs, and both copies bind the same port. A lock named per folder would not help, since the port still collides. Without `-StopOld` the copy runs, but the old copy keeps the port and verify fails, naming it as the port's owner. `-InPlace` always stops the old copy first.
+**On the same PC, pass `-StopOld`.** Two copies of one app cannot both run there: the tray's single-instance lock is named per app, not per folder, so the second tray exits while the first runs, and both copies bind the same port. A lock named per folder would not help, since the port still collides. Without `-StopOld` the copy runs, but the old copy keeps the port and verify fails, naming it as the port's owner. `-Replace` and `-InPlace` always stop the old copy first.
 
 1. **Guards.** The folder must be the root of a clean git checkout (no changed or untracked files), and the old folder another folder, not inside or around it. Anything else is `refused` and nothing is written. A rerun is allowed: files a previous run copied are ignored, so the checkout is still clean.
 2. **Inventory, read only.** The old folder, its git remote, the processes that run from it with their listening ports, and the Startup links and files, `HKCU` Run values and scheduled tasks whose command names it.
@@ -162,25 +162,48 @@ Run in a fresh clone beside the old copy. `-StopOld` first stops the old copy; `
 
 Each row is named, never valued. The exit code is 0 only when every step ran and verify passed; a fact a probe could not establish is `unknown` and fails the run.
 
-### `setup.bat -InPlace`
+### Replacing an install at its path: `-Replace` and `-InPlace`
 
-Replaces the install at the same path, so whatever stores that path (a launcher's app list, a Startup link, a scheduled task) needs no edit. Repeatable any number of times:
+Both replace the install at the same path, so whatever stores that path (a launcher's app list, a Startup link, a scheduled task) needs no edit, and both are repeatable any number of times. They differ only in where the run starts:
 
-1. stop every process that runs from the folder (the `-StopOld` rule);
-2. rename the folder to `<folder>.bak-YYYYMMDD-N`, the first free `N` of the day;
-3. `git clone` the folder's `origin` into the original path (the remote's default branch);
-4. run the new clone's `setup.bat -MigrateFrom <backup>`.
+- **`<app>.incoming\setup.bat -Replace <app>`** runs from a fresh clone beside the install. None of the install's own code runs, so it works whatever version the install is, including one whose `setup.bat` predates both flags. It is the way to use for any install.
+- **`<app>\setup.bat -InPlace`** runs from the install and first clones the install's `origin` to `<app>.incoming` itself. It needs an install new enough to have the flag; an older `setup.bat` stops with `unrecognized arguments: -InPlace`.
 
-The backup is kept as the fallback; nothing deletes it. Windows refuses to rename a folder that a process runs from or has as its current folder, so `setup.bat` copies `installer_migrate.py`, `installer_declaration.py` and `installer_inplace.py` to a temporary folder and runs them there with the system python, its current folder outside the tree. Run it from a terminal whose current folder is outside the app (`cd ..` first); a rename that still fails stops the run with nothing changed. The temporary folder (`%TEMP%\setup-inplace-*`) is removed when the run ends, whether it passed or failed. A clone that fails renames the backup back when the path is still free. `-WhatIf` prints the inventory, what it would stop, every file the migration would copy (by name, from the folder's own `[install.migrate]`; the real run uses the fresh clone's, normally the same), the backup name, the clone and the migration, and changes nothing.
+Run from `<root>`, the folder that holds the app:
+
+```powershell
+cd <root>
+git clone <origin URL> <app>.incoming          # git -C <app> remote get-url origin prints it
+.\<app>.incoming\setup.bat -Replace <app> -WhatIf
+.\<app>.incoming\setup.bat -Replace <app>
+```
+
+`-Replace` takes the install's folder relative to the terminal's current folder, or absolute. Then:
+
+1. **Guards.** The install must be the root of a git checkout with an `origin`. The incoming clone must be the root of a clean checkout (no changed or untracked files), have no `.venv` yet (a venv names the folder it was made in), have the same `origin` (case, slash style, a trailing slash and `.git` aside), and have nothing running from it. Uncommitted changes in the install are reported as `kept`: they stay in the backup. Anything else is `refused` and nothing is changed.
+2. **Inventory and stop.** As in `-MigrateFrom -StopOld`: every process that runs from the install, by PID with its tree, then a wait for its port. The port comes from the clone's `[install.endpoint]`, read against the install's own config, so an install too old to declare one is still waited on.
+3. **Rename** the install to `<app>.bak-YYYYMMDD-N`, the first free `N` of the day.
+4. **Move** the incoming clone to `<app>`.
+5. **Migrate:** the moved clone's `setup.bat -MigrateFrom <backup>`: copy, rebind, secrets, install, start, verify.
+
+`-InPlace` makes the clone before step 2, so a clone that fails stops nothing and changes nothing. A `<app>.incoming` that is already there is refused, with the `-Replace` command that would use it.
+
+**When a step fails.** Before step 3 the install is still at its path: the run names the start command that brings it back (`[install.migrate] start`, by default `tray.bat --restart`). A rename at step 3 that fails changes nothing else. A move at step 4 that fails renames the backup back to `<app>` and leaves the clone where it was. When that rename back fails too, the report names both folders, for a rename by hand. After step 4, the backup is the fallback ([below](#what-still-works-in-the-backup)); nothing deletes it.
+
+**How the run gets out of the way.** Windows refuses to rename a folder that a process runs from or has as its current folder, so `setup.bat` copies the running clone's `installer_migrate.py`, `installer_declaration.py` and `installer_inplace.py` to a temporary folder and runs them there with the system python, with `%TEMP%` as the current folder. Run it from a terminal whose current folder is outside the app (`<root>`). The temporary folder (`%TEMP%\setup-inplace-*`) is removed when the run ends, whether it passed or failed. The run, the removal and the exit are one line of `setup.bat`, because the file cmd.exe is reading is renamed away under it; that line leaves the batch with `(goto)` before it sets the exit code, since ending a batch whose file is gone otherwise fails with exit code 1.
+
+`-WhatIf` prints the guards, the inventory, what it would stop, every file the migration would copy (by name, from the clone's `[install.migrate]`, or the install's own under `-InPlace`, where the clone does not exist yet), the backup name, the two renames and the migration, and changes nothing: the folder listing and the running processes are the same before and after.
 
 Migrating a launcher (app-launcher, app-launcher-lite) stops it and every session it hosts, so run it from a plain terminal: the stop refuses when it would end its own run.
 
-**What still works in the backup.** It is a full git checkout, and `.venv\Scripts\python.exe -m <module>` runs as before, because a venv's `python.exe` finds its base interpreter through `pyvenv.cfg`. The console-script launchers in `.venv\Scripts` (`pip.exe`, `uvicorn.exe` and the like) and the `activate` scripts embed the original path: after the rename they start the new clone's interpreter, or nothing until the clone's `.venv` exists. A `tray.bat` that resolves its own folder (`%~dp0`) starts the backup from the backup. To fall back: stop the new copy, rename the clone away, rename the backup to the original name and start it.
+#### What still works in the backup
+
+It is a full git checkout, and `.venv\Scripts\python.exe -m <module>` runs as before, because a venv's `python.exe` finds its base interpreter through `pyvenv.cfg`. The console-script launchers in `.venv\Scripts` (`pip.exe`, `uvicorn.exe` and the like) and the `activate` scripts embed the original path: after the rename they start the new clone's interpreter, or nothing until the clone's `.venv` exists. A `tray.bat` that resolves its own folder (`%~dp0`) starts the backup from the backup. To fall back: stop the new copy, rename the clone away, rename the backup to the original name and start it.
 
 ## Adopting it
 
 1. Vendor `src/installer.py`, `src/installer_migrate.py`, `src/installer_declaration.py` and `src/installer_inplace.py` and list them under `[vendored]` in the app's `.fleet.toml`. An older entry script that ran the installer is deleted: `setup.bat` runs the module directly.
-2. Copy `scripts/templates/setup.bat` to `setup.bat` at the repo root. An app that already has a `setup.bat` with extra steps (another installer it offers, a closing banner) keeps them after the `src\installer.py` line, skipped when the arguments include `-Json`: anything printed after the report breaks the JSON document a caller parses, and `-InPlace` reads the child's `-MigrateFrom -Json` output that way.
+2. Copy `scripts/templates/setup.bat` to `setup.bat` at the repo root. An app that already has a `setup.bat` with extra steps (another installer it offers, a closing banner) keeps them after the `src\installer.py` line, skipped when the arguments include `-Json`: anything printed after the report breaks the JSON document a caller parses, and `-Replace` and `-InPlace` read the child's `-MigrateFrom -Json` output that way.
 3. Declare the `[install]` table, giving each check its `level` and each optional one its `blocks`. Keep every config's sample tracked and its target gitignored, and add `*.json.bak-*` to `.gitignore`: a rule written for the config (`config/*.json`, or the file's own name) does not match `config.json.bak-<stamp>`, and without the line every top-up is refused. A check or autostart that lives in the app's own code gets a small command-line entry that exits 0, 1 or another code, as above.
 4. Declare `[install.endpoint]` and `[install.migrate]`: the app's own configs, state and certificates to copy, the secrets among them, and its runtime-data folders as `shared`.
 5. Copy `docs/templates/install-playbook.md` to `docs/install.md`, fill each placeholder and delete the lines that do not apply, keeping its Install, Update and Migrate sections. It never deletes the old copy, which is retired only after the owner confirms.

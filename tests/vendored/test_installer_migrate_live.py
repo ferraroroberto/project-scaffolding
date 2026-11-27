@@ -9,10 +9,15 @@ while the migration is given the real path. It proves, with real processes:
 * `-MigrateFrom` beside a running old copy fails verify, naming the old copy as
   the port's owner, even though both copies serve the same commit;
 * `-InPlace -WhatIf` names every file the migration would copy, and changes nothing;
-* `-InPlace` stops the old copy, renames it to `<folder>.bak-YYYYMMDD-1`, clones
-  into the same path, migrates and verifies; the backup keeps the old state;
+* `-InPlace` clones beside the old copy, stops it, renames it to
+  `<folder>.bak-YYYYMMDD-1`, moves the clone to its path, migrates and verifies;
+  the backup keeps the old state;
 * verify finds the port in the app's own config and the scheme it really serves,
   where the declaration names another port and https;
+* `-Replace`, run from a fresh clone beside an install whose own setup.bat predates
+  `-InPlace` (clean, and with an uncommitted edit), changes nothing under `-WhatIf`
+  (same folder listing, same PIDs), then migrates it in place: the edit stays in
+  the backup and the clone serves the new commit on the install's port;
 * no run leaves its `setup-inplace-*` folder in `%TEMP%`;
 * no output contains a config or secret value.
 
@@ -106,6 +111,7 @@ def _seed(tmp_path: Path, declared: int) -> Path:
     (seed / "start.bat").write_text('@echo off\r\nstart "" /b "%~dp0.venv\\Scripts\\pythonw.exe" '
                                     '"%~dp0server.py"\r\n', encoding="ascii")
     (seed / "requirements.txt").write_text("", encoding="utf-8")
+    (seed / "notes.txt").write_text("tracked\n", encoding="utf-8")
     (seed / "config.sample.json").write_text(json.dumps({"port": 0, "token": "", "data_dir": ""}), encoding="utf-8")
     (seed / ".fleet.toml").write_text(TOML.format(declared=declared), encoding="utf-8")
     (seed / ".gitignore").write_text(".venv/\nconfig.json\n*.json.bak-*\ndata/\nsecret.key\n__pycache__/\n",
@@ -145,10 +151,12 @@ def _serving(port: int) -> dict[str, object] | None:
     return None
 
 
-def _install_old(tmp_path: Path, origin: Path, port: int) -> Path:
-    """The "installed" copy: cloned, configured with this PC's values, set up and running."""
+def _install_old(tmp_path: Path, origin: Path, port: int, at: str | None = None) -> Path:
+    """The "installed" copy: cloned (checked out ``at`` an older commit), configured, set up and running."""
     app = tmp_path / "app"
     _git(tmp_path, "clone", "-q", str(origin), str(app))
+    if at:
+        _git(app, "reset", "-q", "--hard", at)
     (app / "config.json").write_text(json.dumps({"port": port, "token": CANARY, "data_dir": str(app / "data")}),
                                      encoding="utf-8")
     (app / "data").mkdir()
@@ -235,5 +243,97 @@ def test_migrate_from_beside_a_running_old_copy_fails_verify_then_in_place_passe
     snap = m.take_snapshot(subprocess.run)
     assert snap is not None
     assert all(m.owner_of(snap, pid, app, backup)[0] == "clone" for pid in snap.listeners[port])
+    assert not any(CANARY in text for text in outputs)
+    assert not list(_temp(tmp_path).glob("setup-inplace-*")), "a run left its stage folder in %TEMP%"
+
+
+# The last scaffold commit whose setup.bat has no -MigrateFrom or -InPlace: the installs in the field that
+# predate them can only be replaced from a fresh clone.
+PRE_IN_PLACE = "f774234"
+OLD_TOML = TOML.split("[install.endpoint]")[0]
+
+
+def _old_commit(tmp_path: Path, origin: Path) -> str:
+    """Make the origin's history an old install followed by the current app: the old commit's sha."""
+    work = tmp_path / "history"
+    _git(tmp_path, "clone", "-q", str(origin), str(work))
+    _git(work, "checkout", "-q", "--orphan", "old")
+    for rel, published in (("src/installer.py", "src/installer.py"), ("setup.bat", "scripts/templates/setup.bat")):
+        done = subprocess.run(["git", "show", f"{PRE_IN_PLACE}:{published}"], cwd=REPO_ROOT, capture_output=True,
+                              timeout=60, check=False, creationflags=NO_WINDOW)
+        if done.returncode != 0:
+            pytest.skip(f"this checkout does not hold commit {PRE_IN_PLACE} (a shallow clone)")
+        (work / rel).write_bytes(done.stdout)
+    for rel in ("src/installer_migrate.py", "src/installer_declaration.py", "src/installer_inplace.py"):
+        (work / rel).unlink()
+    (work / ".fleet.toml").write_text(OLD_TOML, encoding="utf-8")
+    hooks = ["-c", f"core.hooksPath={tmp_path / 'no-hooks'}", "-c", "user.name=t", "-c", "user.email=t@example.invalid"]
+    _git(work, "add", "-A")
+    _git(work, *hooks, "commit", "-qm", "old install")
+    old = _git(work, "rev-parse", "HEAD")
+    new = _git(work, *hooks, "commit-tree", "main^{tree}", "-p", old, "-m", "current app")
+    _git(work, "push", "-q", "--force", str(origin), f"{new}:refs/heads/main")
+    return old
+
+
+def _tree(tmp_path: Path) -> list[str]:
+    """Every file and folder of the pair, leaving out run logs, %TEMP% and git's own folders."""
+    temp = _temp(tmp_path)
+    return sorted(str(p.relative_to(tmp_path)) for p in tmp_path.rglob("*")
+                  if ".git" not in p.parts and p.suffix != ".err" and not p.is_relative_to(temp))
+
+
+def _app_pids(app: Path) -> list[int]:
+    snap = m.take_snapshot(subprocess.run)
+    assert snap is not None
+    return sorted(p.pid for p in m.processes_from(snap, app, set()))
+
+
+@pytest.mark.parametrize("edited", [False, True], ids=["clean", "uncommitted-edit"])
+def test_replace_migrates_an_install_older_than_in_place(pair: tuple[Path, Path, int], edited: bool) -> None:
+    tmp_path, origin, port = pair
+    old_sha = _old_commit(tmp_path, origin)
+    new_sha = _git(origin, "rev-parse", "main")
+    app = _install_old(tmp_path, origin, port, at=old_sha)
+    notes = "edited here, never committed\n" if edited else "tracked\n"
+    (app / "notes.txt").write_text(notes, encoding="utf-8")
+    outputs: list[str] = []
+
+    # The old copy's own setup.bat cannot replace itself: the gap -Replace closes.
+    gap = _cmd(app / "setup.bat", "-InPlace -WhatIf", tmp_path, tmp_path / "gap.err")
+    err = (tmp_path / "gap.err").read_text(encoding="utf-8", errors="replace")
+    assert gap.returncode != 0 and "unrecognized arguments: -InPlace" in err
+
+    incoming = tmp_path / "app.incoming"
+    _git(tmp_path, "clone", "-q", str(origin), str(incoming))
+
+    # What-if, from the fresh clone: the folder listing and the running PIDs are the same before and after.
+    tree, pids = _tree(tmp_path), _app_pids(app)
+    assert pids, "the old copy is not running"
+    preview = _cmd(incoming / "setup.bat", "-Replace app -WhatIf -Json", tmp_path, tmp_path / "whatif.err")
+    outputs += [preview.stdout, (tmp_path / "whatif.err").read_text(encoding="utf-8", errors="replace")]
+    assert preview.returncode == 0, preview.stdout + outputs[-1]
+    would = {r["item"] for r in _rows(json.loads(preview.stdout), "copy") if r["state"] == "would copy"}
+    assert {"config.json", "secret.key", "data/state.db"} <= would, preview.stdout
+    assert _tree(tmp_path) == tree and _app_pids(app) == pids
+    assert _serving(port) == {"git_sha": old_sha, "built_at": "t"}
+
+    # For real: stop, rename to the backup, move the clone in, migrate from the backup, verify.
+    backup = tmp_path / f"app.bak-{datetime.date.today():%Y%m%d}-1"
+    done = _cmd(incoming / "setup.bat", "-Replace app -Json", tmp_path, tmp_path / "replace.err")
+    outputs += [done.stdout, (tmp_path / "replace.err").read_text(encoding="utf-8", errors="replace")]
+    assert done.returncode == 0, done.stdout + outputs[-1]
+    report = json.loads(done.stdout)
+    assert report["ok"] and report["migration"]["ok"], done.stdout
+    assert [row["state"] for row in _rows(report["migration"], "verify")] == ["ok", "ok"]
+
+    assert not incoming.exists() and _git(app, "rev-parse", "HEAD") == new_sha
+    assert _git(backup, "rev-parse", "HEAD") == old_sha
+    assert (backup / "notes.txt").read_text(encoding="utf-8") == notes
+    assert bool(_git(backup, "status", "--porcelain", "--untracked-files=no")) == edited
+    assert (app / "notes.txt").read_text(encoding="utf-8") == "tracked\n"
+    assert json.loads((app / "config.json").read_text(encoding="utf-8"))["token"] == CANARY
+    assert (app / "data" / "state.db").read_bytes() == b"old state"
+    assert _serving(port) == {"git_sha": new_sha, "built_at": "t"}
     assert not any(CANARY in text for text in outputs)
     assert not list(_temp(tmp_path).glob("setup-inplace-*")), "a run left its stage folder in %TEMP%"

@@ -61,15 +61,16 @@ git pull --ff-only
 
 What moves is declared in `[install.migrate]` of `.fleet.toml`: <LIST THE APP'S CONFIGS, STATE AND CERTIFICATES, e.g. config/config.json, data/, webapp/certificates/, .env>. Its runtime data under <e.g. C:\sqlite\<app>> stays where it is and is shared. The installer does the whole move; nothing here or in `setup.bat` deletes the old copy.
 
-**Reinstall in the same folder (the usual case).** From a terminal whose current folder is outside the app (<DELETE FOR AN APP THAT HOSTS NO SESSIONS:> a plain terminal, never a session <APP NAME> hosts, because the run stops <APP NAME> and every session in it):
+**Reinstall in the same folder (the usual case).** It works whatever version the installed copy is, because it runs from a fresh clone and never runs the old copy's code. Run these in order from `<PARENT FOLDER>`, the folder that holds `<FOLDER>` (<DELETE FOR AN APP THAT HOSTS NO SESSIONS:> in a plain terminal, never a session <APP NAME> hosts, because the run stops <APP NAME> and every session in it):
 
 ```powershell
 cd <PARENT FOLDER>
-.\<FOLDER>\setup.bat -InPlace -WhatIf    # read the backup name and every step; nothing changes
-.\<FOLDER>\setup.bat -InPlace
+git clone <REPOSITORY URL> <FOLDER>.incoming          # a fresh clone beside the install; run nothing in it yet
+.\<FOLDER>.incoming\setup.bat -Replace <FOLDER> -WhatIf   # read the backup name and every step; nothing changes
+.\<FOLDER>.incoming\setup.bat -Replace <FOLDER>
 ```
 
-It keeps the replaced copy as `<FOLDER>.bak-YYYYMMDD-N` and passes only when the new clone serves its own commit. The path is unchanged, so <e.g. the launcher's app entry and the Startup link> need no edit.
+It stops `<FOLDER>`, renames it to `<FOLDER>.bak-YYYYMMDD-N` (uncommitted edits stay there), moves `<FOLDER>.incoming` to `<FOLDER>`, migrates and passes only when the new clone serves its own commit. The path is unchanged, so <e.g. the launcher's app entry and the Startup link> need no edit. On an install whose `setup.bat` already has `-InPlace`, `.\<FOLDER>\setup.bat -InPlace` does the same and makes the clone itself.
 
 **Beside it (another folder, or an old copy that is not a git clone):**
 

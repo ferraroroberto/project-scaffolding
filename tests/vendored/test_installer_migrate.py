@@ -519,3 +519,132 @@ def test_in_place_refuses_a_folder_without_an_origin(tmp_path: Path) -> None:
     finally:
         os.chdir(cwd)
     assert report.failed and _states(report, "guard") == {"folder": "refused"}
+
+
+# ---------------------------------------------------------------- -Replace
+
+OLD_TOML = """port = ":8453"
+
+[install]
+samples = []
+"""  # an install from before [install.migrate] existed
+
+
+def _pair(tmp_path: Path, with_incoming: bool = True) -> tuple[Path, Path, Path]:
+    """An origin whose first commit is an old install's, the install at that commit, and a fresh clone beside it."""
+    origin = _clone(tmp_path / "o", OLD_TOML)
+    folder = tmp_path / "app"
+    _git(tmp_path, "clone", "-q", str(origin), str(folder))
+    (origin / ".fleet.toml").write_text(TOML, encoding="utf-8")
+    _git(origin, "-c", f"core.hooksPath={tmp_path / 'no-hooks'}", "-c", "user.name=t",
+         "-c", "user.email=t@example.invalid", "commit", "-qam", "new")
+    incoming = installer_inplace.incoming_path(folder)
+    if with_incoming:
+        _git(tmp_path, "clone", "-q", str(origin), str(incoming))
+    return origin, folder, incoming
+
+
+def _replace(folder: Path, incoming: Path | None, what_if: bool, runner: Any = _runner,
+             snap: m.Snapshot | None = None) -> m.MigrationReport:
+    cwd = os.getcwd()
+    try:
+        return installer_inplace.replace(folder, incoming, what_if=what_if, as_json=True, runner=runner,
+                                         snapshot_fn=lambda: snap if snap is not None else m.Snapshot({}, {}),
+                                         today=datetime.date(2026, 11, 27))
+    finally:
+        os.chdir(cwd)
+
+
+def _child_ok(command: Any, **kwargs: Any) -> subprocess.CompletedProcess[str]:
+    """The moved clone's `setup.bat -MigrateFrom` succeeds; everything else as `_runner`."""
+    if isinstance(command, str) and "-MigrateFrom" in command:
+        return subprocess.CompletedProcess(command, 0, stdout='{"ok": true}')
+    return _runner(command, **kwargs)
+
+
+def _listing(tmp_path: Path) -> list[str]:
+    return sorted(str(p.relative_to(tmp_path)) for p in tmp_path.rglob("*") if ".git" not in p.parts)
+
+
+def test_origins_match_whatever_their_spelling() -> None:
+    assert installer_inplace.same_origin("https://github.com/o/App.git", "https://github.com/o/app/")
+    assert installer_inplace.same_origin(r"E:\tmp\origin.git", "e:/tmp/origin")
+    assert not installer_inplace.same_origin("https://github.com/o/app", "https://github.com/o/other")
+
+
+def test_replace_what_if_lists_the_clone_declaration_for_an_old_install_and_touches_nothing(tmp_path: Path) -> None:
+    _, folder, incoming = _pair(tmp_path)
+    shutil.copytree(_old(tmp_path / "src"), folder, dirs_exist_ok=True)
+    shutil.rmtree(tmp_path / "src")
+    before = _listing(tmp_path)
+    report = _replace(folder, incoming, what_if=True)
+    assert not report.failed, report.render()
+    assert _listing(tmp_path) == before
+    rows = report.rows["in place"]
+    assert rows[0] == ("would rename", "app", "to app.bak-20261127-1, kept as a working checkout")
+    assert rows[1] == ("would rename", "app.incoming", "to app")
+    would = {item for state, item, _ in report.rows["copy"] if state == "would copy"}
+    assert would == {"config.json", ".env", "data/state.db", "data/logs/a.log"}, "not the clone's declaration"
+
+
+def test_replace_swaps_the_clone_in_and_keeps_uncommitted_edits_in_the_backup(tmp_path: Path) -> None:
+    _, folder, incoming = _pair(tmp_path)
+    (folder / ".gitignore").write_text("edited by hand\n", encoding="utf-8")
+    calls: list[tuple[str, Path]] = []
+
+    def runner(command: Any, **kwargs: Any) -> subprocess.CompletedProcess[str]:
+        if isinstance(command, str):
+            calls.append((command, kwargs["cwd"]))
+        return _child_ok(command, **kwargs)
+
+    report = _replace(folder, incoming, what_if=False, runner=runner)
+    assert not report.failed, report.render()
+    backup = tmp_path / "app.bak-20261127-1"
+    assert not incoming.exists() and (folder / ".git").is_dir()
+    assert (backup / ".gitignore").read_text(encoding="utf-8") == "edited by hand\n"
+    assert "[install.migrate]" in (folder / ".fleet.toml").read_text(encoding="utf-8")
+    assert len(calls) == 1 and f'-MigrateFrom "{backup}"' in calls[0][0] and calls[0][1] == folder
+    assert report.migration == {"ok": True}
+
+
+@pytest.mark.parametrize("case", ["other origin", "untracked file", "venv", "running"])
+def test_replace_refuses_a_clone_that_is_not_fresh_or_not_the_same_app(tmp_path: Path, case: str) -> None:
+    _, folder, incoming = _pair(tmp_path)
+    snap = None
+    if case == "other origin":
+        _git(incoming, "remote", "set-url", "origin", "https://example.invalid/other.git")
+    elif case == "untracked file":
+        (incoming / "stray.txt").write_text("x", encoding="utf-8")
+    elif case == "venv":
+        (incoming / ".venv").mkdir()
+    else:
+        snap = _snap(_proc(4242, incoming))
+    report = _replace(folder, incoming, what_if=False, runner=_child_ok, snap=snap)
+    assert report.failed and _states(report, "guard")["incoming clone"] == "refused"
+    assert folder.is_dir() and incoming.is_dir() and not list(tmp_path.glob("app.bak-*"))
+
+
+def test_a_failed_move_of_the_clone_renames_the_backup_back(tmp_path: Path) -> None:
+    folder, backup = tmp_path / "app", tmp_path / "app.bak-20261127-1"
+    folder.mkdir()
+    report = m.MigrationReport(mode="replace", what_if=False)
+    assert not installer_inplace._swap(folder, tmp_path / "missing.incoming", backup, None, report)
+    assert folder.is_dir() and not backup.exists()
+    state, item, detail = report.rows["in place"][-1]
+    assert (state, item) == ("failed", "rename") and "renamed back" in detail and "tray.bat --restart" in detail
+
+
+def test_in_place_clones_beside_the_install_before_it_stops_anything_then_swaps(tmp_path: Path) -> None:
+    _, folder, incoming = _pair(tmp_path, with_incoming=False)
+    report = _replace(folder, None, what_if=False, runner=_child_ok)
+    assert not report.failed, report.render()
+    states = [state for state, _, _ in report.rows["in place"]]
+    assert states == ["cloned", "renamed", "renamed", "ok"]
+    assert not incoming.exists() and (tmp_path / "app.bak-20261127-1" / ".git").is_dir()
+    assert "[install.migrate]" in (folder / ".fleet.toml").read_text(encoding="utf-8")
+
+
+def test_in_place_refuses_when_an_incoming_clone_is_already_there(tmp_path: Path) -> None:
+    _, folder, _ = _pair(tmp_path)
+    report = _replace(folder, None, what_if=True)
+    assert report.failed and _states(report, "guard")["incoming clone"] == "refused"

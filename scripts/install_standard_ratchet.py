@@ -97,7 +97,7 @@ INSTALLER: dict[str, tuple[str, str]] = {
     "installer_declaration": ("src/installer_declaration.py",
                               "f8730c8d8020797d95f9ae2df9b777ab09207181cd74a1f52d1065992e0593fa"),
     "installer_inplace": ("src/installer_inplace.py",
-                          "0d1b606c21cd738470770a24fac838212f93ec386801b01931a10859f080678a"),
+                          "498688cc805a83ab0e8f0e15d8a735f8df6fe2b5905ac11894ba271b38c4734d"),
 }
 
 _CONFIG_KEYS = {"enabled", "baseline", "playbook"}

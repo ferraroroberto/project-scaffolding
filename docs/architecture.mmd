@@ -14,7 +14,7 @@ flowchart TB
     LAUNCHSRV["launch_server.{bat,sh}\nlocal run + Cloudflare Tunnel"]
     TRAYTMPL["tray.bat.template\ncopy-to-adapt tray launcher\n(--restart: detect/kill/reclaim/start)"]
     SETUPTMPL["scripts/templates/setup.bat\ncopy-to-adapt installer launcher\n(-WhatIf, -Startup, -MigrateFrom pass through;
--InPlace runs from a temp copy)"]
+-Replace / -InPlace run from a temp copy)"]
   end
 
   subgraph appdir["app/ — Streamlit UI"]
@@ -34,7 +34,7 @@ flowchart TB
   LAUNCHAPP --> APPPY
   LAUNCHSRV --> APPPY
   SETUPTMPL -->|runs python -I src/installer.py| INSTALLER
-  SETUPTMPL -->|-InPlace: temp copy, system python| INPLACE
+  SETUPTMPL -->|-Replace, -InPlace: temp copy, system python| INPLACE
   INSTALLER -->|-MigrateFrom| MIGRATE
   INPLACE -->|uses| MIGRATE
   MIGRATE -->|loads| DECLARATION
@@ -73,9 +73,9 @@ endpoint serves HEAD and the port owner runs from this clone"]
     DECLARATION["installer_declaration.py (loaded by installer_migrate.py by path)
 vendor-verbatim, stdlib: parses [install.migrate] and [install.endpoint],
 the port this PC's config sets (port_config)"]
-    INPLACE["installer_inplace.py (-InPlace)
+    INPLACE["installer_inplace.py (-Replace, -InPlace)
 vendor-verbatim: stop, rename to <folder>.bak-YYYYMMDD-N,
-clone into the same path, then the clone's -MigrateFrom"]
+move the incoming clone to the path, then its -MigrateFrom"]
     RESTARTCHECK["restart_check.py\none shell-neutral tray restart: runs tray.bat by\nabsolute path, exits non-zero unless a new process\nserves HEAD (needs build_info.py)"]
     SELFRESTART["self_restart.py\nGET/POST /api/restart behind the app's own guard\nruns only targets declared in code, runner detached\nvia cmd /c start, every ending recorded\n(server half of _vendored/page-foot/restart-sheet.js)"]
     RESOURCEPROBE["resource_probe.py\nsample_process(pid): threads, handles, RSS\nstart_breadcrumb(logger) logs them on an interval\nvendor-verbatim; unreadable = SampleUnavailable, never 0"]
