@@ -29,12 +29,14 @@ class FakeRunner:
     """Stands in for `subprocess.run`: records commands, creates the venv, answers probes."""
 
     def __init__(self, root: Path, probe_codes: dict[str, int] | None = None, fail_pip: bool = False,
-                 git: str = "ignored") -> None:
+                 git: str = "ignored", venv_version: str = "3.14", probe_output: str = "") -> None:
         self.root = root
         self.calls: list[list[str]] = []
         self.probe_codes = probe_codes or {}
         self.fail_pip = fail_pip
         self.git = git
+        self.venv_version = venv_version
+        self.probe_output = probe_output
 
     def __call__(self, command: list[str], **kwargs: Any) -> subprocess.CompletedProcess[str]:
         self.calls.append(list(command))
@@ -51,9 +53,11 @@ class FakeRunner:
             python.write_text("", encoding="utf-8")
         elif "pip" in command:
             code = 1 if self.fail_pip else 0
+        elif command[-1] == installer.PYTHON_VERSION_SNIPPET:
+            return subprocess.CompletedProcess(command, 0, stdout=self.venv_version + "\n")
         else:
             code = self.probe_codes.get(command[-1], 0)
-        return subprocess.CompletedProcess(command, code)
+        return subprocess.CompletedProcess(command, code, stdout=self.probe_output)
 
 
 def _repo(tmp_path: Path, install_table: str = "") -> Path:
@@ -77,7 +81,7 @@ def _run(root: Path, runner: FakeRunner, **kwargs: Any) -> installer.Report:
 
 
 def _checklist(report: installer.Report) -> dict[str, str]:
-    return {item: state for state, item, _ in report.checklist}
+    return {item: state for state, item, _ in report.required + report.optional}
 
 
 def test_fresh_install_creates_venv_requirements_and_configs(tmp_path: Path) -> None:
@@ -240,17 +244,22 @@ def test_checklist_items_report_ok_missing_and_unknown(tmp_path: Path) -> None:
     ])
     root = _repo(tmp_path, table)
     report = _run(root, FakeRunner(root, probe_codes={"missing": 1, "weird": 2}))
-    states = {item: (state, detail) for state, item, detail in report.checklist}
-    assert states["Certificate"] == ("missing", "issue one")
-    assert states["Tool"][0] == ("ok" if shutil.which("git") else "missing")
-    assert states["Password"][0] == "missing"
-    assert states["Odd probe"] == ("unknown", "probe exited 2")
+    # No item declares a level: all are optional, so none of them fails setup.
+    assert not report.failed
+    states = {item: (state, detail) for state, item, detail in report.optional}
+    unnamed = "unlocks a feature the declaration does not name"
+    assert states["Certificate"] == ("off", f"{unnamed}; issue one")
+    assert states["Tool"][0] == ("available" if shutil.which("git") else "off")
+    assert states["Password"][0] == "off"
+    assert states["Odd probe"] == ("unknown", f"{unnamed}; probe exited 2")
 
 
 def test_python_probe_before_a_venv_exists_is_unknown(tmp_path: Path) -> None:
     root = _repo(tmp_path, '[[install.check]]\nname = "Password"\ncommand = ["{python}", "-m", "pw", "status"]')
     report = _run(root, FakeRunner(root), what_if=True)
-    assert ("unknown", "Password", "not checked before .venv exists") in report.checklist
+    [(state, item, detail)] = report.optional
+    assert (state, item) == ("unknown", "Password")
+    assert "not checked before .venv exists" in detail
 
 
 STARTUP = '[install.startup]\ncheck = ["{python}", "-m", "auto", "status"]\nregister = ["{python}", "-m", "auto", "enable"]'
@@ -273,7 +282,7 @@ def test_existing_startup_is_kept(tmp_path: Path) -> None:
     report = _run(root, runner, startup=True)
     assert ("kept", "start at log on", "already registered") in report.lines
     assert not any(c[-1] == "enable" for c in runner.calls)
-    assert _checklist(report)["Start at log on"] == "ok"
+    assert _checklist(report)["Start at log on"] == "available"
 
 
 def test_dependency_step_reruns_only_when_its_inputs_change(tmp_path: Path) -> None:
@@ -294,6 +303,10 @@ def test_dependency_step_reruns_only_when_its_inputs_change(tmp_path: Path) -> N
     '[[install.check]]\nname = "Both"\npaths = ["a"]\nwhich = "b"',
     '[install.startup]\ncheck = ["x"]',
     "requirements = 3",
+    '[[install.check]]\nname = "A"\nwhich = "b"\nlevel = "optional"',
+    '[[install.check]]\nname = "A"\nwhich = "b"\nlevel = "needed"',
+    '[[install.check]]\nname = "A"\nwhich = "b"\nlevel = "required"\nblocks = "x"',
+    '[[install.check]]\nname = "A"\npython = 3.14',
 ])
 def test_malformed_install_table_fails_before_any_step(tmp_path: Path, table: str) -> None:
     root = _repo(tmp_path, table)
@@ -310,6 +323,102 @@ def test_no_fleet_toml_uses_the_defaults(tmp_path: Path) -> None:
     report = _run(root, FakeRunner(root))
     assert not report.failed
     assert (root / "config" / "config.json").exists()
+
+
+# One sample declaration with every level: a minimum Python and two optional features.
+def _sample_declaration(python_minimum: str = "3.0") -> str:
+    return "\n".join([
+        "[[install.check]]", 'name = "Interpreter"', f'python = "{python_minimum}"', 'hint = "install it, then rerun"',
+        "[[install.check]]", 'name = "Recording"', 'level = "optional"', 'blocks = "recording"',
+        'command = ["{python}", "-m", "pw", "missing"]', 'hint = "put ffmpeg on PATH"',
+        "[[install.check]]", 'name = "Phone sign-in"', 'level = "optional"', 'blocks = "remote sign-in"',
+        'command = ["{python}", "-m", "pw", "weird"]',
+    ])
+
+
+SAMPLE_CODES = {"missing": 1, "weird": 2}
+
+
+def test_a_required_python_that_is_not_available_stops_before_any_install(tmp_path: Path) -> None:
+    root = _repo(tmp_path, _sample_declaration("99.0"))
+    before = _snapshot(root)
+    runner = FakeRunner(root, probe_codes=SAMPLE_CODES)
+    report = _run(root, runner)
+    assert report.failed and report.stopped
+    assert runner.calls == []
+    assert _snapshot(root) == before
+    [(state, item, detail)] = report.required
+    assert (state, item) == ("missing", "Interpreter")
+    assert "needs 99.0 or newer" in detail and "install it, then rerun" in detail
+    text = installer.render(report)
+    assert "nothing was installed or written" in text
+    assert "Setup failed" in text and "Optional features:" not in text
+
+
+@pytest.mark.parametrize(("found", "state"), [("3.12", "missing"), ("not a version", "unknown")])
+def test_the_existing_venv_is_the_python_that_is_checked(tmp_path: Path, found: str, state: str) -> None:
+    root = _repo(tmp_path, _sample_declaration("3.14"))
+    python = installer.venv_python(root)
+    python.parent.mkdir(parents=True)
+    python.write_text("", encoding="utf-8")
+    runner = FakeRunner(root, venv_version=found)
+    report = _run(root, runner)
+    assert report.stopped and report.failed
+    assert [row[0] for row in report.required] == [state]
+    assert not any("pip" in command for command in runner.calls)
+    assert "not a version" not in installer.render(report)
+
+
+def test_optional_items_never_fail_setup_and_each_names_what_it_unlocks(tmp_path: Path) -> None:
+    root = _repo(tmp_path, _sample_declaration())
+    report = _run(root, FakeRunner(root, probe_codes=SAMPLE_CODES))
+    assert not report.failed
+    assert {state for state, _, _ in report.required} == {"ok"}
+    assert report.optional == [
+        ("off", "Recording", "unlocks recording; put ffmpeg on PATH"),
+        ("unknown", "Phone sign-in", "unlocks remote sign-in; probe exited 2"),
+    ]
+    assert "Setup complete: every required item is ok." in installer.render(report)
+
+
+@pytest.mark.parametrize(("code", "state"), [(1, "missing"), (2, "unknown")])
+def test_a_required_probe_needing_no_venv_stops_setup_unless_it_is_ok(tmp_path: Path, code: int, state: str) -> None:
+    root = _repo(tmp_path, '[[install.check]]\nname = "Node"\nlevel = "required"\ncommand = ["node", "probe"]')
+    runner = FakeRunner(root, probe_codes={"probe": code})
+    report = _run(root, runner)
+    assert report.stopped and report.failed
+    assert runner.calls == [["node", "probe"]]
+    assert [row[:2] for row in report.required] == [(state, "Node")]
+
+
+@pytest.mark.parametrize(("check", "state"), [
+    ('paths = ["vendor/model.bin"]', "missing"),
+    ('command = ["{python}", "-m", "pw", "weird"]', "unknown"),
+])
+def test_a_required_item_setup_may_create_is_checked_after_the_install(tmp_path: Path, check: str, state: str) -> None:
+    root = _repo(tmp_path, f'[[install.check]]\nname = "Needed"\nlevel = "required"\n{check}')
+    # -WhatIf on a fresh clone created nothing, so the item is reported and not held against the run.
+    assert not _run(root, FakeRunner(root, probe_codes=SAMPLE_CODES), what_if=True).failed
+    report = _run(root, FakeRunner(root, probe_codes=SAMPLE_CODES))
+    assert report.failed and not report.stopped
+    assert ("installed", "requirements", "") in report.lines
+    assert [row[0] for row in report.required if row[1] == "Needed"] == [state]
+
+
+def test_no_probe_output_or_config_value_is_printed(tmp_path: Path) -> None:
+    root = _repo(tmp_path, '[[install.check]]\nname = "Token"\ncommand = ["{python}", "-m", "pw", "missing"]')
+    (root / "config" / "apps.json").write_text('{"token": "s3cret-value", broken', encoding="utf-8")
+    report = _run(root, FakeRunner(root, probe_codes=SAMPLE_CODES, probe_output="s3cret-value"))
+    assert report.failed  # a config that does not parse is a required item that is not ok
+    assert "s3cret-value" not in installer.render(report)
+
+
+def test_a_registry_that_is_a_json_list_is_ok(tmp_path: Path) -> None:
+    root = _repo(tmp_path)
+    (root / "config" / "apps.json").write_text('["mine"]', encoding="utf-8")
+    report = _run(root, FakeRunner(root))
+    assert not report.failed
+    assert _checklist(report)["config/apps.json"] == "ok"
 
 
 def test_setup_bat_runs_the_module_isolated_with_its_flags_passed_through() -> None:

@@ -25,12 +25,14 @@ cd <FOLDER>
 2. installs `requirements.txt`, and later reinstalls only when that file changed (its hash is kept inside `.venv`);
 3. <ONLY IF DECLARED: runs the dependency step, e.g. `npm ci`, again only when its inputs changed;>
 4. creates each ignored config from its tracked sample when the config is missing;
-5. ends with a checklist that marks each item `ok`, `missing` or `unknown`.
+5. ends with two lists: the required items, each `ok`, `missing` or `unknown`, and the optional features, each `available`, `off` or `unknown` with what it unlocks.
 
-The checklist names what still needs you. For <APP NAME> that is usually:
+A required item that can be checked first (<e.g. the Python version>) stops the run before anything is installed. Setup has succeeded when it ends with `Setup complete` and exits 0; an optional feature that is `off` never changes that.
 
-- <CHECKLIST ITEM, e.g. "Sign-in password": the command that sets it.>
-- <CHECKLIST ITEM, e.g. "HTTPS certificate": the command that issues it.>
+The optional features of <APP NAME>, each needed only for what it unlocks:
+
+- <CHECKLIST ITEM, e.g. "Sign-in password", for remote sign-in: the command that sets it.>
+- <CHECKLIST ITEM, e.g. "HTTPS certificate", for phone access: the command that issues it.>
 - **Start at log on:** run `.\setup.bat -Startup`. <DELETE IF THE APP HAS NO AUTOSTART.>
 
 `.\setup.bat -WhatIf` lists every change it would make and makes none.
