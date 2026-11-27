@@ -152,6 +152,16 @@ Enforcement: the [port host ratchet](port-host-ratchet.md) fails a new port or m
 
 Issue: https://github.com/ferraroroberto/project-scaffolding/issues/891
 
+### Every app installs, reinstalls and migrates through the scaffold installer
+
+Every fleet app that has an install vendors the scaffold [installer](installer.md) and runs all three from it: `setup.bat` for a fresh install, `setup.bat -MigrateFrom <folder>` into a fresh clone, and `setup.bat -InPlace`, the reinstall into the same folder path that keeps the replaced copy as `<folder>.bak-YYYYMMDD-N` until the owner deletes it. What moves is declared in `.fleet.toml` (`[install.endpoint]`, `[install.migrate]` with `copy`, `secrets`, `shared`), never as a machine path. Each app keeps one playbook, `docs/install.md`, with Install, Update and Migrate sections, the Migrate section being only the installer call plus the steps only the owner can take. Updating in place stays the clean pull plus restart above; this decision covers reinstalling from scratch.
+
+Why: moving the toolbox to another PC meant each app improvising its own steps (finding the old copy, copying files by hand, stopping the old process, checking which copy serves the port, repointing the launcher at suffixed folders); one installer that stops only the old folder's processes, keeps a working backup and proves the new clone serves its own commit makes a migration one repeatable call, and the unchanged path means the launcher's settings never need editing.
+
+Enforcement: the [install standard ratchet](install-standard-ratchet.md) fails an adopter's gate when an installer module is missing, undeclared or not at the scaffold's current content, when `[install.migrate]` does not parse, or when the playbook lacks one of the three sections. The playbook template, `docs/templates/install-playbook.md`, carries the three sections, and the scaffold holds it to the same rule.
+
+Issue: https://github.com/ferraroroberto/project-scaffolding/issues/1014
+
 ### Runtime data lives on a fast drive
 
 A long-lived process resolves its SQLite and other fsync-heavy state through the vendored `src/runtime_data.py`: `runtime_db_path(app, filename, env_var=...)` returns `<root>/<app>/<filename>`, the root being `FLEET_DATA_ROOT` or a fixed per-OS default. A repo-relative database path is a defect, fixed by changing the path and never by a junction; a harness that spawns the app sets `<APP>_DATA_DIR` to a per-run temp folder.

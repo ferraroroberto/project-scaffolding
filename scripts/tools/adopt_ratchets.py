@@ -76,6 +76,8 @@ RATCHETS: tuple[Ratchet, ...] = (
     Ratchet("request_budget", ("request_budget_scan", "ratchet_baseline"), "-"),
     Ratchet("windows_only", ("ratchet_baseline",), "pytest tests marked windows_only for the Mac nightly ([ci.nightly])"),
     Ratchet("port_host", ("ratchet_baseline",), "ports and hosts read from the repo's config resolver (declare it in `resolvers`)"),
+    Ratchet("install_standard", ("ratchet_baseline",),
+            "the scaffold installer (src/installer.py, installer_migrate.py, installer_inplace.py) and docs/install.md"),
     Ratchet("clean_tree", ("ratchet_baseline",), "a disposable start smoke declared in `smoke` (a free `{port}`, a scratch `{data_dir}`)",
             '# smoke = ["{python}", "-m", "myapp", "--port", "{port}"]  # required before --init: '
             'docs/clean-tree-ratchet.md\n'),

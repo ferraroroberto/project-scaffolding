@@ -6,7 +6,7 @@ REM ----------------------------------------------------------------------------
 REM  Copy to setup.bat at the repo root; it needs no edit. What is specific to
 REM  the app is declared in the [install] table of .fleet.toml.
 REM  Safe to run any number of times; it never overwrites what this PC has
-REM  configured. The work is src\installer.py (docs\install-playbook.md):
+REM  configured. The work is src\installer.py (docs\install.md):
 REM    setup.bat            create .venv, install requirements, create missing
 REM                         configs, add keys a settings file lacks (after a
 REM                         backup), end with required and optional checklists

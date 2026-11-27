@@ -110,7 +110,16 @@
                          .fleet.toml [port_host_ratchet]; exit 3 = "not
                          confirmed", a failure, never a pass
                          (docs/port-host-ratchet.md)
-     12f. clean tree ratchet — scripts/clean_tree_ratchet.py: records `git
+     12f. install standard ratchet — scripts/install_standard_ratchet.py: fails
+                         when the repo lacks a piece of the install standard
+                         (the installer modules at the scaffold's content,
+                         [install.migrate] that parses, a playbook with
+                         Install, Update and Migrate sections) beyond the
+                         committed baseline; opt-in via .fleet.toml
+                         [install_standard_ratchet]; exit 3 = "not confirmed",
+                         a failure, never a pass
+                         (docs/install-standard-ratchet.md)
+     12g. clean tree ratchet — scripts/clean_tree_ratchet.py: records `git
                          status --porcelain`, runs the repo's declared start
                          smoke once (a free port, a scratch data dir), and
                          fails when it wrote a path beyond the committed
@@ -284,6 +293,7 @@ Invoke-Stage "ux surface ratchet"                 { & $py "scripts/ux_surface_ra
 Invoke-Stage "request budget ratchet"             { & $py "scripts/request_budget_ratchet.py" }
 Invoke-Stage "windows only ratchet"               { & $py "scripts/windows_only_ratchet.py" }
 Invoke-Stage "port host ratchet"                  { & $py "scripts/port_host_ratchet.py" }
+Invoke-Stage "install standard ratchet"           { & $py "scripts/install_standard_ratchet.py" }
 Invoke-Stage "clean tree ratchet"                 { & $py "scripts/clean_tree_ratchet.py" }
 Invoke-Stage "mypy --strict (vendored)"           { & $py -m mypy @VendoredModules }
 Invoke-Stage "py39 (vendored)"                    { & $py "scripts/tools/vendored_py39_check.py" }
