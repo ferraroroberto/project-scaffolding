@@ -27,18 +27,16 @@ def _active_batch_lines() -> list[str]:
 
 
 def test_tray_template_delegates_lifecycle_to_one_call_per_path() -> None:
-    """One launcher call when the venv exists, one `-File` call when it does not."""
+    """One launcher call, and no plain `-File` line that AllSigned would refuse."""
     lines = _active_batch_lines()
     launcher = [line for line in lines if "-m src.ps_script" in line]
-    plain = [line for line in lines if "-File" in line and '"%TRAY_PS%"' in line]
 
-    assert len(launcher) == 1 and len(plain) == 1
+    assert len(launcher) == 1
+    # With the trailing space: `Start-Process -FilePath` is not a script launch.
+    assert not any(" -File " in line for line in lines)
     # The launcher's command line stops at the action: the helper matches running trays by
     # command line, so TRAY_LAUNCH on it would make the launcher look like the tray (#1003).
     assert launcher[0].endswith('-m src.ps_script "%TRAY_PS%" launch')
-    assert " launch " in plain[0]
-    assert "-Restart" not in plain[0]
-    assert "!RESTART_ARG!" in plain[0]
 
 
 def test_tray_template_never_sets_an_execution_policy() -> None:
@@ -70,7 +68,7 @@ _ECHO_ARGS = (
 )
 
 
-def _make_app(tmp_path: Path, helper_body: str, *, venv: bool) -> dict[str, str]:
+def _make_app(tmp_path: Path, helper_body: str, *, venv: bool = True) -> dict[str, str]:
     """A throwaway app with the filled template and a stub helper; returns its environment.
 
     The template resolves the helper at %USERPROFILE%/.claude/tray/tray_lifecycle.ps1
@@ -127,9 +125,8 @@ def _run_bat(
 
 
 @pytest.mark.skipif(sys.platform != "win32", reason="tray lifecycle is Windows-only")
-@pytest.mark.parametrize("venv", [False, True], ids=["no-venv", "venv"])
-def test_tray_template_launch_args_survive_argv_parsing(tmp_path: Path, venv: bool) -> None:
-    """The template must deliver every switch intact on both launch paths (#145).
+def test_tray_template_launch_args_survive_argv_parsing(tmp_path: Path) -> None:
+    """The template must deliver every switch intact to the helper (#145).
 
     `%~dp0` ends in a backslash, and Windows argv parsing treats an odd run of
     backslashes before a closing quote as escaping it. Passing `-ScriptDir
@@ -141,7 +138,7 @@ def test_tray_template_launch_args_survive_argv_parsing(tmp_path: Path, venv: bo
     PowerShell and read the parsed values back.
     """
     assert Path(POWERSHELL).exists(), f"expected PowerShell at {POWERSHELL}"
-    env = _make_app(tmp_path, _ECHO_ARGS, venv=venv)
+    env = _make_app(tmp_path, _ECHO_ARGS)
 
     result, out = _run_bat(tmp_path, env)
 
@@ -164,7 +161,7 @@ def test_tray_template_reaches_the_helper_under_the_policy(
     tmp_path: Path, policy: str, method: str, restart: bool
 ) -> None:
     """Start and --restart both enter the helper, and say which launch they used (#1003)."""
-    env = _make_app(tmp_path, _ECHO_ARGS, venv=True)
+    env = _make_app(tmp_path, _ECHO_ARGS)
     # A switch left in the caller's environment must not turn a plain start into a restart.
     env["PSL_SWITCH_Restart"] = "1"
 
@@ -183,7 +180,7 @@ def test_tray_template_reaches_the_helper_under_the_policy(
 )
 def test_tray_template_restart_fails_when_the_helper_does(tmp_path: Path, body: str) -> None:
     """A --restart the helper could not carry out is a non-zero exit, never a plain start."""
-    env = _make_app(tmp_path, body, venv=True)
+    env = _make_app(tmp_path, body)
 
     result, _ = _run_bat(tmp_path, env, "--restart", policy="AllSigned")
 
@@ -191,9 +188,30 @@ def test_tray_template_restart_fails_when_the_helper_does(tmp_path: Path, body: 
     assert "starting the ProbeApp tray standalone" not in result.stdout
 
 
+@pytest.mark.windows_only
 @pytest.mark.skipif(sys.platform != "win32", reason="tray lifecycle is Windows-only")
-@pytest.mark.parametrize("venv", [False, True], ids=["no-venv", "venv"])
-def test_tray_template_does_not_leak_app_name_to_children(tmp_path: Path, venv: bool) -> None:
+@pytest.mark.parametrize("policy", ["AllSigned", "RemoteSigned"])
+@pytest.mark.parametrize("restart", [False, True], ids=["start", "restart"])
+@pytest.mark.parametrize("helper", [True, False], ids=["helper", "no-helper"])
+def test_tray_template_without_a_venv_names_setup_bat(
+    tmp_path: Path, policy: str, restart: bool, helper: bool
+) -> None:
+    """No `.venv`: exit non-zero, name `setup.bat`, start no PowerShell script."""
+    env = _make_app(tmp_path, 'Write-Output "HELPER=ran"\n', venv=False)
+    if not helper:
+        (tmp_path / "_home" / ".claude" / "tray" / "tray_lifecycle.ps1").unlink()
+
+    result, out = _run_bat(tmp_path, env, *(["--restart"] if restart else []), policy=policy)
+
+    output = result.stdout + result.stderr
+    assert result.returncode == 1, output
+    assert "setup.bat" in result.stdout, output
+    assert "HELPER" not in out, output
+    assert "PowerShell launch" not in output and "digitally signed" not in output, output
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="tray lifecycle is Windows-only")
+def test_tray_template_does_not_leak_app_name_to_children(tmp_path: Path) -> None:
     """The template must not hand a bare `APP_NAME` to the tray it starts (#264).
 
     `setlocal` scopes a variable away from the *calling* console only; every
@@ -211,7 +229,6 @@ def test_tray_template_does_not_leak_app_name_to_children(tmp_path: Path, venv: 
         "$state = if (Test-Path Env:APP_NAME) { 'present:' + $env:APP_NAME } else { 'absent' }\n"
         'Write-Output "APPNAMEENV=$state"\n'
         'Write-Output "APPNAMEARG=$AppName"\n',
-        venv=venv,
     )
     env["APP_NAME"] = "LeakedFromCaller"
 

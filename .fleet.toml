@@ -987,6 +987,9 @@ box_lock_gate   = { src = "scripts/box_lock_gate.ps1" }
 pooled_http     = { src = "src/pooled_http.py" }
 no_window       = { src = "src/no_window.py" }
 # tray.bat starts the shared tray helper through it: -File, or a ScriptBlock under AllSigned / Restricted.
+# A re-vendor also re-copies tray.bat.template's launch lines (copy-to-adapt, so no hash shows it behind):
+# with no .venv they exit 1 naming setup.bat, with no plain -File fallback. That check comes before any
+# line that runs the .venv python, an adopter's own port read included (docs/windows-tray.md).
 ps_script       = { src = "src/ps_script.py" }
 runtime_data    = { src = "src/runtime_data.py" }
 fleet_root      = { src = "src/fleet_root.py" }
