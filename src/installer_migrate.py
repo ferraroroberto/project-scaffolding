@@ -70,6 +70,10 @@ POLL_S = 2.0
 # Abbreviated commit ids shorter than git's default are not compared.
 MIN_SHA_LEN = 7
 TEXT_SCAN_MAX_BYTES = 1_000_000
+# The local addresses a connection to 127.0.0.1 can meet: the wildcards and loopback itself. A reverse proxy on a
+# LAN or VPN address may share the port number without being a rival. "" is a listener whose address the listing
+# did not give, counted so that an unknown never reads as free.
+LOOPBACK_LISTENERS = frozenset({"0.0.0.0", "::", "127.0.0.1", "::1", ""})
 
 PYTHON_NAMES = ("python.exe", "pythonw.exe", "python", "pythonw", "py.exe")
 DB_SUFFIXES = (".sqlite", ".sqlite3", ".db")
@@ -265,7 +269,8 @@ def run_powershell(script: str, runner: Runner) -> Any | None:
 PS_PROCESSES = r"""
 $procs = @(Get-CimInstance Win32_Process | ForEach-Object {
   @{ pid = [int]$_.ProcessId; ppid = [int]$_.ParentProcessId; exe = [string]$_.ExecutablePath; cmd = [string]$_.CommandLine } })
-$ports = @(Get-NetTCPConnection -State Listen | ForEach-Object { @{ port = [int]$_.LocalPort; pid = [int]$_.OwningProcess } })
+$ports = @(Get-NetTCPConnection -State Listen | ForEach-Object {
+  @{ port = [int]$_.LocalPort; pid = [int]$_.OwningProcess; address = [string]$_.LocalAddress } })
 ConvertTo-Json -InputObject @{ procs = $procs; ports = $ports } -Depth 4 -Compress
 """
 
@@ -300,10 +305,14 @@ class Proc:
 
 @dataclass
 class Snapshot:
-    """Every process and which ones listen on which TCP port, at one moment."""
+    """Every process and which ones listen on which TCP port and address, at one moment."""
 
     procs: dict[int, Proc]
-    listeners: dict[int, set[int]]  # port -> listening PIDs
+    listeners: dict[int, dict[int, set[str]]]  # port -> listening PID -> its local addresses
+
+    def holders(self, port: int) -> set[int]:
+        """The PIDs listening on ``port`` where 127.0.0.1, the only address verify asks, can reach them."""
+        return {pid for pid, addresses in self.listeners.get(port, {}).items() if addresses & LOOPBACK_LISTENERS}
 
 
 def take_snapshot(runner: Runner) -> Snapshot | None:
@@ -313,10 +322,11 @@ def take_snapshot(runner: Runner) -> Snapshot | None:
         return None
     procs = {int(p["pid"]): Proc(int(p["pid"]), int(p["ppid"]), p.get("exe") or "", p.get("cmd") or "")
              for p in data.get("procs") or [] if isinstance(p, dict)}
-    listeners: dict[int, set[int]] = {}
+    listeners: dict[int, dict[int, set[str]]] = {}
     for entry in data.get("ports") or []:
         if isinstance(entry, dict):
-            listeners.setdefault(int(entry["port"]), set()).add(int(entry["pid"]))
+            by_pid = listeners.setdefault(int(entry["port"]), {})
+            by_pid.setdefault(int(entry["pid"]), set()).add(str(entry.get("address") or ""))
     return Snapshot(procs, listeners)
 
 
@@ -341,7 +351,7 @@ def processes_from(snap: Snapshot, folder: Path, mine: set[int]) -> list[Proc]:
 
 
 def _ports_of(snap: Snapshot, pids: set[int]) -> list[int]:
-    return sorted(port for port, owners in snap.listeners.items() if owners & pids)
+    return sorted(port for port, owners in snap.listeners.items() if owners.keys() & pids)
 
 
 def owner_of(snap: Snapshot, pid: int, clone: Path, old: Path | None) -> tuple[str, Proc | None]:
@@ -462,7 +472,7 @@ def _wait_port_free(port: int, report: MigrationReport, snapshot_fn: Callable[[]
         if snap is None:
             report.add("stop", UNKNOWN, f"port {port}", "could not list listening ports")
             return
-        holders = snap.listeners.get(port, set())
+        holders = snap.holders(port)
         if not holders:
             report.add("stop", OK, f"port {port}", "free")
             return
@@ -713,9 +723,10 @@ def _verify_owner(root: Path, old: Path | None, port: int, report: MigrationRepo
     if snap is None:
         report.add("verify", UNKNOWN, f"port {port} owner", "could not list processes and ports")
         return
-    pids = snap.listeners.get(port, set())
+    pids = snap.holders(port)
     if not pids:
-        report.add("verify", FAILED, f"port {port} owner", "nothing listens on the port")
+        report.add("verify", FAILED, f"port {port} owner", "nothing listens on the port at a loopback or "
+                   "wildcard address")
         return
     for pid in sorted(pids):
         side, proc = owner_of(snap, pid, root, old)

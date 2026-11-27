@@ -98,7 +98,7 @@ def _runner(command: Any, **kwargs: Any) -> subprocess.CompletedProcess[str]:
 
 
 def _snap(*procs: m.Proc, port: int | None = None, listener: int | None = None) -> m.Snapshot:
-    listeners = {port: {listener}} if port and listener else {}
+    listeners = {port: {listener: {"127.0.0.1"}}} if port and listener else {}
     return m.Snapshot({p.pid: p for p in procs}, listeners)
 
 
@@ -356,6 +356,46 @@ def test_stop_fails_naming_what_still_holds_the_port(tmp_path: Path) -> None:
     report = m.MigrationReport(mode="migrate", what_if=False)
     m.stop_old(tmp_path / "old", 8453, report, lambda c, **k: None, lambda: _snap(other, port=8453, listener=77))
     assert report.failed and "PID 77 server.exe" in report.rows["stop"][-1][2]
+
+
+# ---------------------------------------------------------------- which listeners hold the port
+
+OUTSIDER = m.Proc(77, 1, r"C:\Other\proxy.exe", "proxy")
+
+
+def _listed(procs: list[m.Proc], *listeners: tuple[int, str]) -> m.Snapshot:
+    """What ``take_snapshot`` reads from a faked listing: ``(pid, local address)`` listeners on port 8453."""
+    data = {"procs": [{"pid": p.pid, "ppid": p.ppid, "exe": p.exe, "cmd": p.cmdline} for p in procs],
+            "ports": [{"port": 8453, "pid": pid, "address": address} for pid, address in listeners]}
+    snap = m.take_snapshot(lambda c, **k: subprocess.CompletedProcess(c, 0, stdout=json.dumps(data)))
+    assert snap is not None
+    return snap
+
+
+def _stop_report(tmp_path: Path, snap: m.Snapshot) -> m.MigrationReport:
+    report = m.MigrationReport(mode="migrate", what_if=False)
+    m.stop_old(tmp_path / "old", 8453, report, lambda c, **k: None, lambda: snap)
+    return report
+
+
+@pytest.mark.parametrize("address", ["192.0.2.7", "2001:db8::7"])
+def test_a_listener_that_cannot_answer_loopback_neither_holds_nor_owns_the_port(tmp_path: Path, address: str) -> None:
+    stop = _stop_report(tmp_path, _listed([OUTSIDER], (77, address)))
+    assert not stop.failed and _states(stop, "stop")["port 8453"] == "ok", stop.render()
+    root, old = _clone(tmp_path), _old(tmp_path)
+    report = _migrate(root, old, _listed([_proc(100, root), OUTSIDER], (100, "127.0.0.1"), (77, address)))
+    assert not report.failed, report.render()
+    assert [row[2].split()[:2] for row in report.rows["verify"] if row[1] == "port 8453 owner"] == [["PID", "100"]]
+
+
+@pytest.mark.parametrize("address", ["0.0.0.0", "::", "127.0.0.1", "::1", ""])
+def test_a_loopback_wildcard_or_unlisted_address_from_outside_still_counts(tmp_path: Path, address: str) -> None:
+    snap = _listed([OUTSIDER], (77, "192.0.2.7"), (77, address))
+    stop = _stop_report(tmp_path, snap)
+    assert stop.failed and "PID 77 proxy.exe" in stop.rows["stop"][-1][2]
+    report = m.MigrationReport(mode="migrate", what_if=False)
+    m._verify_owner(tmp_path / "new", None, 8453, report, lambda: snap)
+    assert _states(report, "verify") == {"port 8453 owner": "unknown"}
 
 
 # ---------------------------------------------------------------- -InPlace
