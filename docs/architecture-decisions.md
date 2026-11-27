@@ -162,6 +162,16 @@ Enforcement: the [install standard ratchet](install-standard-ratchet.md) fails a
 
 Issue: https://github.com/ferraroroberto/project-scaffolding/issues/1014
 
+### Fleet paths are resolved, never hard-coded to one machine
+
+A fleet path (the config repo, the folder holding the app repos, a sibling repo, the user's home) is resolved on the machine that runs it, never written as one machine's absolute path, so a repo, the config repo or the whole root can sit under any name and drive, on any harness. The answer lives once per machine in one harness-neutral place, `~/.fleet`, that every harness reads; it is never stored under one harness's home. Only the config repo's own installer writes it: `fleet-config`'s `install.ps1` on a full machine, and the lite config repo's `install.ps1` on a lite machine (fleet-config-lite, or a clone of it under another name). app-launcher-lite's Copilot installer only reads it and warns when its own location disagrees.
+
+Why: the fleet runs as more than one configuration (fleet-config with app-launcher, a fleet-config-lite clone with app-launcher-lite), on different drive roots and under four harnesses. A hard-coded path works only where it was written, and one writer per machine keeps two installers from disagreeing about the answer.
+
+Enforcement: none yet. The resolver contract, how hook wiring and agent-run text refer to it, the enforcing rule and the staged rollout are open for validation in https://github.com/ferraroroberto/project-scaffolding/issues/1031, and this entry grows as they are approved.
+
+Issue: https://github.com/ferraroroberto/project-scaffolding/issues/1020
+
 ### Runtime data lives on a fast drive
 
 A long-lived process resolves its SQLite and other fsync-heavy state through the vendored `src/runtime_data.py`: `runtime_db_path(app, filename, env_var=...)` returns `<root>/<app>/<filename>`, the root being `FLEET_DATA_ROOT` or a fixed per-OS default. A repo-relative database path is a defect, fixed by changing the path and never by a junction; a harness that spawns the app sets `<APP>_DATA_DIR` to a per-run temp folder.

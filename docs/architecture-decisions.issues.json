@@ -1,5 +1,11 @@
 [
     {
+        "number": 1020,
+        "state": "OPEN",
+        "stateReason": "",
+        "title": "ADR: resolve every fleet path, never hard-code a machine path"
+    },
+    {
         "number": 1014,
         "state": "OPEN",
         "stateReason": "",
