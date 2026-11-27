@@ -27,7 +27,9 @@ Before step 1, every required check that needs nothing setup creates runs ([leve
 
 `-WhatIf` reports every change as `would ...` and writes nothing. A second run reports `unchanged` and writes nothing. The exit code is 0 when every step ran and every required item is `ok`, and 1 otherwise: a step failed, a settings file was left alone, a top-up was refused or not confirmed, or a required item is `missing` or `unknown`. An optional feature never changes it. Under `-WhatIf` nothing is created, so only the checks that run first can fail it.
 
-A probe's output is discarded and no config value is printed: the checklist shows item names, states, hints, the reason a fact could not be established and, for a `python` check, version numbers.
+The `.venv`, install and register steps (1, 2, 3 and 5) write straight to the setup's own output, on the console or into the file it is redirected to, so a long install shows its progress and a failed step's error text stands above the checklist. No window opens: a step shares the console setup runs in, and only a run with no console passes `CREATE_NO_WINDOW`. Passing that flag from a console would put the step on a hidden console of its own and lose everything it writes.
+
+A probe's output is discarded and no config value is printed by the installer itself: the checklist shows item names, states, hints, the reason a fact could not be established and, for a `python` check, version numbers.
 
 ## Required checks and optional features
 
