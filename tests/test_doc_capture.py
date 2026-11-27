@@ -12,6 +12,8 @@ Run: & .\\.venv\\Scripts\\python.exe -m pytest tests/test_doc_capture.py -v
 
 from __future__ import annotations
 
+import codecs
+import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -38,6 +40,15 @@ def _entry(**overrides: Any) -> dict[str, Any]:
     }
     entry.update(overrides)
     return entry
+
+
+class ManifestTests(unittest.TestCase):
+    def test_a_bom_prefixed_manifest_loads_the_same(self) -> None:
+        manifest = _manifest({"reporting": _entry()})
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "manifest.json"
+            path.write_bytes(codecs.BOM_UTF8 + json.dumps(manifest).encode("utf-8"))
+            self.assertEqual(engine.load_manifest(path), manifest)
 
 
 class PlanTests(unittest.TestCase):

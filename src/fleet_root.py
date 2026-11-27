@@ -64,7 +64,7 @@ def _from_config(config: Path) -> Path | None:
     if not config.is_file():
         return None
     try:
-        data = tomllib.loads(config.read_text(encoding="utf-8"))
+        data = tomllib.loads(config.read_text(encoding="utf-8-sig"))
     except (OSError, UnicodeDecodeError, tomllib.TOMLDecodeError) as exc:
         raise FleetRootError(f"cannot read fleet config {config}: {exc}") from exc
     if CONFIG_KEY not in data:

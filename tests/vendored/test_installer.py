@@ -8,6 +8,7 @@ one would have (a venv's interpreter appearing, a probe's exit code).
 
 from __future__ import annotations
 
+import codecs
 import datetime
 import hashlib
 import json
@@ -473,3 +474,19 @@ def test_a_step_is_denied_a_window_only_when_setup_has_no_console(
     for kwargs in steps:
         assert kwargs["creationflags"] == (0 if console else installer.NO_WINDOW)
         assert kwargs["stdout"] is sys.stdout and kwargs["stderr"] is sys.stderr
+
+
+def test_bom_prefixed_declaration_and_configs_install_the_same(tmp_path: Path) -> None:
+    def outcome(folder: Path, bom: bool) -> tuple[Any, ...]:
+        root, target, _ = _stale_settings(folder)
+        if bom:
+            for path in (root / ".fleet.toml", root / "config" / "config.sample.json",
+                         root / "config" / "apps.sample.json", target):
+                path.write_bytes(codecs.BOM_UTF8 + path.read_bytes())
+        report = _run(root, FakeRunner(root))
+        # A second run reads the registry copied from its BOM-prefixed sample.
+        again = _run(root, FakeRunner(root))
+        return (report.failed, report.lines, _checklist(report), again.failed, _checklist(again),
+                json.loads(target.read_text(encoding="utf-8")))
+
+    assert outcome(tmp_path / "bom", True) == outcome(tmp_path / "plain", False)

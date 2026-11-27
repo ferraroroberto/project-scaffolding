@@ -25,7 +25,7 @@ Before step 1, every required check that needs nothing setup creates runs ([leve
 1. **`.venv`:** created when missing; an existing one, a junction included, is kept as it is.
 2. **Requirements:** `pip install -r` runs only when the requirements file's hash differs from the one recorded inside `.venv` by the last successful install.
 3. **Dependency step (optional):** a declared command, rerun only when the command or one of its declared input files changed since it last succeeded.
-4. **Configs:** each sample/target pair. A missing target is copied from its sample. A target listed in `settings` that exists gains only the keys its sample has and it lacks (nested objects included, `_`-prefixed keys skipped), after a timestamped backup beside it (`<name>.bak-<YYYYmmdd-HHMMSS>`); the added key names are printed, never values, and no existing value changes. The backup holds the same values as the config (passwords, tokens), so before writing anything the installer asks `git check-ignore` whether the backup path is ignored: not ignored → the top-up is `refused`; git missing or the folder not a checkout → `not confirmed`. Both write nothing and fail the run. Every other target is a registry, the owner's own list: created when missing, never rewritten. A settings file that does not parse is left alone and reported.
+4. **Configs:** each sample/target pair. A missing target is copied from its sample. A target listed in `settings` that exists gains only the keys its sample has and it lacks (nested objects included, `_`-prefixed keys skipped), after a timestamped backup beside it (`<name>.bak-<YYYYmmdd-HHMMSS>`); the added key names are printed, never values, and no existing value changes. The backup holds the same values as the config (passwords, tokens), so before writing anything the installer asks `git check-ignore` whether the backup path is ignored: not ignored → the top-up is `refused`; git missing or the folder not a checkout → `not confirmed`. Both write nothing and fail the run. Every other target is a registry, the owner's own list: created when missing, never rewritten. A settings file that does not parse is left alone and reported. Configs, samples and `.fleet.toml` may start with a UTF-8 byte-order mark: every reader accepts it, and a file the installer rewrites is written without one.
 5. **Start at log on (optional):** with `-Startup`, the declared register command runs only when the declared check says autostart is absent; a present one is reported `kept`.
 6. **Checklist:** two lists. **Required:** the venv, the requirements, the dependency step, each config and each required check, each `ok`, `missing` or `unknown`. **Optional features:** each optional check and the autostart, each `available`, `off` or `unknown`, with what it unlocks. A fact the run could not establish (a probe that would need a `.venv` that does not exist yet, a probe that hangs or exits with another code) is `unknown`, never `ok`.
 
@@ -91,7 +91,7 @@ name  = "git"
 level = "required"
 which = "git"
 
-# `status` exits 0 when a password is stored, 1 when not, 2 when a file it needs cannot be read.
+# `status` exits 0 when a password is stored, 1 when not, 2 when a file it needs cannot be read or does not parse.
 # An app that still honours an old plaintext value adds where it lives, a top-level key of a JSON file:
 # "--legacy", "config/webapp_config.json", "auth_password".
 [[install.check]]

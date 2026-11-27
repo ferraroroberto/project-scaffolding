@@ -9,6 +9,7 @@ in-page capture itself is pinned by `tests/e2e/_surface_hook_checks.py`.
 
 from __future__ import annotations
 
+import codecs
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, cast
@@ -19,6 +20,7 @@ from playwright.sync_api import Page
 from tests.e2e._surface import (
     CAPTURE_ENV,
     SurfaceCaptureError,
+    _load_capture_dir,
     pytest_collection_modifyitems,
     surface,
 )
@@ -61,6 +63,15 @@ def test_misuse_fails_loudly(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) ->
     monkeypatch.setenv(CAPTURE_ENV, str(tmp_path / "missing"))
     with pytest.raises(SurfaceCaptureError):
         surface(page, "jobs.sort-sheet")
+
+
+def test_bom_prefixed_capture_files_load_the_same(tmp_path: Path) -> None:
+    root = _capture_dir(tmp_path / "cap")
+    (root / "capture.json").write_text('{"theme_storage_key": "theme"}', encoding="utf-8")
+    plain = _load_capture_dir(root)
+    for name in ("script.js", "params.json", "capture.json"):
+        (root / name).write_bytes(codecs.BOM_UTF8 + (root / name).read_bytes())
+    assert _load_capture_dir(root) == plain
 
 
 def _opens_and_captures() -> None:

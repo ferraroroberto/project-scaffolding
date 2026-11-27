@@ -8,6 +8,7 @@ for real on a disposable pair.
 
 from __future__ import annotations
 
+import codecs
 import datetime
 import json
 import os
@@ -19,7 +20,7 @@ from typing import Any
 
 import pytest
 
-from src import installer, installer_inplace
+from src import installer, installer_declaration, installer_inplace
 from src import installer_migrate as m
 from src.no_window import NO_WINDOW
 
@@ -209,12 +210,13 @@ def test_a_value_or_text_spelled_through_a_junction_is_rebound_and_reported(tmp_
     assert m.mentions(f"C:\\Windows\\System32\\cmd.exe /c {link}\\tray.bat C:\\Windows", old)
 
 
-def test_a_config_holding_only_backslash_paths_is_rebound(tmp_path: Path) -> None:
+@pytest.mark.parametrize("bom", [b"", codecs.BOM_UTF8])
+def test_a_config_holding_only_backslash_paths_is_rebound(tmp_path: Path, bom: bytes) -> None:
     old, new = tmp_path / "old", tmp_path / "new"
     new.mkdir()
     old.mkdir()
     # JSON doubles each backslash, so the raw text never holds the folder as spelled.
-    (new / "config.json").write_text(json.dumps({"data_dir": str(old / "data")}), encoding="utf-8")
+    (new / "config.json").write_bytes(bom + json.dumps({"data_dir": str(old / "data")}).encode("utf-8"))
     shutil.copy(new / "config.json", old / "config.json")
     report = m.MigrationReport(mode="migrate", what_if=False)
     m.rebind_copied(old, new, ["config.json"], report)
@@ -331,6 +333,16 @@ def test_the_local_config_sets_the_port_and_the_declaration_is_the_fallback(
         (tmp_path / "config.json").write_text(content if isinstance(content, str) else json.dumps(content),
                                               encoding="utf-8")
     assert m.local_port(tmp_path, endpoint) == expected
+
+
+def test_a_bom_prefixed_declaration_and_port_config_read_the_same(tmp_path: Path) -> None:
+    (tmp_path / "config.json").write_bytes(codecs.BOM_UTF8 + json.dumps({"web": {"port": 9001}}).encode("utf-8"))
+    (tmp_path / ".fleet.toml").write_bytes(codecs.BOM_UTF8 + b'port = ":8453"\n[install.migrate]\n')
+    endpoint = m.parse_migration({"port": ":8453", "install": {"endpoint": {"port_config": "config.json",
+                                  "port_key": "web.port"}, "migrate": {}}}).endpoint
+    assert endpoint is not None
+    assert m.local_port(tmp_path, endpoint) == (9001, "config.json web.port")
+    assert installer_declaration.read_fleet_toml(tmp_path) == {"port": ":8453", "install": {"migrate": {}}}
 
 
 @pytest.mark.parametrize("endpoint", [{"port_config": "../x.json"}, {"port_config": 3}, {"port_key": "a..b"}])

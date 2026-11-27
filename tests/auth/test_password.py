@@ -6,6 +6,7 @@ writes the live ``config/app_password.json``. The passwords are fixtures.
 
 from __future__ import annotations
 
+import codecs
 import io
 import json
 from pathlib import Path
@@ -177,3 +178,26 @@ def test_password_never_logged(pw_file: Path, caplog: pytest.LogCaptureFixture) 
     password.set_password("s3cret-fixture")
     password.check_password("s3cret-fixture")
     assert "s3cret-fixture" not in caplog.text
+
+
+def test_a_bom_prefixed_password_file_and_legacy_config_read_the_same(pw_file: Path, tmp_path: Path) -> None:
+    password.set_password("1234")
+    plain = password.stored_hash()
+    pw_file.write_bytes(codecs.BOM_UTF8 + pw_file.read_bytes())
+    assert password.stored_hash() == plain
+    assert password.check_password("1234", legacy="old") and not password.check_password("old", legacy="old")
+    pw_file.unlink()
+    app_config = tmp_path / "webapp_config.json"
+    app_config.write_bytes(codecs.BOM_UTF8 + json.dumps({"auth_password": "old-fixture"}).encode("utf-8"))
+    assert password.main(["status", "--legacy", str(app_config), "auth_password"]) == 0
+
+
+@pytest.mark.parametrize("content", [b"not json", b"[]", b"\xff\xfe"])
+def test_cli_status_of_a_password_file_that_does_not_parse_is_unknown_not_missing(
+    pw_file: Path, caplog: pytest.LogCaptureFixture, content: bytes
+) -> None:
+    pw_file.parent.mkdir(parents=True)
+    pw_file.write_bytes(content)
+    assert password.main(["status"]) == 2
+    assert pw_file.read_bytes() == content
+    assert "password file" in caplog.text

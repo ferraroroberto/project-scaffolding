@@ -70,7 +70,7 @@ class PlanItem:
 
 
 def load_manifest(path: Path = MANIFEST_PATH) -> dict[str, Any]:
-    with open(path, encoding="utf-8") as fh:
+    with open(path, encoding="utf-8-sig") as fh:
         manifest: dict[str, Any] = json.load(fh)
     return manifest
 

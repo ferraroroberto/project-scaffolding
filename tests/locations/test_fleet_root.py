@@ -85,6 +85,13 @@ def test_config_file_used_when_env_unset(tmp_path: Path) -> None:
     assert fleet_root(anchor=_checkout(tmp_path)) == root
 
 
+def test_bom_prefixed_config_is_read(tmp_path: Path) -> None:
+    root = tmp_path / "config-root"
+    root.mkdir()
+    _write_config(f"\ufeffroot = '{root.as_posix()}'\n")
+    assert fleet_root(anchor=_checkout(tmp_path)) == root
+
+
 def test_config_path_defaults_under_home(monkeypatch: pytest.MonkeyPatch, synthetic_host: SyntheticHost) -> None:
     monkeypatch.delenv("XDG_CONFIG_HOME")
     assert fleet_config_path() == synthetic_host.home / ".config" / "fleet" / "fleet.toml"
