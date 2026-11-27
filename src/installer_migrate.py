@@ -292,12 +292,12 @@ def _sha256(path: Path) -> str:
 # ---------------------------------------------------------------- git, PowerShell, processes
 
 def git(args: list[str], cwd: Path, runner: Runner) -> str | None:
-    """One read-only git query's trimmed output; None when git is missing or the query fails."""
-    env = {**os.environ, "GIT_OPTIONAL_LOCKS": "0"}
+    """The trimmed output of a git command that moves no ref or file, never prompting; None when it fails."""
+    env = {**os.environ, "GIT_OPTIONAL_LOCKS": "0", "GIT_TERMINAL_PROMPT": "0"}
     try:
-        # conventions-exempt: a vendor-verbatim file cannot import the adopter's run_git; read-only queries
+        # conventions-exempt: a vendor-verbatim file cannot import the adopter's run_git; no ref or file moves
         done = runner(["git", *args], cwd=cwd, env=env, timeout=GIT_TIMEOUT_S, check=False, capture_output=True,
-                      encoding="utf-8", errors="replace", creationflags=NO_WINDOW)
+                      stdin=subprocess.DEVNULL, encoding="utf-8", errors="replace", creationflags=NO_WINDOW)
     except (OSError, subprocess.TimeoutExpired):
         return None
     return (done.stdout or "").strip() if done.returncode == 0 else None

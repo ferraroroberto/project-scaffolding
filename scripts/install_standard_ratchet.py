@@ -100,11 +100,11 @@ EXIT_PASS, EXIT_RISE, EXIT_CONFIG, EXIT_NOT_CONFIRMED = 0, 1, 2, 3
 INSTALLER: dict[str, tuple[str, str]] = {
     "installer": ("src/installer.py", "44daf3cf0ebbbdf72d0597259dcf55d066aebac42b4b0ce34be169b99b90c5b2"),
     "installer_migrate": ("src/installer_migrate.py",
-                          "16307032b688b86750491d3aa47a9b36123ce4e6d59ae65fd6f9945623195b1a"),
+                          "c41faeff05e639c793ea448d93221eb9934850fd4b2f9f4b2986078b39aaeb0b"),
     "installer_declaration": ("src/installer_declaration.py",
-                              "6770aba8f6a294484a8ba401ebf5001169eb9e3259f16b31956275cb13973d3b"),
+                              "bc4324f433e465d4e97e6d2ae7de9766a0030cb7d6fa9ca68610db621eada42c"),
     "installer_inplace": ("src/installer_inplace.py",
-                          "057db1c8db66124329bcc4259ae55e99b3ab94b3a8d3b2a4c3d356ea041cde73"),
+                          "156f88db3aabb0b633014be0042744c35f4ee80c6ba4f15e0af043a10aa49ce8"),
 }
 
 # The playbook's migrate entry points and how a setup.bat offers each. "branch": it tests its

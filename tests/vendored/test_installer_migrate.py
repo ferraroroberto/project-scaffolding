@@ -513,6 +513,40 @@ def test_in_place_what_if_names_every_file_it_would_copy(tmp_path: Path, monkeyp
     assert CANARY not in report.render() and (folder / "config.json").is_file()
 
 
+def _behind_origin(tmp_path: Path) -> tuple[Path, Path]:
+    """An install whose copy list the origin's default branch has since added ``vendor`` to."""
+    origin = _clone(tmp_path / "o")
+    folder = tmp_path / "app"
+    _git(tmp_path, "clone", "-q", str(origin), str(folder))
+    (origin / ".fleet.toml").write_text(TOML.replace('".env"]\nsecrets', '".env", "vendor"]\nsecrets'),
+                                        encoding="utf-8-sig")  # the BOM a Windows editor may leave
+    _git(origin, "-c", f"core.hooksPath={tmp_path / 'no-hooks'}", "-c", "user.name=t",
+         "-c", "user.email=t@example.invalid", "commit", "-qam", "vendor is copied")
+    (folder / "vendor").mkdir()
+    (folder / "vendor" / "lib.bin").write_bytes(b"lib")
+    return origin, folder
+
+
+def test_in_place_what_if_previews_the_copy_list_of_the_origins_default_branch(tmp_path: Path) -> None:
+    _, folder = _behind_origin(tmp_path)
+    before = (_listing(tmp_path), _git(folder, "for-each-ref"), _git(folder, "status", "--porcelain"))
+    report = _replace(folder, None, what_if=True)
+    assert not report.failed, report.render()
+    assert "vendor/lib.bin" in {item for state, item, _ in report.rows["copy"] if state == "would copy"}
+    assert report.rows["copy"][0] == ("ok", "copy list", "from origin's default branch")
+    assert (_listing(tmp_path), _git(folder, "for-each-ref"), _git(folder, "status", "--porcelain")) == before
+
+
+def test_in_place_what_if_with_no_origin_to_read_shows_the_live_copys_list_as_unknown(tmp_path: Path) -> None:
+    _, folder = _behind_origin(tmp_path)
+    _git(folder, "remote", "set-url", "origin", str(tmp_path / "gone"))
+    report = _replace(folder, None, what_if=True)
+    state, item, detail = report.rows["copy"][0]
+    assert report.failed and (state, item) == ("unknown", "copy list"), report.render()
+    assert detail.startswith("from the live copy app: origin's default branch could not be read"), detail
+    assert "vendor" not in {item for _, item, _ in report.rows["copy"]}
+
+
 def test_in_place_refuses_a_folder_without_an_origin(tmp_path: Path) -> None:
     folder = _clone(tmp_path)
     cwd = os.getcwd()
@@ -592,6 +626,7 @@ def test_replace_what_if_lists_the_clone_declaration_for_an_old_install_and_touc
     assert rows[1] == ("would rename", "app.incoming", "to app")
     would = {item for state, item, _ in report.rows["copy"] if state == "would copy"}
     assert would == {"config.json", ".env", "data/state.db", "data/logs/a.log"}, "not the clone's declaration"
+    assert report.rows["copy"][0] == ("ok", "copy list", "from the fresh clone app.incoming")
 
 
 def test_replace_swaps_the_clone_in_and_keeps_uncommitted_edits_in_the_backup(tmp_path: Path) -> None:

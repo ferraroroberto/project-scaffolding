@@ -10,7 +10,7 @@ the install. Docs: ``docs/installer.md``.
 
 A ``<root>\\<app>.incoming`` that is already there is used as the fresh clone. Otherwise the run clones
 the origin of ``<root>\\<app>``, or of the one sibling copy named after the app's repository when that
-folder is missing or is another app; ``-WhatIf`` clones nothing and reads that copy in the clone's place.
+folder is missing or is another app; ``-WhatIf`` clones nothing and reads the declaration from that copy's origin.
 """
 
 from __future__ import annotations
