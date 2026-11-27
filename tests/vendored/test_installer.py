@@ -9,6 +9,7 @@ one would have (a venv's interpreter appearing, a probe's exit code).
 from __future__ import annotations
 
 import datetime
+import hashlib
 import json
 import shutil
 import subprocess
@@ -426,18 +427,49 @@ def test_setup_bat_runs_the_module_isolated_with_its_flags_passed_through() -> N
     assert r'"%PY_EXE%" %PY_ARGS% -I "%SCRIPT_DIR%src\installer.py" %*' in template
 
 
-def test_isolated_script_run_never_imports_the_apps_src_package(tmp_path: Path) -> None:
-    """setup.bat's command line on a fresh tree: a broken src package and a stdlib-shadowing module are never loaded."""
-    root = _repo(tmp_path)
+def test_isolated_script_run_keeps_a_failed_steps_output_and_never_imports_the_apps_src_package(tmp_path: Path) -> None:
+    """setup.bat's command line, redirected to a file: the failed step's own lines land above the checklist, and a
+    broken src package or a stdlib-shadowing module beside the installer is never loaded."""
+    step = "import sys; print('step-stdout', flush=True); print('step-stderr', file=sys.stderr); sys.exit(3)"
+    root = _repo(tmp_path, f"[install.deps]\ncommand = {json.dumps([sys.executable, '-c', step])}")
     (root / "src").mkdir()
     shutil.copyfile(REPO_ROOT / "src" / "installer.py", root / "src" / "installer.py")
     poison = "raise ImportError('loaded from the app tree')\n"
     (root / "src" / "__init__.py").write_text(poison, encoding="utf-8")
     (root / "src" / "json.py").write_text(poison, encoding="utf-8")
-    before = _snapshot(root)
-    done = subprocess.run([sys.executable, "-I", str(root / "src" / "installer.py"), "-WhatIf"], cwd=root,
-                          capture_output=True, text=True, encoding="utf-8", timeout=60, check=False,
-                          creationflags=NO_WINDOW)
-    assert done.returncode == 0, done.stderr
-    assert "would create    .venv" in done.stdout
-    assert _snapshot(root) == before
+    # A .venv with requirements already recorded, so the dependency step is the only step that spawns.
+    interpreter = installer.venv_python(root)
+    interpreter.parent.mkdir(parents=True)
+    interpreter.write_text("", encoding="utf-8")
+    recorded = hashlib.sha256((root / "requirements.txt").read_bytes()).hexdigest()
+    (root / ".venv" / installer.REQUIREMENTS_STAMP).write_text(recorded, encoding="ascii")
+    log = tmp_path / "setup.log"
+    with log.open("wb") as out:
+        done = subprocess.run([sys.executable, "-I", str(root / "src" / "installer.py")], cwd=root, stdout=out,
+                              stderr=subprocess.STDOUT, timeout=60, check=False, creationflags=NO_WINDOW)
+    text = log.read_text(encoding="utf-8", errors="replace")
+    assert done.returncode == 1, text
+    assert "dependency step  (exited 3)" in text, text
+    for line in ("step-stdout", "step-stderr"):
+        assert 0 <= text.find(line) < text.find("Required:"), text
+
+
+@pytest.mark.parametrize("console", [True, False])
+def test_a_step_is_denied_a_window_only_when_setup_has_no_console(
+        tmp_path: Path, monkeypatch: pytest.MonkeyPatch, console: bool) -> None:
+    """A CREATE_NO_WINDOW child writes to a hidden console of its own, never to the one setup.bat runs in."""
+    root = _repo(tmp_path, STARTUP)
+    monkeypatch.setattr(installer, "_has_console", lambda: console)
+    fake = FakeRunner(root, probe_codes={"status": 1})
+    steps: list[dict[str, Any]] = []
+
+    def runner(command: list[str], **kwargs: Any) -> subprocess.CompletedProcess[str]:
+        if not kwargs.get("capture_output"):
+            steps.append(kwargs)
+        return fake(command, **kwargs)
+
+    installer.run(root, runner=runner, what_if=False, startup=True, now=lambda: FIXED_NOW)
+    assert len(steps) == 3  # the venv, the requirements and the autostart register
+    for kwargs in steps:
+        assert kwargs["creationflags"] == (0 if console else installer.NO_WINDOW)
+        assert kwargs["stdout"] is sys.stdout and kwargs["stderr"] is sys.stderr

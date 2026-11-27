@@ -30,7 +30,9 @@ anything is installed or written.
 ``-WhatIf`` lists every change and makes none. The run ends with two lists: the
 required items, each ``ok``, ``missing`` or ``unknown``, and the optional
 features, each ``available``, ``off`` or ``unknown`` with what it unlocks. A
-probe's output is never printed. Exit code: 0 when every step ran and every
+step that installs or registers writes straight to this run's own output, so a
+failed one says why above the checklist; a probe's output is never printed.
+Exit code: 0 when every step ran and every
 required item is ``ok`` (``-WhatIf`` does not hold the items setup has yet to
 create against it); 1 otherwise, including a config left alone because it does
 not parse and a top-up refused for its backup. An optional feature never fails it.
@@ -42,6 +44,7 @@ requirement is installed.
 from __future__ import annotations
 
 import argparse
+import ctypes
 import datetime
 import hashlib
 import json
@@ -258,6 +261,21 @@ def _command(root: Path, command: Sequence[str]) -> list[str]:
     return [str(venv_python(root)) if part == PYTHON_TOKEN else part for part in command]
 
 
+def _has_console() -> bool:
+    """Whether this process is attached to a console, a hidden one included."""
+    return os.name == "nt" and bool(ctypes.windll.kernel32.GetConsoleCP())
+
+
+def _step_io() -> dict[str, Any]:
+    """Spawn keywords that keep a step's output where this run's own output goes.
+
+    A ``CREATE_NO_WINDOW`` child gets a hidden console of its own, so nothing it writes reaches this one.
+    A child of a process that has a console shares it and opens no window, so only a run without one needs
+    the flag. The streams are passed so that a redirected run keeps the lines too.
+    """
+    return {"creationflags": 0 if _has_console() else NO_WINDOW, "stdout": sys.stdout, "stderr": sys.stderr}
+
+
 def ensure_venv(root: Path, report: Report, runner: Runner) -> None:
     """Create ``.venv`` when missing; an existing one (a junction included) is kept as it is."""
     if venv_python(root).exists():
@@ -267,7 +285,7 @@ def ensure_venv(root: Path, report: Report, runner: Runner) -> None:
         report.step("would create", ".venv", f"with {sys.executable}")
         return
     done = runner([sys.executable, "-m", "venv", str(root / ".venv")], timeout=VENV_TIMEOUT_S,
-                  check=False, creationflags=NO_WINDOW)
+                  check=False, **_step_io())
     if done.returncode != 0:
         report.fail(".venv", f"python -m venv exited {done.returncode}")
         return
@@ -289,7 +307,7 @@ def _install_when_changed(root: Path, report: Report, runner: Runner, *, item: s
         report.fail(item, ".venv has no python")
         return
     try:
-        done = runner(command, cwd=root, timeout=INSTALL_TIMEOUT_S, check=False, creationflags=NO_WINDOW)
+        done = runner(command, cwd=root, timeout=INSTALL_TIMEOUT_S, check=False, **_step_io())
     except (OSError, subprocess.TimeoutExpired) as exc:
         report.fail(item, f"did not run ({type(exc).__name__})")
         return
@@ -494,7 +512,7 @@ def ensure_startup(root: Path, plan: Plan, report: Report, register: bool, runne
         return
     try:
         done = runner(_command(root, plan.startup_register), cwd=root, timeout=CHECK_TIMEOUT_S, check=False,
-                      creationflags=NO_WINDOW)
+                      **_step_io())
     except (OSError, subprocess.TimeoutExpired) as exc:
         report.fail("start at log on", f"did not run ({type(exc).__name__})")
         return
