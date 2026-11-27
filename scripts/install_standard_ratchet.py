@@ -104,7 +104,7 @@ INSTALLER: dict[str, tuple[str, str]] = {
     "installer_declaration": ("src/installer_declaration.py",
                               "6770aba8f6a294484a8ba401ebf5001169eb9e3259f16b31956275cb13973d3b"),
     "installer_inplace": ("src/installer_inplace.py",
-                          "91a37dd6a30bf663abd231243a3df4013b231ea60765ed9053bebaf1e15be364"),
+                          "057db1c8db66124329bcc4259ae55e99b3ab94b3a8d3b2a4c3d356ea041cde73"),
 }
 
 # The playbook's migrate entry points and how a setup.bat offers each. "branch": it tests its

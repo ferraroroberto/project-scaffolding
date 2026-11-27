@@ -742,15 +742,82 @@ def test_same_app_is_the_shared_root_commit_whatever_the_origin(tmp_path: Path) 
                                                                              "https://example.invalid/o/app"))[0]
 
 
-def test_replace_refuses_an_install_of_another_app(tmp_path: Path) -> None:
-    _, folder, incoming = _pair(tmp_path)
-    folder.rename(tmp_path / "old-app")
+def _squatted(tmp_path: Path, with_incoming: bool = True) -> tuple[Path, Path, Path]:
+    """Another app's repository at <root>/app, the app's live copy at <root>/app-new, a fresh clone beside them."""
+    origin, folder, incoming = _pair(tmp_path, with_incoming)
+    folder.rename(tmp_path / "old-app")  # a name no sibling pattern matches
     _unrelated(tmp_path, "app")
+    return folder, _sibling(tmp_path, origin, "app-new"), incoming
+
+
+def test_an_unrelated_install_folder_is_moved_aside_and_the_live_sibling_is_migrated(tmp_path: Path) -> None:
+    folder, live, incoming = _squatted(tmp_path)
+    before = _listing(tmp_path)
+    preview = _replace(folder, incoming, what_if=True, snap=_windows_holder(10, live))
+    assert not preview.failed, preview.render()
+    assert _states(preview, "discover") == {"app": "other app", "app-new": "live"}
+    assert {i: d for _, i, d in preview.rows["discover"]}["app"].startswith("left alone: shares no root commit")
+    assert {i for s, i, _ in preview.rows["stop"] if s == "would stop"} == {"PID 10 python.exe", "PID 11 python.exe"}
+    assert [(s, i) for s, i, _ in preview.rows["in place"]] == [
+        ("would rename", "app"), ("would rename", "app.incoming"), ("would run", "setup.bat -MigrateFrom"),
+        ("would rename", "app-new")]
+    assert "another app" in preview.rows["in place"][0][2] and _listing(tmp_path) == before
+
+    calls: list[Any] = []
+    report = _replace_seq(folder, incoming, calls, [_windows_holder(10, live)] * 2)
+    assert not report.failed, report.render()
+    assert _kills(calls) == ["10"]
+    child = [c for c in calls if isinstance(c, str)]
+    assert len(child) == 1 and f'-MigrateFrom "{live}"' in child[0]
+    backup = tmp_path / "app.bak-20261127-1"
+    assert "another app" in (backup / ".fleet.toml").read_text(encoding="utf-8")
+    assert (tmp_path / "app-new.bak-20261127-1" / ".git").is_dir() and not live.exists()
+    assert "[install.migrate]" in (folder / ".fleet.toml").read_text(encoding="utf-8") and not incoming.exists()
+
+
+def test_another_apps_backup_is_never_named_the_fallback(tmp_path: Path) -> None:
+    folder, live, incoming = _squatted(tmp_path)
+
+    def failing(command: Any, **kwargs: Any) -> subprocess.CompletedProcess[str]:
+        if isinstance(command, str) and "-MigrateFrom" in command:
+            return subprocess.CompletedProcess(command, 1, stdout='{"ok": false}')
+        return _runner(command, **kwargs)
+
+    report = _replace_seq(folder, incoming, [], [_windows_holder(10, live)] * 2, runner=failing)
+    assert report.failed and live.is_dir(), report.render()
+    [detail] = [d for _, i, d in report.rows["in place"] if i == "setup.bat -MigrateFrom"]
+    assert "app.bak-20261127-1 holds the other app" in detail and "the fallback" not in detail
+
+
+@pytest.mark.parametrize("what_if", [True, False])
+def test_an_unrelated_install_folder_in_use_is_refused_before_anything_stops(tmp_path: Path, what_if: bool) -> None:
+    folder, live, incoming = _squatted(tmp_path)
+    snap = _windows_holder(10, live)
+    snap.procs[500] = _proc(500, folder)
+    calls: list[Any] = []
+    report = _replace(folder, incoming, what_if=what_if, runner=_recording(calls), snap=snap)
+    state, item, detail = report.rows["guard"][-1]
+    assert report.failed and (state, item) == ("refused", "app") and "PID 500" in detail, report.render()
+    assert not _kills(calls) and folder.is_dir() and live.is_dir() and not list(tmp_path.glob("*.bak-*"))
+
+
+def test_an_unrelated_install_folder_with_no_copy_of_the_app_is_left_where_it_is(tmp_path: Path) -> None:
+    folder, live, incoming = _squatted(tmp_path)
+    live.rename(tmp_path / "elsewhere")
     calls: list[Any] = []
     report = _replace(folder, incoming, what_if=False, runner=_recording(calls))
-    assert report.failed and _states(report, "guard")["app"] == "refused"
-    assert "not a copy of this app" in report.rows["guard"][-1][2]
+    assert report.failed and _states(report, "discover") == {"app": "refused"}, report.render()
+    assert [s for s, i, _ in report.rows["discover"] if i == "app"] == ["other app", "refused"]
     assert not _kills(calls) and folder.is_dir() and incoming.is_dir() and not list(tmp_path.glob("*.bak-*"))
+
+
+def test_an_install_folder_that_is_no_checkout_is_still_refused(tmp_path: Path) -> None:
+    folder, live, incoming = _squatted(tmp_path)
+    folder.rename(tmp_path / "set-aside")
+    folder.mkdir()
+    report = _replace(folder, incoming, what_if=False, runner=_recording([]), snap=_windows_holder(10, live))
+    assert report.failed and _states(report, "guard")["app"] == "refused"
+    assert "not the root of a git checkout" in report.rows["guard"][-1][2] and live.is_dir()
 
 
 def test_replace_with_only_a_live_suffixed_copy_lands_the_clone_at_the_canonical_path(tmp_path: Path) -> None:
@@ -888,6 +955,19 @@ def test_the_entry_point_uses_an_incoming_clone_that_is_already_there(
     _pair(tmp_path)
     code, report = _entry(["app", "--root", str(tmp_path), "-WhatIf", "-Json"], monkeypatch)
     assert code == 0 and report.mode == "replace" and _states(report, "guard")["incoming clone"] == "ok"
+
+
+def test_the_entry_point_clones_the_app_not_an_unrelated_install_folder(
+        tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    folder, live, _ = _squatted(tmp_path, with_incoming=False)
+    named = shutil.copytree(tmp_path / "o" / "new", tmp_path / "remotes" / "app")  # an origin named after the app
+    _git(live, "remote", "set-url", "origin", str(named))
+    _git(folder, "remote", "add", "origin", "https://example.invalid/o/something-else.git")
+    code, report = _entry(["app", "--root", str(tmp_path), "-WhatIf"], monkeypatch)
+    assert code == 0, report.render()
+    assert _states(report, "discover") == {"app": "other app", "app-new": "live"}, report.render()
+    assert [d for s, _, d in report.rows["in place"] if s == "would clone"] == [f"into {tmp_path / 'app.incoming'}"]
+    assert str(named) in [i for s, i, _ in report.rows["in place"] if s == "would clone"]
 
 
 def test_the_entry_point_refuses_when_no_copy_names_the_app(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

@@ -20,7 +20,10 @@ app when it shares the repository's root commit (its origin URL, parsed, when on
 history). The candidates are ``<root>\\<app>``, every sibling ``<app>-*`` / ``<app>.*`` that is the
 same app (never a ``.bak-*`` or ``.incoming`` folder), and the checkout of whatever holds the
 app's port. The live copy is the one holding the port, else the one something runs from, else
-the most recently committed. A port held by anything that is not the same app is refused.
+the most recently committed. A port held by anything that is not the same app is refused. A
+``<root>\\<app>`` that is another app's checkout is no candidate: nothing in it is stopped, it
+is renamed to its backup when the clone lands there, and the run is refused while something
+runs from it.
 
 The swap, repeatable any number of times:
 
@@ -302,11 +305,12 @@ def discover(folder: Path, incoming: Path | None, ref: Checkout, mig: Any, snap:
                        "be the same app; migrate from it with -MigrateFrom instead")
             return None
         ok, reason = same_app(read_checkout(folder, runner), ref)
-        if not ok:
-            report.add("guard", "refused", folder.name, f"not a copy of this app: {reason}")
-            return None
-        candidates.append(folder)
-        why[folder] = reason
+        if ok:
+            candidates.append(folder)
+            why[folder] = reason
+        else:
+            report.add("discover", "other app", folder.name, f"left alone: {reason}; moved to a backup only when "
+                       "the clone lands at its path")
     else:
         report.add("discover", "missing", folder.name, "no such folder: the clone lands there")
     for sibling in siblings(folder, incoming):
@@ -407,6 +411,19 @@ def _guard_renamed(folders: list[Path], report: Any, runner: Runner) -> bool:
             report.add("guard", "kept", f"{folder.name}: uncommitted changes",
                        f"{len(changes.splitlines())} tracked file(s), kept in its backup")
     return True
+
+
+def _guard_other(other: Path, candidates: list[Path], report: Any, snap: Any) -> bool:
+    """Whether another app's folder can be moved aside: this run stops only the app's own copies, so nothing
+    else may run from it. Asked before anything stops, since its rename comes after the stop.
+    """
+    running = [p for p in m.processes_from(snap, other, m.ancestors(snap, os.getpid()))
+               if not any(m.runs_from(p, c) for c in candidates)]
+    if running:
+        report.add("guard", "refused", other.name, "another app runs from it (PID "
+                   + ", ".join(str(p.pid) for p in running) + "), so it cannot be renamed; nothing was stopped: "
+                   "stop it yourself, then run again")
+    return not running
 
 
 def _declaration(folder: Path) -> tuple[Any, str]:
@@ -571,6 +588,10 @@ def replace(folder: Path, incoming: Path | None, *, what_if: bool, as_json: bool
         return _kept_clone(report, cloning and have_clone, incoming, folder)
     if mig is None:  # an install too old to declare one may still sit beside a copy that does
         mig, why = _first_declaration([found.live, *found.candidates])
+    # <root>/<app> that is no copy of the app: another app's repository, moved aside like an old install.
+    other = folder if folder.is_dir() and not any(_same_folder(folder, c) for c in found.candidates) else None
+    if other is not None and not _guard_other(other, found.candidates, report, snap):
+        return _kept_clone(report, cloning and have_clone, incoming, folder)
     renamed = [c for c in (folder, found.live) if c.is_dir()]
     if not _guard_renamed(list(dict.fromkeys(renamed)), report, runner):
         return report
@@ -585,7 +606,8 @@ def replace(folder: Path, incoming: Path | None, *, what_if: bool, as_json: bool
     if what_if:
         _preview_copy(found.live, mig, why, report)
         if backup is not None:
-            report.add("in place", "would rename", folder.name, f"to {backup.name}, kept as a working checkout")
+            moved = "; another app, moved aside so the clone can land" if other is not None else ""
+            report.add("in place", "would rename", folder.name, f"to {backup.name}, kept as a working checkout{moved}")
         report.add("in place", "would rename", incoming.name, f"to {folder.name}")
         report.add("in place", "would run", "setup.bat -MigrateFrom", f"{source.name}: copy (as listed), "
                    "secrets, install, start, verify")
@@ -601,8 +623,11 @@ def replace(folder: Path, incoming: Path | None, *, what_if: bool, as_json: bool
         report.handed_off = True
     code, child = _run_child(folder, source, as_json, runner)
     report.migration = child
-    report.add("in place", m.OK if code == 0 else m.FAILED, "setup.bat -MigrateFrom",
-               f"exited {code}" + (f"; the backup {backup.name} stays as the fallback" if backup else ""))
+    kept = ""
+    if backup is not None:
+        kept = (f"; {backup.name} holds the other app that was at {folder.name}" if other is not None
+                else f"; the backup {backup.name} stays as the fallback")
+    report.add("in place", m.OK if code == 0 else m.FAILED, "setup.bat -MigrateFrom", f"exited {code}{kept}")
     if sibling is not None:
         _retire(sibling, backup_path(sibling, day), code == 0, mig, report)
     return report
