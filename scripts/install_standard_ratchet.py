@@ -98,11 +98,11 @@ EXIT_PASS, EXIT_RISE, EXIT_CONFIG, EXIT_NOT_CONFIRMED = 0, 1, 2, 3
 # current installer modules; tests/ratchets/installer/test_install_standard_ratchet.py fails the scaffold's
 # gate until they are updated in the same PR as the installer.
 INSTALLER: dict[str, tuple[str, str]] = {
-    "installer": ("src/installer.py", "aca52564fcf71b7e377782b3fa527f80d11d328c7dda1a832efca695b5cee906"),
+    "installer": ("src/installer.py", "44daf3cf0ebbbdf72d0597259dcf55d066aebac42b4b0ce34be169b99b90c5b2"),
     "installer_migrate": ("src/installer_migrate.py",
-                          "29280e26a88509d4e5a47fe5d8d1c983a6f5c7e012fbb9a02e8f421d86c0c3ac"),
+                          "16307032b688b86750491d3aa47a9b36123ce4e6d59ae65fd6f9945623195b1a"),
     "installer_declaration": ("src/installer_declaration.py",
-                              "f8730c8d8020797d95f9ae2df9b777ab09207181cd74a1f52d1065992e0593fa"),
+                              "6770aba8f6a294484a8ba401ebf5001169eb9e3259f16b31956275cb13973d3b"),
     "installer_inplace": ("src/installer_inplace.py",
                           "91a37dd6a30bf663abd231243a3df4013b231ea60765ed9053bebaf1e15be364"),
 }

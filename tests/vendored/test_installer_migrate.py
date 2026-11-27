@@ -8,6 +8,7 @@ for real on a disposable pair.
 
 from __future__ import annotations
 
+import codecs
 import datetime
 import json
 import os
@@ -209,12 +210,13 @@ def test_a_value_or_text_spelled_through_a_junction_is_rebound_and_reported(tmp_
     assert m.mentions(f"C:\\Windows\\System32\\cmd.exe /c {link}\\tray.bat C:\\Windows", old)
 
 
-def test_a_config_holding_only_backslash_paths_is_rebound(tmp_path: Path) -> None:
+@pytest.mark.parametrize("bom", [b"", codecs.BOM_UTF8])
+def test_a_config_holding_only_backslash_paths_is_rebound(tmp_path: Path, bom: bytes) -> None:
     old, new = tmp_path / "old", tmp_path / "new"
     new.mkdir()
     old.mkdir()
     # JSON doubles each backslash, so the raw text never holds the folder as spelled.
-    (new / "config.json").write_text(json.dumps({"data_dir": str(old / "data")}), encoding="utf-8")
+    (new / "config.json").write_bytes(bom + json.dumps({"data_dir": str(old / "data")}).encode("utf-8"))
     shutil.copy(new / "config.json", old / "config.json")
     report = m.MigrationReport(mode="migrate", what_if=False)
     m.rebind_copied(old, new, ["config.json"], report)

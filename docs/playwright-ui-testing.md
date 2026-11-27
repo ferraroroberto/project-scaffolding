@@ -1303,7 +1303,9 @@ an element path and the measurement, never the page's text.
 its screenshot path, its milliseconds, and its findings with kind,
 severity, element, the other element of an overlap, the measurement, the
 first 40 characters of the element's text (local only) and any allow
-reason. A second call merges into it by state x viewport x theme.
+reason. A second call merges into it by state x viewport x theme. A
+manifest that cannot be read fails that call and is left untouched, so
+earlier legs are never replaced by a failed read.
 
 **Apps with a theme toggle** pass `theme_storage_key=<localStorage key>`:
 the theme is written there and to `data-theme` before any page script

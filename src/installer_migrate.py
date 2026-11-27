@@ -608,7 +608,7 @@ def rebind_copied(old: Path, new: Path, copied: list[str], report: MigrationRepo
         try:
             if source.stat().st_size > TEXT_SCAN_MAX_BYTES:
                 continue
-            text = source.read_text(encoding="utf-8")
+            text = source.read_text(encoding="utf-8-sig")
         except (OSError, UnicodeDecodeError):
             continue
         if not mentions(text, old):

@@ -105,7 +105,7 @@ def local_port(root: Path, endpoint: Endpoint) -> tuple[int | None, str]:
         return endpoint.port, "declared"
     name = endpoint.port_config
     try:
-        value: Any = json.loads((root / name).read_text(encoding="utf-8"))
+        value: Any = json.loads((root / name).read_text(encoding="utf-8-sig"))
     except FileNotFoundError:
         return endpoint.port, f"declared; {name} is not here"
     except (OSError, UnicodeDecodeError, ValueError):
@@ -149,6 +149,6 @@ def read_fleet_toml(root: Path) -> dict[str, Any]:
     except ModuleNotFoundError as exc:
         raise ValueError("reading .fleet.toml needs Python 3.11 or newer") from exc
     try:
-        return tomllib.loads((root / ".fleet.toml").read_text(encoding="utf-8"))
+        return tomllib.loads((root / ".fleet.toml").read_text(encoding="utf-8-sig"))
     except (OSError, UnicodeDecodeError, tomllib.TOMLDecodeError) as exc:
         raise ValueError(f".fleet.toml cannot be read ({type(exc).__name__})") from exc
