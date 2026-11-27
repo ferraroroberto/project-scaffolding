@@ -19,7 +19,7 @@ from src.no_window import NO_WINDOW
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 NAMES = ("static", "comment", "docs", "structure", "instruction", "doc_refs", "dead_code", "conventions",
-         "runtime_write", "usage_track", "ux_surface", "request_budget", "windows_only", "port_host",
+         "runtime_write", "usage_track", "ux_surface", "request_budget", "windows_only", "probe_fake", "port_host",
          "install_standard", "clean_tree", "test_value")
 
 

@@ -103,14 +103,23 @@
                          beyond the committed baseline; opt-in via .fleet.toml
                          [windows_only_ratchet]; exit 3 = "not confirmed", a
                          failure, never a pass (docs/windows-only-ratchet.md)
-     12e. port host ratchet — scripts/port_host_ratchet.py: fails when a script
+     12e. probe fake ratchet — scripts/probe_fake_ratchet.py: fails when a
+                         declared process, port or listener probe module lacks
+                         a test faking each platform's probe output beyond the
+                         committed baseline, or when the branch's diff changes
+                         a probe with no change to a test reaching it; prints
+                         `MAC_NIGHTLY: unverified` for a probe-touching diff;
+                         opt-in via .fleet.toml [probe_fake_ratchet]; exit 3 =
+                         "not confirmed", a failure, never a pass
+                         (docs/probe-fake-ratchet.md)
+     12f. port host ratchet — scripts/port_host_ratchet.py: fails when a script
                          or code file gains a port literal or a machine-local
                          host outside the declared config resolvers and the
                          samples, beyond the committed baseline; opt-in via
                          .fleet.toml [port_host_ratchet]; exit 3 = "not
                          confirmed", a failure, never a pass
                          (docs/port-host-ratchet.md)
-     12f. install standard ratchet — scripts/install_standard_ratchet.py: fails
+     12g. install standard ratchet — scripts/install_standard_ratchet.py: fails
                          when the repo lacks a piece of the install standard
                          (the installer modules at the scaffold's content,
                          [install.migrate] that parses, a playbook with
@@ -119,7 +128,7 @@
                          [install_standard_ratchet]; exit 3 = "not confirmed",
                          a failure, never a pass
                          (docs/install-standard-ratchet.md)
-     12g. clean tree ratchet — scripts/clean_tree_ratchet.py: records `git
+     12h. clean tree ratchet — scripts/clean_tree_ratchet.py: records `git
                          status --porcelain`, runs the repo's declared start
                          smoke once (a free port, a scratch data dir), and
                          fails when it wrote a path beyond the committed
@@ -292,6 +301,7 @@ Invoke-Stage "usage track ratchet"                { & $py "scripts/usage_track_r
 Invoke-Stage "ux surface ratchet"                 { & $py "scripts/ux_surface_ratchet.py" }
 Invoke-Stage "request budget ratchet"             { & $py "scripts/request_budget_ratchet.py" }
 Invoke-Stage "windows only ratchet"               { & $py "scripts/windows_only_ratchet.py" }
+Invoke-Stage "probe fake ratchet"                 { & $py "scripts/probe_fake_ratchet.py" }
 Invoke-Stage "port host ratchet"                  { & $py "scripts/port_host_ratchet.py" }
 Invoke-Stage "install standard ratchet"           { & $py "scripts/install_standard_ratchet.py" }
 Invoke-Stage "clean tree ratchet"                 { & $py "scripts/clean_tree_ratchet.py" }

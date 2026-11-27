@@ -75,6 +75,8 @@ RATCHETS: tuple[Ratchet, ...] = (
             "a web UI (HTML/JS) to scan and its docs/ux-surfaces.yaml (docs/ux-surface-map.md)"),
     Ratchet("request_budget", ("request_budget_scan", "ratchet_baseline"), "-"),
     Ratchet("windows_only", ("ratchet_baseline",), "pytest tests marked windows_only for the Mac nightly ([ci.nightly])"),
+    Ratchet("probe_fake", ("ratchet_baseline",), "the process, port and listener probe modules, listed in `probes`",
+            '# probes = ["src/ports.py"]  # required before --init: docs/probe-fake-ratchet.md\n'),
     Ratchet("port_host", ("ratchet_baseline",), "ports and hosts read from the repo's config resolver (declare it in `resolvers`)"),
     Ratchet("install_standard", ("ratchet_baseline",),
             "the scaffold installer (src/installer.py, installer_migrate.py, installer_declaration.py, installer_inplace.py) and docs/install.md"),

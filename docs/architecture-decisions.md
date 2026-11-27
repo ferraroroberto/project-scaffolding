@@ -223,3 +223,13 @@ Why: one engine, one result format and no hosted minutes for the whole fleet, ru
 Enforcement: `tests/ci/test_nightly_mac_workflow.py` (the safety rules) and `scripts/ci/nightly_matrix.py` (the table contract, selection and retry); contract in [mac-runner.md](mac-runner.md).
 
 Issue: https://github.com/ferraroroberto/project-scaffolding/issues/661
+
+### A probe change ships a per-platform fake test
+
+A change that touches process, port or listener probing ships a test that pins each supported platform's probe output with a fake: a recorded or hand-built probe result per platform, injected through a seam, so the macOS shape (a framework Python's moved image path, a refused or partial listener scan, listeners on another address) is caught in the Windows gate with no Mac. Each repo lists its probe modules in `.fleet.toml`. For a probe-touching diff the finish report names the Mac nightly as `unverified`, never folded into the gate's pass. There is no per-change Mac run.
+
+Why: lanes gate on Windows only, so a probe that reads macOS differently reached `main` and turned the Mac nightly red a day later, one repo at a time; a fake per platform moves that discovery into the gate at the cost of a test, not a machine.
+
+Enforcement: the [probe fake ratchet](probe-fake-ratchet.md) counts each declared probe module and platform that no test fakes, in a shrink-only baseline; fails any branch whose probe edits leave every test of that probe untouched, a hit no baseline can hold; and prints the Mac nightly's `unverified` line whenever probes moved.
+
+Issue: https://github.com/ferraroroberto/project-scaffolding/issues/1018

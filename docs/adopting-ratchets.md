@@ -34,6 +34,7 @@ Listed in gate stage order, the order `scripts/run_ratchets.py` runs them. **Sib
 | ux surface | `ux_surface_ratchet.py`, `usage_track_scan.py`, `ux_surface_map.py` | a web UI and its `docs/ux-surfaces.yaml` | fast | | [ux-surface-ratchet.md](ux-surface-ratchet.md) |
 | request budget | `request_budget_ratchet.py`, `request_budget_scan.py` | - | fast | | [request-budget-ratchet.md](request-budget-ratchet.md) |
 | windows only | `windows_only_ratchet.py` | tests marked `windows_only` for the Mac nightly | fast | | [windows-only-ratchet.md](windows-only-ratchet.md) |
+| probe fake | `probe_fake_ratchet.py` | the probe modules listed in `probes`; `base_ref` fetched | fast | | [probe-fake-ratchet.md](probe-fake-ratchet.md) |
 | port host | `port_host_ratchet.py` | list the config resolver in `resolvers` | fast | | [port-host-ratchet.md](port-host-ratchet.md) |
 | install standard | `install_standard_ratchet.py` | the scaffold installer and a `docs/install.md` playbook | fast | | [install-standard-ratchet.md](install-standard-ratchet.md) |
 | clean tree | `clean_tree_ratchet.py` | a disposable start smoke declared in `smoke` | slow (one app boot) | | [clean-tree-ratchet.md](clean-tree-ratchet.md) |

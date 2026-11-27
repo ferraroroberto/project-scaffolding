@@ -208,7 +208,14 @@ opt-in via .fleet.toml [windows_only_ratchet]; exit 3 = not confirmed"]
 port and machine-local host literals outside the config resolvers and samples
 may not rise vs .ratchets/port-host.json
 opt-in via .fleet.toml [port_host_ratchet]; exit 3 = not confirmed"]
-  VERIFY -->|runs, opt-in, after the windows only ratchet| PHRATCHET
+  PFRATCHET["probe_fake_ratchet.py (vendor-verbatim, stdlib ast + git)
+probe modules without a per-platform fake test may not rise vs .ratchets/probe-fake.json
+a branch diff changing a probe moves a test reaching it; prints MAC_NIGHTLY: unverified
+opt-in via .fleet.toml [probe_fake_ratchet]; exit 3 = not confirmed"]
+  VERIFY -->|runs, opt-in, after the windows only ratchet| PFRATCHET
+  PFRATCHET -.->|reads [probe_fake_ratchet] from| FLEETTOML
+  ADOPTKIT -->|copies into an outside repo + runs there| PFRATCHET
+  VERIFY -->|runs, opt-in, after the probe fake ratchet| PHRATCHET
   PHRATCHET -.->|reads [port_host_ratchet] + [vendored] from| FLEETTOML
   ADOPTKIT -->|copies into an outside repo + runs there| PHRATCHET
   CTRATCHET["clean_tree_ratchet.py (vendor-verbatim, stdlib subprocess + urllib)
