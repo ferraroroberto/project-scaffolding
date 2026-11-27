@@ -142,13 +142,26 @@ def parse_migration(data: dict[str, Any]) -> Migration:
     return mig
 
 
-def read_fleet_toml(root: Path) -> dict[str, Any]:
-    """``root/.fleet.toml`` parsed; ValueError when it is missing or does not parse."""
+def _unreadable(exc: Exception) -> ValueError:
+    return ValueError(f".fleet.toml cannot be read ({type(exc).__name__})")
+
+
+def parse_fleet_toml(text: str) -> dict[str, Any]:
+    """A ``.fleet.toml``'s text parsed, with or without a BOM; ValueError when it does not parse."""
     try:
         import tomllib
     except ModuleNotFoundError as exc:
         raise ValueError("reading .fleet.toml needs Python 3.11 or newer") from exc
     try:
-        return tomllib.loads((root / ".fleet.toml").read_text(encoding="utf-8-sig"))
-    except (OSError, UnicodeDecodeError, tomllib.TOMLDecodeError) as exc:
-        raise ValueError(f".fleet.toml cannot be read ({type(exc).__name__})") from exc
+        return tomllib.loads(text.removeprefix("\ufeff"))
+    except tomllib.TOMLDecodeError as exc:
+        raise _unreadable(exc) from exc
+
+
+def read_fleet_toml(root: Path) -> dict[str, Any]:
+    """``root/.fleet.toml`` parsed; ValueError when it is missing or does not parse."""
+    try:
+        text = (root / ".fleet.toml").read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError) as exc:
+        raise _unreadable(exc) from exc
+    return parse_fleet_toml(text)

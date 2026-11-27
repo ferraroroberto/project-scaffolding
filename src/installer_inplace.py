@@ -39,7 +39,8 @@ The swap, repeatable any number of times:
 A failure before step 2 leaves every install where it was (start the live one again with its
 own start command); a failure at step 3 renames the backup back. ``-WhatIf`` names every
 candidate and which one is live, the backup names, every step and every file the migration would
-copy (by name), and changes nothing.
+copy (by name) with where that list was read, and changes no file or ref. With no clone to read it
+from, it fetches the origin's default branch into the copy it would clone from.
 """
 
 from __future__ import annotations
@@ -426,31 +427,70 @@ def _guard_other(other: Path, candidates: list[Path], report: Any, snap: Any) ->
     return not running
 
 
-def _declaration(folder: Path) -> tuple[Any, str]:
-    """A folder's own migration declaration, or (None, why)."""
+@dataclass
+class Declared:
+    """The declaration a run goes by and where it was read."""
+
+    mig: Any
+    why: str  # why ``mig`` is None
+    source: str
+    unread: str = ""  # why the origin could not be read: what the real run will read is then not known
+    note: str = ""  # the origin was read and gives no declaration, so the real run falls back too
+
+
+def _parsed(read: Callable[[], dict[str, Any]]) -> tuple[Any, str]:
+    """The migration declaration in what ``read`` returns, or (None, why)."""
     try:
-        return m.parse_migration(m.read_fleet_toml(folder)), ""
+        return m.parse_migration(read()), ""
     except ValueError as exc:
         return None, str(exc)
 
 
-def _first_declaration(folders: list[Path]) -> tuple[Any, str]:
-    """The first folder's declaration that parses, else (None, the first one's reason)."""
+def _origin_declaration(anchor: Path, runner: Runner) -> Declared:
+    """The declaration at the head of the origin's default branch, which a clone of ``anchor``'s origin checks out.
+
+    The fetch adds objects and ``FETCH_HEAD`` under ``.git``; it moves no ref and no file. When the origin
+    cannot be read, ``anchor``'s own file stands in.
+    """
+    source = "origin's default branch"
+    if m.git(["fetch", "--quiet", "--no-tags", "--no-recurse-submodules", "origin", "HEAD"], anchor, runner) is None:
+        unread = "git fetch failed"
+    elif (text := m.git(["show", "FETCH_HEAD:.fleet.toml"], anchor, runner)) is None:
+        unread = "no .fleet.toml could be read at its head"
+    else:
+        mig, why = _parsed(lambda: m.parse_fleet_toml(text))
+        return Declared(mig, why, source)
+    mig, why = _parsed(lambda: m.read_fleet_toml(anchor))
+    return Declared(mig, why, source, unread=unread)
+
+
+def _live_declaration(declared: Declared, live: Path, candidates: list[Path]) -> Declared:
+    """The first declaration that parses among this PC's copies, the live one first."""
+    note = "" if declared.unread or declared.mig is not None else f"{declared.source} gives none ({declared.why})"
     first = ""
-    for folder in folders:
-        mig, why = _declaration(folder)
+    for folder in (live, *candidates):
+        mig, why = _parsed(lambda: m.read_fleet_toml(folder))
         if mig is not None:
-            return mig, ""
+            copy = "the live copy" if folder == live else "the copy"
+            return Declared(mig, "", f"{copy} {folder.name}", declared.unread, note)
         first = first or why
-    return None, first
+    return Declared(None, first, f"the live copy {live.name}", declared.unread, note)
 
 
-def _preview_copy(folder: Path, mig: Any, why: str, report: Any) -> None:
-    """Every file the migration would copy from the live copy into the empty clone, by name, never by value."""
-    if mig is None:
-        report.add("copy", m.UNKNOWN, ".fleet.toml", f"the copy list cannot be shown: {why}")
+def _preview_copy(folder: Path, declared: Declared, report: Any) -> None:
+    """Where the copy list comes from, then every file it would copy from the live copy, by name, never by value."""
+    if declared.mig is None:
+        origin = f"origin's default branch could not be read ({declared.unread}), and " if declared.unread else ""
+        report.add("copy", m.UNKNOWN, ".fleet.toml", f"the copy list cannot be shown: {origin}{declared.why}")
         return
-    m.copy_declared(folder, None, mig, report, old_running=False)  # the stop runs before the copy
+    detail = f"from {declared.source}"
+    if declared.unread:
+        detail += (f": origin's default branch could not be read ({declared.unread}), so the real run may copy "
+                   "another list")
+    elif declared.note:
+        detail += f": {declared.note}"
+    report.add("copy", m.UNKNOWN if declared.unread else m.OK, "copy list", detail)
+    m.copy_declared(folder, None, declared.mig, report, old_running=False)  # the stop runs before the copy
 
 
 def _start_hint(folder: Path, mig: Any) -> str:
@@ -553,7 +593,8 @@ def replace(folder: Path, incoming: Path | None, *, what_if: bool, as_json: bool
     """Swap whichever copy of the app is live for the clone at ``incoming``, landing it at ``folder``.
 
     ``incoming`` None clones ``anchor``'s origin (``folder`` by default: ``-InPlace``) into
-    ``<folder>.incoming`` first; under ``-WhatIf`` nothing is cloned and ``anchor`` stands in for the clone.
+    ``<folder>.incoming`` first; under ``-WhatIf`` nothing is cloned, ``anchor``'s history stands in for the
+    clone's and the declaration is read from its origin.
     """
     report = m.MigrationReport(mode="in place" if incoming is None else "replace", what_if=what_if)
     snapshot_fn = snapshot_fn or (lambda: m.take_snapshot(runner))
@@ -581,13 +622,19 @@ def replace(folder: Path, incoming: Path | None, *, what_if: bool, as_json: bool
     have_clone = incoming.is_dir()
     if have_clone and not guard_incoming(incoming, folder, report, runner, snap):
         return report
-    # The clone's declaration is the one -MigrateFrom uses; with no clone yet (-WhatIf), the copy it would be made from.
-    mig, why = _first_declaration([reference])
-    found = discover(folder, incoming, read_checkout(reference, runner), mig, snap, report, runner)
+    # -MigrateFrom goes by the clone's declaration. -InPlace -WhatIf makes no clone, so it asks the origin for it.
+    if cloning and what_if:
+        declared = _origin_declaration(reference, runner)
+    else:
+        mig, why = _parsed(lambda: m.read_fleet_toml(reference))
+        declared = Declared(mig, why, f"the fresh clone {incoming.name}")
+    found = discover(folder, incoming, read_checkout(reference, runner), declared.mig, snap, report, runner)
     if found is None:
         return _kept_clone(report, cloning and have_clone, incoming, folder)
-    if mig is None:  # an install too old to declare one may still sit beside a copy that does
-        mig, why = _first_declaration([found.live, *found.candidates])
+    # An unread origin, or a clone too old to declare one beside a copy that does.
+    if declared.unread or declared.mig is None:
+        declared = _live_declaration(declared, found.live, found.candidates)
+    mig = declared.mig
     # <root>/<app> that is no copy of the app: another app's repository, moved aside like an old install.
     other = folder if folder.is_dir() and not any(_same_folder(folder, c) for c in found.candidates) else None
     if other is not None and not _guard_other(other, found.candidates, report, snap):
@@ -604,7 +651,7 @@ def replace(folder: Path, incoming: Path | None, *, what_if: bool, as_json: bool
     sibling = None if _same_folder(found.live, folder) else found.live
     source = sibling or backup or folder  # no sibling live means the install at ``folder`` is, so it has a backup
     if what_if:
-        _preview_copy(found.live, mig, why, report)
+        _preview_copy(found.live, declared, report)
         if backup is not None:
             moved = "; another app, moved aside so the clone can land" if other is not None else ""
             report.add("in place", "would rename", folder.name, f"to {backup.name}, kept as a working checkout{moved}")
