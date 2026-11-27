@@ -70,7 +70,15 @@ git clone <REPOSITORY URL> <FOLDER>.incoming          # a fresh clone beside the
 .\<FOLDER>.incoming\setup.bat -Replace <FOLDER>
 ```
 
-It stops `<FOLDER>`, renames it to `<FOLDER>.bak-YYYYMMDD-N` (uncommitted edits stay there), moves `<FOLDER>.incoming` to `<FOLDER>`, migrates and passes only when the new clone serves its own commit. The path is unchanged, so <e.g. the launcher's app entry and the Startup link> need no edit. On an install whose `setup.bat` already has `-InPlace`, `.\<FOLDER>\setup.bat -InPlace` does the same and makes the clone itself.
+It finds the copy that really runs, even one in a suffixed folder such as `<FOLDER>-new` or with an origin spelled another way, and stops every copy of the app. It renames `<FOLDER>`, when it exists, to `<FOLDER>.bak-YYYYMMDD-N` (uncommitted edits stay there), moves `<FOLDER>.incoming` to `<FOLDER>`, migrates from the live copy and passes only when the new clone serves its own commit; a live suffixed copy then becomes `<its name>.bak-YYYYMMDD-N`. A port held by another program stops the run before anything is stopped. The path is `<FOLDER>`, so <e.g. the launcher's app entry and the Startup link> need no edit. On an install whose `setup.bat` already has `-InPlace`, `.\<FOLDER>\setup.bat -InPlace` does the same and makes the clone itself.
+
+**From the scaffold, when this app's installer is older than a fix.** A project-scaffolding clone runs the same flow with the scaffold's newest code, so a fix needs no re-vendoring of this app first:
+
+```powershell
+git -C <SCAFFOLD FOLDER> pull --ff-only
+py -3 -I <SCAFFOLD FOLDER>\scripts\tools\replace_app.py <FOLDER> --root <PARENT FOLDER> -WhatIf
+py -3 -I <SCAFFOLD FOLDER>\scripts\tools\replace_app.py <FOLDER> --root <PARENT FOLDER>
+```
 
 **Beside it (another folder, or an old copy that is not a git clone):**
 

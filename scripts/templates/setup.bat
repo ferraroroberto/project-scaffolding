@@ -17,9 +17,11 @@ REM                         in a fresh clone: copy this PC's declared files from
 REM                         an existing install, install, start, verify
 REM    setup.bat -Replace <install> [-WhatIf] [-Json]
 REM                         in a fresh clone beside an install of any age:
-REM                         stop the install, rename it to
-REM                         <install>.bak-YYYYMMDD-N, move this clone to its
-REM                         path, migrate from the backup
+REM                         find the copy that runs (a suffixed sibling or
+REM                         the port's holder included), stop every copy,
+REM                         rename <install> to <install>.bak-YYYYMMDD-N,
+REM                         move this clone to its path, migrate from the
+REM                         live copy
 REM    setup.bat -InPlace [-WhatIf] [-Json]
 REM                         the same from the install itself: clone its origin
 REM                         to <folder>.incoming first
