@@ -438,7 +438,7 @@ class Declared:
     note: str = ""  # the origin was read and gives no declaration, so the real run falls back too
 
 
-def _parsed(read: Callable[[], dict[str, Any]]) -> tuple[Any, str]:
+def _parsed(read: Callable[[], dict[str, Any] | str]) -> tuple[Any, str]:
     """The migration declaration in what ``read`` returns, or (None, why)."""
     try:
         return m.parse_migration(read()), ""
@@ -458,10 +458,18 @@ def _origin_declaration(anchor: Path, runner: Runner) -> Declared:
     elif (text := m.git(["show", "FETCH_HEAD:.fleet.toml"], anchor, runner)) is None:
         unread = "no .fleet.toml could be read at its head"
     else:
-        mig, why = _parsed(lambda: m.parse_fleet_toml(text))
+        mig, why = _parsed(lambda: text)
         return Declared(mig, why, source)
     mig, why = _parsed(lambda: m.read_fleet_toml(anchor))
     return Declared(mig, why, source, unread=unread)
+
+
+def _clone_declaration(reference: Path, incoming: Path, no_clone: bool, runner: Runner) -> Declared:
+    """What ``-MigrateFrom`` will go by: the clone's declaration, asked of the origin when no clone is made."""
+    if no_clone:
+        return _origin_declaration(reference, runner)
+    mig, why = _parsed(lambda: m.read_fleet_toml(reference))
+    return Declared(mig, why, f"the fresh clone {incoming.name}")
 
 
 def _live_declaration(declared: Declared, live: Path, candidates: list[Path]) -> Declared:
@@ -491,6 +499,17 @@ def _preview_copy(folder: Path, declared: Declared, report: Any) -> None:
         detail += f": {declared.note}"
     report.add("copy", m.UNKNOWN if declared.unread else m.OK, "copy list", detail)
     m.copy_declared(folder, None, declared.mig, report, old_running=False)  # the stop runs before the copy
+
+
+def _preview_swap(folder: Path, incoming: Path, backup: Path | None, other: Path | None, source: Path,
+                  report: Any) -> None:
+    """The renames and the migration the swap would make."""
+    if backup is not None:
+        moved = "; another app, moved aside so the clone can land" if other is not None else ""
+        report.add("in place", "would rename", folder.name, f"to {backup.name}, kept as a working checkout{moved}")
+    report.add("in place", "would rename", incoming.name, f"to {folder.name}")
+    report.add("in place", "would run", "setup.bat -MigrateFrom", f"{source.name}: copy (as listed), "
+               "secrets, install, start, verify")
 
 
 def _start_hint(folder: Path, mig: Any) -> str:
@@ -622,13 +641,8 @@ def replace(folder: Path, incoming: Path | None, *, what_if: bool, as_json: bool
     have_clone = incoming.is_dir()
     if have_clone and not guard_incoming(incoming, folder, report, runner, snap):
         return report
-    # -MigrateFrom goes by the clone's declaration. -InPlace -WhatIf makes no clone, so it asks the origin for it.
-    if cloning and what_if:
-        declared = _origin_declaration(reference, runner)
-    else:
-        mig, why = _parsed(lambda: m.read_fleet_toml(reference))
-        declared = Declared(mig, why, f"the fresh clone {incoming.name}")
-    found = discover(folder, incoming, read_checkout(reference, runner), declared.mig, snap, report, runner)
+    declared = _clone_declaration(reference, incoming, cloning and what_if, runner)
+    found =discover(folder, incoming, read_checkout(reference, runner), declared.mig, snap, report, runner)
     if found is None:
         return _kept_clone(report, cloning and have_clone, incoming, folder)
     # An unread origin, or a clone too old to declare one beside a copy that does.
@@ -652,12 +666,7 @@ def replace(folder: Path, incoming: Path | None, *, what_if: bool, as_json: bool
     source = sibling or backup or folder  # no sibling live means the install at ``folder`` is, so it has a backup
     if what_if:
         _preview_copy(found.live, declared, report)
-        if backup is not None:
-            moved = "; another app, moved aside so the clone can land" if other is not None else ""
-            report.add("in place", "would rename", folder.name, f"to {backup.name}, kept as a working checkout{moved}")
-        report.add("in place", "would rename", incoming.name, f"to {folder.name}")
-        report.add("in place", "would run", "setup.bat -MigrateFrom", f"{source.name}: copy (as listed), "
-                   "secrets, install, start, verify")
+        _preview_swap(folder, incoming, backup, other, source, report)
         if sibling is not None:
             report.add("in place", "would rename", sibling.name, f"to {backup_path(sibling, day).name} once the "
                        "migration passes, kept as a working checkout")

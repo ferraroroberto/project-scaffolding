@@ -115,7 +115,6 @@ if TYPE_CHECKING:
         Migration,
         local_port,
         parse_endpoint,
-        parse_fleet_toml,
         parse_migration,
         read_fleet_toml,
     )
@@ -123,7 +122,7 @@ else:
     _d = sys.modules.get("installer_declaration") or _load_declaration()
     Endpoint, Migration, parse_endpoint, parse_migration = (_d.Endpoint, _d.Migration, _d.parse_endpoint,
                                                             _d.parse_migration)
-    local_port, read_fleet_toml, parse_fleet_toml = _d.local_port, _d.read_fleet_toml, _d.parse_fleet_toml
+    local_port, read_fleet_toml = _d.local_port, _d.read_fleet_toml
     DEFAULT_START, DEFAULT_VERSION_PATH = _d.DEFAULT_START, _d.DEFAULT_VERSION_PATH
 
 
@@ -293,10 +292,7 @@ def _sha256(path: Path) -> str:
 # ---------------------------------------------------------------- git, PowerShell, processes
 
 def git(args: list[str], cwd: Path, runner: Runner) -> str | None:
-    """One git command's trimmed output; None when git is missing or the command fails.
-
-    For commands that move no ref and write no working-tree file. It never waits at a terminal prompt.
-    """
+    """The trimmed output of a git command that moves no ref or file, never prompting; None when it fails."""
     env = {**os.environ, "GIT_OPTIONAL_LOCKS": "0", "GIT_TERMINAL_PROMPT": "0"}
     try:
         # conventions-exempt: a vendor-verbatim file cannot import the adopter's run_git; no ref or file moves
