@@ -53,18 +53,23 @@ git pull --ff-only
 
 ## Migrate from an existing install
 
-Use this on a PC that already runs an older copy of <APP NAME>: one that may not be a git clone, and may live at another path. The old copy keeps running until the new one is verified, and it is deleted only when you say so.
+Use this on a PC that already runs a copy of <APP NAME>. What moves is declared in `[install.migrate]` of `.fleet.toml`: <LIST THE APP'S CONFIGS, STATE AND CERTIFICATES, e.g. config/config.json, data/, webapp/certificates/, .env>. Its runtime data under <e.g. C:\sqlite\<app>> stays where it is and is shared. Nothing in this playbook or in `setup.bat` deletes the old copy.
 
-1. **Clone fresh beside it.** Clone into a new folder next to the old one (`git clone <REPOSITORY URL> <NEW FOLDER>`); never clone over the old folder.
-2. **Copy this PC's own files across.** From the old folder into the new one, copy only these, keeping their relative paths (they are all gitignored, so nothing tracked is touched):
-   - configs: <LIST, e.g. config/config.json, config/apps.json>
-   - state: <LIST, e.g. data/, the runtime database folder if it lives in the repo>
-   - certificates and secrets: <LIST, e.g. webapp/certificates/, .env>
-3. **Top them up.** Run `.\setup.bat -WhatIf` in the new folder and read what it would change, then `.\setup.bat`. Settings files gain only the keys they lack; the values you copied stay as they were.
-4. **Stop the old copy.** <HOW, e.g. quit the tray from its menu; remove the old copy's log-on autostart entry.>
-5. **Start the new one.** <START COMMAND>, and `.\setup.bat -Startup` if it should start at log on.
-6. **Verify it.** <WHAT TO CHECK, e.g. open the app, confirm the build line shows the new commit, run one real action.> If anything is wrong, stop the new copy and start the old one again: it is untouched.
-7. **Retire the old folder, only after you confirm.** Nothing in this playbook or in `setup.bat` deletes the old copy. When you are satisfied, rename it first (for example `<OLD FOLDER>.retired`) and run on the new copy for a while; delete it yourself once you are sure. An agent working through this playbook asks you before it deletes anything.
+**Same folder (the usual case).** From a terminal whose current folder is outside the app (<DELETE FOR AN APP THAT HOSTS NO SESSIONS:> a plain terminal, never a session <APP NAME> hosts, because the run stops <APP NAME> and every session in it):
+
+```powershell
+cd <PARENT FOLDER>
+.\<FOLDER>\setup.bat -InPlace -WhatIf    # read the backup name and every step; nothing changes
+.\<FOLDER>\setup.bat -InPlace
+```
+
+It stops the running copy, renames the folder to `<FOLDER>.bak-YYYYMMDD-N`, clones fresh into the same path, copies the declared files from the backup, installs, starts <APP NAME> and passes only when the new folder's process serves its own commit. The path is unchanged, so <e.g. the launcher's app entry and the Startup link> need no edit. An old copy that is not a git clone has no `setup.bat -InPlace`: use the next way.
+
+**Beside it (another folder, or an old copy that is not a clone).** `git clone <REPOSITORY URL> <NEW FOLDER>`, then in the new folder `.\setup.bat -MigrateFrom <OLD FOLDER> -StopOld`. Repoint whatever stores the old path; the run lists what still points at it.
+
+**If verify fails,** the report names the step. To go back: stop the new copy, rename the new folder away and the backup to the original name, and start it: it is untouched.
+
+**Retire the backup only after you confirm.** Run on the new copy for a while; delete the backup yourself once you are sure. An agent working through this playbook asks you before it deletes anything.
 
 ## Uninstall
 
