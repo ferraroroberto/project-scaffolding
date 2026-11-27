@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "hits": [
+    "probe-fake-missing: src/installer_migrate.py [darwin]",
+    "probe-fake-missing: src/resource_probe.py [darwin]",
+    "probe-fake-missing: src/resource_probe.py [win32]",
+    "probe-fake-missing: src/self_restart.py [darwin]",
+    "probe-fake-missing: src/self_restart.py [win32]",
+    "probe-fake-missing: tests/_port_probe.py [darwin]"
+  ]
+}

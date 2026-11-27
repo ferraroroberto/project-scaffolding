@@ -15,6 +15,7 @@ The ratchets are the baseline-and-ratchet stages of the pre-ship gate: stdlib-on
 - [UX surfaces: ux surface](#ux-surfaces)
 - [Request budget: request budget](#request-budget)
 - [Windows-only tests: windows only](#windows-only-tests)
+- [Per-platform probes: probe fake](#per-platform-probes)
 - [Machine-local values: port host, clean tree](#machine-local-values)
 - [Install standard: install standard](#install-standard)
 - [Test value: test value](#test-value)
@@ -1374,6 +1375,47 @@ def test_finds_chrome_in_program_files(monkeypatch, tmp_path):
 
 A `windows-only-exempt` marker with no reason is a `bare-exempt` hit, the rule the request budget ratchet above shares.
 
+## Per-platform probes
+
+[probe-fake-ratchet.md](probe-fake-ratchet.md). Every lane gates on Windows, so a process, port or listener probe that reads macOS differently (a framework Python's moved image path, a refused or partial `lsof`, a listener on `*` or `::1`) passes the gate and turns the Mac night red. The repo lists its probe modules in `probes`; this ratchet asks for a test that reaches each one (imports it, or names it in a string) and fakes each declared platform's probe output, read from the test's names and string data (docstrings, comments and skip reasons never count), and for a change to a probe to move such a test with it. A diff that touches a probe prints `MAC_NIGHTLY: unverified`, which the finish report carries as unverified. **Every rule is on**; `probes` is required. **Except** a probe module with `probe-fake-exempt: <reason>` (anywhere in it for the missing fake; among the lines the diff adds for the diff rule); a marker with no reason exempts nothing and is a `bare-exempt` hit, the rule the request budget ratchet above shares.
+
+```toml
+[probe_fake_ratchet]
+enabled = true
+probes  = ["src/ports.py"]   # required; platforms = ["win32", "darwin"] by default
+```
+
+#### `probe-fake-missing`
+
+A declared probe module with no test that reaches it and fakes one platform: one hit per module and platform, baselined and shrink-only.
+
+```python
+# bad: runs the real probe, so the gate only ever sees Windows
+def test_holders():
+    assert ports.holders(8000) == []
+
+# fixed: each platform's recorded output through the seam
+WIN32_NETSTAT = "  TCP    127.0.0.1:8000    0.0.0.0:0    LISTENING    4242\n"
+DARWIN_LSOF = "python3 4242 me 5u IPv6 0t0 TCP [::1]:8000 (LISTEN)\n"
+
+@pytest.mark.parametrize("platform,output", [("win32", WIN32_NETSTAT), ("darwin", DARWIN_LSOF)])
+def test_holders(platform, output):
+    assert ports.holders(8000, platform=platform, run=lambda cmd: output) == [4242]
+```
+
+#### `probe-changed-no-fake`
+
+The branch's diff against the merge base with `base_ref` changes a probe module and no test module that reaches it. Never baselined: the change ships its fake, or adds `probe-fake-exempt: <reason>` to the probe in the same diff.
+
+```
+# bad: the diff
+ M src/ports.py
+
+# fixed: the diff
+ M src/ports.py
+ M tests/test_ports.py
+```
+
 ## Machine-local values
 
 [port-host-ratchet.md](port-host-ratchet.md). Updating a fleet app is a clean `git pull --ff-only` plus its restart recipe ([architecture-decisions.md](architecture-decisions.md)), so a port or host a machine might need to change lives in ignored config with a tracked sample, read through the repo's config resolver. This ratchet reads the tracked scripts and code (`.py`, `.ps1`, `.psm1`, `.bat`, `.cmd`, `.sh`, `.js`, `.mjs`, `.cjs`, `.ts`) and counts, per file and rule, the literals written outside the files listed in `resolvers`, the samples (a name holding `.sample` or `.example`), tests (unless `include_tests = true`) and vendored copies. Full-line comments, PowerShell `<# ... #>` and JS `/* ... */` blocks and Python docstrings are prose and are skipped. **Every rule is on by default.** **Except** one hit with `port-host-exempt: <reason>` on its line or the comment line right above it; a marker with no reason exempts nothing and is itself a `bare-exempt` hit, the rule the request budget ratchet above shares.
@@ -1560,6 +1602,7 @@ Which ratchets take which:
 | usage track | `<rule>-exempt: <reason>` | `exclude`, `paths`, `builders` |
 | ux surface | `<rule>-exempt: <reason>` | `exclude`, `paths`, `rules` |
 | windows only | `windows-only-exempt: <reason>` | `exclude`, `test_paths`, `rules` |
+| probe fake | `probe-fake-exempt: <reason>` in the probe module | `probes`, `platforms`, `test_paths` |
 | port host | `port-host-exempt: <reason>` | `resolvers`, `exclude`, `include_tests`, `rules` |
 | install standard | none: the baseline names a piece that is missing on purpose | `playbook` |
 | clean tree | none: the baseline names a path that must stay | `smoke`, `ready_path`, `timeout_s`, `settle_s`, `data_dir_env` |
@@ -1574,4 +1617,4 @@ Which ratchets take which:
 
 ## Adoption order
 
-[adopting-ratchets.md](adopting-ratchets.md) has the steps and the prerequisites table, and `scripts/tools/adopt_ratchets.py` does them. A sensible order: start with the set that is Python only and needs no choices (comment, docs, structure, instruction, doc references, dead code, runtime write), then add static once `ruff` is installed, then conventions and usage track by choosing the rules that match the repository, ux surface once the web app has its surface map, request budget (every rule on, no choices) in any repo, web code or not, windows only in any repo the Mac nightly tests, and port host once the repo has a config resolver to list, then clean tree once it has a disposable start smoke to declare, and install standard in any app that ships `setup.bat`. Run `--init` on each, review the baseline, and burn it down in later changes.
+[adopting-ratchets.md](adopting-ratchets.md) has the steps and the prerequisites table, and `scripts/tools/adopt_ratchets.py` does them. A sensible order: start with the set that is Python only and needs no choices (comment, docs, structure, instruction, doc references, dead code, runtime write), then add static once `ruff` is installed, then conventions and usage track by choosing the rules that match the repository, ux surface once the web app has its surface map, request budget (every rule on, no choices) in any repo, web code or not, windows only in any repo the Mac nightly tests, probe fake in any of those whose code probes processes, ports or listeners, and port host once the repo has a config resolver to list, then clean tree once it has a disposable start smoke to declare, and install standard in any app that ships `setup.bat`. Run `--init` on each, review the baseline, and burn it down in later changes.

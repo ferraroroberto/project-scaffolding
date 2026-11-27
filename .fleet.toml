@@ -720,6 +720,19 @@ why        = "logs the process's thread, handle and memory counts every 5 minute
 enabled = true
 
 # ---------------------------------------------------------------------------
+# Probe fake ratchet. scripts/verify-before-ship.ps1 runs
+# scripts/probe_fake_ratchet.py, which fails when a declared process, port or
+# listener probe module lacks a test that fakes each platform's probe output
+# beyond the committed baseline, or when the branch's diff changes a probe
+# module with no change to a test that imports it (never baselined). A run whose
+# diff touches a probe prints `MAC_NIGHTLY: unverified`. Opt-in per repo through
+# this table; `probes` names the modules. Mechanism + limits:
+# docs/probe-fake-ratchet.md.
+[probe_fake_ratchet]
+enabled = true
+probes  = ["src/installer_migrate.py", "src/resource_probe.py", "src/self_restart.py", "tests/_port_probe.py"]
+
+# ---------------------------------------------------------------------------
 # Port host ratchet. scripts/verify-before-ship.ps1 runs
 # scripts/port_host_ratchet.py, which fails when a script or code file gains a
 # port literal (`127.0.0.1:8445`, `PORT=8501`, `--port 8130`) or a machine-local
@@ -949,6 +962,7 @@ request_budget_ratchet = { src = "scripts/request_budget_ratchet.py", requires =
 # request_budget_ratchet loads this sibling (the JS and Python rule readers); `requires` makes /propagate-vendored carry both.
 request_budget_scan = { src = "scripts/request_budget_scan.py" }
 windows_only_ratchet = { src = "scripts/windows_only_ratchet.py", requires = ["ratchet_baseline"] }
+probe_fake_ratchet = { src = "scripts/probe_fake_ratchet.py", requires = ["ratchet_baseline"] }
 port_host_ratchet = { src = "scripts/port_host_ratchet.py", requires = ["ratchet_baseline"] }
 # Pins the installer modules' content: re-vendor it with installer, installer_migrate, installer_declaration and installer_inplace.
 install_standard_ratchet = { src = "scripts/install_standard_ratchet.py", requires = ["ratchet_baseline"] }
