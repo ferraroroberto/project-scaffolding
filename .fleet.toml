@@ -966,6 +966,9 @@ build_info      = { src = "src/build_info.py" }
 health_routes   = { src = "src/health_routes.py", requires = ["build_info"] }
 # The clone-and-setup installer setup.bat runs as `python -I src\installer.py` (docs/installer.md).
 installer       = { src = "src/installer.py" }
+# setup.bat -MigrateFrom / -InPlace: copy, rebind, install, start, verify the clone serves (docs/installer.md).
+installer_migrate = { src = "src/installer_migrate.py", requires = ["installer"] }
+installer_inplace = { src = "src/installer_inplace.py", requires = ["installer_migrate"] }
 # One shell-neutral tray restart: runs tray.bat by absolute path, fails unless a new process serves HEAD.
 restart_check   = { src = "src/restart_check.py", requires = ["build_info"] }
 # The page-foot restart sheet's server half: declared targets, detached runner, recorded endings.

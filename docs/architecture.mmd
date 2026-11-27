@@ -13,7 +13,8 @@ flowchart TB
     LAUNCHAPP["launch_app.{bat,sh}\nlocal Streamlit run"]
     LAUNCHSRV["launch_server.{bat,sh}\nlocal run + Cloudflare Tunnel"]
     TRAYTMPL["tray.bat.template\ncopy-to-adapt tray launcher\n(--restart: detect/kill/reclaim/start)"]
-    SETUPTMPL["scripts/templates/setup.bat\ncopy-to-adapt installer launcher\n(-WhatIf, -Startup pass through)"]
+    SETUPTMPL["scripts/templates/setup.bat\ncopy-to-adapt installer launcher\n(-WhatIf, -Startup, -MigrateFrom pass through;
+-InPlace runs from a temp copy)"]
   end
 
   subgraph appdir["app/ — Streamlit UI"]
@@ -33,6 +34,9 @@ flowchart TB
   LAUNCHAPP --> APPPY
   LAUNCHSRV --> APPPY
   SETUPTMPL -->|runs python -I src/installer.py| INSTALLER
+  SETUPTMPL -->|-InPlace: temp copy, system python| INPLACE
+  INSTALLER -->|-MigrateFrom| MIGRATE
+  INPLACE -->|uses| MIGRATE
   TRAYTMPL -.->|calls by path, not vendored (#153)| FLEETCFGTRAY["fleet-config: tray/tray_lifecycle.ps1\nONE shared machine-local copy\n(external repo, ~/.claude/tray junction)"]
 
   subgraph srcdir["src/ — non-UI Python (reusable from CLI + tests)"]
@@ -61,6 +65,13 @@ GET /healthz (open, no I/O) + GET /api/version
 identity from build_info, captured once;
 loopback without proxy headers skips authorize"]
     INSTALLER["installer.py (run as a script by setup.bat)\nvendor-verbatim, stdlib: .venv, requirements on hash change,\nconfigs created or topped up (never overwritten), -WhatIf,\nrequired checks first, then required and optional checklists;\nreads [install] in .fleet.toml"]
+    MIGRATE["installer_migrate.py (-MigrateFrom, loaded by installer.py by path)
+vendor-verbatim, stdlib: inventory, -StopOld by PID, declared copy
+(never overwrite), rebind, secret hashes, install, start, verify:
+endpoint serves HEAD and the port owner runs from this clone"]
+    INPLACE["installer_inplace.py (-InPlace)
+vendor-verbatim: stop, rename to <folder>.bak-YYYYMMDD-N,
+clone into the same path, then the clone's -MigrateFrom"]
     RESTARTCHECK["restart_check.py\none shell-neutral tray restart: runs tray.bat by\nabsolute path, exits non-zero unless a new process\nserves HEAD (needs build_info.py)"]
     SELFRESTART["self_restart.py\nGET/POST /api/restart behind the app's own guard\nruns only targets declared in code, runner detached\nvia cmd /c start, every ending recorded\n(server half of _vendored/page-foot/restart-sheet.js)"]
     RESOURCEPROBE["resource_probe.py\nsample_process(pid): threads, handles, RSS\nstart_breadcrumb(logger) logs them on an interval\nvendor-verbatim; unreadable = SampleUnavailable, never 0"]
