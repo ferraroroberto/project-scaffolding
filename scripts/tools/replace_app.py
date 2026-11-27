@@ -10,7 +10,7 @@ the install. Docs: ``docs/installer.md``.
 
 A ``<root>\\<app>.incoming`` that is already there is used as the fresh clone. Otherwise the run clones
 the origin of ``<root>\\<app>``, or of the one sibling copy named after the app's repository when that
-folder is missing; ``-WhatIf`` clones nothing and reads that copy in the clone's place.
+folder is missing or is another app; ``-WhatIf`` clones nothing and reads that copy in the clone's place.
 """
 
 from __future__ import annotations
@@ -42,18 +42,24 @@ def load_inplace() -> ModuleType:
 
 
 def pick_anchor(inplace: ModuleType, folder: Path, runner: Any) -> tuple[Path | None, str]:
-    """The copy whose origin is cloned: ``folder``, else the one sibling named after its repository; or why not."""
+    """The copy whose origin is cloned: ``folder``, else the one sibling named after its repository; or why not.
+
+    ``folder`` is passed over when it is another app: its origin is not named after the app, and it is no copy
+    of any sibling whose origin is.
+    """
+    named = [s for s in inplace.siblings(folder, None)
+             if inplace.repo_name(inplace.m.git(["remote", "get-url", "origin"], s, runner)) == folder.name.casefold()]
+    wrong = "is not a checkout"
     if os.path.lexists(folder / ".git"):
-        return folder, ""
-    named = []
-    for sibling in inplace.siblings(folder, None):
-        origin = inplace.m.git(["remote", "get-url", "origin"], sibling, runner)
-        if inplace.repo_name(origin) == folder.name.casefold():
-            named.append(sibling)
+        here = inplace.read_checkout(folder, runner)
+        if (not named or inplace.repo_name(here.origin) == folder.name.casefold()
+                or any(inplace.same_app(here, inplace.read_checkout(s, runner))[0] for s in named)):
+            return folder, ""
+        wrong = "is another app's checkout"
     if len(named) == 1:
         return named[0], ""
     found = ", ".join(s.name for s in named) or "none"
-    return None, (f"{folder} is not a checkout and the sibling copies whose origin is {folder.name} are: {found}; "
+    return None, (f"{folder} {wrong} and the sibling copies whose origin is {folder.name} are: {found}; "
                   f"clone the app to {folder.name}{inplace.INCOMING_SUFFIX} yourself and run this again")
 
 
