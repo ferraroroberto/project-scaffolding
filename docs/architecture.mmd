@@ -37,6 +37,7 @@ flowchart TB
   SETUPTMPL -->|-Replace, -InPlace: temp copy, system python| INPLACE
   INSTALLER -->|-MigrateFrom| MIGRATE
   INPLACE -->|uses| MIGRATE
+  REPLACEAPP -->|loads by path| INPLACE
   MIGRATE -->|loads| DECLARATION
   TRAYTMPL -.->|calls by path, not vendored (#153)| FLEETCFGTRAY["fleet-config: tray/tray_lifecycle.ps1\nONE shared machine-local copy\n(external repo, ~/.claude/tray junction)"]
 
@@ -74,8 +75,9 @@ endpoint serves HEAD and the port owner runs from this clone"]
 vendor-verbatim, stdlib: parses [install.migrate] and [install.endpoint],
 the port this PC's config sets (port_config)"]
     INPLACE["installer_inplace.py (-Replace, -InPlace)
-vendor-verbatim: stop, rename to <folder>.bak-YYYYMMDD-N,
-move the incoming clone to the path, then its -MigrateFrom"]
+vendor-verbatim: find every copy (root commit, siblings, port holder),
+stop them, rename <app> to <app>.bak-YYYYMMDD-N, move the incoming
+clone to <app>, then its -MigrateFrom the live copy"]
     RESTARTCHECK["restart_check.py\none shell-neutral tray restart: runs tray.bat by\nabsolute path, exits non-zero unless a new process\nserves HEAD (needs build_info.py)"]
     SELFRESTART["self_restart.py\nGET/POST /api/restart behind the app's own guard\nruns only targets declared in code, runner detached\nvia cmd /c start, every ending recorded\n(server half of _vendored/page-foot/restart-sheet.js)"]
     RESOURCEPROBE["resource_probe.py\nsample_process(pid): threads, handles, RSS\nstart_breadcrumb(logger) logs them on an interval\nvendor-verbatim; unreadable = SampleUnavailable, never 0"]
@@ -111,6 +113,9 @@ Recibo / Revisión / Report keep their first letters"]
   DATALOGS["data/\nlogs/app.log, input/, output/\n(gitignored)"]
 
   subgraph scriptsdir["scripts/"]
+    REPLACEAPP["replace_app.py (never vendored)
+runs this scaffold's installer_inplace.py on any app:
+an installer fix reaches every app with a git pull"]
     VERIFY["verify-before-ship.ps1\nbyte-compile -> ruff -> static ratchet\n-> comment ratchet -> docs ratchet -> structure ratchet -> instruction ratchet -> doc refs ratchet -> dead code ratchet -> conventions ratchet -> runtime write ratchet -> usage track ratchet -> ux surface ratchet -> mypy --strict (vendored primitives) -> pytest (non-e2e)\n-> routed e2e (skip/static/full) -> shot baseline -> runtime write probe"]
     CLASSIFY["classify_e2e.py (vendor-verbatim, #180)\ndiff-proportionate e2e routing\nreads .fleet.toml [e2e] rules, fail-safe to full"]
     WEBKITBUDGET["webkit_budget_check.py (vendor-verbatim)\nruns the tests that call measure_request_budget( on WebKit\nas the Mac nightly does; WebKit not installed = not run, never a pass\noptional [webkit_budget] targets"]

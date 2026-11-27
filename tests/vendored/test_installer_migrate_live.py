@@ -230,7 +230,7 @@ def test_migrate_from_beside_a_running_old_copy_fails_verify_then_in_place_passe
     assert done.returncode == 0, done.stdout + outputs[-1]
     report = json.loads(done.stdout)
     assert report["ok"] and report["migration"]["ok"], done.stdout
-    assert {r["item"]: r["state"] for r in _rows(report, "stop")}["old copy"] == "stopped"
+    assert {r["item"]: r["state"] for r in _rows(report, "stop")}["app copies"] == "stopped"
     child = report["migration"]
     assert [row["state"] for row in _rows(child, "verify")] == ["ok", "ok"]
 
