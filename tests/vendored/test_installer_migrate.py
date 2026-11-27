@@ -106,6 +106,15 @@ def _proc(pid: int, folder: Path, ppid: int = 1) -> m.Proc:
     return m.Proc(pid, ppid, str(folder / ".venv" / "Scripts" / "python.exe"), "python -m app")
 
 
+def _junction(link: Path, target: Path) -> Path:
+    """A real directory junction: another spelling of ``target``."""
+    import _winapi  # Windows only, and the Mac nightly still imports this module to collect it
+
+    target.mkdir(parents=True, exist_ok=True)
+    _winapi.CreateJunction(str(target), str(link))
+    return link
+
+
 @pytest.fixture(autouse=True)
 def _fast(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(m.time, "sleep", lambda _s: None)
@@ -158,6 +167,59 @@ def test_paths_match_by_component_so_a_backup_folder_is_never_the_app_folder(tmp
     assert m.mentions(f'"{app}\\.venv\\python.exe" -m x', app)
     assert m.mentions(str(app).replace("\\", "/").upper() + "/tray.bat", app)
     assert not m.mentions(f"{app}.bak-20260101-1\\tray.bat", app)
+
+
+def test_a_process_reached_through_a_junction_runs_from_the_folder(tmp_path: Path) -> None:
+    app = tmp_path / "my app"
+    link, above = _junction(tmp_path / "li nk", app), _junction(tmp_path / "above", tmp_path)
+    sibling = _junction(tmp_path / "other", tmp_path / "my app.bak-1")
+    base_python = r"C:\Python\python.exe"
+    found = m.processes_from(_snap(
+        _proc(1, link),
+        m.Proc(2, 0, base_python, f'"{link}\\.venv\\Scripts\\python.exe" -m app'),
+        m.Proc(3, 0, base_python, "python -X x " + str(above / "my app" / "server.py").replace("\\", "/")),
+        _proc(4, sibling), _proc(5, above / "my app.bak-1"),
+        m.Proc(6, 0, base_python, f'python "{sibling}\\server.py" http://localhost/x'),
+    ), app, set())
+    assert [p.pid for p in found] == [1, 2, 3]
+
+
+def test_a_venv_that_is_a_junction_to_elsewhere_still_belongs_to_its_app(tmp_path: Path) -> None:
+    app = tmp_path / "app"
+    app.mkdir()
+    link = _junction(tmp_path / "link", app)
+    _junction(app / ".venv", tmp_path / "shared-venv")
+    for spelled in (app, link):
+        assert m.inside(str(spelled / ".venv" / "Scripts" / "python.exe"), app)
+        assert m.mentions(f'"{spelled}\\.venv\\Scripts\\python.exe" -m app', app)
+    assert not m.inside(str(tmp_path / "shared-venv" / "Scripts" / "python.exe"), app)
+
+
+def test_a_value_or_text_spelled_through_a_junction_is_rebound_and_reported(tmp_path: Path) -> None:
+    old, new = tmp_path / "old", tmp_path / "new"
+    link = _junction(tmp_path / "link", old)
+    data_link = _junction(tmp_path / "datalink", old / "data")
+    data = {"a": str(link / "d"), "b": str(link).replace("\\", "/"), "c": str(data_link) + "\\x.db",
+            "d": str(link) + ".bak-1\\y"}
+    assert m.rebind_values(data, old, new) == ["a", "b", "c"]
+    assert data["a"] == str(new / "d") and data["b"] == str(new).replace("\\", "/")
+    assert data["c"] == str(new / "data" / "x.db") and data["d"] == str(link) + ".bak-1\\y"
+    assert m.mentions(f'@echo off\r\nstart "" "{link}\\tray.bat"\r\n', old)
+    # A shortcut's target, arguments and folder arrive unquoted on one line: the later path counts too.
+    assert m.mentions(f"C:\\Windows\\System32\\cmd.exe /c {link}\\tray.bat C:\\Windows", old)
+
+
+def test_a_config_holding_only_backslash_paths_is_rebound(tmp_path: Path) -> None:
+    old, new = tmp_path / "old", tmp_path / "new"
+    new.mkdir()
+    old.mkdir()
+    # JSON doubles each backslash, so the raw text never holds the folder as spelled.
+    (new / "config.json").write_text(json.dumps({"data_dir": str(old / "data")}), encoding="utf-8")
+    shutil.copy(new / "config.json", old / "config.json")
+    report = m.MigrationReport(mode="migrate", what_if=False)
+    m.rebind_copied(old, new, ["config.json"], report)
+    assert _states(report, "rebind") == {"config.json": "rebound"}
+    assert json.loads((new / "config.json").read_text(encoding="utf-8")) == {"data_dir": str(new / "data")}
 
 
 def test_rebind_rewrites_leading_old_paths_in_their_own_slash_style(tmp_path: Path) -> None:
@@ -330,10 +392,12 @@ def test_installer_rejects_migration_flags_without_migrate_from(tmp_path: Path) 
 
 # ---------------------------------------------------------------- stopping
 
-def test_stop_refuses_when_this_run_was_started_from_the_old_copy(tmp_path: Path) -> None:
+@pytest.mark.parametrize("spelling", ["old", "junction"])
+def test_stop_refuses_when_this_run_was_started_from_the_old_copy(tmp_path: Path, spelling: str) -> None:
     old = tmp_path / "old"
+    host = old if spelling == "old" else _junction(tmp_path / spelling, old)
     me = os.getpid()
-    snap = m.Snapshot({me: m.Proc(me, 50, r"C:\Python\python.exe", "python x"), 50: _proc(50, old)}, {})
+    snap = m.Snapshot({me: m.Proc(me, 50, r"C:\Python\python.exe", "python x"), 50: _proc(50, host)}, {})
     report = m.MigrationReport(mode="migrate", what_if=False)
     calls: list[Any] = []
     m.stop_old(old, 8453, report, lambda c, **k: calls.append(c), lambda: snap)
