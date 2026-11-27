@@ -8,6 +8,7 @@ Every app in the toolbox moves to another Windows PC the same way: `git clone`, 
 | --- | --- | --- | --- |
 | The installer | `src/installer.py` | `src/installer.py` | vendored verbatim, manifest key `installer` |
 | Migration | `src/installer_migrate.py` | `src/installer_migrate.py` | vendored verbatim, manifest key `installer_migrate` |
+| Its declaration | `src/installer_declaration.py` | `src/installer_declaration.py` | vendored verbatim, manifest key `installer_declaration`; `installer_migrate.py` loads it by path |
 | In-place replace | `src/installer_inplace.py` | `src/installer_inplace.py` | vendored verbatim, manifest key `installer_inplace` |
 | The launcher | `scripts/templates/setup.bat` | `setup.bat` | copied once, renamed; it needs no edit |
 | The playbook | `docs/templates/install-playbook.md` | `docs/install.md` | copied once, placeholders filled per app; its Install, Update and Migrate sections are checked by the [install standard ratchet](install-standard-ratchet.md) |
@@ -116,9 +117,11 @@ Two entries move a PC's existing install onto a fresh clone. Both read the same 
 ```toml
 # Where the app answers {git_sha, built_at}. Always asked on 127.0.0.1; port falls back to the top-level `port`.
 [install.endpoint]
-scheme       = "http"             # or "https"
+scheme       = "http"             # or "https"; asked first, the other scheme second
 version_path = "/api/version"
 self_signed  = false              # true accepts any certificate, safe only because the host is loopback
+port_config  = "config.json"      # optional: the JSON config where this PC sets the port it serves on
+port_key     = "port"             # the default; a dotted key ("webapp.port") reaches a nested one
 
 [install.migrate]
 copy    = ["config.json", ".env", "webapp/certificates"]   # this PC's own files and folders, repo-relative
@@ -129,18 +132,22 @@ start   = ["tray.bat", "--restart"]                         # the default
 
 A malformed table fails the run before anything is written, naming the key. An app with no `[install.endpoint]` can still copy, but its verify is `unknown`, so the run fails.
 
+**Which port and scheme verify asks.** The declaration holds the app's defaults; a PC can serve elsewhere. With `port_config`, the port is read from that file under `port_key`, in the clone after the copy (the old copy's file for the `-StopOld` wait and under `-WhatIf`). A file that is not there, or that sets no such key, means the app runs on its default, so the declared port is used. A file that does not parse, or a value that is not a TCP port, is `unknown` and fails the run: the real port cannot be told. The declared scheme is asked first and the other one second, so a PC that serves plain HTTP where the declaration says HTTPS (or the reverse) still verifies; the second HTTPS attempt accepts any certificate, because the host is always 127.0.0.1. The verify row names the URL that answered and where its port came from.
+
 ### `setup.bat -MigrateFrom <old folder>`
 
 Run in a fresh clone beside the old copy. `-StopOld` first stops the old copy; `-WhatIf` and `-Json` apply as usual.
 
+**On the same PC, pass `-StopOld`.** Two copies of one app cannot both run there: the tray's single-instance lock is named per app, not per folder, so the second tray exits while the first runs, and both copies bind the same port. A lock named per folder would not help, since the port still collides. Without `-StopOld` the copy runs, but the old copy keeps the port and verify fails, naming it as the port's owner. `-InPlace` always stops the old copy first.
+
 1. **Guards.** The folder must be the root of a clean git checkout (no changed or untracked files), and the old folder another folder, not inside or around it. Anything else is `refused` and nothing is written. A rerun is allowed: files a previous run copied are ignored, so the checkout is still clean.
 2. **Inventory, read only.** The old folder, its git remote, the processes that run from it with their listening ports, and the Startup links and files, `HKCU` Run values and scheduled tasks whose command names it.
 3. **Stop (`-StopOld` only).** Every process that runs from the old folder is stopped by PID with its tree, never by name, repeating while a watchdog respawns one. Then the run waits for the declared port to be free, naming any PID that still holds it. When this run was itself started from one of those processes (the program lives in the folder), the stop is `refused`, because it would end the run: migrate a launcher from a plain terminal, never from a session it hosts.
-4. **Copy.** Each declared file, or each file in a declared folder, is `copied` only when it is not here yet; one that is here is `kept` and never overwritten. SQLite `-wal`, `-shm` and `-journal` files are never copied, and a database (`.sqlite`, `.sqlite3`, `.db`) is held back while the old copy runs. `shared` folders stay where they are and are reported.
+4. **Copy.** Each declared file, or each file in a declared folder, is `copied` only when it is not here yet; one that is here is `kept` and never overwritten. SQLite `-wal`, `-shm` and `-journal` files are never copied, and a database (`.sqlite`, `.sqlite3`, `.db`) is held back while the old copy runs. `shared` folders stay where they are and are reported. Under `-WhatIf` each file a declared folder would copy gets its own `would copy` row, by name.
 5. **Rebind.** In each copied JSON file, a string value that starts with the old folder (either slash style, any case, by path component) is rewritten to the clone's folder; the key names are printed. A copied file of another kind that still names the old folder is listed for a hand edit.
 6. **Secrets.** Each declared secret here against the old one: `same`, `differs` or `missing`, by hash.
 7. **Install.** The normal run above, so copied settings files are topped up the usual way.
-8. **Start and verify.** The start command runs (its output goes to `.venv/migrate-start.log`, so an app it leaves running holds no pipe of this run). Verify passes only when the endpoint serves this clone's `HEAD` and every process listening on the port runs from this clone, found by walking up from the listener to the nearest process whose program or python command line is in either folder. An old copy that still serves the port fails it, even on the same commit.
+8. **Start and verify.** The start command runs (its output goes to `.venv/migrate-start.log`, so an app it leaves running holds no pipe of this run). Verify passes only when the endpoint ([port and scheme](#migrating-an-existing-install)) serves this clone's `HEAD` and every process listening on the port runs from this clone, found by walking up from the listener to the nearest process whose program or python command line is in either folder. An old copy that still serves the port fails it, even on the same commit.
 9. **Leftovers.** What still runs from or points at the old folder is listed after verify, without failing it.
 
 Each row is named, never valued. The exit code is 0 only when every step ran and verify passed; a fact a probe could not establish is `unknown` and fails the run.
@@ -154,7 +161,7 @@ Replaces the install at the same path, so whatever stores that path (a launcher'
 3. `git clone` the folder's `origin` into the original path (the remote's default branch);
 4. run the new clone's `setup.bat -MigrateFrom <backup>`.
 
-The backup is kept as the fallback; nothing deletes it. Windows refuses to rename a folder that a process runs from or has as its current folder, so `setup.bat` copies `installer_migrate.py` and `installer_inplace.py` to a temporary folder and runs them there with the system python, its current folder outside the tree. Run it from a terminal whose current folder is outside the app (`cd ..` first); a rename that still fails stops the run with nothing changed. A clone that fails renames the backup back when the path is still free. `-WhatIf` prints the inventory, what it would stop, the backup name, the clone and the migration, and changes nothing.
+The backup is kept as the fallback; nothing deletes it. Windows refuses to rename a folder that a process runs from or has as its current folder, so `setup.bat` copies `installer_migrate.py`, `installer_declaration.py` and `installer_inplace.py` to a temporary folder and runs them there with the system python, its current folder outside the tree. Run it from a terminal whose current folder is outside the app (`cd ..` first); a rename that still fails stops the run with nothing changed. The temporary folder (`%TEMP%\setup-inplace-*`) is removed when the run ends, whether it passed or failed. A clone that fails renames the backup back when the path is still free. `-WhatIf` prints the inventory, what it would stop, every file the migration would copy (by name, from the folder's own `[install.migrate]`; the real run uses the fresh clone's, normally the same), the backup name, the clone and the migration, and changes nothing.
 
 Migrating a launcher (app-launcher, app-launcher-lite) stops it and every session it hosts, so run it from a plain terminal: the stop refuses when it would end its own run.
 
@@ -162,8 +169,8 @@ Migrating a launcher (app-launcher, app-launcher-lite) stops it and every sessio
 
 ## Adopting it
 
-1. Vendor `src/installer.py`, `src/installer_migrate.py` and `src/installer_inplace.py` and list them under `[vendored]` in the app's `.fleet.toml`. An older entry script that ran the installer is deleted: `setup.bat` runs the module directly.
-2. Copy `scripts/templates/setup.bat` to `setup.bat` at the repo root. An app that already has a `setup.bat` with extra steps (another installer it offers, a closing banner) keeps them after the `src\installer.py` line.
+1. Vendor `src/installer.py`, `src/installer_migrate.py`, `src/installer_declaration.py` and `src/installer_inplace.py` and list them under `[vendored]` in the app's `.fleet.toml`. An older entry script that ran the installer is deleted: `setup.bat` runs the module directly.
+2. Copy `scripts/templates/setup.bat` to `setup.bat` at the repo root. An app that already has a `setup.bat` with extra steps (another installer it offers, a closing banner) keeps them after the `src\installer.py` line, skipped when the arguments include `-Json`: anything printed after the report breaks the JSON document a caller parses, and `-InPlace` reads the child's `-MigrateFrom -Json` output that way.
 3. Declare the `[install]` table, giving each check its `level` and each optional one its `blocks`. Keep every config's sample tracked and its target gitignored, and add `*.json.bak-*` to `.gitignore`: a rule written for the config (`config/*.json`, or the file's own name) does not match `config.json.bak-<stamp>`, and without the line every top-up is refused. A check or autostart that lives in the app's own code gets a small command-line entry that exits 0, 1 or another code, as above.
 4. Declare `[install.endpoint]` and `[install.migrate]`: the app's own configs, state and certificates to copy, the secrets among them, and its runtime-data folders as `shared`.
 5. Copy `docs/templates/install-playbook.md` to `docs/install.md`, fill each placeholder and delete the lines that do not apply, keeping its Install, Update and Migrate sections. It never deletes the old copy, which is retired only after the owner confirms.

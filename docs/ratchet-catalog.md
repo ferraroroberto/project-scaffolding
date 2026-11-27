@@ -1445,17 +1445,18 @@ playbook = "docs/install.md"   # the default
 
 #### `installer-vendored`
 
-An installer module (`src/installer.py`, `src/installer_migrate.py`, `src/installer_inplace.py`) that is missing, not declared under its manifest key in `[vendored]`, or not the scaffold's current content (CRLF read as LF). The script carries each module's hash, so a re-vendor of the ratchet without the installer goes red.
+An installer module (`src/installer.py`, `src/installer_migrate.py`, `src/installer_declaration.py`, `src/installer_inplace.py`) that is missing, not declared under its manifest key in `[vendored]`, or not the scaffold's current content (CRLF read as LF). The script carries each module's hash, so a re-vendor of the ratchet without the installer goes red.
 
 ```toml
 # bad: the module is there but not declared, so /propagate-vendored never refreshes it
 [vendored]
 installer = { src = "src/installer.py", sha = "<scaffold sha>", dest = "src/installer.py" }
 
-# fixed: all three declared and re-vendored together
+# fixed: all four declared and re-vendored together
 [vendored]
 installer         = { src = "src/installer.py", sha = "<scaffold sha>", dest = "src/installer.py" }
 installer_migrate = { src = "src/installer_migrate.py", sha = "<scaffold sha>", dest = "src/installer_migrate.py" }
+installer_declaration = { src = "src/installer_declaration.py", sha = "<scaffold sha>", dest = "src/installer_declaration.py" }
 installer_inplace = { src = "src/installer_inplace.py", sha = "<scaffold sha>", dest = "src/installer_inplace.py" }
 ```
 

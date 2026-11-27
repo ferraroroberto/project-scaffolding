@@ -239,6 +239,70 @@ def test_what_if_changes_nothing(tmp_path: Path) -> None:
     assert _states(report, "start") == {"start.bat": "would run"}
 
 
+def test_what_if_names_every_file_a_folder_would_copy(tmp_path: Path) -> None:
+    root, old = _clone(tmp_path), _old(tmp_path)
+    report = _migrate(root, old, _snap(), what_if=True, stop=True)
+    would = {item for state, item, _ in report.rows["copy"] if state == "would copy"}
+    assert would == {"config.json", ".env", "data/state.db", "data/logs/a.log"}
+    assert CANARY not in report.render()
+
+
+# ---------------------------------------------------------------- the port and scheme verify asks
+
+PORT_TOML = TOML.replace('[install.endpoint]\n', '[install.endpoint]\nscheme = "https"\n'
+                         'port_config = "config.json"\nport_key = "web.port"\n')
+
+
+@pytest.mark.parametrize(("content", "expected"), [
+    (None, (8453, "declared; config.json is not here")),
+    ({"web": {}}, (8453, "declared; config.json sets no web.port")),
+    ({"web": {"port": 9001}}, (9001, "config.json web.port")),
+    ({"web": {"port": "x"}}, (None, "config.json web.port is not a TCP port")),
+    ("{not json", (None, "config.json cannot be read or does not parse")),
+])
+def test_the_local_config_sets_the_port_and_the_declaration_is_the_fallback(
+        tmp_path: Path, content: Any, expected: tuple[int | None, str]) -> None:
+    endpoint = m.parse_migration({"port": ":8453", "install": {"endpoint": {"port_config": "config.json",
+                                  "port_key": "web.port"}, "migrate": {}}}).endpoint
+    assert endpoint is not None
+    if content is not None:
+        (tmp_path / "config.json").write_text(content if isinstance(content, str) else json.dumps(content),
+                                              encoding="utf-8")
+    assert m.local_port(tmp_path, endpoint) == expected
+
+
+@pytest.mark.parametrize("endpoint", [{"port_config": "../x.json"}, {"port_config": 3}, {"port_key": "a..b"}])
+def test_a_malformed_port_config_names_the_key(endpoint: dict[str, Any]) -> None:
+    with pytest.raises(ValueError, match="port_"):
+        m.parse_migration({"port": ":8453", "install": {"endpoint": endpoint, "migrate": {}}})
+
+
+def test_verify_asks_the_configured_port_on_the_scheme_that_answers(tmp_path: Path) -> None:
+    root, old = _clone(tmp_path, PORT_TOML), _old(tmp_path)
+    config = json.loads((old / "config.json").read_text(encoding="utf-8"))
+    (old / "config.json").write_text(json.dumps({**config, "web": {"port": 9001}}), encoding="utf-8")
+    head = _git(root, "rev-parse", "HEAD")
+    asked: list[str] = []
+
+    def fetch(endpoint: m.Endpoint) -> dict[str, Any] | None:
+        asked.append(m._url(endpoint))
+        return {"git_sha": head} if endpoint.scheme == "http" else None
+
+    (root / ".venv").mkdir()
+    report = m.migrate(root, old, installer=StubInstaller(), what_if=False, stop=False, runner=_runner,
+                       snapshot_fn=lambda: _snap(_proc(100, root), port=9001, listener=100), fetch=fetch)
+    assert not report.failed, report.render()
+    assert asked[:2] == ["https://127.0.0.1:9001/api/version", "http://127.0.0.1:9001/api/version"]
+    assert _states(report, "verify") == {"http://127.0.0.1:9001/api/version": "ok", "port 9001 owner": "ok"}
+
+
+def test_verify_is_unknown_when_the_local_config_cannot_tell_the_port(tmp_path: Path) -> None:
+    root, old = _clone(tmp_path, PORT_TOML), _old(tmp_path)
+    (old / "config.json").write_text("{not json", encoding="utf-8")
+    report = _migrate(root, old, _snap(_proc(100, root), port=8453, listener=100))
+    assert report.failed and _states(report, "verify") == {"endpoint port": "unknown"}
+
+
 @pytest.mark.parametrize("case", ["dirty", "nested", "missing"])
 def test_guard_refuses_before_anything_is_copied(tmp_path: Path, case: str) -> None:
     root, old = _clone(tmp_path), _old(tmp_path)
@@ -321,6 +385,25 @@ def test_in_place_what_if_names_the_backup_and_touches_nothing(tmp_path: Path, m
     assert rows["app"] == ("would rename", "to app.bak-20261127-1, kept as a working checkout")
     assert rows[str(origin)][0] == "would clone"
     assert sorted(p.name for p in tmp_path.iterdir()) == ["app", "o"]
+
+
+def test_in_place_what_if_names_every_file_it_would_copy(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(installer_inplace.m.time, "sleep", lambda _s: None)
+    origin = _clone(tmp_path / "o")
+    folder = tmp_path / "app"
+    _git(tmp_path, "clone", "-q", str(origin), str(folder))
+    shutil.copytree(_old(tmp_path / "src"), folder, dirs_exist_ok=True)
+    cwd = os.getcwd()
+    try:
+        report = installer_inplace.in_place(folder, what_if=True, as_json=False, runner=_runner,
+                                            snapshot_fn=lambda: installer_inplace.m.Snapshot({}, {}))
+    finally:
+        os.chdir(cwd)
+    assert not report.failed, report.render()
+    would = {item for state, item, _ in report.rows["copy"] if state == "would copy"}
+    assert would == {"config.json", ".env", "data/state.db", "data/logs/a.log"}
+    assert "data/state.db-wal" not in {item for _, item, _ in report.rows["copy"]}
+    assert CANARY not in report.render() and (folder / "config.json").is_file()
 
 
 def test_in_place_refuses_a_folder_without_an_origin(tmp_path: Path) -> None:
