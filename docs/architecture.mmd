@@ -37,6 +37,7 @@ flowchart TB
   SETUPTMPL -->|-InPlace: temp copy, system python| INPLACE
   INSTALLER -->|-MigrateFrom| MIGRATE
   INPLACE -->|uses| MIGRATE
+  MIGRATE -->|loads| DECLARATION
   TRAYTMPL -.->|calls by path, not vendored (#153)| FLEETCFGTRAY["fleet-config: tray/tray_lifecycle.ps1\nONE shared machine-local copy\n(external repo, ~/.claude/tray junction)"]
 
   subgraph srcdir["src/ — non-UI Python (reusable from CLI + tests)"]
@@ -69,6 +70,9 @@ loopback without proxy headers skips authorize"]
 vendor-verbatim, stdlib: inventory, -StopOld by PID, declared copy
 (never overwrite), rebind, secret hashes, install, start, verify:
 endpoint serves HEAD and the port owner runs from this clone"]
+    DECLARATION["installer_declaration.py (loaded by installer_migrate.py by path)
+vendor-verbatim, stdlib: parses [install.migrate] and [install.endpoint],
+the port this PC's config sets (port_config)"]
     INPLACE["installer_inplace.py (-InPlace)
 vendor-verbatim: stop, rename to <folder>.bak-YYYYMMDD-N,
 clone into the same path, then the clone's -MigrateFrom"]

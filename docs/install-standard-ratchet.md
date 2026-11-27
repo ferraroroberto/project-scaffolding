@@ -10,17 +10,17 @@ It has the shape of the other ratchets ([adopting-ratchets.md](adopting-ratchets
 
 ### `installer-vendored`
 
-One hit per installer module (`src/installer.py`, `src/installer_migrate.py`, `src/installer_inplace.py`) that is:
+One hit per installer module (`src/installer.py`, `src/installer_migrate.py`, `src/installer_declaration.py`, `src/installer_inplace.py`) that is:
 
 - missing;
-- not declared under its manifest key (`installer`, `installer_migrate`, `installer_inplace`) in `[vendored]` (in this scaffold, which publishes them, `[components]`);
+- not declared under its manifest key (`installer`, `installer_migrate`, `installer_declaration`, `installer_inplace`) in `[vendored]` (in this scaffold, which publishes them, `[components]`);
 - not the scaffold's current content. The script carries the sha256 of each module as released with it, with CRLF read as LF so a Windows `autocrlf` checkout matches. The scaffold's own test fails until those values match its modules, so every installer change updates the ratchet in the same PR, and a re-vendor carries both together: an adopter that takes the new ratchet without the new installer goes red.
 
-Fix: re-vendor the module byte for byte from project-scaffolding and record its `sha` under `[vendored]` (`/propagate-vendored installer_inplace` carries all three, through `requires`).
+Fix: re-vendor the module byte for byte from project-scaffolding and record its `sha` under `[vendored]` (`/propagate-vendored installer_inplace` carries all four, through `requires`).
 
 ### `migrate-table`
 
-`[install.migrate]` (with `[install.endpoint]`) is absent or does not parse. It is parsed by the repo's own `src/installer_migrate.py`, the code `setup.bat -MigrateFrom` runs, so the ratchet and the installer never disagree on what is valid; the hit prints the installer's own message, naming the key. With that module missing the table cannot be parsed, which is a hit, not a pass. Fix: declare the tables ([installer.md](installer.md#migrating-an-existing-install)).
+`[install.migrate]` (with `[install.endpoint]`) is absent or does not parse. It is parsed by the repo's own `src/installer_migrate.py`, the code `setup.bat -MigrateFrom` runs, so the ratchet and the installer never disagree on what is valid; the hit prints the installer's own message, naming the key. With that module, or the `src/installer_declaration.py` it loads, missing the table cannot be parsed, which is a hit, not a pass. Fix: declare the tables ([installer.md](installer.md#migrating-an-existing-install)).
 
 ### `playbook-sections`
 

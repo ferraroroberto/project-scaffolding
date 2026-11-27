@@ -6,8 +6,12 @@ origin, an "installed" clone that runs a tiny version server from its own
 
 * `-MigrateFrom` beside a running old copy fails verify, naming the old copy as
   the port's owner, even though both copies serve the same commit;
+* `-InPlace -WhatIf` names every file the migration would copy, and changes nothing;
 * `-InPlace` stops the old copy, renames it to `<folder>.bak-YYYYMMDD-1`, clones
   into the same path, migrates and verifies; the backup keeps the old state;
+* verify finds the port in the app's own config and the scheme it really serves,
+  where the declaration names another port and https;
+* no run leaves its `setup-inplace-*` folder in `%TEMP%`;
 * no output contains a config or secret value.
 
 Every process started under `tmp_path` is stopped at the end, by PID.
@@ -17,6 +21,7 @@ from __future__ import annotations
 
 import datetime
 import json
+import os
 import shutil
 import socket
 import subprocess
@@ -54,7 +59,8 @@ class Server(http.server.HTTPServer):
 Server(("127.0.0.1", port), Handler).serve_forever()
 '''
 
-TOML = '''port = ":{port}"
+# The declaration names a spare port and https; the app serves plain http on the port its config.json sets.
+TOML = '''port = ":{declared}"
 
 [install]
 samples  = []
@@ -65,6 +71,8 @@ sample = "config.sample.json"
 target = "config.json"
 
 [install.endpoint]
+scheme      = "https"
+port_config = "config.json"
 
 [install.migrate]
 copy    = ["config.json", "data", "secret.key"]
@@ -85,11 +93,11 @@ def _free_port() -> int:
         return int(sock.getsockname()[1])
 
 
-def _seed(tmp_path: Path, port: int) -> Path:
+def _seed(tmp_path: Path, declared: int) -> Path:
     """A bare origin holding a minimal app that vendors the three installer modules."""
     seed, origin = tmp_path / "seed", tmp_path / "origin.git"
     (seed / "src").mkdir(parents=True)
-    for name in ("installer.py", "installer_migrate.py", "installer_inplace.py"):
+    for name in ("installer.py", "installer_migrate.py", "installer_declaration.py", "installer_inplace.py"):
         shutil.copyfile(REPO_ROOT / "src" / name, seed / "src" / name)
     shutil.copyfile(REPO_ROOT / "scripts" / "templates" / "setup.bat", seed / "setup.bat")
     (seed / "server.py").write_text(SERVER, encoding="utf-8")
@@ -97,7 +105,7 @@ def _seed(tmp_path: Path, port: int) -> Path:
                                     '"%~dp0server.py"\r\n', encoding="ascii")
     (seed / "requirements.txt").write_text("", encoding="utf-8")
     (seed / "config.sample.json").write_text(json.dumps({"port": 0, "token": "", "data_dir": ""}), encoding="utf-8")
-    (seed / ".fleet.toml").write_text(TOML.format(port=port), encoding="utf-8")
+    (seed / ".fleet.toml").write_text(TOML.format(declared=declared), encoding="utf-8")
     (seed / ".gitignore").write_text(".venv/\nconfig.json\n*.json.bak-*\ndata/\nsecret.key\n__pycache__/\n",
                                      encoding="utf-8")
     _git(tmp_path, "init", "-q", "--bare", "--initial-branch=main", str(origin))
@@ -110,9 +118,17 @@ def _seed(tmp_path: Path, port: int) -> Path:
     return origin
 
 
+def _temp(cwd: Path) -> Path:
+    """The `%TEMP%` every setup.bat run of the pair gets, so what a run leaves there can be seen."""
+    return cwd / "temp"
+
+
 def _cmd(bat: Path, args: str, cwd: Path, log: Path) -> subprocess.CompletedProcess[str]:
+    temp = _temp(cwd)
+    temp.mkdir(exist_ok=True)
+    env = {**os.environ, "TEMP": str(temp), "TMP": str(temp)}
     with open(log, "w", encoding="utf-8") as err:
-        return subprocess.run(f'cmd.exe /d /s /c ""{bat}" {args}"', cwd=cwd, stdin=subprocess.DEVNULL,
+        return subprocess.run(f'cmd.exe /d /s /c ""{bat}" {args}"', cwd=cwd, stdin=subprocess.DEVNULL, env=env,
                               stdout=subprocess.PIPE, stderr=err, text=True, encoding="utf-8", errors="replace",
                               timeout=RUN_TIMEOUT_S, check=False, creationflags=NO_WINDOW)
 
@@ -148,8 +164,9 @@ def _install_old(tmp_path: Path, origin: Path, port: int) -> Path:
 
 @pytest.fixture
 def pair(tmp_path: Path) -> Iterator[tuple[Path, Path, int]]:
-    port = _free_port()
-    origin = _seed(tmp_path, port)
+    port, declared = _free_port(), _free_port()
+    assert port != declared
+    origin = _seed(tmp_path, declared)
     try:
         yield tmp_path, origin, port
     finally:
@@ -181,6 +198,15 @@ def test_migrate_from_beside_a_running_old_copy_fails_verify_then_in_place_passe
     assert {r["item"]: r["state"] for r in _rows(report, "copy")}["config.json"] == "copied"
     assert not (new / "data" / "state.db").exists(), "a database was copied while the old copy ran"
 
+    # In place, what-if: every file the migration would copy, by name; nothing changes.
+    preview = _cmd(app / "setup.bat", "-InPlace -WhatIf -Json", tmp_path, tmp_path / "whatif.err")
+    outputs += [preview.stdout, (tmp_path / "whatif.err").read_text(encoding="utf-8", errors="replace")]
+    assert preview.returncode == 0, preview.stdout + outputs[-1]
+    would = {r["item"] for r in _rows(json.loads(preview.stdout), "copy") if r["state"] == "would copy"}
+    assert {"config.json", "secret.key", "data/state.db"} <= would, preview.stdout
+    assert "data/state.db-wal" not in would
+    assert _serving(port) is not None and not any(tmp_path.glob("app.bak-*"))
+
     # In place: stop, rename to the backup, clone into the same path, migrate from the backup, verify.
     backup = tmp_path / f"app.bak-{datetime.date.today():%Y%m%d}-1"
     done = _cmd(app / "setup.bat", "-InPlace -Json", tmp_path, tmp_path / "inplace.err")
@@ -202,3 +228,4 @@ def test_migrate_from_beside_a_running_old_copy_fails_verify_then_in_place_passe
     assert snap is not None
     assert all(m.owner_of(snap, pid, app, backup)[0] == "clone" for pid in snap.listeners[port])
     assert not any(CANARY in text for text in outputs)
+    assert not list(_temp(tmp_path).glob("setup-inplace-*")), "a run left its stage folder in %TEMP%"

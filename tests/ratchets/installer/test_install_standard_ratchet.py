@@ -36,6 +36,7 @@ secrets = [".env"]
 [vendored]
 installer         = { src = "src/installer.py" }
 installer_migrate = { src = "src/installer_migrate.py" }
+installer_declaration = { src = "src/installer_declaration.py" }
 installer_inplace = { src = "src/installer_inplace.py" }
 """
 
@@ -93,6 +94,13 @@ def test_a_missing_undeclared_and_stale_module_are_each_a_hit(repo: Path) -> Non
     assert "missing" in found["installer-vendored: src/installer_inplace.py"]
     assert "not declared" in found["installer-vendored: src/installer_migrate.py"]
     assert "differs" in found["installer-vendored: src/installer.py"]
+
+
+def test_a_missing_declaration_module_is_a_hit_on_both_rules(repo: Path) -> None:
+    (repo / "src/installer_declaration.py").unlink()
+    found = hits(repo)
+    assert "missing" in found["installer-vendored: src/installer_declaration.py"]
+    assert found["migrate-table"] == "src/installer_declaration.py is missing, so [install.migrate] cannot be parsed"
 
 
 def test_a_missing_migration_table_is_a_hit(repo: Path) -> None:
