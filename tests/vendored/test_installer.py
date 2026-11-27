@@ -20,7 +20,7 @@ from typing import Any
 
 import pytest
 
-from src import installer
+from src import installer, installer_declaration
 from src.no_window import NO_WINDOW
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -490,3 +490,12 @@ def test_bom_prefixed_declaration_and_configs_install_the_same(tmp_path: Path) -
                 json.loads(target.read_text(encoding="utf-8")))
 
     assert outcome(tmp_path / "bom", True) == outcome(tmp_path / "plain", False)
+
+
+def test_a_bom_prefixed_port_config_and_migration_declaration_read_the_same(tmp_path: Path) -> None:
+    (tmp_path / "config.json").write_bytes(codecs.BOM_UTF8 + json.dumps({"web": {"port": 9001}}).encode("utf-8"))
+    (tmp_path / ".fleet.toml").write_bytes(codecs.BOM_UTF8 + b'port = ":8453"\n[install.migrate]\n')
+    endpoint = installer_declaration.parse_endpoint({"port_config": "config.json", "port_key": "web.port"}, ":8453")
+    assert endpoint is not None
+    assert installer_declaration.local_port(tmp_path, endpoint) == (9001, "config.json web.port")
+    assert installer_declaration.read_fleet_toml(tmp_path) == {"port": ":8453", "install": {"migrate": {}}}

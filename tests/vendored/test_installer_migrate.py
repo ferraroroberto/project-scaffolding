@@ -20,7 +20,7 @@ from typing import Any
 
 import pytest
 
-from src import installer, installer_declaration, installer_inplace
+from src import installer, installer_inplace
 from src import installer_migrate as m
 from src.no_window import NO_WINDOW
 
@@ -333,16 +333,6 @@ def test_the_local_config_sets_the_port_and_the_declaration_is_the_fallback(
         (tmp_path / "config.json").write_text(content if isinstance(content, str) else json.dumps(content),
                                               encoding="utf-8")
     assert m.local_port(tmp_path, endpoint) == expected
-
-
-def test_a_bom_prefixed_declaration_and_port_config_read_the_same(tmp_path: Path) -> None:
-    (tmp_path / "config.json").write_bytes(codecs.BOM_UTF8 + json.dumps({"web": {"port": 9001}}).encode("utf-8"))
-    (tmp_path / ".fleet.toml").write_bytes(codecs.BOM_UTF8 + b'port = ":8453"\n[install.migrate]\n')
-    endpoint = m.parse_migration({"port": ":8453", "install": {"endpoint": {"port_config": "config.json",
-                                  "port_key": "web.port"}, "migrate": {}}}).endpoint
-    assert endpoint is not None
-    assert m.local_port(tmp_path, endpoint) == (9001, "config.json web.port")
-    assert installer_declaration.read_fleet_toml(tmp_path) == {"port": ":8453", "install": {"migrate": {}}}
 
 
 @pytest.mark.parametrize("endpoint", [{"port_config": "../x.json"}, {"port_config": 3}, {"port_key": "a..b"}])
