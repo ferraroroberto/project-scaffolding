@@ -134,6 +134,12 @@ A malformed table fails the run before anything is written, naming the key. An a
 
 **Which port and scheme verify asks.** The declaration holds the app's defaults; a PC can serve elsewhere. With `port_config`, the port is read from that file under `port_key`, in the clone after the copy (the old copy's file for the `-StopOld` wait and under `-WhatIf`). A file that is not there, or that sets no such key, means the app runs on its default, so the declared port is used. A file that does not parse, or a value that is not a TCP port, is `unknown` and fails the run: the real port cannot be told. The declared scheme is asked first and the other one second, so a PC that serves plain HTTP where the declaration says HTTPS (or the reverse) still verifies; the second HTTPS attempt accepts any certificate, because the host is always 127.0.0.1. The verify row names the URL that answered and where its port came from.
 
+### Which paths belong to a folder
+
+A folder can be reached by more than one spelling: a directory junction, a symlink, a mapped or `subst` drive, and a copy started through one of them carries that spelling in its program path, command line, configs and Startup entries. Every folder comparison therefore matches a path that is spelled as the folder **or leads to it**: the process list the stop and verify work from, the refusal of a run started from the app, the autostart inventory and leftovers, and rebind. A sibling that only shares a prefix (`app.bak-1` beside `app`) never matches.
+
+A `.venv` that is itself a junction to somewhere else still belongs to the app it sits in. The reverse also holds: a process whose program reaches into the folder through another checkout's junction (a worktree sharing the app's `.venv`) is running the folder's files, so it is stopped with the rest. Only drive-letter paths in free text are followed; a UNC path is matched by spelling.
+
 ### Which listeners hold the port
 
 The `-StopOld` wait and verify's owner check count only the listeners a connection to 127.0.0.1 can meet: those on `0.0.0.0`, `::`, `127.0.0.1` or `::1`, and one whose address the listing does not give. A listener on any other address of the same port number is ignored by both, because verify only ever asks 127.0.0.1: a reverse proxy publishing the app's port on a VPN or LAN address (Tailscale Serve mapping `https:<port>` to `http://127.0.0.1:<port>` has this shape) neither keeps the port busy nor counts as its owner. The inventory still lists every port a process listens on, whatever the address.

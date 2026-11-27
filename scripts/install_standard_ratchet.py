@@ -93,7 +93,7 @@ EXIT_PASS, EXIT_RISE, EXIT_CONFIG, EXIT_NOT_CONFIRMED = 0, 1, 2, 3
 INSTALLER: dict[str, tuple[str, str]] = {
     "installer": ("src/installer.py", "aca52564fcf71b7e377782b3fa527f80d11d328c7dda1a832efca695b5cee906"),
     "installer_migrate": ("src/installer_migrate.py",
-                          "2205fed2b0afb3e681d3e381105a6cac83d03e491f08228c970aa554d2a29b06"),
+                          "4bcdd0bbbc6a6b356239acd7d627944cf1d2a28f7c6de9bdb929d076d2181086"),
     "installer_declaration": ("src/installer_declaration.py",
                               "f8730c8d8020797d95f9ae2df9b777ab09207181cd74a1f52d1065992e0593fa"),
     "installer_inplace": ("src/installer_inplace.py",

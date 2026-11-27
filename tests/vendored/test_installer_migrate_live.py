@@ -2,7 +2,9 @@
 
 Nothing here touches an installed app. The pair lives under `tmp_path`: a bare
 origin, an "installed" clone that runs a tiny version server from its own
-`.venv`, and the clones the migration makes. It proves, with real processes:
+`.venv`, and the clones the migration makes. The old copy is started through a
+directory junction to its folder, so its command lines carry only that spelling,
+while the migration is given the real path. It proves, with real processes:
 
 * `-MigrateFrom` beside a running old copy fails verify, naming the old copy as
   the port's owner, even though both copies serve the same commit;
@@ -155,7 +157,11 @@ def _install_old(tmp_path: Path, origin: Path, port: int) -> Path:
     (app / "secret.key").write_text(CANARY, encoding="utf-8")
     done = _cmd(app / "setup.bat", "", tmp_path, tmp_path / "install.err")
     assert done.returncode == 0, done.stdout
-    subprocess.run(f'cmd.exe /d /s /c ""{app / "start.bat"}""', cwd=app, stdin=subprocess.DEVNULL,
+    import _winapi  # Windows only, and the Mac nightly still imports this module to collect it
+
+    link = tmp_path / "link"
+    _winapi.CreateJunction(str(app), str(link))
+    subprocess.run(f'cmd.exe /d /s /c ""{link / "start.bat"}""', cwd=link, stdin=subprocess.DEVNULL,
                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=60, check=True,
                    creationflags=NO_WINDOW)
     assert _serving(port) is not None, "the old copy did not start"
@@ -202,7 +208,9 @@ def test_migrate_from_beside_a_running_old_copy_fails_verify_then_in_place_passe
     preview = _cmd(app / "setup.bat", "-InPlace -WhatIf -Json", tmp_path, tmp_path / "whatif.err")
     outputs += [preview.stdout, (tmp_path / "whatif.err").read_text(encoding="utf-8", errors="replace")]
     assert preview.returncode == 0, preview.stdout + outputs[-1]
-    would = {r["item"] for r in _rows(json.loads(preview.stdout), "copy") if r["state"] == "would copy"}
+    stops = [r for r in _rows(json.loads(preview.stdout), "stop") if r["state"] == "would stop"]
+    assert stops, "the processes started through the junction were not found by the folder's real path"
+    would ={r["item"] for r in _rows(json.loads(preview.stdout), "copy") if r["state"] == "would copy"}
     assert {"config.json", "secret.key", "data/state.db"} <= would, preview.stdout
     assert "data/state.db-wal" not in would
     assert _serving(port) is not None and not any(tmp_path.glob("app.bak-*"))
