@@ -123,7 +123,8 @@
                          when the repo lacks a piece of the install standard
                          (the installer modules at the scaffold's content,
                          [install.migrate] that parses, a playbook with
-                         Install, Update and Migrate sections) beyond the
+                         Install, Update and Migrate sections, a setup.bat
+                         offering its migrate entry points) beyond the
                          committed baseline; opt-in via .fleet.toml
                          [install_standard_ratchet]; exit 3 = "not confirmed",
                          a failure, never a pass

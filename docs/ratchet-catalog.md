@@ -1477,12 +1477,13 @@ STATE = runtime_db_path("myapp", "state.json")
 
 ### Install standard ratchet
 
-[install-standard-ratchet.md](install-standard-ratchet.md). Enforces "Every app installs, reinstalls and migrates through the scaffold installer" in [architecture-decisions.md](architecture-decisions.md): the repo carries the scaffold installer at its current content, declares what a migration moves, and keeps one playbook with Install, Update and Migrate sections. It reads files only, never runs `setup.bat`. **On once enabled.** **No per-hit marker:** a piece that is missing on purpose goes in the baseline, reviewed.
+[install-standard-ratchet.md](install-standard-ratchet.md). Enforces "Every app installs, reinstalls and migrates through the scaffold installer" in [architecture-decisions.md](architecture-decisions.md): the repo carries the scaffold installer at its current content, declares what a migration moves, keeps one playbook with Install, Update and Migrate sections, and has a `setup.bat` that offers its migrate entry points. It reads files only, never runs `setup.bat`. **On once enabled.** **No per-hit marker:** a piece that is missing on purpose goes in the baseline, reviewed.
 
 ```toml
 [install_standard_ratchet]
 enabled  = true
 playbook = "docs/install.md"   # the default
+setup    = "setup.bat"         # the default
 ```
 
 #### `installer-vendored`
@@ -1524,6 +1525,20 @@ The playbook missing, or lacking an `## Install`, `## Update` or `## Migrate` he
 ```text
 bad:   docs/install.md has "## Fresh PC" and "## Migrate from an existing install"
 fixed: "## Install", "## Update" and "## Migrate", from docs/templates/install-playbook.md
+```
+
+#### `setup-flags`
+
+`setup.bat` missing, or not offering `-MigrateFrom`, `-Replace` or `-InPlace` outside its comment lines. The hit names the file and the flag.
+
+```bat
+REM bad: -Replace only in a comment, so the installer gets an argument it does not know
+REM    setup.bat -Replace <install>
+"%PY_EXE%" -I "%SCRIPT_DIR%src\installer.py" %*
+
+REM fixed: the branch from scripts/templates/setup.bat tests for the flag and runs installer_inplace.py
+if /i "%%~A"=="-Replace" set "REPLACE_FLAG=1"
+"%PY_EXE%" -I "%STAGE%\installer_inplace.py" -Folder "%REPLACE%" -Incoming "%SCRIPT_DIR%." %*
 ```
 
 ## Test value

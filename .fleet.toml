@@ -750,13 +750,15 @@ enabled = true
 # scripts/install_standard_ratchet.py, which fails when the repo lacks a piece
 # of the install standard beyond the committed baseline: the three installer
 # modules vendored at the scaffold's current content, [install.migrate] that
-# parses, and a playbook with Install, Update and Migrate sections. Opt-in per
-# repo through this table. The scaffold is not an installable app: it holds its
-# playbook template to the rule and baselines its missing [install.migrate].
+# parses, a playbook with Install, Update and Migrate sections, and a setup.bat
+# that offers its migrate entry points. Opt-in per repo through this table. The
+# scaffold is not an installable app: it holds its playbook and setup.bat
+# templates to the rules and baselines its missing [install.migrate].
 # Mechanism + limits: docs/install-standard-ratchet.md.
 [install_standard_ratchet]
 enabled  = true
 playbook = "docs/templates/install-playbook.md"
+setup    = "scripts/templates/setup.bat"
 
 # ---------------------------------------------------------------------------
 # Clean tree ratchet. scripts/verify-before-ship.ps1 runs

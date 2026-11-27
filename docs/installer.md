@@ -227,7 +227,7 @@ It is a full git checkout, and `.venv\Scripts\python.exe -m <module>` runs as be
 4. Declare `[install.endpoint]` and `[install.migrate]`: the app's own configs, state and certificates to copy, the secrets among them, and its runtime-data folders as `shared`.
 5. Copy `docs/templates/install-playbook.md` to `docs/install.md`, fill each placeholder and delete the lines that do not apply, keeping its Install, Update and Migrate sections. It never deletes the old copy, which is retired only after the owner confirms.
 6. Link the playbook from the README's install section.
-7. Vendor `scripts/install_standard_ratchet.py` (manifest key `install_standard_ratchet`) and enable `[install_standard_ratchet]`: it fails the gate when one of the pieces above goes missing or the installer falls behind the scaffold's ([install standard ratchet](install-standard-ratchet.md)).
+7. Vendor `scripts/install_standard_ratchet.py` (manifest key `install_standard_ratchet`) and enable `[install_standard_ratchet]`: it fails the gate when one of the pieces above goes missing, the installer falls behind the scaffold's, or `setup.bat` does not offer `-MigrateFrom`, `-Replace` and `-InPlace` ([install standard ratchet](install-standard-ratchet.md)).
 
 ## The top-up can change behaviour
 
