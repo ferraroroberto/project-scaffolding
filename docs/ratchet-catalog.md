@@ -16,6 +16,7 @@ The ratchets are the baseline-and-ratchet stages of the pre-ship gate: stdlib-on
 - [Request budget: request budget](#request-budget)
 - [Windows-only tests: windows only](#windows-only-tests)
 - [Machine-local values: port host, clean tree](#machine-local-values)
+- [Install standard: install standard](#install-standard)
 - [Test value: test value](#test-value)
 - [Exceptions and burn-down](#exceptions-and-burn-down)
 - [Adoption order](#adoption-order)
@@ -1430,6 +1431,58 @@ STATE = Path(__file__).parent / "state.json"
 STATE = runtime_db_path("myapp", "state.json")
 ```
 
+## Install standard
+
+### Install standard ratchet
+
+[install-standard-ratchet.md](install-standard-ratchet.md). Enforces "Every app installs, reinstalls and migrates through the scaffold installer" in [architecture-decisions.md](architecture-decisions.md): the repo carries the scaffold installer at its current content, declares what a migration moves, and keeps one playbook with Install, Update and Migrate sections. It reads files only, never runs `setup.bat`. **On once enabled.** **No per-hit marker:** a piece that is missing on purpose goes in the baseline, reviewed.
+
+```toml
+[install_standard_ratchet]
+enabled  = true
+playbook = "docs/install.md"   # the default
+```
+
+#### `installer-vendored`
+
+An installer module (`src/installer.py`, `src/installer_migrate.py`, `src/installer_inplace.py`) that is missing, not declared under its manifest key in `[vendored]`, or not the scaffold's current content (CRLF read as LF). The script carries each module's hash, so a re-vendor of the ratchet without the installer goes red.
+
+```toml
+# bad: the module is there but not declared, so /propagate-vendored never refreshes it
+[vendored]
+installer = { src = "src/installer.py", sha = "<scaffold sha>", dest = "src/installer.py" }
+
+# fixed: all three declared and re-vendored together
+[vendored]
+installer         = { src = "src/installer.py", sha = "<scaffold sha>", dest = "src/installer.py" }
+installer_migrate = { src = "src/installer_migrate.py", sha = "<scaffold sha>", dest = "src/installer_migrate.py" }
+installer_inplace = { src = "src/installer_inplace.py", sha = "<scaffold sha>", dest = "src/installer_inplace.py" }
+```
+
+#### `migrate-table`
+
+`[install.migrate]` (with `[install.endpoint]`) absent or not parsing, as judged by the repo's own `src/installer_migrate.py`; the hit carries the installer's message naming the key.
+
+```toml
+# bad: a machine path, which the installer refuses
+[install.migrate]
+copy = ["C:/apps/myapp/config.json"]
+
+# fixed: repo-relative
+[install.migrate]
+copy    = ["config/config.json", ".env"]
+secrets = [".env"]
+```
+
+#### `playbook-sections`
+
+The playbook missing, or lacking an `## Install`, `## Update` or `## Migrate` heading outside code fences. Other sections are allowed.
+
+```text
+bad:   docs/install.md has "## Fresh PC" and "## Migrate from an existing install"
+fixed: "## Install", "## Update" and "## Migrate", from docs/templates/install-playbook.md
+```
+
 ## Test value
 
 ### Test value ratchet
@@ -1507,6 +1560,7 @@ Which ratchets take which:
 | ux surface | `<rule>-exempt: <reason>` | `exclude`, `paths`, `rules` |
 | windows only | `windows-only-exempt: <reason>` | `exclude`, `test_paths`, `rules` |
 | port host | `port-host-exempt: <reason>` | `resolvers`, `exclude`, `include_tests`, `rules` |
+| install standard | none: the baseline names a piece that is missing on purpose | `playbook` |
 | clean tree | none: the baseline names a path that must stay | `smoke`, `ready_path`, `timeout_s`, `settle_s`, `data_dir_env` |
 | test value | `test-value-exempt: <reason>` (new units only) | `unit_roots` |
 
@@ -1519,4 +1573,4 @@ Which ratchets take which:
 
 ## Adoption order
 
-[adopting-ratchets.md](adopting-ratchets.md) has the steps and the prerequisites table, and `scripts/tools/adopt_ratchets.py` does them. A sensible order: start with the set that is Python only and needs no choices (comment, docs, structure, instruction, doc references, dead code, runtime write), then add static once `ruff` is installed, then conventions and usage track by choosing the rules that match the repository, ux surface once the web app has its surface map, request budget (every rule on, no choices) in any repo, web code or not, windows only in any repo the Mac nightly tests, and port host once the repo has a config resolver to list, then clean tree once it has a disposable start smoke to declare. Run `--init` on each, review the baseline, and burn it down in later changes.
+[adopting-ratchets.md](adopting-ratchets.md) has the steps and the prerequisites table, and `scripts/tools/adopt_ratchets.py` does them. A sensible order: start with the set that is Python only and needs no choices (comment, docs, structure, instruction, doc references, dead code, runtime write), then add static once `ruff` is installed, then conventions and usage track by choosing the rules that match the repository, ux surface once the web app has its surface map, request budget (every rule on, no choices) in any repo, web code or not, windows only in any repo the Mac nightly tests, and port host once the repo has a config resolver to list, then clean tree once it has a disposable start smoke to declare, and install standard in any app that ships `setup.bat`. Run `--init` on each, review the baseline, and burn it down in later changes.

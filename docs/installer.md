@@ -10,7 +10,7 @@ Every app in the toolbox moves to another Windows PC the same way: `git clone`, 
 | Migration | `src/installer_migrate.py` | `src/installer_migrate.py` | vendored verbatim, manifest key `installer_migrate` |
 | In-place replace | `src/installer_inplace.py` | `src/installer_inplace.py` | vendored verbatim, manifest key `installer_inplace` |
 | The launcher | `scripts/templates/setup.bat` | `setup.bat` | copied once, renamed; it needs no edit |
-| The playbook | `docs/templates/install-playbook.md` | `docs/install-playbook.md` | copied once, placeholders filled per app |
+| The playbook | `docs/templates/install-playbook.md` | `docs/install.md` | copied once, placeholders filled per app; its Install, Update and Migrate sections are checked by the [install standard ratchet](install-standard-ratchet.md) |
 
 The module is stdlib only, because on a fresh PC it runs on the system python before any requirement is installed. `setup.bat` runs it as a script in isolated mode, `python -I src\installer.py`: `src/` stays off `sys.path`, so an app whose `src/__init__.py` imports a third-party package still installs, and no module of the app can shadow the standard library. Reading `.fleet.toml` needs Python 3.11 or newer (`tomllib`); an older interpreter fails the run with that message.
 
@@ -166,8 +166,9 @@ Migrating a launcher (app-launcher, app-launcher-lite) stops it and every sessio
 2. Copy `scripts/templates/setup.bat` to `setup.bat` at the repo root. An app that already has a `setup.bat` with extra steps (another installer it offers, a closing banner) keeps them after the `src\installer.py` line.
 3. Declare the `[install]` table, giving each check its `level` and each optional one its `blocks`. Keep every config's sample tracked and its target gitignored, and add `*.json.bak-*` to `.gitignore`: a rule written for the config (`config/*.json`, or the file's own name) does not match `config.json.bak-<stamp>`, and without the line every top-up is refused. A check or autostart that lives in the app's own code gets a small command-line entry that exits 0, 1 or another code, as above.
 4. Declare `[install.endpoint]` and `[install.migrate]`: the app's own configs, state and certificates to copy, the secrets among them, and its runtime-data folders as `shared`.
-5. Copy `docs/templates/install-playbook.md` to `docs/install-playbook.md`, fill each placeholder and delete the lines that do not apply. It never deletes the old copy, which is retired only after the owner confirms.
+5. Copy `docs/templates/install-playbook.md` to `docs/install.md`, fill each placeholder and delete the lines that do not apply, keeping its Install, Update and Migrate sections. It never deletes the old copy, which is retired only after the owner confirms.
 6. Link the playbook from the README's install section.
+7. Vendor `scripts/install_standard_ratchet.py` (manifest key `install_standard_ratchet`) and enable `[install_standard_ratchet]`: it fails the gate when one of the pieces above goes missing or the installer falls behind the scaffold's ([install standard ratchet](install-standard-ratchet.md)).
 
 ## The top-up can change behaviour
 

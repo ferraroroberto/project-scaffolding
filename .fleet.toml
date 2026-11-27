@@ -515,7 +515,7 @@ allow_refs = [
     "scripts/gen_icons.py",
     "scripts/gen_ssl_cert.py",
     "docs/ux-surfaces.yaml",
-    "docs/install-playbook.md",
+    "docs/install.md",
 ]
 
 # ---------------------------------------------------------------------------
@@ -733,6 +733,19 @@ enabled = true
 enabled = true
 
 # ---------------------------------------------------------------------------
+# Install standard ratchet. scripts/verify-before-ship.ps1 runs
+# scripts/install_standard_ratchet.py, which fails when the repo lacks a piece
+# of the install standard beyond the committed baseline: the three installer
+# modules vendored at the scaffold's current content, [install.migrate] that
+# parses, and a playbook with Install, Update and Migrate sections. Opt-in per
+# repo through this table. The scaffold is not an installable app: it holds its
+# playbook template to the rule and baselines its missing [install.migrate].
+# Mechanism + limits: docs/install-standard-ratchet.md.
+[install_standard_ratchet]
+enabled  = true
+playbook = "docs/templates/install-playbook.md"
+
+# ---------------------------------------------------------------------------
 # Clean tree ratchet. scripts/verify-before-ship.ps1 runs
 # scripts/clean_tree_ratchet.py, which records `git status --porcelain`, runs
 # the start smoke below once, and fails when it added, modified or deleted a
@@ -937,6 +950,8 @@ request_budget_ratchet = { src = "scripts/request_budget_ratchet.py", requires =
 request_budget_scan = { src = "scripts/request_budget_scan.py" }
 windows_only_ratchet = { src = "scripts/windows_only_ratchet.py", requires = ["ratchet_baseline"] }
 port_host_ratchet = { src = "scripts/port_host_ratchet.py", requires = ["ratchet_baseline"] }
+# Pins the installer modules' content: re-vendor it with installer, installer_migrate and installer_inplace.
+install_standard_ratchet = { src = "scripts/install_standard_ratchet.py", requires = ["ratchet_baseline"] }
 clean_tree_ratchet = { src = "scripts/clean_tree_ratchet.py", requires = ["ratchet_baseline"] }
 runtime_write_ratchet = { src = "scripts/runtime_write_ratchet.py", requires = ["runtime_write_resolve", "ratchet_baseline"] }
 # runtime_write_ratchet loads this sibling (the static path resolver); `requires` makes /propagate-vendored carry both.

@@ -1,16 +1,15 @@
-# Install, update and move <APP NAME>
+# Install, update and migrate <APP NAME>
 
-<!-- Template: copy to docs/install-playbook.md in the app, replace every <ANGLE BRACKET> placeholder, and delete
-     the lines that do not apply. The installer and its [install] table: project-scaffolding docs/installer.md. -->
+<!-- Template: copy to docs/install.md in the app, replace every <ANGLE BRACKET> placeholder, and delete
+     the lines that do not apply. Keep the three sections Install, Update and Migrate: the install standard
+     ratchet fails a playbook without them. The installer and its [install] table: project-scaffolding
+     docs/installer.md. -->
 
-<APP NAME> moves to another Windows PC the way any app in the toolbox does: clone it and run one `setup.bat`. An update is a pull plus a restart. Neither ever resets or overwrites what a PC has configured.
+<APP NAME> installs, updates and migrates the way any app in the toolbox does: clone it and run one `setup.bat`. An update is a pull plus a restart. A migration, onto a fresh clone of the same PC or of another one, is one `setup.bat` call. None of them ever resets or overwrites what a PC has configured.
 
-## What you need
+## Install
 
-- Windows 10 or 11, `git`, and Python 3.11 or newer (the `py` launcher, or `python` on `PATH`).
-- <ANY EXTERNAL TOOL THE APP NEEDS, e.g. an agent CLI or Tailscale, with where to get it.>
-
-## Fresh PC
+You need Windows 10 or 11, `git`, and Python 3.11 or newer (the `py` launcher, or `python` on `PATH`). <ANY EXTERNAL TOOL THE APP NEEDS, e.g. an agent CLI or Tailscale, with where to get it.>
 
 ```powershell
 git clone <REPOSITORY URL>
@@ -37,6 +36,13 @@ The optional features of <APP NAME>, each needed only for what it unlocks:
 
 `.\setup.bat -WhatIf` lists every change it would make and makes none.
 
+### Uninstall
+
+1. Turn off the log-on autostart: <HOW, e.g. delete <NAME>.bat from shell:startup>.
+2. <ANYTHING ELSE THE APP REGISTERED OUTSIDE ITS FOLDER, e.g. scheduled tasks, hooks in another tool.>
+3. Stop the app: <HOW>.
+4. Delete the folder. Keep a copy of the files listed under "Migrate" first if you may want them back.
+
 ## Update
 
 ```powershell
@@ -51,11 +57,11 @@ git pull --ff-only
 - Registries (<LIST THEM, e.g. config/apps.json>) are your own lists: created when missing, never rewritten or reformatted.
 - A second run reports `unchanged` and writes nothing.
 
-## Migrate from an existing install
+## Migrate
 
-Use this on a PC that already runs a copy of <APP NAME>. What moves is declared in `[install.migrate]` of `.fleet.toml`: <LIST THE APP'S CONFIGS, STATE AND CERTIFICATES, e.g. config/config.json, data/, webapp/certificates/, .env>. Its runtime data under <e.g. C:\sqlite\<app>> stays where it is and is shared. Nothing in this playbook or in `setup.bat` deletes the old copy.
+What moves is declared in `[install.migrate]` of `.fleet.toml`: <LIST THE APP'S CONFIGS, STATE AND CERTIFICATES, e.g. config/config.json, data/, webapp/certificates/, .env>. Its runtime data under <e.g. C:\sqlite\<app>> stays where it is and is shared. The installer does the whole move; nothing here or in `setup.bat` deletes the old copy.
 
-**Same folder (the usual case).** From a terminal whose current folder is outside the app (<DELETE FOR AN APP THAT HOSTS NO SESSIONS:> a plain terminal, never a session <APP NAME> hosts, because the run stops <APP NAME> and every session in it):
+**Reinstall in the same folder (the usual case).** From a terminal whose current folder is outside the app (<DELETE FOR AN APP THAT HOSTS NO SESSIONS:> a plain terminal, never a session <APP NAME> hosts, because the run stops <APP NAME> and every session in it):
 
 ```powershell
 cd <PARENT FOLDER>
@@ -63,17 +69,18 @@ cd <PARENT FOLDER>
 .\<FOLDER>\setup.bat -InPlace
 ```
 
-It stops the running copy, renames the folder to `<FOLDER>.bak-YYYYMMDD-N`, clones fresh into the same path, copies the declared files from the backup, installs, starts <APP NAME> and passes only when the new folder's process serves its own commit. The path is unchanged, so <e.g. the launcher's app entry and the Startup link> need no edit. An old copy that is not a git clone has no `setup.bat -InPlace`: use the next way.
+It keeps the replaced copy as `<FOLDER>.bak-YYYYMMDD-N` and passes only when the new clone serves its own commit. The path is unchanged, so <e.g. the launcher's app entry and the Startup link> need no edit.
 
-**Beside it (another folder, or an old copy that is not a clone).** `git clone <REPOSITORY URL> <NEW FOLDER>`, then in the new folder `.\setup.bat -MigrateFrom <OLD FOLDER> -StopOld`. Repoint whatever stores the old path; the run lists what still points at it.
+**Beside it (another folder, or an old copy that is not a git clone):**
 
-**If verify fails,** the report names the step. To go back: stop the new copy, rename the new folder away and the backup to the original name, and start it: it is untouched.
+```powershell
+git clone <REPOSITORY URL> <NEW FOLDER>
+cd <NEW FOLDER>
+.\setup.bat -MigrateFrom <OLD FOLDER> -StopOld
+```
 
-**Retire the backup only after you confirm.** Run on the new copy for a while; delete the backup yourself once you are sure. An agent working through this playbook asks you before it deletes anything.
+Only you can do these steps:
 
-## Uninstall
-
-1. Turn off the log-on autostart: <HOW, e.g. delete <NAME>.bat from shell:startup>.
-2. <ANYTHING ELSE THE APP REGISTERED OUTSIDE ITS FOLDER, e.g. scheduled tasks, hooks in another tool.>
-3. Stop the app: <HOW>.
-4. Delete the folder. Keep a copy of the configs, state and certificates listed under "Migrate" first if you may want them back.
+- **Repoint** whatever stores the old path, after a `-MigrateFrom` into another folder: the run lists what still points at it.
+- **Fall back** if verify fails (the report names the step): stop the new copy, rename the new folder away and the backup to the original name, and start it; it is untouched.
+- **Retire the backup** once you are sure the new copy works, by deleting it yourself. An agent working through this playbook asks you before it deletes anything.

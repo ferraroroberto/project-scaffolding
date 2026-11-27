@@ -211,7 +211,15 @@ opt-in via .fleet.toml [port_host_ratchet]; exit 3 = not confirmed"]
 boots the declared start smoke once on a free port
 paths it writes into git status may not rise vs .ratchets/clean-tree.json
 opt-in via .fleet.toml [clean_tree_ratchet]; exit 3 = not confirmed"]
-  VERIFY -->|runs, opt-in, after the port host ratchet| CTRATCHET
+  ISRATCHET["install_standard_ratchet.py (vendor-verbatim, stdlib)
+installer modules at the scaffold's content, [install.migrate], playbook sections
+missing pieces may not rise vs .ratchets/install-standard.json
+opt-in via .fleet.toml [install_standard_ratchet]; exit 3 = not confirmed"]
+  VERIFY -->|runs, opt-in, after the port host ratchet| ISRATCHET
+  ISRATCHET -.->|reads [install_standard_ratchet] + [install.migrate] + [vendored] from| FLEETTOML
+  ISRATCHET -.->|hashes + parses with| INSTALLER
+  ADOPTKIT -->|copies into an outside repo + runs there| ISRATCHET
+  VERIFY -->|runs, opt-in, after the install standard ratchet| CTRATCHET
   CTRATCHET -.->|reads [clean_tree_ratchet] from| FLEETTOML
   ADOPTKIT -->|copies into an outside repo + runs there| CTRATCHET
   ADOPTKIT -->|writes the adopter's files through| RUNTIMEFILES

@@ -1,5 +1,11 @@
 [
     {
+        "number": 1014,
+        "state": "OPEN",
+        "stateReason": "",
+        "title": "ADR: every app installs, reinstalls and migrates through the scaffold installer"
+    },
+    {
         "number": 914,
         "state": "OPEN",
         "stateReason": "",
