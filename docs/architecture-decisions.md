@@ -158,7 +158,7 @@ Every fleet app that has an install vendors the scaffold [installer](installer.m
 
 Why: moving the toolbox to another PC meant each app improvising its own steps (finding the old copy, copying files by hand, stopping the old process, checking which copy serves the port, repointing the launcher at suffixed folders); one installer that stops only the old folder's processes, keeps a working backup and proves the new clone serves its own commit makes a migration one repeatable call, and the unchanged path means the launcher's settings never need editing.
 
-Enforcement: the [install standard ratchet](install-standard-ratchet.md) fails an adopter's gate when an installer module is missing, undeclared or not at the scaffold's current content, when `[install.migrate]` does not parse, or when the playbook lacks one of the three sections. The playbook template, `docs/templates/install-playbook.md`, carries the three sections, and the scaffold holds it to the same rule.
+Enforcement: the [install standard ratchet](install-standard-ratchet.md) fails an adopter's gate when an installer module is missing, undeclared or not at the scaffold's current content, when `[install.migrate]` does not parse, when the playbook lacks one of the three sections, or when `setup.bat` does not offer `-MigrateFrom`, `-Replace` and `-InPlace`. The scaffold holds its templates, `docs/templates/install-playbook.md` and `scripts/templates/setup.bat`, to the same rules.
 
 Issue: https://github.com/ferraroroberto/project-scaffolding/issues/1014
 

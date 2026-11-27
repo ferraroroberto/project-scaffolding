@@ -6,6 +6,7 @@ real one an adopter would see; the hashes the script carries are held to this sc
 
 from __future__ import annotations
 
+import re
 import shutil
 import subprocess
 import sys
@@ -18,6 +19,8 @@ from src.no_window import NO_WINDOW
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 SCRIPT = REPO_ROOT / "scripts" / "install_standard_ratchet.py"
+TEMPLATE_BAT = REPO_ROOT / "scripts" / "templates" / "setup.bat"
+TEMPLATE_PLAYBOOK = REPO_ROOT / "docs" / "templates" / "install-playbook.md"
 
 PLAYBOOK = "# Install, update and migrate\n\n## Install\n\ntext\n\n## Update\n\ntext\n\n## Migrate\n\ntext\n"
 FLEET = """\
@@ -43,18 +46,19 @@ installer_inplace = { src = "src/installer_inplace.py" }
 
 @pytest.fixture
 def repo(tmp_path: Path) -> Path:
-    """A repo that meets the standard: the three modules, the tables, the playbook."""
+    """A repo that meets the standard: the installer modules, the tables, the playbook, setup.bat."""
     (tmp_path / "src").mkdir()
     for rel, _ in isr.INSTALLER.values():
         shutil.copyfile(REPO_ROOT / rel, tmp_path / rel)
+    shutil.copyfile(TEMPLATE_BAT, tmp_path / "setup.bat")
     (tmp_path / "docs").mkdir()
     (tmp_path / "docs/install.md").write_text(PLAYBOOK, encoding="utf-8")
     (tmp_path / ".fleet.toml").write_text(FLEET, encoding="utf-8")
     return tmp_path
 
 
-def hits(root: Path, playbook: str = "docs/install.md") -> dict[str, str]:
-    return isr.scan(root, isr.read_toml(root), playbook)
+def hits(root: Path, playbook: str = "docs/install.md", setup: str = "setup.bat") -> dict[str, str]:
+    return isr.scan(root, isr.read_toml(root), playbook, setup)
 
 
 def run(root: Path, *args: str) -> int:
@@ -149,11 +153,51 @@ def test_a_heading_inside_a_fence_does_not_count(repo: Path) -> None:
     assert list(hits(repo)) == ["playbook-sections: docs/install.md ## Update"]
 
 
+def drop_lines(path: Path, needle: str) -> None:
+    """Remove every non-comment line of a batch file that holds `needle`."""
+    lines = path.read_text(encoding="utf-8").splitlines(keepends=True)
+    kept = [line for line in lines if line.lstrip().upper().startswith("REM") or needle not in line]
+    assert kept != lines, f"{needle!r} is on no code line of {path.name}"
+    path.write_text("".join(kept), encoding="utf-8")
+
+
+def test_a_setup_bat_without_replace_fails_naming_the_file_and_flag(
+        repo: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    (repo / ".ratchets").mkdir()
+    (repo / ".ratchets/install-standard.json").write_text(isr.render_baseline([]), encoding="utf-8")
+    assert run(repo) == isr.EXIT_PASS, capsys.readouterr().out
+    # The comments and the error message still mention -Replace: neither offers it.
+    drop_lines(repo / "setup.bat", '=="-Replace"')
+    assert list(hits(repo)) == ["setup-flags: setup.bat -Replace"]
+    capsys.readouterr()
+    assert run(repo) == isr.EXIT_RISE
+    assert "[setup-flags] setup.bat -Replace: does not offer -Replace" in capsys.readouterr().out
+
+
+def test_each_entry_point_needs_the_line_that_runs_it(repo: Path) -> None:
+    drop_lines(repo / "setup.bat", "installer_inplace.py")
+    assert list(hits(repo)) == ["setup-flags: setup.bat -Replace", "setup-flags: setup.bat -InPlace"]
+    shutil.copyfile(TEMPLATE_BAT, repo / "setup.bat")
+    drop_lines(repo / "setup.bat", "installer.py")
+    assert list(hits(repo)) == ["setup-flags: setup.bat -MigrateFrom"]
+    (repo / "setup.bat").unlink()
+    assert list(hits(repo)) == ["setup-flags: setup.bat"]
+
+
+def test_the_entry_points_are_the_ones_the_playbook_template_names() -> None:
+    migrate = TEMPLATE_PLAYBOOK.read_text(encoding="utf-8").split("## Migrate\n")[-1]
+    named = set(re.findall(r"setup\.bat`? (?:already has `)?(-[A-Za-z]+)", migrate))
+    assert named == set(isr.ENTRY_POINTS), (
+        "update ENTRY_POINTS in scripts/install_standard_ratchet.py: the ratchet holds every adopter's "
+        "setup.bat to the migrate entry points the playbook names")
+
+
 def test_config_rejects_unknown_keys_and_outside_paths() -> None:
     with pytest.raises(isr.ConfigError, match="unknown key"):
         isr.parse_config({"install_standard_ratchet": {"enabled": True, "rules": []}})
-    with pytest.raises(isr.ConfigError, match="inside the repo"):
-        isr.parse_config({"install_standard_ratchet": {"enabled": True, "playbook": "../x.md"}})
+    for key in ("playbook", "setup"):
+        with pytest.raises(isr.ConfigError, match="inside the repo"):
+            isr.parse_config({"install_standard_ratchet": {"enabled": True, key: "../x"}})
     assert isr.parse_config({"install_standard_ratchet": {"enabled": False}}) is None
     assert isr.parse_config({}) is None
 
@@ -177,7 +221,7 @@ def test_modes_init_check_shrink_and_additions(repo: Path) -> None:
 
 
 def test_this_repo_holds_its_template_and_passes() -> None:
-    assert hits(REPO_ROOT, "docs/templates/install-playbook.md") == {
+    assert hits(REPO_ROOT, "docs/templates/install-playbook.md", "scripts/templates/setup.bat") == {
         "migrate-table": "[install.migrate] is not declared"}
     proc = subprocess.run([sys.executable, "-P", str(SCRIPT)], cwd=REPO_ROOT, capture_output=True, text=True,
                           encoding="utf-8", creationflags=NO_WINDOW, timeout=120, check=False)
