@@ -38,6 +38,7 @@ Listed in gate stage order, the order `scripts/run_ratchets.py` runs them. **Sib
 | port host | `port_host_ratchet.py` | list the config resolver in `resolvers` | fast | | [port-host-ratchet.md](port-host-ratchet.md) |
 | install standard | `install_standard_ratchet.py` | the scaffold installer and a `docs/install.md` playbook | fast | | [install-standard-ratchet.md](install-standard-ratchet.md) |
 | clean tree | `clean_tree_ratchet.py` | a disposable start smoke declared in `smoke` | slow (one app boot) | | [clean-tree-ratchet.md](clean-tree-ratchet.md) |
+| personal data | `personal_data_ratchet.py` | a machine-local term list, or narrow `rules` | fast | | [personal-data-ratchet.md](personal-data-ratchet.md) |
 
 The test value ratchet is not in this table: it reads a test run's recorded results, so it runs after the tests and `run_ratchets.py` and `adopt_ratchets.py` leave it out. Its siblings (`unit_ledger.py`, `spawn_probe/`, `unit_ledger_pytest.py`, `weekly_burst.py`), the gate wiring and the weekly job: [test-value-ratchet.md](test-value-ratchet.md).
 

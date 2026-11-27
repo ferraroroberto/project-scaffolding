@@ -83,6 +83,8 @@ RATCHETS: tuple[Ratchet, ...] = (
     Ratchet("clean_tree", ("ratchet_baseline",), "a disposable start smoke declared in `smoke` (a free `{port}`, a scratch `{data_dir}`)",
             '# smoke = ["{python}", "-m", "myapp", "--port", "{port}"]  # required before --init: '
             'docs/clean-tree-ratchet.md\n'),
+    Ratchet("personal_data", ("ratchet_baseline",),
+            "a machine-local term list for the term rules, else narrow `rules` (docs/personal-data-ratchet.md)"),
 )
 BY_NAME = {r.name: r for r in RATCHETS}
 #: Ratchets that read a recorded test run, so they run after the tests and are wired by hand

@@ -18,6 +18,7 @@ The ratchets are the baseline-and-ratchet stages of the pre-ship gate: stdlib-on
 - [Per-platform probes: probe fake](#per-platform-probes)
 - [Machine-local values: port host, clean tree](#machine-local-values)
 - [Install standard: install standard](#install-standard)
+- [Personal data: personal data](#personal-data)
 - [Test value: test value](#test-value)
 - [Exceptions and burn-down](#exceptions-and-burn-down)
 - [Adoption order](#adoption-order)
@@ -1541,6 +1542,66 @@ if /i "%%~A"=="-Replace" set "REPLACE_FLAG=1"
 "%PY_EXE%" -I "%STAGE%\installer_inplace.py" -Folder "%REPLACE%" -Incoming "%SCRIPT_DIR%." %*
 ```
 
+## Personal data
+
+### Personal data ratchet
+
+[personal-data-ratchet.md](personal-data-ratchet.md). A repository that other people will read must not carry its owner's paths, address, handle or private app names. The ratchet reads every tracked text file and counts findings per file and rule; vendored copies and binary files are not read. It prints file, line and rule, **never the matched text**. **Every rule is on by default**; a term rule with nothing to read is `unknown` and the run exits 3, never a pass. **Except** one hit with `<rule>-exempt: <reason>` on its line or the comment line right above it; a marker with no reason is a `bare-exempt` hit, the rule the request budget ratchet shares.
+
+```toml
+[personal_data_ratchet]
+enabled = true
+rules   = ["user-path", "personal-email", "handle-default", "bare-exempt"]   # absent: every rule, the term rules included
+```
+
+#### `user-path`
+
+An absolute local user or checkout path, in Windows or POSIX form. The segments `<root>`, `<you>`, `me`, `you` and `sample` are placeholders.
+
+```python
+# bad
+# user-path-exempt: this page's bad example
+LOG_DIR = r"C:\Users\alice\app\logs"
+
+# fixed
+LOG_DIR = Path(__file__).resolve().parent / "logs"
+```
+
+#### `personal-email`
+
+An email address outside the reserved example domains.
+
+```python
+# bad
+# personal-email-exempt: this page's bad example
+SENDER = "jo@corp-mail.io"
+
+# fixed
+SENDER = "jo@example.com"
+```
+
+#### `handle-default`
+
+The owner's GitHub handle (the `origin` remote's owner, plus the list's `handles`) as a value in code or a config sample. A clone URL, an issue reference and a comment are not hits.
+
+```yaml
+# bad: only one account can run it
+if: github.repository == 'repo-owner/app'
+
+# fixed
+if: github.repository_owner == vars.APP_OWNER
+```
+
+The term rules read the machine-local list (`~/.config/personal-data/terms.toml`, or the file `PERSONAL_DATA_TERMS` names), which is never committed. Each fails on a listed term anywhere in a text file, whatever the case, and is fixed by rewording.
+
+| Rule | A hit is |
+|---|---|
+| `term-name` | a listed person's name |
+| `term-handle` | a listed account handle |
+| `term-email` | a listed email address |
+| `term-domain` | a listed personal domain |
+| `term-app` | a listed private app or repository name |
+
 ## Test value
 
 ### Test value ratchet
@@ -1621,6 +1682,7 @@ Which ratchets take which:
 | port host | `port-host-exempt: <reason>` | `resolvers`, `exclude`, `include_tests`, `rules` |
 | install standard | none: the baseline names a piece that is missing on purpose | `playbook` |
 | clean tree | none: the baseline names a path that must stay | `smoke`, `ready_path`, `timeout_s`, `settle_s`, `data_dir_env` |
+| personal data | `<rule>-exempt: <reason>` | `exclude`, `rules` |
 | test value | `test-value-exempt: <reason>` (new units only) | `unit_roots` |
 
 **A baseline is a ledger to burn to zero, never a permanent allowance.** It records debt, not approval:
@@ -1632,4 +1694,4 @@ Which ratchets take which:
 
 ## Adoption order
 
-[adopting-ratchets.md](adopting-ratchets.md) has the steps and the prerequisites table, and `scripts/tools/adopt_ratchets.py` does them. A sensible order: start with the set that is Python only and needs no choices (comment, docs, structure, instruction, doc references, dead code, runtime write), then add static once `ruff` is installed, then conventions and usage track by choosing the rules that match the repository, ux surface once the web app has its surface map, request budget (every rule on, no choices) in any repo, web code or not, windows only in any repo the Mac nightly tests, probe fake in any of those whose code probes processes, ports or listeners, and port host once the repo has a config resolver to list, then clean tree once it has a disposable start smoke to declare, and install standard in any app that ships `setup.bat`. Run `--init` on each, review the baseline, and burn it down in later changes.
+[adopting-ratchets.md](adopting-ratchets.md) has the steps and the prerequisites table, and `scripts/tools/adopt_ratchets.py` does them. A sensible order: start with the set that is Python only and needs no choices (comment, docs, structure, instruction, doc references, dead code, runtime write), then add static once `ruff` is installed, then conventions and usage track by choosing the rules that match the repository, ux surface once the web app has its surface map, request budget (every rule on, no choices) in any repo, web code or not, windows only in any repo the Mac nightly tests, probe fake in any of those whose code probes processes, ports or listeners, and port host once the repo has a config resolver to list, then clean tree once it has a disposable start smoke to declare, install standard in any app that ships `setup.bat`, and personal data in any repo other people will read. Run `--init` on each, review the baseline, and burn it down in later changes.

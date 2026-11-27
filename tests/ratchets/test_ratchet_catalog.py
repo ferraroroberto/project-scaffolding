@@ -16,6 +16,7 @@ from scripts import (
     conventions_ratchet,
     install_standard_ratchet,
     instruction_ratchet,
+    personal_data_ratchet,
     port_host_ratchet,
     probe_fake_ratchet,
     request_budget_ratchet,
@@ -59,6 +60,8 @@ def expected_rules() -> list[str]:
         *probe_fake_ratchet.RULES,
         *clean_tree_ratchet.RULES,
         *install_standard_ratchet.RULES,
+        # `bare-exempt` is one rule shared with the request budget and port host rows.
+        *(r for r in personal_data_ratchet.RULES if r != "bare-exempt"),
         *instruction_ratchet.RULES,
         *instruction_ratchet.SHAPE_RULES,
         *static_ratchet.DEFAULT_RULES,

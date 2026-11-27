@@ -238,6 +238,10 @@ opt-in via .fleet.toml [install_standard_ratchet]; exit 3 = not confirmed"]
   VERIFY -->|runs, opt-in, after the install standard ratchet| CTRATCHET
   CTRATCHET -.->|reads [clean_tree_ratchet] from| FLEETTOML
   ADOPTKIT -->|copies into an outside repo + runs there| CTRATCHET
+  PDRATCHET["personal_data_ratchet.py (vendor-verbatim, stdlib re + ast)\npersonal paths, addresses, handle and listed terms in tracked text\nmay not rise vs .ratchets/personal-data.json; term list outside the repo\nopt-in via .fleet.toml [personal_data_ratchet]; exit 3 = not confirmed"]
+  VERIFY -->|runs, opt-in, after the clean tree ratchet| PDRATCHET
+  PDRATCHET -.->|reads [personal_data_ratchet] + [vendored] from| FLEETTOML
+  ADOPTKIT -->|copies into an outside repo + runs there| PDRATCHET
   ADOPTKIT -->|writes the adopter's files through| RUNTIMEFILES
   VERIFY -->|runs after the e2e stage| SHOTBASE
   SHOTBASE -.->|reads [shot_baseline] from| FLEETTOML
