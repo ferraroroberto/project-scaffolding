@@ -91,7 +91,8 @@ name  = "git"
 level = "required"
 which = "git"
 
-# `status` exits 0 when a password is stored, 1 when not, 2 when a file it needs cannot be read or does not parse.
+# `status` exits 0 when a password is stored, 1 when not, 2 when a file it needs cannot be read.
+# A password file holding no usable hash, unparseable included, is 1.
 # An app that still honours an old plaintext value adds where it lives, a top-level key of a JSON file:
 # "--legacy", "config/webapp_config.json", "auth_password".
 [[install.check]]
