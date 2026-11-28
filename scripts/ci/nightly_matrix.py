@@ -260,6 +260,8 @@ def build(
 def cmd_build(args: argparse.Namespace) -> int:
     try:
         adopters = read_adopters(Path(args.adopters))
+        if not adopters:
+            raise ValueError("no repo names (is the NIGHTLY_ADOPTERS variable set?)")
     except (OSError, ValueError) as exc:
         print(f"SELECT=unknown reason=adopter list unusable: {clean_reason(str(exc))}")
         return 3

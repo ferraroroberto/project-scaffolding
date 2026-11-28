@@ -190,9 +190,9 @@ A read-only dry run over three fleet web apps, every HTML and JS file outside ve
 
 | Repo | `untracked-control` | `untracked-sheet` | `dynamic-id` | `usage-log-wired` |
 |---|---|---|---|---|
-| app-launcher | 357 | 40 | 4 | passes |
-| home-automation | 254 | 51 | 3 | passes |
-| voice-transcriber | 11 | 4 | 1 | passes |
+| repo-a | 357 | 40 | 4 | passes |
+| repo-b | 254 | 51 | 3 | passes |
+| repo-c | 11 | 4 | 1 | passes |
 
 Checked by hand: every `dynamic-id` hit and a sample of 14 JS control hits. The `dynamic-id` hits are a fake-click probe with a runtime `data-track`, a table lookup, a concatenated id, a builder's pass-through (resolved by declaring the builder) and the nav wiring `trackView(tab)` in each app (rewritten to pass `usage.trackView` by reference, or a marker). An earlier draft also flagged `placement.track()`, a positioning API, which is why a call with no argument is not read. The JS control sample was all true hits: buttons and summaries built with `createElement` and never given an id, and one `role="option"` list item. No false-positive kind remains that needs more than a marker.
 

@@ -36,7 +36,8 @@ from src.no_window import NO_WINDOW  # noqa: E402 -- needs the sys.path line abo
 
 logger = logging.getLogger("nightly_mac_fallback")
 
-DEFAULT_REPO = "ferraroroberto/project-scaffolding"
+# The checkout this script runs from; gh reads its origin to name the repo.
+REPO_ROOT = Path(__file__).resolve().parents[2]
 WORKFLOW = "nightly-mac.yml"
 REF = "main"
 # Enough to reach back past the day's runs: the workflow makes one per night
@@ -63,7 +64,7 @@ def run_gh(args: Sequence[str]) -> subprocess.CompletedProcess[str]:
     """Run ``gh`` with *args*; raises GhError on a spawn failure or a timeout."""
     try:
         return subprocess.run(
-            ["gh", *args],
+            ["gh", *args], cwd=REPO_ROOT,
             capture_output=True, text=True, encoding="utf-8", errors="replace",
             stdin=subprocess.DEVNULL, creationflags=NO_WINDOW, timeout=GH_TIMEOUT_S,
         )
@@ -78,6 +79,14 @@ def _checked(gh: GhRunner, args: Sequence[str]) -> str:
         detail = (proc.stderr or proc.stdout or "").strip() or "no output"
         raise GhError(f"gh {' '.join(args[:2])} exited {proc.returncode}: {detail}")
     return proc.stdout
+
+
+def checkout_repo(gh: GhRunner) -> str:
+    """owner/name of this checkout's repo; raises GhError when gh cannot say."""
+    slug = _checked(gh, ["repo", "view", "--json", "nameWithOwner", "--jq", ".nameWithOwner"]).strip()
+    if slug.count("/") != 1:
+        raise GhError(f"gh repo view returned no owner/name: {slug!r}")
+    return slug
 
 
 def runs_created_on(gh: GhRunner, repo: str, day: dt.date) -> list[dict]:
@@ -135,10 +144,15 @@ def run(
 
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    parser.add_argument("--repo", default=DEFAULT_REPO, help="owner/name of the repo (default: %(default)s)")
+    parser.add_argument("--repo", help="owner/name of the repo (default: this checkout's, as gh reads it)")
     args = parser.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
-    return run(args.repo)
+    try:
+        repo = args.repo or checkout_repo(run_gh)
+    except GhError as exc:
+        logger.error("❌ gh failed, nothing confirmed dispatched: %s", exc)
+        return EXIT_GH_FAILED
+    return run(repo)
 
 
 if __name__ == "__main__":

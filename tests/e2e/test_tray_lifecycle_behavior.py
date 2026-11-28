@@ -225,7 +225,7 @@ def _check_restart_reclaims_a_tray_started_from_the_other_spelling(
 ) -> None:
     """`--restart` from one spelling of the repo path replaces a tray started from the other.
 
-    A fleet root reached as `C:/automation` and `E:/automation` is one checkout
+    A fleet root reached on two drive letters (a junction) is one checkout
     with two spellings, and a live process keeps the one it started from. Two
     drive letters mapped over *root* reproduce that. The old tray must be gone
     and one new tray serve the new build -- not two trays with the stale one

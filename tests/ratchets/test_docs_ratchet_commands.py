@@ -79,7 +79,7 @@ def test_a_command_after_a_chain_operator_is_flagged() -> None:
 
 def test_a_shell_prompt_is_stripped_before_the_command() -> None:
     assert len(bare(fenced("$ python app.py"))) == 1
-    assert len(bare(fenced("PS C:\\repo> pip install x", "powershell"))) == 1
+    assert len(bare(fenced("PS C:\\app> pip install x", "powershell"))) == 1
 
 
 def test_a_console_block_reads_only_prompt_lines() -> None:

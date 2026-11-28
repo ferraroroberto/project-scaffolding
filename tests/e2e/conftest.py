@@ -9,8 +9,8 @@ free it boots a fresh Streamlit against the current code on disk (see
 restart) an occupied port. The check-refuse-log policy itself is the
 vendor-verbatim `_e2e_live_guard.py` (issue #191/#194); this fixture owns
 only the Streamlit-specific boot/teardown around it. See `CLAUDE.md` ("End-to-
-end UI testing" — live-app isolation); reference implementation: `app-
-launcher`'s `LAUNCHER_E2E_LIVE` / `tests/e2e/conftest.py`.
+end UI testing" — live-app isolation); reference implementation: an
+adopter's `<APP>_E2E_LIVE` in its `tests/e2e/conftest.py`.
 
 `static_server` serves `app/webapp/static` over HTTP for the
 vendored-component harnesses (their ESM imports don't run from `file://`).
@@ -125,7 +125,7 @@ def _neutral_driver_cwd() -> Iterator[str]:
     `taskkill` answers "no running instance", yet a thread still alive and the
     cwd handle still held. Nothing can reap it, so the directory it pins is
     pinned for good; six empty, undeletable worktrees accumulated on the fleet
-    host that way (`home-automation#681`).
+    host that way.
 
     So don't fight the wedge — make it harmless. With the driver started from
     `%TEMP%` no helper ever roots in the checkout, and a wedged one pins a

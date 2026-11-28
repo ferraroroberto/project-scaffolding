@@ -44,9 +44,9 @@ check  = "desktop-measure"
 detail = "no desktop content cap found — spec: centered max-width 772px"
 reason = "component gallery harness, no app shell; demo.html is deliberately a 480px phone-width probe that the e2e overflow and ellipsis assertions depend on"
 
-# Nightly CI on the Mac Mini (docs/mac-runner.md, "The [ci.nightly] table"). A
-# public repo opts in with this table plus one line in project-scaffolding's
-# .github/nightly-adopters.txt; scripts/ci/nightly_matrix.py reads it from `main`
+# Nightly CI on the self-hosted Mac (docs/mac-runner.md, "The [ci.nightly] table"). A
+# public repo opts in with this table plus its name in project-scaffolding's
+# NIGHTLY_ADOPTERS repository variable; scripts/ci/nightly_matrix.py reads it from `main`
 # and refuses unknown keys or values outside a safe character set. The scaffold
 # itself has no web app to check, so it is not an adopter. Uncomment and edit:
 # [ci.nightly]
@@ -453,11 +453,9 @@ history_phrases = true
 # docs/agents/CLAUDE.master.md is the byte mirror of CLAUDE.md (an instruction
 # file, outside this ratchet's scope), so its decision-record references are
 # excluded with it; tests/test_claude_master_sync.py keeps the two identical.
-# `allow_refs` keeps the one canonical-issue link brand-icons.md opens with.
 [docs_ratchet]
 enabled    = true
 exclude    = ["docs/agents/CLAUDE.master.md"]
-allow_refs = ["app-launcher#65"]
 
 # ---------------------------------------------------------------------------
 # Structure ratchet. scripts/verify-before-ship.ps1 runs

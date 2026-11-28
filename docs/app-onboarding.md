@@ -1,10 +1,10 @@
 # New self-hosted PWA app: onboarding playbook (didactic)
 
-Personal reference for standing up a **new tray-resident FastAPI + static PWA app** from this scaffold, end to end, until it is reachable as a trusted-HTTPS installed PWA on an iPhone. It collects three procedures that every fleet app (`home-automation`, `photo-ocr`, `app-launcher`, …) has otherwise rediscovered independently: bootstrap the app, provision HTTPS (a real Let's Encrypt cert via `tailscale cert` for a tailnet app — preferred, zero per-device trust; the self-signed-CA dance only as the LAN-only fallback), and install the PWA on a phone. The per-app README instances stay; this is the canonical *procedure* so the knowledge stops drifting and a new app doesn't re-pay the discovery cost. §4 then carries the two webapp-shape internals worth getting right once the app is reachable — static-asset cache-busting and the SQLite connection lifecycle.
+Personal reference for standing up a **new tray-resident FastAPI + static PWA app** from this scaffold, end to end, until it is reachable as a trusted-HTTPS installed PWA on an iPhone. It collects three procedures that every fleet app has otherwise rediscovered independently: bootstrap the app, provision HTTPS (a real Let's Encrypt cert via `tailscale cert` for a tailnet app — preferred, zero per-device trust; the self-signed-CA dance only as the LAN-only fallback), and install the PWA on a phone. The per-app README instances stay; this is the canonical *procedure* so the knowledge stops drifting and a new app doesn't re-pay the discovery cost. §4 then carries the two webapp-shape internals worth getting right once the app is reachable — static-asset cache-busting and the SQLite connection lifecycle.
 
 > **Audience.** Me, plus any AI coding agent I hand a fresh app to.
 > **Status.** Living reference, not a changelog. Update in place when the recipe changes.
-> **Worked examples.** `home-automation` (the cert + "Phone install (PWA)" README sections) and `photo-ocr` are the two apps this playbook is lifted from — open either repo's `README.md` + `scripts/gen_ssl_cert.py` for a filled-in instance.
+> **Worked examples.** This playbook is lifted from two shipped fleet apps; a filled-in instance is an adopter's `README.md` (the cert + "Phone install (PWA)" sections) plus its `scripts/gen_ssl_cert.py`.
 > **Scope.** The cold-handoff test for this doc: a fresh reader takes a scaffold clone to a trusted-HTTPS, iPhone-installed PWA using only what is written here. The tray *lifecycle* (idempotent start, orphan-proof `--restart`) is **not** re-documented — it lives once in [`windows-tray.md`](windows-tray.md) and this doc links to it. Cloudflare-tunnel / public remote access is a separate concern and out of scope.
 
 ---
@@ -15,8 +15,8 @@ Clone this scaffold, rename the directory, and wire the basics. The scaffold shi
 
 ```powershell
 # Clone + rename (the scaffold is the template; the new app is a separate repo)
-git clone <scaffold-url> E:\automation\my-new-app
-cd E:\automation\my-new-app
+git clone <scaffold-url> <root>\my-new-app
+cd <root>\my-new-app
 
 # Create the virtual environment. ALWAYS .venv, NEVER venv. Never activate it in
 # scripts — invoke the interpreter directly (& .\.venv\Scripts\python.exe ...).
@@ -55,9 +55,9 @@ The signal that the new code is actually live is a product-specific render (e.g.
 
 Full convention and proof: [`webapp-pwa-conventions.md`](webapp-pwa-conventions.md) → "Webapp PWA HTTP/2 launch".
 
-**The selector event loop is pinned inside it.** On Windows, asyncio's default **proactor** event loop closes its listening socket the moment `accept()` raises any `OSError` (CPython's `proactor_events.py:_start_serving` accept loop) — a client aborting a connection mid-handshake (a browser dropping the socket, a phone roaming off Wi-Fi) surfaces as exactly such an error (`WinError 64`), and one aborted client wedges the listener: the process stays alive but every subsequent connection fails until a manual restart. The **selector** event loop has no such failure mode. The bug wedged `app-launcher`'s phone-facing webapp; verified empirically there that a bare `SelectorEventLoop` server survived 800 concurrent aborted connections while a `ProactorEventLoop` server died after ~20.
+**The selector event loop is pinned inside it.** On Windows, asyncio's default **proactor** event loop closes its listening socket the moment `accept()` raises any `OSError` (CPython's `proactor_events.py:_start_serving` accept loop) — a client aborting a connection mid-handshake (a browser dropping the socket, a phone roaming off Wi-Fi) surfaces as exactly such an error (`WinError 64`), and one aborted client wedges the listener: the process stays alive but every subsequent connection fails until a manual restart. The **selector** event loop has no such failure mode. The bug wedged one adopter's phone-facing webapp; verified empirically there that a bare `SelectorEventLoop` server survived 800 concurrent aborted connections while a `ProactorEventLoop` server died after ~20.
 
-`serve.py` runs under `asyncio.Runner(loop_factory=...)` and defaults to the selector loop, so a new app gets the pin by launching through it. An app that tunes the loop itself (`app-launcher` lowers the GIL switch interval) passes its own factory, which must return an *instantiated* loop, not a loop class:
+`serve.py` runs under `asyncio.Runner(loop_factory=...)` and defaults to the selector loop, so a new app gets the pin by launching through it. An app that tunes the loop itself (for example, to lower the GIL switch interval) passes its own factory, which must return an *instantiated* loop, not a loop class:
 
 ```python
 # app/webapp/event_loop.py
@@ -122,13 +122,13 @@ The generator auto-detects this machine's MagicDNS name from `tailscale status -
 > "%VENV_PY%" "%SCRIPT_DIR%scripts\gen_tailscale_cert.py" --check
 > ```
 >
-> Put this in the **app's own launcher**, not the generic `tray.bat.template` — that template is the byte-identical vendored tray lifecycle, and cert provisioning is app-specific. The reference wire-up lives in `grocery-shopping-automation`'s `webapp.bat`.
+> Put this in the **app's own launcher**, not the generic `tray.bat.template` — that template is the byte-identical vendored tray lifecycle, and cert provisioning is app-specific. The reference wire-up lives in an adopter's `webapp.bat`.
 
 `localhost` is **not** covered by this cert (the leaf is issued only for the `.ts.net` name), so `https://localhost:<PORT>` shows a hostname-mismatch warning — use `http://localhost:<PORT>` for plain local desktop access and the `https://<host>.ts.net:<PORT>` URL everywhere else.
 
 ### 2b. Self-signed CA (LAN-only / no-Tailscale fallback)
 
-Use this **only** for an app with no tailnet access — a genuinely LAN-only / loopback-only surface. It mints its own local **CA + leaf** and requires trusting the CA once on **every** device (the dance in §3). The app mints the CA + leaf with `scripts/gen_ssl_cert.py` (derive it from a worked example — `home-automation` / `photo-ocr` — if the scaffold itself doesn't ship one yet; that's tracked as a separate concern). The leaf's SAN list auto-includes loopback (`127.0.0.1`, `::1`, `localhost`), the machine hostname, and bound LAN IPv4s.
+Use this **only** for an app with no tailnet access — a genuinely LAN-only / loopback-only surface. It mints its own local **CA + leaf** and requires trusting the CA once on **every** device (the dance in §3). The app mints the CA + leaf with `scripts/gen_ssl_cert.py` (derive it from a worked example in an adopter if the scaffold itself doesn't ship one yet; that's tracked as a separate concern). The leaf's SAN list auto-includes loopback (`127.0.0.1`, `::1`, `localhost`), the machine hostname, and bound LAN IPv4s.
 
 ```powershell
 & .\.venv\Scripts\python.exe scripts\gen_ssl_cert.py
@@ -161,7 +161,7 @@ The webapp installs to the phone home screen as a full-screen app. **If you prov
 
 1. In Safari, open the dashboard, expand **Settings**, and tap **Install certificate** — or open `https://<pc-hostname>:<PORT>/install-ca` directly. Tap **Allow** to download the configuration profile.
 2. **Settings → General → VPN & Device Management** → tap the downloaded profile → **Install** (enter your passcode).
-3. **Settings → General → About → Certificate Trust Settings** → toggle full trust **ON** for the app's CA (e.g. "Home Automation Local CA"). This step is separate from installing the profile and is easy to miss — without it the cert is installed but still untrusted.
+3. **Settings → General → About → Certificate Trust Settings** → toggle full trust **ON** for the app's CA (e.g. "My App Local CA"). This step is separate from installing the profile and is easy to miss — without it the cert is installed but still untrusted.
 4. Force-quit Safari and reopen the URL. The lock icon should now be solid. Then **Share → Add to Home Screen** to install the PWA.
 
 **Self-signed fallback only (§2b) — Android:** the CA is served as DER at `/static/ca.crt` if a device needs the root installed.
@@ -176,7 +176,7 @@ Once the app boots over HTTPS (§1–§3), two webapp-shape conventions decide w
 
 ### 4a. Cache-bust the static module graph (`CachingStaticFiles` + fleet hash)
 
-A bare `StaticFiles` mount sends only `ETag`/`Last-Modified`, so an installed iOS PWA heuristic-caches the JS/CSS and keeps running the **old build** after a deploy + tray restart — while `/api/version` reports the new SHA. The fix is a single content/build hash used as the asset cache key, plus an explicit per-suffix `Cache-Control` and a shell that always revalidates. The nominated canonical implementation is `home-automation/src/static_versioning.py` (the `BuildInfo` + fleet-hash + rewriters) and the `CachingStaticFiles` subclass in `home-automation/app/webapp/server.py`. Copy those; adapt only the static dir.
+A bare `StaticFiles` mount sends only `ETag`/`Last-Modified`, so an installed iOS PWA heuristic-caches the JS/CSS and keeps running the **old build** after a deploy + tray restart — while `/api/version` reports the new SHA. The fix is a single content/build hash used as the asset cache key, plus an explicit per-suffix `Cache-Control` and a shell that always revalidates. The nominated canonical implementation is the reference app's `src/static_versioning.py` (the `BuildInfo` + fleet-hash + rewriters) and the `CachingStaticFiles` subclass in its `app/webapp/server.py`. Copy those; adapt only the static dir.
 
 **Why a *fleet* hash, not a per-file hash.** The webapp is an ES-module graph — `index.html` loads `main.js`, which imports the other modules. A naive per-file hash goes stale on a transitive edit: if `state.js` changes but `main.js`'s own bytes don't, `main.js`'s hash is unchanged, yet the graph it pulls in is now different — so the device re-fetches `main.js` (unchanged) and keeps the stale `state.js`. A single **fleet hash** — one SHA-256 over the concatenation of every hashable file's per-file hash — rotates *every* `?v=` stamp on any edit to any module, so the whole (tiny) graph is re-fetched together:
 
@@ -200,7 +200,7 @@ def compute_asset_hashes(static_dir: Path) -> Dict[str, str]:
     return {name: fleet_hash for name in per_file}
 ```
 
-The rewriters stamp `?v=<fleet_hash>` onto each `href`/`src` in `index.html` (`rewrite_index_html`, wrapped by `BuildInfo.stamp_html`) and onto each relative `import` in a served `.js` (`rewrite_js_imports`, wrapped by `BuildInfo.stamp_js`). **Canonical names are `stamp_html` / `stamp_js`** — this is the resolution of the old photo-ocr `stamp_js` vs voice-transcriber `rewrite_js_imports` split: apps copy one API. The matching regexes also capture an existing `?v=…` so re-stamping an already-served body is idempotent.
+The rewriters stamp `?v=<fleet_hash>` onto each `href`/`src` in `index.html` (`rewrite_index_html`, wrapped by `BuildInfo.stamp_html`) and onto each relative `import` in a served `.js` (`rewrite_js_imports`, wrapped by `BuildInfo.stamp_js`). **Canonical names are `stamp_html` / `stamp_js`** — this resolves an old `stamp_js` vs `rewrite_js_imports` split between two apps: apps copy one API. The matching regexes also capture an existing `?v=…` so re-stamping an already-served body is idempotent.
 
 **Per-suffix `Cache-Control`, and a shell that always revalidates.** The mount subclass keys the policy on the file suffix; the root route serves the shell `no-cache` so the entry document re-validates every load (a cached shell pointing at the old entry module would defeat the hashing):
 
@@ -242,7 +242,7 @@ async def index(request: Request) -> Response:
 
 ### 4b. One SQLite connection per request via a `Depends` dependency
 
-A FastAPI app backed by SQLite exposes the connection through **one** dependency that opens it, `yield`s it, and closes it in a `finally`. One place owns open/close and the connection setup (pragmas, row factory, timeout); every handler that needs the DB just declares `Depends(get_db)`, and the handle is guaranteed closed even when the handler raises. This replaces the per-handler `connect → use → close` boilerplate that `whatsapp-radar` had copy-pasted across 11 handlers — every copy a potential leak on an early return, all of them needing edits together to change setup.
+A FastAPI app backed by SQLite exposes the connection through **one** dependency that opens it, `yield`s it, and closes it in a `finally`. One place owns open/close and the connection setup (pragmas, row factory, timeout); every handler that needs the DB just declares `Depends(get_db)`, and the handle is guaranteed closed even when the handler raises. This replaces the per-handler `connect → use → close` boilerplate that one adopter had copy-pasted across 11 handlers — every copy a potential leak on an early return, all of them needing edits together to change setup.
 
 ```python
 import sqlite3
@@ -266,7 +266,7 @@ async def list_messages(db: sqlite3.Connection = Depends(get_db)) -> list[dict]:
 
 Acceptance: a derived app has **zero** per-handler `sqlite3.connect(...)` calls in its routers. SQLite + stdlib `sqlite3` stays the fleet default — this is only the lifecycle dependency, not an ORM / async driver / connection pool. The documented exception (none currently in the fleet) is an app that legitimately needs a long-lived single connection.
 
-Two gotchas when first adopting this (both surfaced shipping it into `whatsapp-radar`):
+Two gotchas when first adopting this (both surfaced shipping it into an adopter):
 
 - **ruff B008.** `Depends(get_db)` as a default argument is FastAPI's documented idiom, but `flake8-bugbear`'s B008 ("do not perform function calls in argument defaults") flags every injection. Add `fastapi.Depends` to ruff's `flake8-bugbear.extend-immutable-calls` allowlist in `pyproject.toml` so the convention doesn't fight the linter.
 - **async handlers → `async def` dependency.** If your handlers are `async def`, make `get_db` an **`async def` generator**. A plain `def` generator runs in Starlette's threadpool while the handler runs on the event-loop thread, so the connection is created in one thread and used in another — `sqlite3`'s same-thread guard trips unless you pass `check_same_thread=False` (the snippet above does). The `async def` form keeps creation and use on the same thread and is the cleaner fix.
@@ -285,7 +285,7 @@ Either way, stamp `data-theme` on `<html>` before first paint with the `text-siz
 ## See also
 
 - [`windows-tray.md`](windows-tray.md) — the tray lifecycle this playbook deliberately does **not** duplicate: idempotent single-instance start, the orphan-proof `tray.bat --restart`, and the agent-side restart contract.
-- `home-automation` `README.md` (the cert + "Phone install (PWA)" sections) and `photo-ocr` `README.md` — the two worked examples this playbook is lifted from.
-- `scripts/gen_tailscale_cert.py` (this scaffold) — the preferred-path generator: provision a real Let's Encrypt leaf via `tailscale cert` plus the `--check` auto-renew leg. **Copy-to-adapt, not vendor-verbatim** — every real adopter's copy differs (its own `NO_WINDOW` import, `grocery-shopping-automation`'s different `CERT_DIR`), so it is not in the scaffold's `[components]` catalog. Reference wire-up into a webapp launcher: `grocery-shopping-automation`'s `webapp.bat`.
+- An adopter's `README.md` (the cert + "Phone install (PWA)" sections) — the worked example this playbook is lifted from.
+- `scripts/gen_tailscale_cert.py` (this scaffold) — the preferred-path generator: provision a real Let's Encrypt leaf via `tailscale cert` plus the `--check` auto-renew leg. **Copy-to-adapt, not vendor-verbatim** — every real adopter's copy differs (its own `NO_WINDOW` import, one app's different `CERT_DIR`), so it is not in the scaffold's `[components]` catalog. Reference wire-up into a webapp launcher: an adopter's `webapp.bat`.
 - `scripts/gen_ssl_cert.py` in either worked-example repo — the **fallback** self-signed CA + leaf generator (auto-trust on Windows, `/install-ca` mobileconfig output) for LAN-only apps.
-- `home-automation/src/static_versioning.py` + the `CachingStaticFiles` subclass in `home-automation/app/webapp/server.py` — the nominated **canonical** cache-busting reference (§4a): the fleet-hash `BuildInfo` with `stamp_html`/`stamp_js`, copied verbatim into a new PWA app.
+- The reference app's `src/static_versioning.py` + the `CachingStaticFiles` subclass in its `app/webapp/server.py` — the nominated **canonical** cache-busting reference (§4a): the fleet-hash `BuildInfo` with `stamp_html`/`stamp_js`, copied verbatim into a new PWA app.

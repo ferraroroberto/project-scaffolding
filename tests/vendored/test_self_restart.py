@@ -211,9 +211,9 @@ def test_the_tray_recipe_starts_when_the_cwd_is_off_the_exe_search_path(
 
 
 def test_launch_root_keeps_the_launch_spelling(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(sys, "prefix", str(Path("E:/automation/my-app/.venv")))
+    monkeypatch.setattr(sys, "prefix", str(Path("E:/apps/my-app/.venv")))
     monkeypatch.setattr(sys, "base_prefix", str(Path("C:/Python311")))
-    assert self_restart.launch_root() == Path(os.path.abspath("E:/automation/my-app"))
+    assert self_restart.launch_root() == Path(os.path.abspath("E:/apps/my-app"))
 
 
 @pytest.mark.skipif(sys.platform != "win32", reason="taskkill /T is the Windows tray restart's kill")

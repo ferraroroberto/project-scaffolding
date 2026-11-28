@@ -14,15 +14,15 @@ imports it.
 Usage (from a downstream project's own ``scripts/gen_icons.py``):
 
     import sys
-    sys.path.insert(0, r"E:\automation\project-scaffolding\scripts\tools")
+    sys.path.insert(0, r"<scaffold-checkout>\scripts\tools")
     from brand_gen import render_set
 
     render_set(
-        master=Path(r"E:\automation\project-scaffolding\brand\rocket.svg"),
+        master=Path(r"<scaffold-checkout>\brand\rocket.svg"),
         out_dir=STATIC_DIR,
         tray_out_dir=PROJECT_ROOT / "assets" / "tray",
         stream_deck_out_dir=PROJECT_ROOT / "assets" / "stream-deck",
-        project_slug="app-launcher",
+        project_slug="my-app",
     )
 """
 from __future__ import annotations

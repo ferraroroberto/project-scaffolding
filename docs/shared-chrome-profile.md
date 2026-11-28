@@ -76,7 +76,7 @@ a new module. The wrapper composes with the stealth launch kwargs: it calls
 them internally and returns the context, so callers swap one line in their
 session `__enter__` and inherit the whole behavior.
 
-A reference implementation lives in the `content-management` project:
+A reference implementation lives in one fleet project:
 `config/chrome_profile_lock.py` exposing
 `launch_persistent_context_with_lock_wait(playwright, user_data_dir, *,
 headless, logger, backoff_seconds=...)`, with `backoff_seconds` injectable so

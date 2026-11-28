@@ -2,9 +2,9 @@
 
 The load-bearing assertions are the *precedence* ones. Every fleet app that
 adopts this module already has a full-path override its unit and e2e harnesses
-set (``TELEMETRY_DB_PATH``, ``WR_DB_PATH``, …); if that override ever stopped
+set (``TELEMETRY_DB_PATH``, ``MYAPP_DB_PATH``, …); if that override ever stopped
 winning, a test run would silently write into the live production store — the
-exact pollution bug `home-automation#296` fixed once already.
+exact pollution bug one adopter fixed once already.
 """
 
 from __future__ import annotations
@@ -34,8 +34,8 @@ def _clean_env(monkeypatch: pytest.MonkeyPatch) -> None:
 # ------------------------------------------------------------- env-var names
 
 def test_app_dir_env_var_normalises_the_slug() -> None:
-    assert app_dir_env_var("home-automation") == "HOME_AUTOMATION_DATA_DIR"
-    assert app_dir_env_var("task-os") == "TASK_OS_DATA_DIR"
+    assert app_dir_env_var("demo-app") == "DEMO_APP_DATA_DIR"
+    assert app_dir_env_var("other-app") == "OTHER_APP_DATA_DIR"
     assert app_dir_env_var("demo") == "DEMO_DATA_DIR"
 
 
@@ -73,8 +73,8 @@ def test_each_app_gets_its_own_subdirectory(
 ) -> None:
     """The whole point of the per-app level: two apps, same filename, no clash."""
     monkeypatch.setenv(FLEET_DATA_ROOT_ENV, str(tmp_path))
-    a = runtime_db_path("home-automation", "telemetry.sqlite3")
-    b = runtime_db_path("voice-transcriber", "telemetry.sqlite3")
+    a = runtime_db_path("demo-app", "telemetry.sqlite3")
+    b = runtime_db_path("other-app", "telemetry.sqlite3")
     assert a != b
     assert a.name == b.name == "telemetry.sqlite3"
 

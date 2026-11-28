@@ -1,6 +1,6 @@
 # `icon-tile` — the Home-screen rounded-square
 
-The fleet's canonical **icon tile**: a squircle at `rounded.md` filled with **one** of the five `tile-*` colors (the fleet's only saturated surfaces), a centered feature-size Lucide glyph in `accent-fg`. The fill signals *category*, not state — never use a `tile-*` color anywhere else. Contract: `~/.claude/design.md` → `icon-tile` token block + "Component contracts".
+The fleet's canonical **icon tile**: a squircle at `rounded.md` filled with **one** of the five `tile-*` colors (the fleet's only saturated surfaces), a centered feature-size Lucide glyph in `accent-fg`. The fill signals *category*, not state — never use a `tile-*` color anywhere else. Contract: the fleet design system → `icon-tile` token block + "Component contracts".
 
 ## Files
 
@@ -43,7 +43,7 @@ The fleet's canonical **icon tile**: a squircle at `rounded.md` filled with **on
 | `--icon-feature` | `24px` | glyph size (`icons.size.feature`) |
 | `--tile-size` | `48px` (proposed) | tile box |
 
-**`--tile-size` note:** unlike every other value here, the tile box size has no shipped fleet instance behind it yet — `48px` is proposed from the GitHub-mobile look the identity is modelled on (glyph ½ the tile). The first adopting app (app-launcher, per the rollout plan) validates it; if it lands differently, update this README and `design.md` **together**.
+**`--tile-size` note:** unlike every other value here, the tile box size has no shipped fleet instance behind it yet — `48px` is proposed from the GitHub-mobile look the identity is modelled on (glyph ½ the tile). The first adopting app (per the rollout plan) validates it; if it lands differently, update this README and `design.md` **together**.
 
 ## Don't diverge
 

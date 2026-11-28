@@ -1,6 +1,6 @@
 # `src/doc_capture/` — deterministic, fail-safe app screenshots + README regen
 
-Canonical **vendor-verbatim** component (project-scaffolding#171; pilot proven and merged in ferraroroberto/content-management#110, PR #162). Manifest-driven Playwright screenshots of a *running* app, plus a README "tour" section regenerated between markers. The companion LLM half — the `/docs-shots` skill that decides *when* to capture (diff ∩ `source_globs` → propose-then-capture) — lives in ferraroroberto/fleet-config#93 and invokes this engine; the skill activates only when `docs/screenshots/manifest.json` exists in a repo.
+Canonical **vendor-verbatim** component (project-scaffolding#171; pilot proven in its first adopter). Manifest-driven Playwright screenshots of a *running* app, plus a README "tour" section regenerated between markers. The companion LLM half — the `/docs-shots` skill that decides *when* to capture (diff ∩ `source_globs` → propose-then-capture) — lives in `fleet-config` and invokes this engine; the skill activates only when `docs/screenshots/manifest.json` exists in a repo.
 
 ## Invariants (the part worth canonicalizing)
 
@@ -8,7 +8,7 @@ Canonical **vendor-verbatim** component (project-scaffolding#171; pilot proven a
 - **Fail-safe masking.** An entry without `mask` selectors is refused, loudly — never captured raw, even with `--force`. Enforced in `plan_features`; `capture_features` only acts on planned items, so nothing downstream can bypass the gate.
 - **Idempotency by input hash.** sha256 over the files matched by `source_globs` + the entry's capture config (`reach`/`mask`/`wait`). PNG bytes are never hashed (they drift run-to-run).
 - **Stable filenames.** `docs/screenshots/<feature>-desktop.png`; timestamps live in manifest metadata only, so git diffs stay clean.
-- **Clean, non-persistent, non-stealth browser.** `launch.py` launches real Chrome (`channel="chrome"`) with determinism flags (`srgb`, hidden scrollbars, pinned locale/timezone/scale, forced light + reduced motion) and a settle CSS that kills animations/carets. This is deliberately *not* the stealth scraping profile — doc capture drives your own localhost app — so the kwargs ship self-contained inside the component (reasoning: content-management#110). A project with its own `chrome_launch.py` may re-export them.
+- **Clean, non-persistent, non-stealth browser.** `launch.py` launches real Chrome (`channel="chrome"`) with determinism flags (`srgb`, hidden scrollbars, pinned locale/timezone/scale, forced light + reduced motion) and a settle CSS that kills animations/carets. This is deliberately *not* the stealth scraping profile — doc capture drives your own localhost app — so the kwargs ship self-contained inside the component (reasoning: the first adopter's pilot). A project with its own `chrome_launch.py` may re-export them.
 
 ## Files
 
@@ -82,6 +82,6 @@ Add the two markers once, where the screenshots belong:
 doc_capture = { src = "src/doc_capture", sha = "<scaffold commit>", dest = "src/doc_capture" }
 ```
 
-**First adopter:** `content-management` (the pilot, at `dest = "config/doc_capture"`) — its `[vendored].doc_capture` entry is written by the first `/propagate-vendored doc_capture` wave, which re-vendors this canonical shape over the pilot copy.
+**First adopter:** the pilot, at `dest = "config/doc_capture"` — its `[vendored].doc_capture` entry is written by the first `/propagate-vendored doc_capture` wave, which re-vendors this canonical shape over the pilot copy.
 
 Dependencies: Playwright (+ real Chrome) at capture time only — planning, hashing, and README regen are stdlib and run browserless.

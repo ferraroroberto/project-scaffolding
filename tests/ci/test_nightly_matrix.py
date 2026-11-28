@@ -78,8 +78,8 @@ def test_an_opt_out_needs_only_its_reason() -> None:
 
 def test_the_adopter_list_ignores_comments_and_rejects_odd_names(tmp_path: Path) -> None:
     good = tmp_path / "a.txt"
-    good.write_text("# header\nhome-automation\n\nother  # note\nhome-automation\n", encoding="utf-8")
-    assert nm.read_adopters(good) == ["home-automation", "other"]
+    good.write_text("# header\nrepo-a\n\nrepo-b  # note\nrepo-a\n", encoding="utf-8")
+    assert nm.read_adopters(good) == ["repo-a", "repo-b"]
     bad = tmp_path / "b.txt"
     bad.write_text("../escape repo\n", encoding="utf-8")
     with pytest.raises(ValueError):
@@ -158,6 +158,18 @@ def test_build_writes_the_matrix_and_an_empty_night_is_clean(tmp_path: Path, mon
     lines = dict(line.split("=", 1) for line in out.read_text(encoding="utf-8").splitlines())
     assert json.loads(lines["matrix"]) == {"include": []} and lines["count"] == "0"
     assert "Nothing changed" in summary.read_text(encoding="utf-8")
+
+
+@pytest.mark.parametrize("content", ["", "\n", "# only a comment\n"])
+def test_an_empty_adopter_list_is_unknown_not_a_clean_night(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], content: str,
+) -> None:
+    """An unset NIGHTLY_ADOPTERS variable writes a blank list: that must not go green."""
+    adopters = tmp_path / "adopters.txt"
+    adopters.write_text(content, encoding="utf-8")
+    argv = ["build", "--adopters", str(adopters), "--url-base", "https://x/", "--state-root", str(tmp_path / "state")]
+    assert nm.main(argv) == 3
+    assert "SELECT=unknown" in capsys.readouterr().out
 
 
 def test_fetch_main_reads_sha_and_table_from_one_shallow_fetch(tmp_path: Path) -> None:
@@ -354,14 +366,14 @@ def test_a_green_night_writes_ready_and_records_the_sha(tmp_path: Path) -> None:
     results.mkdir()
     (results / "e2e-flaky.txt").write_text("m::a\nm::b\n", encoding="utf-8")
     rc = nm.main([
-        "ready", "--results", str(results), "--state", str(state), "--run", "42", "--repo", "home-automation",
+        "ready", "--results", str(results), "--state", str(state), "--run", "42", "--repo", "repo-a",
         "--sha", SHA_B, "--status", "run", "--declared", ",unit,e2e,smoke",
         "--unit", "pass", "--e2e", "flaky", "--smoke", "pass", "--smoke-step", "success", "--audit", "clean",
     ])
     assert rc == 0
     ready = dict(line.split("=", 1) for line in (results / "READY").read_text(encoding="utf-8").splitlines())
     assert ready == {
-        "run": "42", "repo": "home-automation", "sha": SHA_B, "result": "green",
+        "run": "42", "repo": "repo-a", "sha": SHA_B, "result": "green",
         "unit": "pass", "e2e": "flaky", "smoke": "pass", "flaky": "2", "audit": "clean",
     }
     assert all(" " not in v for v in ready.values()), "the puller reads READY values as single tokens"

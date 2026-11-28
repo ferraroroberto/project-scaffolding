@@ -52,7 +52,7 @@ One sign is a hint; two or more on the same concept is a suspect worth a deep-di
 
 ## Worked example
 
-local-llm-hub declares the per-model serving state: `stopped`, `loading`, `ready`, `adopted`, `failed` and `unknown`, derived in one module from one observation and read the same way by the Models tab, the audio health route and the fleet placement summary. Its write-up, [local-llm-hub `docs/serving-state.md`](https://github.com/ferraroroberto/local-llm-hub/blob/main/docs/serving-state.md), is the model to follow: why the machine was implicit, the state table, who reads it, and the rule that a new reader calls the derive path.
+The local LLM hub declares the per-model serving state: `stopped`, `loading`, `ready`, `adopted`, `failed` and `unknown`, derived in one module from one observation and read the same way by the Models tab, the audio health route and the fleet placement summary. Its write-up (the hub's `docs/serving-state.md`) is the model to follow: why the machine was implicit, the state table, who reads it, and the rule that a new reader calls the derive path.
 
 ## Vibe coding recreates them
 

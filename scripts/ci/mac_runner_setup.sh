@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Install, check or remove the fleet's self-hosted GitHub Actions runner on the
-# Mac Mini. Run it as the runner user, in that user's GUI session (the iOS
+# Install, check or remove the fleet's self-hosted GitHub Actions runner on a
+# Mac. Run it as the runner user, in that user's GUI session (the iOS
 # Simulator needs one). Guide, prerequisites and safety settings:
 # docs/mac-runner.md.
 #
@@ -14,18 +14,26 @@
 # in, or `gh auth logout` once the runner is registered.
 #
 # Environment overrides:
-#   RUNNER_REPO  owner/repo the runner registers on (default ferraroroberto/project-scaffolding)
-#   RUNNER_NAME  runner name (default mac-mini)
+#   RUNNER_REPO  owner/repo the runner registers on (default: this checkout's GitHub origin)
+#   RUNNER_NAME  runner name (default mac-runner)
 #   RUNNER_DIR   install folder (default ~/actions-runner)
 set -euo pipefail
 
-REPO="${RUNNER_REPO:-ferraroroberto/project-scaffolding}"
-NAME="${RUNNER_NAME:-mac-mini}"
+# owner/repo from the origin URL (https or ssh); empty when it is not on GitHub.
+origin_slug() {
+  git -C "$(dirname "$0")" remote get-url origin 2>/dev/null \
+    | sed -n 's#^.*github\.com[:/]\([^/]*/[^/]*\)$#\1#p' | sed 's#\.git$##'
+}
+
+REPO="${RUNNER_REPO:-$(origin_slug || true)}"
+NAME="${RUNNER_NAME:-mac-runner}"
 DIR="${RUNNER_DIR:-$HOME/actions-runner}"
 # self-hosted, macOS and ARM64 are added by the runner itself; labels match
 # case-insensitively, so the workflow's [self-hosted, macos, arm64, iphone-sim]
 # needs only this one custom label.
 LABELS="iphone-sim"
+# user-path-exempt: the fixed folder actions/setup-python installs into on macOS
+SETUP_PYTHON_HOME="/Users/runner"
 
 log() { printf '%s\n' "$*"; }
 die() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
@@ -52,9 +60,9 @@ preflight() {
     log "creating an iPhone simulator for this user"
     xcrun simctl create "nightly iPhone" "$model" "$runtime" >/dev/null
   fi
-  [ -w /Users/runner ] \
-    || die "/Users/runner is missing or not writable, which actions/setup-python needs: sudo mkdir -p /Users/runner && sudo chown $(id -un) /Users/runner"
-  log "ok: macOS arm64, simctl, an available iPhone simulator, writable /Users/runner"
+  [ -w "$SETUP_PYTHON_HOME" ] \
+    || die "$SETUP_PYTHON_HOME is missing or not writable, which actions/setup-python needs: sudo mkdir -p $SETUP_PYTHON_HOME && sudo chown $(id -un) $SETUP_PYTHON_HOME"
+  log "ok: macOS arm64, simctl, an available iPhone simulator, writable $SETUP_PYTHON_HOME"
 }
 
 install() {
@@ -105,6 +113,8 @@ remove() {
   ./config.sh remove --token "${RUNNER_REMOVE_TOKEN:-$(token remove-token)}"
   log "runner $NAME removed from $REPO; $DIR can now be deleted by hand"
 }
+
+[[ "$REPO" == */* ]] || die "cannot tell the repo from this checkout's origin; set RUNNER_REPO=owner/repo"
 
 case "${1:-}" in
   install) install ;;

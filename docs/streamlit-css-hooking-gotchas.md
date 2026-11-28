@@ -135,14 +135,14 @@ just below the header instead of underneath it.
 
 ## Single source of truth
 
-Reference implementation combining all three gotchas: `content-management`'s
+Reference implementation combining all three gotchas: one adopter's
 `app/app.py` — a sticky
 `segmented_control` nav bar with an inline theme toggle. That specific
 nav/theme *pattern* is not vendored here: this scaffold's own Streamlit
 starter (`app/app.py`) uses a structurally different navigation
 (`st.navigation` + `st.Page` in the sidebar) and already ships a simpler
 theme toggle (a sidebar `st.toggle()` injecting a `light.css` overlay, no
-private API needed) — content-management's approach exists specifically to
+private API needed) — that adopter's approach exists specifically to
 work around `st.tabs()` losing state on rerun
 and a locked custom theme in that
 repo's `config.toml`, neither of which applies to this scaffold's starter.

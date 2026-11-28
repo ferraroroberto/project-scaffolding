@@ -103,7 +103,7 @@ def test_a_port_holder_is_traced_to_its_checkout_on_windows_listings(tmp_path: P
 def test_a_macos_listing_with_no_drive_path_is_never_traced_to_a_checkout() -> None:
     """The installer probes Windows only: a macOS framework python names no drive path, so it is never the app's."""
     framework = "/Library/Frameworks/Python.framework/Versions/3.13/Resources/Python.app/Contents/MacOS/Python"
-    darwin = m.Snapshot({5: m.Proc(5, 1, framework, "/Users/o/app/.venv/bin/python -m app")}, {8453: {5: {"*"}}})
+    darwin = m.Snapshot({5: m.Proc(5, 1, framework, "/Users/sample/app/.venv/bin/python -m app")}, {8453: {5: {"*"}}})
     assert installer_inplace.port_holders(darwin, 8453) == []  # "*" is not a loopback address in the Windows listing's terms
     darwin.listeners[8453] = {5: {"::"}}
     assert installer_inplace.port_holders(darwin, 8453) == [(5, darwin.procs[5], None)]

@@ -8,8 +8,8 @@ count and the first/last timestamps over the last ``--days`` days. With
 per device class and per view, the report ``GET /api/usage/time`` serves
 (rules: the ``src/usage_log.py`` docstring).
 
-    python scripts/usage_summary.py --app app-launcher --days 30 --json
-    python scripts/usage_summary.py --app app-launcher --days 7 --time
+    python scripts/usage_summary.py --app my-app --days 30 --json
+    python scripts/usage_summary.py --app my-app --days 7 --time
 
 ``/design-review``'s full-app inventory fills its frequency column from this
 output. A missing database exits 2 with a message on stderr — "no data yet"
@@ -84,7 +84,7 @@ def _render_time(app: str, db_path: Path, report: dict[str, Any]) -> str:
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="Summarize a fleet app's local usage log.")
-    ap.add_argument("--app", required=True, help="app slug, e.g. app-launcher (its runtime-data directory name)")
+    ap.add_argument("--app", required=True, help="app slug, e.g. my-app (its runtime-data directory name)")
     ap.add_argument("--days", type=int, default=30, help="window in days (default 30)")
     ap.add_argument("--json", action="store_true", help="print JSON instead of text")
     ap.add_argument("--time", action="store_true",

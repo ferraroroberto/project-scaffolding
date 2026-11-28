@@ -819,7 +819,7 @@ def test_classifier_fits_the_strictest_adopter_line_length() -> None:
     """No line over 100 columns (project-scaffolding#262).
 
     This file is vendored byte-verbatim, so it can't be reformatted downstream.
-    whatsapp-radar lints its whole tree at ``line-length = 100`` with ``E``
+    One adopter lints its whole tree at ``line-length = 100`` with ``E``
     selected; a longer line here fails that adopter's gate on re-vendor.
     """
     source = REPO_ROOT / "scripts" / "classify_e2e.py"

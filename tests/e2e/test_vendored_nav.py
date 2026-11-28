@@ -152,7 +152,7 @@ def _check_desktop_control_and_wide_rail(nav: Page) -> None:
     assert app_x >= _RAIL, app_x
 
 
-# An app's generic icon utility, as home-automation and local-llm-hub ship it
+# An app's generic icon utility, as two adopters ship it
 # on every glyph, the nav's included. It loads after nav-tabs.css.
 _APP_ICON_UTILITY = ".icon { display: inline-block; width: 1em; height: 1em; }"
 
@@ -177,7 +177,7 @@ def _check_app_icon_utility_does_not_resize_nav_glyphs(nav: Page) -> None:
     The icon-size rules used to be a bare `.tab-icon`, the same specificity as
     an app's icon utility, so whichever stylesheet loaded last won: the rail's
     icons rendered at 1em of the 12px caption (12px, not 24px) in
-    home-automation, and local-llm-hub was right only because its styles.css
+    one adopter, and another was right only because its styles.css
     loads first. The rail also keeps its 24px when an app leaves
     `--icon-feature` undefined.
     """
