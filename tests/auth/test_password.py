@@ -192,12 +192,13 @@ def test_a_bom_prefixed_password_file_and_legacy_config_read_the_same(pw_file: P
     assert password.main(["status", "--legacy", str(app_config), "auth_password"]) == 0
 
 
-@pytest.mark.parametrize("content", [b"not json", b"[]", b"\xff\xfe"])
-def test_cli_status_of_a_password_file_that_does_not_parse_is_unknown_not_missing(
+@pytest.mark.parametrize("content", [b"", b"{", b"not json", b"[]", b"\xff\xfe"])
+def test_cli_status_of_a_password_file_that_does_not_parse_is_missing_logged_and_untouched(
     pw_file: Path, caplog: pytest.LogCaptureFixture, content: bytes
 ) -> None:
+    # Exit 2 is for a file that cannot be read; content no login can use is a known "none stored".
     pw_file.parent.mkdir(parents=True)
     pw_file.write_bytes(content)
-    assert password.main(["status"]) == 2
+    assert password.main(["status"]) == 1
     assert pw_file.read_bytes() == content
     assert "password file" in caplog.text
