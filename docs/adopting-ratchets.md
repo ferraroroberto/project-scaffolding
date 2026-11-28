@@ -62,9 +62,16 @@ Clone this repository anywhere (it is the source; nothing is installed from it),
 
 2. **Review the baselines.** Each `.ratchets/<name>.json` is today's debt, one entry per line. Adoption never requires cleaning it up first.
 
-3. **Commit** `scripts/`, `.fleet.toml` and the baseline files together.
+3. **Run the repo's own tests.** A copied script is a new file under `scripts/`, so a test that walks the whole tree sees it, and the ratchets' `[vendored]` skip does not reach that test. Give the new file its entry in the same commit; never edit the copy. Two such tests:
 
-4. **Wire the gate.** Run the runner wherever the repo's checks run (a pre-push script, a Makefile target, CI):
+   | The repo's test | Entry the new script needs |
+   |---|---|
+   | a spawn guard that accepts only the repo's shared no-window constant | its list of vendored files: a copied script cannot import that constant, so it derives `_NO_WINDOW` itself and passes it on every spawn |
+   | a README layout tree that must name every script | one line in the tree |
+
+4. **Commit** `scripts/`, `.fleet.toml` and the baseline files together.
+
+5. **Wire the gate.** Run the runner wherever the repo's checks run (a pre-push script, a Makefile target, CI):
 
    ```
    .venv/Scripts/python.exe scripts/run_ratchets.py --tests .venv/Scripts/python.exe -m pytest -q
