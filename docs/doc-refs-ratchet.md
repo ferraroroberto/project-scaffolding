@@ -34,7 +34,7 @@ The tree of record is `git ls-files --cached --others --exclude-standard` (spawn
 | Not checked | Why |
 |---|---|
 | A path whose first segment is not a tracked top-level folder | Another repo's tree reads exactly like a typo. Bare file names (`tray.bat`, `design.md`) are skipped for the same reason: in a fleet dry run they were about 2,000 of 2,500 hits, and a reviewed sample was dotted identifiers (`browser.close`, `st.error`), bare extensions (`.py`) and files that live in another repo |
-| A span right after a possessive, a pronoun or a repo slug | `` `fleet-config`'s `docs/repo-layout.md` ``, "its", "their", `local-llm-hub` `docs/repo-layout.md`, a table row whose previous cell is a repo slug. The previous line's end counts when the span opens its line, so a wrapped possessive still qualifies |
+| A span right after a possessive, a pronoun or a repo slug | `` `fleet-config`'s `docs/repo-layout.md` ``, "its", "their", `repo-a` `docs/repo-layout.md`, a table row whose previous cell is a repo slug. The previous line's end counts when the span opens its line, so a wrapped possessive still qualifies |
 | Placeholders, globs and variables | `<`, `>`, `*`, `?`, `{}`, `[]`, `$`, `%`, `\|`, `=`, `…` or `...` in the token |
 | Absolute, home and drive paths, URLs, `..` segments in a span | Machine-local, or not a claim about this tree |
 | A link that leaves the repo | `../../other-repo/x.md` points at a sibling checkout this stage cannot see |

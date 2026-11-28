@@ -256,7 +256,7 @@ opt-in via .fleet.toml [install_standard_ratchet]; exit 3 = not confirmed"]
     BRANDSVGS["catalog.json + 21 curated identity SVGs\nvendored verbatim from lucide-static"]
   end
   BRANDGEN -->|reads| BRANDSVGS
-  BRANDGEN -.->|imported via known local path by| DOWNSTREAM["downstream projects'\nscripts/gen_icons.py\n(app-launcher, photo-ocr, voice-transcriber,\nlocal-llm-hub, whatsapp-radar, home-automation)"]
+  BRANDGEN -.->|imported via known local path by| DOWNSTREAM["downstream projects'\nscripts/gen_icons.py\n(each adopter's own caller)"]
 
   subgraph testsdir["tests/"]
     UNIT["test_*.py\none file per src/ module, hermetic\n(incl. test_doc_capture.py — browserless\nplan/hash/readme/adapter contract;\ntest_watchdog.py — retry/edge-transition/breadcrumb,\nno sleeping, no threads)"]
@@ -331,7 +331,7 @@ opt-in via .fleet.toml [install_standard_ratchet]; exit 3 = not confirmed"]
   NIGHTLYMAC[".github/workflows/nightly-mac.yml
 the fleet's nightly CI on the self-hosted Mac runner
 schedule + dispatch only, fork-guarded, no secrets
-select job: scripts/ci/nightly_matrix.py reads .github/nightly-adopters.txt
+select job: scripts/ci/nightly_matrix.py reads the NIGHTLY_ADOPTERS repository variable
 + each adopter's [ci.nightly] table, changed repos only (all on Sunday)
 per adopter: unit + WebKit e2e (one retry) + scripts/ci/ios_sim_smoke.py
 results + READY stay on the runner host"]

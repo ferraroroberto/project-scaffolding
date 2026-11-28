@@ -51,7 +51,8 @@ MAX_AUDIT_BYTES = 1_000_000
 MAX_NODES_IN_ISSUE = 50
 MAX_NODE_CHARS = 300
 ISSUE_TITLE = "e2e routing: nightly audit found a miss"
-OWNER = "ferraroroberto"
+# The checkout this script runs from; its origin's owner owns the adopters too.
+REPO_ROOT = Path(__file__).resolve().parents[2]
 _REPO_NAME = re.compile(r"^[A-Za-z0-9._-]+$")
 
 
@@ -270,13 +271,19 @@ def issue_body(data: dict[str, Any]) -> str:
 def _gh(*args: str) -> str | None:
     try:
         out = subprocess.run(
-            ["gh", *args], capture_output=True, text=True, encoding="utf-8",
+            ["gh", *args], cwd=REPO_ROOT, capture_output=True, text=True, encoding="utf-8",
             errors="replace", stdin=subprocess.DEVNULL, creationflags=NO_WINDOW,
             timeout=GH_TIMEOUT_S,
         )
     except (OSError, subprocess.TimeoutExpired):
         return None
     return out.stdout if out.returncode == 0 else None
+
+
+def _checkout_owner() -> str | None:
+    """The GitHub owner of this checkout, or None when gh cannot say."""
+    out = _gh("repo", "view", "--json", "owner", "--jq", ".owner.login")
+    return (out or "").strip() or None
 
 
 def file_issue(data: dict[str, Any], slug: str) -> tuple[str, str]:
@@ -312,11 +319,17 @@ def _file_main(args: argparse.Namespace) -> int:
     if data.get("outcome") != "miss" or not data["miss_nodes"]:
         print(f"FILE=none outcome={data.get('outcome')}")
         return 0
-    slug = args.repo_slug or f"{OWNER}/{data['repo']}"
     if args.dry_run:
         print(issue_body(data))
         print("FILE=none dry-run")
         return 0
+    slug = args.repo_slug
+    if not slug:
+        owner = _checkout_owner()
+        if owner is None:
+            print("FILE=unknown reason=gh could not name this checkout's owner")
+            return 3
+        slug = f"{owner}/{data['repo']}"
     state, detail = file_issue(data, slug)
     print(f"FILE={state} {detail}")
     return 3 if state == "unknown" else 0
@@ -335,7 +348,7 @@ def main(argv: list[str]) -> int:
     a.add_argument("--summary-file")
     f = sub.add_parser("file", help="file or update the adopter issue (trusted host, needs gh)")
     f.add_argument("--audit", required=True)
-    f.add_argument("--repo-slug", help="owner/name; default is the owner's repo named in audit.json")
+    f.add_argument("--repo-slug", help="owner/name; default is audit.json's repo under this checkout's owner")
     f.add_argument("--dry-run", action="store_true")
     args = parser.parse_args(argv[1:])
     return _audit_main(args) if args.cmd == "audit" else _file_main(args)

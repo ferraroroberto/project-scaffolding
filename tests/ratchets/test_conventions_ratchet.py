@@ -199,7 +199,7 @@ def test_helpers_and_wrappers_may_do_what_everyone_else_may_not() -> None:
     assert hits("import subprocess\nsubprocess.run(['git', 'x'], creationflags=0)\n", "src/git_run.py") == []
     assert hits("from secrets import compare_digest\ncompare_digest(a, b)\n") == ["secret-compare:2"]
     assert hits("import subprocess\nsubprocess.run('git status', creationflags=0)\n") == ["git-wrapper:2"]
-    assert hits("import subprocess\nsubprocess.run([r'C:\\\\Git\\\\git.exe', 'x'], creationflags=0)\n") == [
+    assert hits("import subprocess\nsubprocess.run([r'C:\\\\Tools\\\\git.exe', 'x'], creationflags=0)\n") == [
         "git-wrapper:2", "no-drive-path:2"]
 
 
@@ -714,7 +714,7 @@ def test_no_baseline_is_ever_read_as_evidence(repo: Path, capsys: pytest.Capture
     run_mode(repo, init=True)
     git(repo, "add", "-f", cr.DEFAULT_BASELINE)
     write(repo, ".dead-code-ratchet-baseline.json", '{"note": "E:/old/data subprocess.run([\'x\'])"}\n')
-    write(repo, "notes.txt", "C:/Users/someone\n")
+    write(repo, "notes.txt", "C:/Users/sample\n")
     capsys.readouterr()
     assert run_mode(repo) == cr.EXIT_PASS
     assert "PASS (1 baselined hit(s) in 1 file(s), none new" in capsys.readouterr().out

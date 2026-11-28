@@ -2,7 +2,7 @@
 
 Vendor-verbatim component. Copy this whole package unchanged; relative
 imports keep it location-independent (``src/doc_capture/`` here,
-``config/doc_capture/`` in content-management) as long as it sits exactly two
+``config/doc_capture/`` in one adopter) as long as it sits exactly two
 directories below the repo root. The per-app contract lives in
 ``docs/screenshots/manifest.json`` — see this package's ``README.md``.
 """

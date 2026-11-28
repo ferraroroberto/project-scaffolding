@@ -1,6 +1,6 @@
 """Speech-to-text latency of the hub's audio route, before and during a nightly run.
 
-The Mac Mini that hosts the nightly runner also serves speech-to-text for the
+The Mac that hosts the nightly runner also serves speech-to-text for the
 hub (the `audio_transcribe` role). This answers one question: does a
 `nightly-mac` run move that latency? The same fixed probe runs twice, once with
 the Mac idle and once overlapping a run, and the two p95 figures are compared.

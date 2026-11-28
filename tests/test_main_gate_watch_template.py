@@ -2,7 +2,7 @@
 
 The template files a `ci-red-main` tracking issue the moment the adopting repo's
 gate goes red on a push to `main` — the fix for "a red default branch is nobody's
-finding" (`whatsapp-radar#258`: four days red, discounted in turn by two
+finding" (seen in one adopter: four days red, discounted in turn by two
 unrelated PRs). It is inherited by every clone, so the properties that make it
 *correct* are asserted here rather than left to a careful reader:
 
@@ -79,7 +79,7 @@ def test_gate_workflow_name_is_parameterised() -> None:
         "A literal `e2e` survives in the executable body — the template would "
         "file 'main's e2e gate is red' in a repo whose gate is not called e2e."
     )
-    assert "ferraroroberto" not in text, (
+    assert re.findall(r"--assignee\s+(\S+)", body) == ['"$OWNER"'] and "OWNER: ${{ github.repository_owner }}" in body, (
         "Hardcoded assignee. Use ${{ github.repository_owner }} — every clone "
         "inherits this file, and not every clone is owned by the same account."
     )

@@ -162,7 +162,7 @@ def test_recovery_fires_once_and_rearms_the_edge() -> None:
 
 
 def test_rearm_lets_a_failed_respawn_try_again_next_tick() -> None:
-    """photo-ocr#110's addition: without rearm() a failed respawn goes silent forever."""
+    """Without rearm() a failed respawn goes silent forever."""
     rec = _Recorder()
     wd: HealthWatchdog
 

@@ -1,8 +1,8 @@
 # `day-row` — an action-row led by a date tile
 
-The fleet's **date-keyed row** (`~/.claude/design.md` → action-row, "date tile", `ferraroroberto/fleet-config#1356`): an [`action-row`](../action-row/) whose **one leading slot is a date tile**, the weekday over the day number in a 44px square, today tinted `accent-soft`, all text at least 14px. The title then says what the day *is* ("Booked", "Holiday") and the one context line gives the reason. A chip appears **only for an exception**, and a chevron **only when the row opens something**.
+The fleet's **date-keyed row** (the fleet design system → action-row, "date tile"): an [`action-row`](../action-row/) whose **one leading slot is a date tile**, the weekday over the day number in a 44px square, today tinted `accent-soft`, all text at least 14px. The title then says what the day *is* ("Booked", "Holiday") and the one context line gives the reason. A chip appears **only for an exception**, and a chevron **only when the row opens something**.
 
-Normalized from parking-manager's day row (`parking-manager#113`, `#114`), where one renderer served Home's coming days, a live view and a holidays list. It stops the next date-keyed app from drawing its own (`project-scaffolding#350`). Its sibling for a strip or a month grid is [`day-marks/`](../day-marks/).
+Normalized from a shipped day row, where one renderer served Home's coming days, a live view and a holidays list. It stops the next date-keyed app from drawing its own (`project-scaffolding#350`). Its sibling for a strip or a month grid is [`day-marks/`](../day-marks/).
 
 ## Files
 

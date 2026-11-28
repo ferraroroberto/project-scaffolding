@@ -440,7 +440,7 @@ def _check_build_footer_ends_a_gap_above_the_bottom_fade(nav_phone: Page, tail: 
     assert _undimmed(page, "#testFoot"), m
 
 
-# task-os's header shape: a rounded header card as the first child of .app,
+# A shipped header shape: a rounded header card as the first child of .app,
 # under an app rule that keeps .app's top padding to the safe area alone.
 _HEADER_CARD_JS = """([sticky]) => {
   const app = document.querySelector('.app');

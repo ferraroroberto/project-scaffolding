@@ -44,14 +44,14 @@ TRAY_BAT_TEMPLATE = ROOT / "tray.bat.template"
 PS_SCRIPT = ROOT / "src" / "ps_script.py"
 POWERSHELL = r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe"
 
-# fleet-config's PRIMARY checkout -- not this box's only possible location,
-# but the one the committed fallback must reference (project-scaffolding#153):
+# fleet-config's PRIMARY checkout, beside this one -- not the only possible
+# location, but the one the committed fallback must reference (project-scaffolding#153):
 # a fresh machine that merged fleet-config#340 but hasn't run install.ps1 yet
 # still has the file here, just not junctioned to %USERPROFILE%\.claude\tray
 # yet. This is deliberately NOT a worktree path -- a worktree only carries the
 # file while a PR is in flight, so pinning to one would break the moment that
 # branch is deleted.
-_FLEET_CONFIG_PRIMARY_CHECKOUT = Path(r"E:/automation/fleet-config/tray/tray_lifecycle.ps1")
+_FLEET_CONFIG_PRIMARY_CHECKOUT = ROOT.parent / "fleet-config" / "tray" / "tray_lifecycle.ps1"
 
 
 def resolve_tray_lifecycle_path() -> Path:
@@ -89,7 +89,7 @@ def resolve_tray_lifecycle_path() -> Path:
         "tray_lifecycle.ps1 not found at the shared junctioned path "
         f"({shared}) or fleet-config's primary checkout "
         f"({_FLEET_CONFIG_PRIMARY_CHECKOUT}). Install/update fleet-config "
-        "and run its install.ps1 -- see ferraroroberto/fleet-config's README "
+        "and run its install.ps1 -- see fleet-config's README "
         "(project-scaffolding#153)."
     )
 
@@ -422,7 +422,7 @@ def two_drive_spellings(root: Path) -> Iterator[tuple[Path, Path]]:
 
     A path under `a:/` and the same path under `b:/` are one folder with two
     spellings that differ only by drive letter -- exactly how a fleet root
-    reached as `C:/automation` and as `E:/automation` (a junction) looks to a
+    reached on two drive letters (one a junction) looks to a
     process command line. `subst` writes nothing to disk, so the mapping is
     undone on exit and a crashed run leaves no file behind.
     """

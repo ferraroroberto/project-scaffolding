@@ -217,8 +217,8 @@ def test_tray_template_does_not_leak_app_name_to_children(tmp_path: Path) -> Non
     `setlocal` scopes a variable away from the *calling* console only; every
     process tray.bat launches still inherits it. A bare `APP_NAME` then rode the
     whole tray -> service chain into every session and app that service spawns,
-    where another project reads `APP_NAME` as its own config key
-    (ferraroroberto/app-launcher#963). The usual restart route is an agent in a
+    where another project reads `APP_NAME` as its own config key.
+    The usual restart route is an agent in a
     session that already carries the leaked value, so the caller presets it:
     the template must clear it, not merely stop setting it. The stub helper
     records the environment it inherited plus its `-AppName` argument.

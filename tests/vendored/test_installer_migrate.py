@@ -610,7 +610,7 @@ def test_origins_match_whatever_their_spelling() -> None:
     for ssh in ("git@github.com:o/app.git", "ssh://git@github.com/O/App", "ssh://git@github.com:22/o/app.git"):
         assert installer_inplace.same_origin(ssh, "https://github.com/o/app"), ssh
     assert not installer_inplace.same_origin("git@github.com:o/app.git", "https://gitlab.com/o/app")
-    assert not installer_inplace.same_origin(r"C:\repos\app", "C:/repos/other")
+    assert not installer_inplace.same_origin(r"C:\apps\app", "C:/apps/other")
 
 
 def test_replace_what_if_lists_the_clone_declaration_for_an_old_install_and_touches_nothing(tmp_path: Path) -> None:

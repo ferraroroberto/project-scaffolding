@@ -85,7 +85,7 @@ Machine-local paths are arguments, never config: the ledger, the coverage map, t
 
    The wrapper exits with the tests' own code. The ratchet's exit 3 fails the gate.
 4. Run the gate three times, then write the baseline: `test_value_ratchet.py --update-baseline --allow-additions --ledger <ledger>`. Commit the `test-value.json` it writes in `.ratchets/`.
-5. Schedule the burst weekly on the main machine (an app-launcher Job calling the script directly, no model): `weekly_burst.py --ledger <ledger> --coverage-map <map> --results-dir <state dir>\weekly-burst`. Run it once by hand: `new-test-value` stays exit 3 until the first coverage map exists.
+5. Schedule the burst weekly on the main machine (a scheduled job calling the script directly, no model): `weekly_burst.py --ledger <ledger> --coverage-map <map> --results-dir <state dir>\weekly-burst`. Run it once by hand: `new-test-value` stays exit 3 until the first coverage map exists.
 6. Turn on both tables.
 
 A repo whose gate already runs through a gate-evidence helper that sets the same report variables (`FLEET_GATE_UNIT_REPORT`, `FLEET_GATE_SPAWN_REPORT`, `FLEET_GATE_WTREE` and the probe on `PYTHONPATH`) can run the ratchet inside the gate on the live reports instead: `--units-report`, `--spawns-report`, `--tree`. A repo with its own leg runner builds a `weekly_burst.Burst` with `leg_argv` and calls `weekly_burst.main(argv, burst)`.

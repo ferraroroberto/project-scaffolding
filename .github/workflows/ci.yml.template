@@ -6,8 +6,8 @@
 # only loads `.yml`/`.yaml` under `.github/workflows/`. Adoption steps and how
 # to make tests CI-safe: docs/ci-conventions.md -> "Web-app CI template".
 #
-# Derived from the workflows that run green on the hosted runner (voice-
-# transcriber, whatsapp-radar, app-launcher e2e.yml). It follows every rule in
+# Derived from the e2e workflows that run green on the hosted runner in three
+# fleet apps. It follows every rule in
 # docs/ci-conventions.md: dated runner, Node-24 action majors, one run per
 # commit (push:[main] + pull_request:[main]), a timeout that caps a wedge.
 #

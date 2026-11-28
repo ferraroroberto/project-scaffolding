@@ -292,7 +292,7 @@ def _bound_default_timeouts(context) -> None:
 
 `expect()` web-first assertions carry their own 5 s default — leave them alone. An explicit `timeout=` on any single call still overrides. Widen for a slow hosted CI runner without a code change: set `E2E_DEFAULT_TIMEOUT_MS=20000` in the workflow env.
 
-**Why:** the implicit 30 s default hid a ~120 s CI e2e hang that was opaque and never named. whatsapp-radar already sets an explicit `page.set_default_timeout` with a 30 s × scale-factor variant (`_scaled_page_timeouts`) — satisfies the spirit. The **15 s bounded base is the fleet standard** across all sister repos.
+**Why:** the implicit 30 s default hid a ~120 s CI e2e hang that was opaque and never named. One adopter already sets an explicit `page.set_default_timeout` with a 30 s × scale-factor variant (`_scaled_page_timeouts`) — satisfies the spirit. The **15 s bounded base is the fleet standard** across all sister repos.
 
 ### Bounded WebKit driver teardown
 
@@ -397,8 +397,8 @@ def browser(playwright: Playwright) -> Iterator[Browser]:
 This overrides pytest-playwright's own session-scoped `playwright`/`browser`
 fixtures — same fixture names, so the override is picked up automatically
 without changing any test. Worst case on a wedge is a leaked driver process,
-not a hung suite. Reference implementation: `home-automation`
-(`tests/e2e/conftest.py`).
+not a hung suite. Reference implementation: an adopter's
+`tests/e2e/conftest.py`.
 
 ### Post-run sweep for leaked browser helpers
 
@@ -447,7 +447,7 @@ correctly and is not the same claim as "no residue": tree-killing the driver
 kills each browser out from under its own helpers, and a helper killed that
 way can wedge *inside* termination — permanent, unkillable, and still holding
 its working directory. A repo whose teardown watchdog force-kills the driver
-tree (`home-automation`) manufactures these routinely; one that never
+tree (one adopter does) manufactures these routinely; one that never
 force-kills does not.
 
 So a sweep's job is **not** to compensate for a broken cascade on the current
@@ -600,7 +600,7 @@ scope path is the only call-site argument. It also runs standalone, which is
 the thing to reach for when `git worktree remove` fails as busy:
 
 ```powershell
-& .\.venv\Scripts\python.exe tests\e2e\_browser_sweep.py E:\automation\my-repo-wt-203 --dry-run
+& .\.venv\Scripts\python.exe tests\e2e\_browser_sweep.py <root>\my-repo-wt-203 --dry-run
 ```
 
 Two deliberate limits. Chromium is **not** swept: its helpers are plain
@@ -656,7 +656,7 @@ opposite ends of the same fixture and neither replaces the other. In fact the
 watchdog is what makes this fix load-bearing: force-killing the driver tree is
 precisely what leaves a helper wedged.
 
-Verified in `home-automation`: a full 302-execution run in a worktree
+Verified in one adopter: a full 302-execution run in a worktree
 produced 5 fresh wedged `WebKitNetworkProcess` helpers; all five rooted in
 `%TEMP%`, and the worktree tore down clean. The same run pre-fix left 4 helpers
 rooted in the worktree and `remove-worktree` returned `rc=1 Worktree NOT
@@ -691,7 +691,7 @@ Two guards are what make it safe, and neither is optional:
   handle leaves the cwd *string* behind, so a PEB re-read still reports a pin
   that is already gone. Check for `DELETE` access on the directory instead.
 
-Working implementation to copy from: `home-automation`'s
+Working implementation to copy from: one adopter's
 `scripts/unpin_directory.py` (stdlib + `ctypes`, no repo imports;
 `<path>` reports, `<path> --close` frees). This scaffold does not ship one —
 the driver-cwd fix above means a repo that adopts it stops creating pins, and
@@ -816,7 +816,7 @@ project grows a long-lived, **stateful** child process that owns the
 user's real work: a worker with in-flight jobs, a PTY host, a
 session-host holding live shells.
 
-This bit app-launcher for real: its pre-ship e2e
+This bit one app for real: its pre-ship e2e
 gate adopted the live tray's session-host on its fixed port — the same
 one holding the user's actual Coding sessions — instead of spawning its
 own throwaway instance. Its destructive kill-tests then targeted "the
@@ -894,11 +894,11 @@ layout and geometry, touch targets, the
 nav, the composer and keyboard input, safe-area. Functional tests
 (routes, polling, payloads, menus, readbacks, dialogs with no geometry
 and no engine branch) run on **one** engine. Pin them with a fixture or
-marker (app-launcher's `chromium_projection_only`), and keep the
+marker (such as `chromium_projection_only`), and keep the
 projection always-on for the tests that qualify, so it can't be
 forgotten there.
 
-Why not the whole suite. app-launcher measured it:
+Why not the whole suite. One app measured it:
 
 - 0 WebKit-engine product bugs in 400 merged PRs. Of 32 WebKit-only
   reds, one was an engine-independent race that the slower engine
@@ -926,7 +926,7 @@ iOS Simulator.
 
 ### Page-width (horizontal-overflow) assert (phone-first apps only)
 
-A real-device bug (grocery-shopping-automation) shipped a
+A real-device bug (in one fleet app) shipped a
 page-wide horizontal scroll that **every other check missed**: token
 lint was clean, component contracts passed, the phone-viewport
 screenshot sweep "looked fine", and the full pytest+Playwright e2e
@@ -1040,7 +1040,7 @@ Plus the **viewport × theme matrix**: `MATRIX` (320 / 390 / 430 /
 `apply_matrix_leg(page, width, theme, set_theme=...)`. The default
 theme application stamps `document.documentElement.dataset.theme`
 *and* emulates `prefers-color-scheme`; an app whose theme boot reads
-its own persisted state (e.g. home-automation's localStorage key)
+its own persisted state (e.g. its own localStorage key)
 passes its own `set_theme` callable. Call it **after** navigation, and
 pair it with a boot-check that the theme actually took (assert a
 token-driven computed style flipped) — the same fail-loud idiom as the
@@ -1073,7 +1073,7 @@ Altitude split: `~/.claude/design.md` owns the
 normative contract, `design_lint.py` proves the static half,
 `/design-sync` reports the rendered leg as **unmeasured** for a repo
 that lacks this harness — this helper is what turns that leg
-measurable. Migrating home-automation's original inline assertions to
+measurable. Migrating one app's original inline assertions to
 the helper is the reference adoption.
 
 ### Design surface capture
@@ -1481,8 +1481,8 @@ Optional, lives at `tests/e2e/`. Don't create the folder until the first regress
 - Run via `& .\.venv\Scripts\python.exe -m pytest tests/e2e/` (Windows) / `./.venv/bin/python -m pytest tests/e2e/` (POSIX). No LLM in the loop, zero per-run cost.
 - One shared session fixture boots the app plus any service dependencies (API process, worker, PTY host, …) once per pytest run. Engine-agnostic: `streamlit run`, `uvicorn`, `flask run` are all just the launch command.
 - Default to isolation: boot a disposable instance; if target port occupied with no opt-in, **refuse** (`pytest.exit`, naming the flag) rather than killing/reusing what's there. Bare `pytest tests/e2e` must never silently drive a live app the harness didn't start.
-- Opt-in to *acting on* an occupied port = one loudly-named env var per project (`LAUNCHER_E2E_LIVE`; scaffold's `STREAMLIT_E2E_LIVE`) — never an opt-**out** flag (e.g. `E2E_FORCE_AUTOBOOT=1` has backwards polarity: forgetting to set it silently re-enables adoption).
-- What the flag permits differs per repo — don't conflate: `app-launcher`'s `LAUNCHER_E2E_LIVE` = read-only assertions against the live tray, never a kill (`_require_live_tray` guard; `--e2e-autoboot` never adopts the live session-host on `:8446`, always spawns its own on a free port). This scaffold's `STREAMLIT_E2E_LIVE` = kill-and-restart via `ensure_fresh_streamlit`, legitimate only because the target is a stateless, cheap-to-restart dev server *and* goes through this repo's own canonical restart helper, never a by-hand kill. A repo adopting the vendored guard picks its own meaning, documented in the guard's exit message pointing at that repo's CLAUDE.md. **Log** which instance (disposable vs acted-on-live) the suite is driving and why, so a hung run is diagnosable from its own output.
+- Opt-in to *acting on* an occupied port = one loudly-named env var per project (`<APP>_E2E_LIVE`; scaffold's `STREAMLIT_E2E_LIVE`) — never an opt-**out** flag (e.g. `E2E_FORCE_AUTOBOOT=1` has backwards polarity: forgetting to set it silently re-enables adoption).
+- What the flag permits differs per repo — don't conflate: one app's `<APP>_E2E_LIVE` = read-only assertions against the live tray, never a kill (`_require_live_tray` guard; `--e2e-autoboot` never adopts the live session-host on `:8446`, always spawns its own on a free port). This scaffold's `STREAMLIT_E2E_LIVE` = kill-and-restart via `ensure_fresh_streamlit`, legitimate only because the target is a stateless, cheap-to-restart dev server *and* goes through this repo's own canonical restart helper, never a by-hand kill. A repo adopting the vendored guard picks its own meaning, documented in the guard's exit message pointing at that repo's CLAUDE.md. **Log** which instance (disposable vs acted-on-live) the suite is driving and why, so a hung run is diagnosable from its own output.
 - Isolate anything stateful — never adopt-and-mutate a host holding the user's live work, even under the live opt-in. The reclaim-on-opt-in rule is safe only for a stateless, cheap-to-restart webapp. A host owning user state or child processes (session-host, worker with in-flight jobs, PTY host) must **always** get the harness's own disposable instance on a free port, injected via env override — never the live fixed port, opt-in or not. Litmus test: is the thing I'd be touching holding work the user would be upset to lose? If yes, isolate unconditionally. Same bar — a destructive test scopes to what it created: snapshot pre-existing ids before acting, kill only the delta, never `.first`/"whatever's in the list".
 - Is a `/propagate-vendored` component: `tests/e2e/_e2e_live_guard.py` (manifest key `e2e_live_guard`). The policy — check target port, refuse (`pytest.exit`, naming the flag) if occupied with no opt-in, else log the decision — is shape-independent; only the port number, flag name, and how the disposable instance boots are call-site parameters. Same vendoring pattern as `app/tray/single_instance.py` and `tests/e2e/_geometry.py`: copy the file byte-identical into an app's `tests/e2e/`, call `require_disposable_instance(port, flag_env_name)` from the fixture, let `/propagate-vendored e2e_live_guard` hash-verify and re-vendor fleet-wide. (`tray_lifecycle.ps1` is NOT a valid precedent — it is one shared machine-local copy, not vendored.) Adopter records the entry in its own `.fleet.toml`'s `[vendored]` table — never here.
 - Boot the app with `synthetic_host_env()` and read host identity in tests only through the `synthetic_host` fixture (vendored `tests/host/_synthetic_host.py`); the conventions ratchet's `host-identity` rule flags direct reads.
@@ -1496,5 +1496,5 @@ Optional, lives at `tests/e2e/`. Don't create the folder until the first regress
 *Apply only if the app's primary surface is a phone.*
 
 - Project the regression suite onto **WebKit** with a device-emulation descriptor (Playwright ships iPhone/Android descriptors — viewport, user-agent, touch, scale factor). WebKit shares the iOS Safari rendering + JS engine, reproducing most "Safari is unhappy" bugs on Windows/Linux before a real phone.
-- Run it only where the engine or the viewport changes the outcome (see "Mobile projection" above): layout and geometry, touch targets, the nav, the composer and keyboard input, safe-area. Functional tests (routes, polling, payloads, menus, readbacks, dialogs with no geometry and no engine branch) run on **one** engine. Pin qualifying tests with a fixture or marker (app-launcher's `chromium_projection_only`) and keep the projection always-on *there* — never make it opt-in for the whole suite, and never run it on everything.
+- Run it only where the engine or the viewport changes the outcome (see "Mobile projection" above): layout and geometry, touch targets, the nav, the composer and keyboard input, safe-area. Functional tests (routes, polling, payloads, menus, readbacks, dialogs with no geometry and no engine branch) run on **one** engine. Pin qualifying tests with a fixture or marker (such as `chromium_projection_only`) and keep the projection always-on *there* — never make it opt-in for the whole suite, and never run it on everything.
 - WebKit-on-Windows is *not* real iOS: no iOS shell, no real WKWebView memory limits, no Apple keyboard, no Add-to-Home-Screen container. For residual shell-only bugs, attach PC DevTools to a real phone via `ios-webkit-debug-proxy` (bridges the iOS Web Inspector to a local port Edge/Chrome DevTools can attach to). Playwright cannot drive real iOS Safari — only its bundled WebKit and the iOS Simulator on macOS.

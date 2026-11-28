@@ -2,7 +2,7 @@
 
 A kit for the one-off job of moving a public site from a hosted builder (Squarespace, Wix, Webflow and the like) to a fleet **built static site** without losing what search engines and visitors rely on. It is separate from the web-page design standard and from the vendored site components (`docs/components.md`): the components are how every fleet site looks and is checked, and this kit runs once per site, until cutover, and is then retired.
 
-The reference implementation is the fleet's first web page, the `robertoferraro` repo (its `scripts/`): `crawl.py`, `inventory.py`, `pagefacts.py`, `compare.py`, `render_checks.py`, `compare_report.py` and `compare_accepted.json`. They are not vendored: each names the old builder's hosts and the live site's quirks, so the next migration copies them as a starting point and adapts them.
+The reference implementation is the fleet's first web page (its repo's `scripts/`): `crawl.py`, `inventory.py`, `pagefacts.py`, `compare.py`, `render_checks.py`, `compare_report.py` and `compare_accepted.json`. They are not vendored: each names the old builder's hosts and the live site's quirks, so the next migration copies them as a starting point and adapts them.
 
 ## What must not regress
 

@@ -253,6 +253,21 @@ def test_file_reports_unknown_when_gh_fails(monkeypatch: pytest.MonkeyPatch) -> 
     assert audit.file_issue(_miss(["n"]), "o/adopter")[0] == "unknown"
 
 
+def test_file_cli_files_under_this_checkouts_owner_and_never_guesses_one(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str],
+) -> None:
+    miss = tmp_path / "miss.json"
+    miss.write_text(json.dumps(_miss(["tests/e2e/test_a.py::test_x"])), encoding="utf-8")
+    slugs: list[str] = []
+    monkeypatch.setattr(audit, "file_issue", lambda _data, slug: slugs.append(slug) or ("created", "url"))
+    monkeypatch.setattr(audit, "_gh", lambda *a: "someone\n" if a[:2] == ("repo", "view") else None)
+    assert audit.main(["x", "file", "--audit", str(miss)]) == 0
+    assert slugs == [f"someone/{_miss([])['repo']}"]
+    monkeypatch.setattr(audit, "_gh", lambda *a: None)
+    assert audit.main(["x", "file", "--audit", str(miss)]) == 3
+    assert len(slugs) == 1 and "FILE=unknown" in capsys.readouterr().out
+
+
 def test_file_cli_files_nothing_for_clean_or_unknown_and_rejects_bad_shapes(tmp_path: Path) -> None:
     clean = tmp_path / "clean.json"
     clean.write_text(json.dumps({"repo": "adopter", "outcome": "unknown", "miss_nodes": [], "tiers": {}}),

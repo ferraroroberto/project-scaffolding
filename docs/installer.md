@@ -127,7 +127,7 @@ port_key     = "port"             # the default; a dotted key ("webapp.port") re
 [install.migrate]
 copy    = ["config.json", ".env", "webapp/certificates"]   # this PC's own files and folders, repo-relative
 secrets = [".env", "webapp/certificates/key.pem"]           # compared by hash, never printed
-shared  = ["folder-explorer"]                                # runtime-data folder names (<FLEET_DATA_ROOT>/<name>): left in place
+shared  = ["repo-a"]                                         # runtime-data folder names (<FLEET_DATA_ROOT>/<name>): left in place
 start   = ["tray.bat", "--restart"]                         # the default
 ```
 
@@ -221,7 +221,7 @@ The run is `refused` before anything stops while something runs from that folder
 
 The copy list is the one the real run goes by, and the first `copy` row, `copy list`, names where it was read. With an `<app>.incoming` that is the fresh clone. Without one it is `origin's default branch`: the run fetches that branch's head into the copy it would clone from (objects and `FETCH_HEAD` under `.git` only) and reads its `.fleet.toml`. When the origin cannot be read, the list shown is the live copy's and the row is `unknown`, so the preview does not pass. When the origin is read and declares no `[install.migrate]`, the real run falls back to the live copy's list, and the preview shows that one.
 
-Migrating a launcher (app-launcher, app-launcher-lite) stops it and every session it hosts, so run it from a plain terminal: the stop refuses when it would end its own run.
+Migrating a launcher stops it and every session it hosts, so run it from a plain terminal: the stop refuses when it would end its own run.
 
 #### What still works in the backup
 

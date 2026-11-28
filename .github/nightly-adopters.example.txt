@@ -1,0 +1,6 @@
+# Example of the nightly adopter list (docs/mac-runner.md). The real list is the
+# repository variable NIGHTLY_ADOPTERS: the same format, one repo name per line.
+# Each repo declares its own settings in a [ci.nightly] table in its .fleet.toml
+# on main, and must be public: the run reads it anonymously.
+repo-a
+repo-b

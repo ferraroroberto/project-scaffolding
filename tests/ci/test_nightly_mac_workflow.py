@@ -21,7 +21,11 @@ import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 WORKFLOW = REPO_ROOT / ".github" / "workflows" / "nightly-mac.yml"
-ADOPTERS = REPO_ROOT / ".github" / "nightly-adopters.txt"
+ADOPTERS = REPO_ROOT / ".github" / "nightly-adopters.example.txt"
+# What the owner's repository variable holds, as the dry run sees it. A fork has
+# no repository variables, so there NIGHTLY_REPOSITORY reads as empty.
+HOME = "owner/project-scaffolding"
+FORK = "someone/project-scaffolding"
 
 
 def _body() -> str:
@@ -77,13 +81,14 @@ def _run_scripts() -> list[str]:
     return scripts
 
 
-_ATOM = re.compile(r"^\s*([\w.]+)\s*(==|!=)\s*('[^']*'|true|false)\s*$")
+_ATOM = re.compile(r"^\s*([\w.]+)\s*(==|!=)\s*('[^']*'|true|false|vars\.\w+)\s*$")
 
 
 def _evaluate(guard: str, repository: str, event_name: str, fork: bool | None, count: str = "1") -> bool:
     """A dry run of a job's `if:` for one event: `&&` of `||`-groups of `==`/`!=` atoms."""
     context: dict[str, object] = {
         "github.repository": repository,
+        "vars.NIGHTLY_REPOSITORY": HOME if repository == HOME else "",
         "github.event_name": event_name,
         "github.event.pull_request.head.repo.fork": fork,
         "needs.select.outputs.count": count,
@@ -95,6 +100,9 @@ def _evaluate(guard: str, repository: str, event_name: str, fork: bool | None, c
         name, op, raw = match.groups()
         assert name in context, f"guard reads {name}, which the dry run does not model"
         literal: object = {"true": True, "false": False}.get(raw, raw.strip("'"))
+        if raw.startswith("vars."):
+            assert raw in context, f"guard reads {raw}, which the dry run does not model"
+            literal = context[raw]
         return (context[name] == literal) is (op == "==")
 
     return all(
@@ -114,21 +122,21 @@ def test_triggers_are_schedule_and_dispatch_only() -> None:
 
 def test_schedule_is_in_the_quiet_hours() -> None:
     crons = re.findall(r'cron:\s*"([^"]+)"', _on_block())
-    assert crons == ["23 1 * * *"], "01:23 UTC is 02:23 CET / 03:23 CEST, inside 02:00-05:00 local"
+    assert crons == ["23 1 * * *"], "01:23 UTC is 02:23 local at UTC+1 / 03:23 at UTC+2, inside 02:00-05:00"
     assert not crons[0].startswith("0 "), "the top of the hour is GitHub's high-load slot"
 
 
 @pytest.mark.parametrize(
     ("repository", "event", "fork", "runs"),
     [
-        ("ferraroroberto/project-scaffolding", "schedule", None, True),
-        ("ferraroroberto/project-scaffolding", "workflow_dispatch", None, True),
-        ("ferraroroberto/project-scaffolding", "pull_request", True, False),
-        ("ferraroroberto/project-scaffolding", "pull_request", False, False),
-        ("ferraroroberto/project-scaffolding", "pull_request_target", True, False),
-        ("ferraroroberto/project-scaffolding", "push", None, False),
-        ("someone/project-scaffolding", "schedule", None, False),
-        ("someone/project-scaffolding", "workflow_dispatch", None, False),
+        (HOME, "schedule", None, True),
+        (HOME, "workflow_dispatch", None, True),
+        (HOME, "pull_request", True, False),
+        (HOME, "pull_request", False, False),
+        (HOME, "pull_request_target", True, False),
+        (HOME, "push", None, False),
+        (FORK, "schedule", None, False),
+        (FORK, "workflow_dispatch", None, False),
     ],
 )
 def test_job_guard_dry_run(repository: str, event: str, fork: bool | None, runs: bool) -> None:
@@ -139,7 +147,7 @@ def test_job_guard_dry_run(repository: str, event: str, fork: bool | None, runs:
 
 def test_an_empty_matrix_skips_the_platform_job() -> None:
     guard = _job_guard("platform")
-    assert not _evaluate(guard, "ferraroroberto/project-scaffolding", "schedule", None, count="0")
+    assert not _evaluate(guard, HOME, "schedule", None, count="0")
     assert re.search(r"^    needs: select$", _jobs()["platform"], re.M)
 
 
@@ -178,15 +186,25 @@ def test_action_majors_are_node_24() -> None:
     assert set(re.findall(r"uses:\s*(\S+)", _body())) == {"actions/checkout@v6", "actions/setup-python@v6"}
 
 
-def test_home_automation_is_the_first_adopter() -> None:
-    names = [ln.split("#", 1)[0].strip() for ln in ADOPTERS.read_text(encoding="utf-8").splitlines()]
-    assert "home-automation" in names
+def test_the_adopter_list_comes_from_the_repository_variable() -> None:
+    select = _jobs()["select"]
+    assert "ADOPTERS: ${{ vars.NIGHTLY_ADOPTERS }}" in select
+    assert 'printf \'%s\\n\' "$ADOPTERS" > "$RUNNER_TEMP/nightly-adopters.txt"' in select
+    assert '--adopters "$RUNNER_TEMP/nightly-adopters.txt"' in select
     assert "include:" not in _body(), "the matrix is built from the adopters' [ci.nightly] tables, never hand-written"
+
+
+def test_the_example_list_is_the_format_the_variable_takes() -> None:
+    """One name per line: what the select job writes to a file is what `read_adopters` reads."""
+    names = [ln.split("#", 1)[0].strip() for ln in ADOPTERS.read_text(encoding="utf-8").splitlines()]
+    assert [n for n in names if n] == ["repo-a", "repo-b"]
 
 
 def test_adopters_are_read_anonymously_in_the_select_job_only() -> None:
     jobs = _jobs()
-    assert "--url-base https://github.com/ferraroroberto/" in jobs["select"]
+    assert "OWNER: ${{ github.repository_owner }}" in jobs["select"]
+    assert '--url-base "https://github.com/$OWNER/"' in jobs["select"]
+    assert "repository: ${{ github.repository_owner }}/${{ matrix.repo }}" in jobs["platform"]
     assert "https://" not in jobs["platform"]
     assert "matrix: ${{ fromJSON(needs.select.outputs.matrix) }}" in jobs["platform"]
     assert "ref: ${{ matrix.sha }}" in jobs["platform"], "test the exact commit the select job read"

@@ -354,8 +354,8 @@ def _check_sprite_open_about_view_control_glyphs(gallery: Page) -> None:
         assert row["symbol"] and row["drawn"], row
 
 
-def _check_sprite_app_launcher_glyphs(gallery: Page) -> None:
-    """The sprite carries the 16 glyphs upstreamed from app-launcher, and each draws (#391)."""
+def _check_sprite_upstreamed_glyphs(gallery: Page) -> None:
+    """The sprite carries the 16 glyphs upstreamed from an adopter, and each draws (#391)."""
     ids = (
         "i-arrow-big-up", "i-arrow-down", "i-arrow-left", "i-arrow-right",
         "i-arrow-up", "i-bell", "i-chevron-down", "i-copy",
@@ -857,8 +857,8 @@ def test_gallery_component_contracts(new_gallery: Callable[[], AbstractContextMa
                 _check_icon_only_controls_unpainted(gallery=gallery, theme=theme)
         with c.case("sprite_open_about_view_control_glyphs"), new_gallery() as gallery:
             _check_sprite_open_about_view_control_glyphs(gallery=gallery)
-        with c.case("sprite_app_launcher_glyphs"), new_gallery() as gallery:
-            _check_sprite_app_launcher_glyphs(gallery=gallery)
+        with c.case("sprite_upstreamed_glyphs"), new_gallery() as gallery:
+            _check_sprite_upstreamed_glyphs(gallery=gallery)
         with c.case("icon_button_contract"), new_gallery() as gallery:
             _check_icon_button_contract(gallery=gallery)
         with c.case("range_tab_contract"), new_gallery() as gallery:

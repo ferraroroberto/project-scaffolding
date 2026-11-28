@@ -1,8 +1,7 @@
 # Fleet icon brand — shared masters + generator
 
 Fleet apps share one icon family so they read as one coherent set on the iPhone home screen, the
-Stream Deck, and the Windows tray. Canonical issue:
-[`app-launcher#65`](https://github.com/ferraroroberto/app-launcher/issues/65).
+Stream Deck, and the Windows tray.
 
 ## The rule
 
@@ -19,7 +18,7 @@ each redefining its own palette and inset math).
 ## `brand/` — the curated master library
 
 `brand/catalog.json` is the discoverable inventory: 23 SVG masters mapped to their upstream
-Lucide glyph and the fleet repos that use, or are the intended consumers of, that identity.
+Lucide glyph. Which repo uses which identity is recorded in that repo's own `gen_icons.py`.
 Every SVG is vendored **verbatim** from
 [`lucide-static` v1.23.0](https://www.npmjs.com/package/lucide-static) and keeps its `@license`
 comment. The initial six shipped identities remain (`rocket`, `camera`, `mic`, `share-2` renamed
@@ -58,7 +57,7 @@ and writes:
 
 Pass `emit_tray=False` (and `tray_out_dir=None`) for a project whose tray
 renders its own live, state-tinted icon at runtime instead of loading a
-static file (e.g. a health-status color) — `local-llm-hub`'s hub tray glyph
+static file (e.g. a health-status color) — one app's tray glyph
 is the first example. The tray `.ico` row above is then skipped entirely.
 
 A downstream project's own `scripts/gen_icons.py` becomes a thin caller:
@@ -67,24 +66,24 @@ A downstream project's own `scripts/gen_icons.py` becomes a thin caller:
 import sys
 from pathlib import Path
 
-sys.path.insert(0, r"E:\automation\project-scaffolding\scripts\tools")
+sys.path.insert(0, r"<scaffold-checkout>\scripts\tools")
 from brand_gen import render_set
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 STATIC_DIR = PROJECT_ROOT / "app" / "webapp" / "static"
 
 render_set(
-    master=Path(r"E:\automation\project-scaffolding\brand\rocket.svg"),
+    master=Path(r"<scaffold-checkout>\brand\rocket.svg"),
     out_dir=STATIC_DIR,
     tray_out_dir=PROJECT_ROOT / "assets" / "tray",
     stream_deck_out_dir=PROJECT_ROOT / "assets" / "stream-deck",
-    project_slug="app-launcher",
+    project_slug="my-app",
 )
 ```
 
 An older `gen_icons.py` that puts `scripts` (not `scripts\tools`) on `sys.path` still works: `scripts/brand_gen.py` re-exports `render_set`.
 
-Consumption is a known local path (`E:\automation\project-scaffolding\scripts\tools\brand_gen.py`), not a
+Consumption is a known local path (`<scaffold-checkout>\scripts\tools\brand_gen.py`), not a
 package install or git submodule — this is a single-machine fleet, so the simplest wiring is the
 right one. If that ever stops being true (a second machine, CI), revisit packaging then.
 
@@ -101,6 +100,6 @@ SVG correctly with no system dependencies).
 1. Pick the Lucide glyph that matches the project's existing icon identity (or, if there's a real
    choice to make, render a few candidates as tiles and compare visually before locking one in).
 2. Download it verbatim from `lucide-static` into `brand/<name>.svg`.
-3. Add it to `brand/catalog.json` with the upstream glyph name and concrete consumer repo(s).
+3. Add it to `brand/catalog.json` with the upstream glyph name.
 4. Add a thin `scripts/gen_icons.py` caller in the downstream project per the example above.
 5. Regenerate and commit the outputs; wire the manifest / tray / Stream Deck loading as needed.

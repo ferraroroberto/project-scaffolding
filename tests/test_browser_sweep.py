@@ -27,7 +27,7 @@ def _helper(
     name: str = "WebKitNetworkProcess.exe",
     state: str = sweep.STATE_RUNNING,
     parent_alive: bool = False,
-    cwd: str | None = r"E:\automation\demo-wt-1",
+    cwd: str | None = r"E:\apps\demo-wt-1",
 ) -> sweep.HelperProcess:
     """A running, orphaned, in-scope helper — the kill-nominated baseline."""
     return sweep.HelperProcess(
@@ -35,7 +35,7 @@ def _helper(
     )
 
 
-SCOPE = Path(r"E:\automation\demo-wt-1")
+SCOPE = Path(r"E:\apps\demo-wt-1")
 
 
 def test_running_orphan_in_scope_is_nominated_for_the_kill() -> None:
@@ -43,7 +43,7 @@ def test_running_orphan_in_scope_is_nominated_for_the_kill() -> None:
 
 
 def test_helper_in_a_subdirectory_of_the_scope_is_in_scope() -> None:
-    assert sweep.classify(_helper(cwd=r"E:\automation\demo-wt-1\tests"), SCOPE) == (
+    assert sweep.classify(_helper(cwd=r"E:\apps\demo-wt-1\tests"), SCOPE) == (
         sweep.VERDICT_KILLED
     )
 
@@ -97,7 +97,7 @@ def test_wedged_helper_in_scope_is_reported_as_pinning_it() -> None:
 
 
 def test_wedged_helper_elsewhere_is_reported_but_not_against_this_scope() -> None:
-    entry = _helper(state=sweep.STATE_WEDGED, cwd=r"C:\Users\demo\AppData\Local\Temp")
+    entry = _helper(state=sweep.STATE_WEDGED, cwd=r"C:\Users\sample\AppData\Local\Temp")
     assert sweep.classify(entry, SCOPE) == sweep.VERDICT_WEDGED_ELSEWHERE
 
 
@@ -142,7 +142,7 @@ def test_main_exits_nonzero_when_the_scope_is_pinned(
     )
     monkeypatch.setattr(sweep.sys, "platform", "win32")
     assert sweep.main([str(SCOPE), "--dry-run"]) == 1
-    assert sweep.main([r"E:\automation\demo-wt-2", "--dry-run"]) == 0
+    assert sweep.main([r"E:\apps\demo-wt-2", "--dry-run"]) == 0
 
 
 def test_live_parent_is_never_killed() -> None:
@@ -156,14 +156,14 @@ def test_unreadable_cwd_reports_unknown_rather_than_killing() -> None:
 
 def test_sibling_checkout_is_out_of_scope() -> None:
     """A sibling worktree must never be swept by this run's scope."""
-    assert sweep.classify(_helper(cwd=r"E:\automation\demo-wt-2"), SCOPE) == (
+    assert sweep.classify(_helper(cwd=r"E:\apps\demo-wt-2"), SCOPE) == (
         sweep.VERDICT_OUT_OF_SCOPE
     )
 
 
 def test_prefix_lookalike_path_is_out_of_scope() -> None:
     """`demo-wt-11` shares a string prefix with `demo-wt-1` but is a different tree."""
-    assert sweep.classify(_helper(cwd=r"E:\automation\demo-wt-11"), SCOPE) == (
+    assert sweep.classify(_helper(cwd=r"E:\apps\demo-wt-11"), SCOPE) == (
         sweep.VERDICT_OUT_OF_SCOPE
     )
 

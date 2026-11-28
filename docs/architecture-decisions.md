@@ -102,7 +102,7 @@ Enforcement: prose in the design spec (`design.md` / `design.dark.md`, owned by 
 
 Issue: https://github.com/ferraroroberto/project-scaffolding/issues/847
 
-### LLM access goes through the local-llm-hub
+### LLM access goes through the local LLM hub
 
 Downstream apps reach Claude, Gemini and open-weight models through the hub's Anthropic-shape and OpenAI-shape endpoints on `127.0.0.1:8000`, and audio through its transcription and translation endpoints, using standard SDKs. No app wraps `claude -p`, `codex exec` or `gemini -p` itself or hard-codes a whisper port; when the hub lacks a feature, the answer is a plan for the hub to add it.
 
@@ -164,9 +164,9 @@ Issue: https://github.com/ferraroroberto/project-scaffolding/issues/1014
 
 ### Fleet paths are resolved, never hard-coded to one machine
 
-A fleet path (the config repo, the folder holding the app repos, a sibling repo, the user's home) is resolved on the machine that runs it, never written as one machine's absolute path, so a repo, the config repo or the whole root can sit under any name and drive, on any harness. The answer lives once per machine in one harness-neutral place, `~/.fleet`, that every harness reads; it is never stored under one harness's home. Only the config repo's own installer writes it: `fleet-config`'s `install.ps1` on a full machine, and the lite config repo's `install.ps1` on a lite machine (fleet-config-lite, or a clone of it under another name). app-launcher-lite's Copilot installer only reads it and warns when its own location disagrees.
+A fleet path (the config repo, the folder holding the app repos, a sibling repo, the user's home) is resolved on the machine that runs it, never written as one machine's absolute path, so a repo, the config repo or the whole root can sit under any name and drive, on any harness. The answer lives once per machine in one harness-neutral place, `~/.fleet`, that every harness reads; it is never stored under one harness's home. Only the config repo's own installer writes it: `fleet-config`'s `install.ps1` on a full machine, and the lite config repo's `install.ps1` on a lite machine (fleet-config-lite, or a clone of it under another name). the lite launcher's Copilot installer only reads it and warns when its own location disagrees.
 
-Why: the fleet runs as more than one configuration (fleet-config with app-launcher, a fleet-config-lite clone with app-launcher-lite), on different drive roots and under four harnesses. A hard-coded path works only where it was written, and one writer per machine keeps two installers from disagreeing about the answer.
+Why: the fleet runs as more than one configuration (fleet-config with its launcher, a fleet-config-lite clone with the lite launcher), on different drive roots and under four harnesses. A hard-coded path works only where it was written, and one writer per machine keeps two installers from disagreeing about the answer.
 
 Enforcement: none yet. The resolver contract, how hook wiring and agent-run text refer to it, the enforcing rule and the staged rollout are open for validation in https://github.com/ferraroroberto/project-scaffolding/issues/1031, and this entry grows as they are approved.
 
@@ -214,9 +214,9 @@ Enforcement: the [conventions ratchet](conventions-ratchet.md)'s `no-window` rul
 
 Issue: https://github.com/ferraroroberto/project-scaffolding/issues/640
 
-### The Mac Mini nightly is the fleet's one CI
+### The self-hosted Mac nightly is the fleet's one CI
 
-Each public repo's `main` is checked nightly on the Mac Mini self-hosted runner (`nightly-mac.yml`): unit with `windows_only` tests excluded, WebKit e2e and an iOS Simulator smoke, for every adopter whose `main` moved since its last green night and for every adopter on Sunday. Opt-in is a `[ci.nightly]` table in the repo's `.fleet.toml` plus one line in `.github/nightly-adopters.txt`. A failed test is retried once; a pass on the retry is recorded as flaky, a second failure is red. The local gate stays the per-change contract, hosted Actions gates are retired per repo after three consecutive green nights, and the runner's safety rules (schedule and dispatch only, read-only, no secrets, results stay on the Mac, pull-only delivery) stay as they are. Private repos keep their hosted CI until a private runner registration is decided.
+Each public repo's `main` is checked nightly on the self-hosted Mac runner (`nightly-mac.yml`): unit with `windows_only` tests excluded, WebKit e2e and an iOS Simulator smoke, for every adopter whose `main` moved since its last green night and for every adopter on Sunday. Opt-in is a `[ci.nightly]` table in the repo's `.fleet.toml` plus one line in the `NIGHTLY_ADOPTERS` repository variable. A failed test is retried once; a pass on the retry is recorded as flaky, a second failure is red. The local gate stays the per-change contract, hosted Actions gates are retired per repo after three consecutive green nights, and the runner's safety rules (schedule and dispatch only, read-only, no secrets, results stay on the Mac, pull-only delivery) stay as they are. Private repos keep their hosted CI until a private runner registration is decided.
 
 Why: one engine, one result format and no hosted minutes for the whole fleet, running only where something changed, with flakes counted rather than hidden.
 

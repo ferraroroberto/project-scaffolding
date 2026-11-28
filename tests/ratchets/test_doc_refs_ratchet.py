@@ -104,7 +104,7 @@ def test_every_token_of_a_command_span_is_read() -> None:
     "span",
     [
         "src/<name>.py", "tests/*.py", "docs/{a,b}.md", "scripts/$TOOL", "docs/…", "src/app/...",
-        "/scripts/x.py", "~/docs/x.md", "C:/src/x.py", "docs/../x.md", "https://x.dev/docs/a.md",
+        "/scripts/x.py", "~/docs/x.md", "C:/lib/x.py", "docs/../x.md", "https://x.dev/docs/a.md",
     ],
 )
 def test_templates_globs_absolute_and_urls_are_not_literal_paths(span: str) -> None:
@@ -134,8 +134,8 @@ def test_line_symbol_and_test_id_suffixes_are_not_part_of_the_path(span: str, ke
         "the scaffold's `docs/a.md`",
         "see its `docs/a.md`",
         "fleet-config’s [`docs/a.md`](https://example.com)",
-        "contract: local-llm-hub `docs/a.md`",
-        "| task-os | `src/a.py:12` | what it does |",
+        "contract: repo-a `docs/a.md`",
+        "| repo-b | `src/a.py:12` | what it does |",
     ],
 )
 def test_a_span_named_as_another_owners_is_not_read(line: str) -> None:
@@ -143,7 +143,7 @@ def test_a_span_named_as_another_owners_is_not_read(line: str) -> None:
 
 
 def test_a_possessive_wrapped_onto_the_previous_line_still_qualifies() -> None:
-    assert keys("Copy from `home-automation`'s\n`scripts/x.py` verbatim.") == []
+    assert keys("Copy from `repo-a`'s\n`scripts/x.py` verbatim.") == []
     assert keys("A sentence ends here.\n`scripts/x.py` is ours.") == ["scripts/x.py"]
 
 

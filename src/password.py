@@ -67,7 +67,7 @@ DEFAULT_PATH = Path(__file__).resolve().parent.parent / "config" / "app_password
 HASH_KEY = "password_hash"
 HASH_PREFIX = "pbkdf2_sha256"
 # 200k keeps one check near 0.3 s on the fleet PC, cheap enough per login, while
-# src/login_lockout.py bounds the guess rate; task-os stores hashes in this same format.
+# src/login_lockout.py bounds the guess rate; an adopter already stores hashes in this same format.
 ITERATIONS = 200_000
 SALT_BYTES = 16
 

@@ -57,7 +57,7 @@
         "number": 661,
         "state": "OPEN",
         "stateReason": "",
-        "title": "ADR: the Mac Mini nightly is the fleet's one CI"
+        "title": "ADR: the self-hosted Mac nightly is the fleet's one CI"
     },
     {
         "number": 640,
@@ -117,7 +117,7 @@
         "number": 567,
         "state": "CLOSED",
         "stateReason": "COMPLETED",
-        "title": "ADR: LLM access goes through the local-llm-hub"
+        "title": "ADR: LLM access goes through the local LLM hub"
     },
     {
         "number": 561,

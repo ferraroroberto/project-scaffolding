@@ -32,7 +32,7 @@ Hidden tabs do not poll: RB1's helper arms no tick while the page is hidden and 
 
 ## The `poll` helper
 
-`app/webapp/static/_vendored/poll/poll.js` (manifest key `poll`), normalized from app-launcher-lite's poll module:
+`app/webapp/static/_vendored/poll/poll.js` (manifest key `poll`), normalized from a shipped poll module:
 
 - `startPoll(read, ms, opts?)` calls `read()` `ms` after the last call settled, arms nothing while `document.hidden`, reads once straight away on the return to the foreground, and returns `{ stop, kick }`. `opts.activeWhile` makes it a busy-only poll: while the predicate is false no tick is armed, and `kick()` starts it again.
 - `singleFlight(read)` lets every caller that asks while a read is out share it (a poll tick, a tab tap, a retry); `.fresh()` waits for a read that may predate a write and shares the next.
@@ -41,7 +41,7 @@ Contract and vendoring steps: the component's [README](../app/webapp/static/_ven
 
 ## The request-timing middleware
 
-`src/request_timing.py` (manifest key `request_timing`), lifted from app-launcher-lite's instrumentation. Stdlib only, pure ASGI (it buffers nothing), Python 3.9+:
+`src/request_timing.py` (manifest key `request_timing`), lifted from a shipped app's instrumentation. Stdlib only, pure ASGI (it buffers nothing), Python 3.9+:
 
 - `RequestTimingMiddleware` adds `Server-Timing: queue, worker, app` to every response under `timed_prefix` (default `/api/`), logs a request slower than `slow_s` (default 3 s) with where its time went, logs a rate-limited line when more than `inflight_warn` (default 16) requests are in flight, and judges each request class the app declares against a soft and a hard limit ("over budget", "budget breach").
 - `TimedExecutor(name, max_workers)` is a thread pool that charges queue and worker time to the request that submitted the work; `default_executor()` is a timed stand-in for the event loop's default pool. One named pool per class of work is how RB5 is met.

@@ -1,5 +1,5 @@
 /* The gallery's design tokens: SAMPLE values transcribed from
- * ~/.claude/design.md (light) + design.dark.md (dark), the one place a
+ * the fleet design system (light + dark), the one place a
  * consuming app would normally define them. They live here, not in a
  * component file, because defining tokens is the app's job and demo.html
  * plays the app. The P3 wide-gamut twins are intentionally omitted: the

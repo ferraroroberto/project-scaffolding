@@ -245,8 +245,8 @@ def _assert_options(gallery: Page) -> None:
 # kebab, flipped above it when below would run under the floating nav pill (or
 # off the screen), clamped with an internal scroll only when neither side fits,
 # and re-fitted while it is open. The bug this pins: a menu on the last visible
-# row opened under the pill with its lower items untappable (app-launcher#1508,
-# local-llm-hub#767), because the placement only knew the viewport edge.
+# row opened under the pill with its lower items untappable (seen in two
+# adopters), because the placement only knew the viewport edge.
 #
 # Runs at 390x844 with a coarse pointer, so the real `nav/nav-tabs.css` lays the
 # real skeleton out as the fixed bottom pill, over the gallery's tokens. The

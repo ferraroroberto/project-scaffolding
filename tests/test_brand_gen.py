@@ -32,7 +32,7 @@ def test_catalog_is_stable_and_specific() -> None:
         "license": "ISC",
     }
     assert len(ICONS) == 23
-    assert all(icon["consumers"] for icon in ICONS)
+    assert all(set(icon) == {"file", "glyph"} for icon in ICONS)
     assert len({icon["glyph"] for icon in ICONS}) == len(ICONS)
 
 
@@ -61,7 +61,7 @@ def test_doc_snippet_import_path_holds_the_generator() -> None:
     # Adopters copy the thin-caller snippet; its sys.path entry must still hold brand_gen.py.
     doc = (ROOT / "docs" / "brand-icons.md").read_text(encoding="utf-8")
     match = re.search(
-        r'sys\.path\.insert\(0, r"E:\\automation\\project-scaffolding\\([^"]+)"\)', doc
+        r'sys\.path\.insert\(0, r"<scaffold-checkout>\\([^"]+)"\)', doc
     )
     assert match, "docs/brand-icons.md lost its thin-caller sys.path line"
     assert (ROOT / Path(match.group(1).replace("\\", "/")) / "brand_gen.py").is_file()

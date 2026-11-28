@@ -110,3 +110,17 @@ def test_unreadable_gh_output_is_a_failure_not_a_skip() -> None:
     gh = FakeGh([_done("not json")])
     assert _run(gh) == fb.EXIT_GH_FAILED
     assert gh.dispatches == []
+
+
+@pytest.mark.parametrize(
+    ("reply", "code"),
+    [(_done("owner/repo\n"), None), (_done("", 1, "not logged in"), fb.EXIT_GH_FAILED), (_done("\n"), fb.EXIT_GH_FAILED)],
+)
+def test_without_repo_the_checkout_names_itself_or_nothing_is_dispatched(
+    monkeypatch: pytest.MonkeyPatch, reply: subprocess.CompletedProcess[str], code: int | None,
+) -> None:
+    ran: list[str] = []
+    monkeypatch.setattr(fb, "run_gh", lambda _args: reply)
+    monkeypatch.setattr(fb, "run", lambda repo: ran.append(repo) or fb.EXIT_OK)
+    assert fb.main([]) == (fb.EXIT_OK if code is None else code)
+    assert ran == (["owner/repo"] if code is None else [])

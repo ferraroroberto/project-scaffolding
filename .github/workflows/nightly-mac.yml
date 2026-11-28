@@ -1,22 +1,24 @@
-# The fleet's CI, nightly on the Mac Mini self-hosted runner: for each adopter
+# The fleet's CI, nightly on a self-hosted Mac runner: for each adopter
 # whose `main` moved since its last green night (every adopter on Sunday), its
 # unit suite with Windows-only tests excluded, its WebKit e2e suite (iPhone
 # projection) and an iOS Simulator Mobile Safari smoke of its key views.
 #
 # One hub runner serves the fleet: it is registered on this repo only, and this
-# workflow checks out each adopter in turn. The adopter list is
-# .github/nightly-adopters.txt; each adopter's settings are the `[ci.nightly]`
+# workflow checks out each adopter in turn. The adopter list is the repository
+# variable NIGHTLY_ADOPTERS (one repo name per line, the format of
+# .github/nightly-adopters.example.txt); NIGHTLY_REPOSITORY names the one
+# owner/repo allowed to run this. Each adopter's settings are the `[ci.nightly]`
 # table in its own .fleet.toml, read by scripts/ci/nightly_matrix.py. Setup,
-# labels, the table contract and the safety settings: docs/mac-runner.md. The
-# per-change contract stays each repo's local gate; this checks what landed on
-# `main`.
+# variables, labels, the table contract and the safety settings:
+# docs/mac-runner.md. The per-change contract stays each repo's local gate; this
+# checks what landed on `main`.
 #
 # PUBLIC REPO, SELF-HOSTED RUNNER. A self-hosted runner executes whatever a
 # triggering workflow says, so nothing an outsider controls may start it:
 #   * triggers are `schedule` and `workflow_dispatch` only (dispatch needs write
 #     access); never `pull_request`, `pull_request_target` or `push`;
 #   * every job's `if:` refuses any other event, any fork event and any copy of
-#     this file running in a fork;
+#     this file running in a fork (a fork does not inherit repository variables);
 #   * `permissions` is read-only and every checkout drops the token afterwards;
 #   * no secret is used: the runner holds only its own registration;
 #   * adopter settings reach scripts through `env:`, never as `${{ }}` text
@@ -36,10 +38,9 @@ name: nightly-mac
 
 on:
   schedule:
-    # Cron is UTC. 01:23 UTC is 02:23 in Madrid in winter (CET, UTC+1) and
-    # 03:23 in summer (CEST, UTC+2): inside the 02:00-05:00 local quiet hours
-    # either way, with the 90-minute cap ending by 04:53, when the hub is not
-    # placing whisper jobs on the Mac. The minute is off :00 because GitHub
+    # Cron is UTC. 01:23 UTC is 02:23 local at UTC+1 and 03:23 at UTC+2: inside
+    # the 02:00-05:00 local quiet hours either way, with the 90-minute cap ending
+    # by 04:53, when no speech-to-text jobs are placed on the Mac. The minute is off :00 because GitHub
     # delays or drops scheduled runs at the start of the hour, its high-load slot.
     - cron: "23 1 * * *"
   # A manual run outside the quiet hours slows the Mac's speech-to-text for the
@@ -71,7 +72,7 @@ env:
 jobs:
   select:
     if: >-
-      github.repository == 'ferraroroberto/project-scaffolding' &&
+      github.repository == vars.NIGHTLY_REPOSITORY &&
       (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') &&
       github.event.pull_request.head.repo.fork != true
     runs-on: [self-hosted, macos, arm64, iphone-sim]
@@ -98,19 +99,22 @@ jobs:
         id: build
         env:
           FULL: ${{ inputs.full }}
-        run: >
-          python scaffold/scripts/ci/nightly_matrix.py build
-          --adopters scaffold/.github/nightly-adopters.txt
-          --url-base https://github.com/ferraroroberto/
-          --state-root "$HOME/mac-nightly-results"
-          --full "${FULL:-false}"
-          --github-output "$GITHUB_OUTPUT"
-          --summary-file "$GITHUB_STEP_SUMMARY"
+          ADOPTERS: ${{ vars.NIGHTLY_ADOPTERS }}
+          OWNER: ${{ github.repository_owner }}
+        run: |
+          printf '%s\n' "$ADOPTERS" > "$RUNNER_TEMP/nightly-adopters.txt"
+          python scaffold/scripts/ci/nightly_matrix.py build \
+            --adopters "$RUNNER_TEMP/nightly-adopters.txt" \
+            --url-base "https://github.com/$OWNER/" \
+            --state-root "$HOME/mac-nightly-results" \
+            --full "${FULL:-false}" \
+            --github-output "$GITHUB_OUTPUT" \
+            --summary-file "$GITHUB_STEP_SUMMARY"
 
   platform:
     needs: select
     if: >-
-      github.repository == 'ferraroroberto/project-scaffolding' &&
+      github.repository == vars.NIGHTLY_REPOSITORY &&
       (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') &&
       github.event.pull_request.head.repo.fork != true &&
       needs.select.outputs.count != '0'
@@ -174,7 +178,7 @@ jobs:
       - name: Check out the adopter at the selected commit
         uses: actions/checkout@v6
         with:
-          repository: ferraroroberto/${{ matrix.repo }}
+          repository: ${{ github.repository_owner }}/${{ matrix.repo }}
           ref: ${{ matrix.sha }}
           path: adopter
           # Full history: the routing audit walks the commits merged since the last green night.
@@ -182,6 +186,7 @@ jobs:
           persist-credentials: false
 
       # setup-python on macOS ignores AGENT_TOOLSDIRECTORY and always installs
+      # user-path-exempt: the fixed folder setup-python installs into on macOS
       # into /Users/runner/hostedtoolcache, so that folder must exist and be
       # writable for the runner user (docs/mac-runner.md, prerequisite 6).
       - uses: actions/setup-python@v6

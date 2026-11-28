@@ -1,8 +1,8 @@
 # `day-marks` — one shape per day
 
-The fleet's **day marks** (`~/.claude/design.md` → "day marks", `ferraroroberto/fleet-config#1356`): a month grid or a two-week strip draws each day as **its number over one small shape** for its state. **State is a mark, never a fill**: no cell is filled with a status colour. Colour only **rings an exception**, in `danger` (broken) or `attention` (needs the user), so a problem day is the one ringed cell in the grid. An expected non-day (a holiday, a day off) gets the neutral "off" dash, not amber. The legend lists **marks, not swatches**.
+The fleet's **day marks** (the fleet design system → "day marks"): a month grid or a two-week strip draws each day as **its number over one small shape** for its state. **State is a mark, never a fill**: no cell is filled with a status colour. Colour only **rings an exception**, in `danger` (broken) or `attention` (needs the user), so a problem day is the one ringed cell in the grid. An expected non-day (a holiday, a day off) gets the neutral "off" dash, not amber. The legend lists **marks, not swatches**.
 
-Normalized from parking-manager's strip and month grid (`parking-manager#114`, `#115`), so the next date-keyed app doesn't re-invent them (`project-scaffolding#350`). Its sibling for a list is [`day-row/`](../day-row/).
+Normalized from a shipped strip and month grid, so the next date-keyed app doesn't re-invent them (`project-scaffolding#350`). Its sibling for a list is [`day-row/`](../day-row/).
 
 | Mark | Shape | Colour | Means (default legend words) |
 | --- | --- | --- | --- |

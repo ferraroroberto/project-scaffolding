@@ -32,7 +32,7 @@ from typing import Any
 logger = logging.getLogger(__name__)
 
 # The package must sit exactly two directories below the repo root
-# (src/doc_capture/ here; config/doc_capture/ in content-management) — these
+# (src/doc_capture/ here; config/doc_capture/ in one adopter) — these
 # anchors resolve relative to that.
 REPO_ROOT = Path(__file__).resolve().parents[2]
 MANIFEST_PATH = REPO_ROOT / "docs" / "screenshots" / "manifest.json"
