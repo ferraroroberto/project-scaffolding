@@ -218,7 +218,13 @@ def test_launch_root_keeps_the_launch_spelling(monkeypatch: pytest.MonkeyPatch) 
 
 @pytest.mark.skipif(sys.platform != "win32", reason="taskkill /T is the Windows tray restart's kill")
 def test_the_detached_runner_survives_a_tree_kill_of_its_parent(tmp_path: Path) -> None:
-    spec = _spec(tmp_path, [sys.executable, "-c", "import time; time.sleep(2)"])
+    # The kill waits for the recipe to start, which is when a real restart kills: until then
+    # the intermediate `cmd.exe` may still tie the runner to the parent's tree. The recipe
+    # then outlives the kill, so a runner inside the tree cannot finish first.
+    started = tmp_path / "recipe-started"
+    spec = _spec(tmp_path, [
+        sys.executable, "-c", f"import pathlib, time; pathlib.Path({str(started)!r}).touch(); time.sleep(5)",
+    ])
     parent_code = (
         "import sys, time\n"
         "from pathlib import Path\n"
@@ -234,6 +240,10 @@ def test_the_detached_runner_survives_a_tree_kill_of_its_parent(tmp_path: Path) 
     try:
         assert parent.stdout is not None
         assert parent.stdout.readline().strip() == "spawned"
+        launch_deadline = time.monotonic() + 30
+        while not started.exists() and time.monotonic() < launch_deadline:
+            time.sleep(0.05)
+        assert started.exists(), "the detached runner never started the recipe"
         subprocess.run(["taskkill", "/T", "/F", "/PID", str(parent.pid)], capture_output=True,
                        timeout=30, creationflags=NO_WINDOW, check=False)
         parent.wait(timeout=30)
